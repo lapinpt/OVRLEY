@@ -18,15 +18,25 @@ use chrono::{DateTime, SecondsFormat, Utc};
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
     // Keep validation messages frontend-friendly because they are surfaced
     // directly when a user configures an invalid export window.
-    if start < 0.0 || start >= duration {
-        return Err(CoreError::Activity(format!(
-            "Invalid scene start value in config. Value should be at least 0 and less than {duration:.3}. Current value is {start}"
-        )));
+    if start < 0.0 {
+        return Err(CoreError::Activity(
+            "The video starts before the activity. The activity has no data for the start of the video.".into(),
+        ));
     }
-    if end <= start || end > duration {
-        return Err(CoreError::Activity(format!(
-            "Invalid scene end value in config. Value should be at most {duration:.3} and greater than {start}. Current value is {end}"
-        )));
+    if start >= duration {
+        return Err(CoreError::Activity(
+            "The video starts after the activity ends. The activity has no data for the video.".into(),
+        ));
+    }
+    if end <= start {
+        return Err(CoreError::Activity(
+            "The video end must be after the video start.".into(),
+        ));
+    }
+    if end > duration {
+        return Err(CoreError::Activity(
+            "The video ends after the activity ends. The activity has no data for the end of the video.".into(),
+        ));
     }
     Ok(())
 }
