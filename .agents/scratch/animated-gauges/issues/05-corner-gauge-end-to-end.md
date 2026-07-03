@@ -20,7 +20,8 @@ NON-NEGOTIABLE: design-principles.md contains the blueprint for implementing ani
 - Static layer: empty arc track + border + min/max labels (if enabled) + unit label.
 - Rounded corner-gauge arc ends should reuse the arc gauge's stroke-cap strategy (`Round` caps on stroked arcs), following the same approach observed in the upstream Cyclemetry renderer rather than custom rounded path geometry.
 - Dynamic per frame: arc fill + value text.
-- All inner widget customization (x/y offset, font size) works identically to arc gauge. The value and units are always centered against each other horizontally.
+- All inner widget customization (x/y offset, font size) works identically to arc gauge.
+  The value and units are always centered against each other horizontally.
 
 **Frontend behavior:**
 
