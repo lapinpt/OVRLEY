@@ -6,6 +6,7 @@ const viewportActions = vi.hoisted(() => ({
   fitActivity: vi.fn(),
   fitAll: vi.fn(),
   fitVideo: vi.fn(),
+  panBy: vi.fn(),
   resetView: vi.fn(),
   zoomBy: vi.fn(),
 }))
@@ -38,6 +39,7 @@ vi.mock('@/features/player/hooks/usePlayerKeyboard', () => ({
 }))
 
 import OverlayPlayer from '@/features/player/components/OverlayPlayer'
+import useTimelineViewport from '@/features/player/hooks/useTimelineViewport'
 
 function setPlaybackState(overrides = {}) {
   playbackState.current = {
@@ -60,7 +62,14 @@ function renderPlayer() {
 
 function installResizeObserver() {
   globalThis.ResizeObserver = class ResizeObserver {
-    observe() {}
+    constructor(callback) {
+      this.callback = callback
+    }
+
+    observe() {
+      this.callback([{ contentRect: { width: 100 } }])
+    }
+
     disconnect() {}
   }
 }
@@ -82,6 +91,21 @@ describe('OverlayPlayer S2 toolbar behavior', () => {
 
     for (const action of Object.values(viewportActions)) action.mockReset()
     for (const handler of Object.values(playbackHandlers)) handler.mockReset()
+    useTimelineViewport.mockClear()
+  })
+
+  test('passes playback and drag state to the viewport hook for auto-follow', () => {
+    setPlaybackState({ clampedPlayhead: 88, isPlaying: true })
+
+    renderPlayer()
+
+    expect(useTimelineViewport).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isDragging: false,
+        isPlaying: true,
+        playheadSecond: 88,
+      }),
+    )
   })
 
   test('zoom buttons pivot at the current playhead', () => {
@@ -150,5 +174,43 @@ describe('OverlayPlayer S2 toolbar behavior', () => {
 
     expect(playbackHandlers.handleTimelineChange).toHaveBeenCalledWith([100])
     expect(playbackHandlers.handleTimelineCommit).toHaveBeenCalledWith([100])
+  })
+
+  test('scrub drag suspends viewport follow until the drag commits', async () => {
+    renderPlayer()
+
+    const axis = screen.getByRole('group', { name: 'Timeline axis' })
+    vi.spyOn(axis, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 100 })
+
+    fireEvent.pointerDown(axis, { button: 0, clientX: 25, pointerId: 1 })
+    await waitFor(() => {
+      expect(useTimelineViewport).toHaveBeenLastCalledWith(expect.objectContaining({ isDragging: true }))
+    })
+    expect(playbackHandlers.handleTimelineChange).toHaveBeenCalledWith([25])
+
+    fireEvent.pointerUp(axis, { clientX: 25, pointerId: 1 })
+    await waitFor(() => {
+      expect(useTimelineViewport).toHaveBeenLastCalledWith(expect.objectContaining({ isDragging: false }))
+    })
+    expect(playbackHandlers.handleTimelineCommit).toHaveBeenCalledWith([25])
+  })
+
+  test('dragging the lane background pans by the pixel delta converted to seconds', async () => {
+    renderPlayer()
+
+    const panSurface = screen.getByRole('group', { name: 'Timeline lane background' })
+
+    fireEvent.pointerDown(panSurface, { button: 0, clientX: 70, pointerId: 1 })
+    await waitFor(() => {
+      expect(useTimelineViewport).toHaveBeenLastCalledWith(expect.objectContaining({ isDragging: true }))
+    })
+
+    fireEvent.pointerMove(panSurface, { clientX: 60, pointerId: 1 })
+    expect(viewportActions.panBy).toHaveBeenCalledWith(10)
+
+    fireEvent.pointerUp(panSurface, { clientX: 60, pointerId: 1 })
+    await waitFor(() => {
+      expect(useTimelineViewport).toHaveBeenLastCalledWith(expect.objectContaining({ isDragging: false }))
+    })
   })
 })

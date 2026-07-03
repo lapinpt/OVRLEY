@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fitRangeToViewport, fitToFull, zoomRange } from '../utils/playerTimeline'
+import { fitRangeToViewport, fitToFull, followPlayhead, panViewport, zoomRange } from '../utils/playerTimeline'
 
 /**
  * Holds the visible window { viewStart, viewEnd } as local React state
- * and exposes zoom, fit, and reset actions.
+ * and exposes zoom, fit, reset, pan, and follow actions.
  *
  * @param {object} options
  * @param {number} options.totalDuration - Total playable duration in seconds.
@@ -11,7 +11,10 @@ import { fitRangeToViewport, fitToFull, zoomRange } from '../utils/playerTimelin
  * @param {number} [options.importedVideoDuration] - Imported video duration for fitVideo.
  * @param {number} [options.activityDurationSeconds] - Activity duration for fitActivity.
  * @param {number} [options.fallbackDurationSeconds] - Fallback duration for fitActivity.
- * @returns {{ viewport: { viewStart: number, viewEnd: number }, zoomBy: function, fitAll: function, fitVideo: function, fitActivity: function, resetView: function }}
+ * @param {boolean} [options.isPlaying] - Whether playback is active (drives follow effect).
+ * @param {number} [options.playheadSecond] - Current playhead position (drives follow effect).
+ * @param {boolean} [options.isDragging] - Whether a scrub/pan drag is active (suspends follow).
+ * @returns {{ viewport: { viewStart: number, viewEnd: number }, zoomBy: function, fitAll: function, fitVideo: function, fitActivity: function, resetView: function, panBy: function }}
  */
 export default function useTimelineViewport({
   totalDuration,
@@ -19,6 +22,9 @@ export default function useTimelineViewport({
   importedVideoDuration = 0,
   activityDurationSeconds = 0,
   fallbackDurationSeconds = 0,
+  isPlaying = false,
+  playheadSecond = 0,
+  isDragging = false,
 }) {
   const [viewport, setViewport] = useState(() => fitToFull(totalDuration))
 
@@ -30,6 +36,23 @@ export default function useTimelineViewport({
   useEffect(() => {
     setViewport(fitToFull(totalDuration))
   }, [totalDuration])
+
+  const didMountRef = useRef(false)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    if (!isPlaying || isDragging) return
+    setViewport((prev) =>
+      followPlayhead({
+        playheadSecond,
+        viewStart: prev.viewStart,
+        viewEnd: prev.viewEnd,
+        totalDuration: totalDurationRef.current,
+      }),
+    )
+  }, [isPlaying, playheadSecond, isDragging])
 
   const zoomBy = useCallback((direction, pivot) => {
     setViewport((prev) =>
@@ -64,5 +87,16 @@ export default function useTimelineViewport({
     setViewport(fitToFull(totalDurationRef.current))
   }, [])
 
-  return { viewport, zoomBy, fitAll, fitVideo, fitActivity, resetView }
+  const panBy = useCallback((deltaSeconds) => {
+    setViewport((prev) =>
+      panViewport({
+        viewStart: prev.viewStart,
+        viewEnd: prev.viewEnd,
+        deltaSeconds,
+        totalDuration: totalDurationRef.current,
+      }),
+    )
+  }, [])
+
+  return { viewport, zoomBy, fitAll, fitVideo, fitActivity, resetView, panBy }
 }

@@ -5,9 +5,19 @@ import { pointerToSecond } from '../utils/playerTimeline'
 /**
  * Vertical playhead line with a triangle handle. Drags to scrub.
  *
- * @param {{ second: number, viewStart: number, viewEnd: number, totalDuration: number, widthPx: number, onScrubStart: function, onScrubMove: function, onScrubEnd: function }} props
+ * @param {{ second: number, viewStart: number, viewEnd: number, totalDuration: number, widthPx: number, onScrubStart: function, onScrubMove: function, onScrubEnd: function, onScrubCancel?: function }} props
  */
-export default function TimelinePlayhead({ second, viewStart, viewEnd, totalDuration, widthPx, onScrubStart, onScrubMove, onScrubEnd }) {
+export default function TimelinePlayhead({
+  second,
+  viewStart,
+  viewEnd,
+  totalDuration,
+  widthPx,
+  onScrubStart,
+  onScrubMove,
+  onScrubEnd,
+  onScrubCancel,
+}) {
   const containerRef = useRef(null)
 
   const getSecond = useCallback(
@@ -24,6 +34,7 @@ export default function TimelinePlayhead({ second, viewStart, viewEnd, totalDura
     onDragStart: onScrubStart,
     onDragMove: onScrubMove,
     onDragEnd: onScrubEnd,
+    onDragCancel: onScrubCancel,
     stopPropagation: true,
   })
 

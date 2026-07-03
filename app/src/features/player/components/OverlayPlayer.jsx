@@ -13,6 +13,7 @@ import usePlayerKeyboard from '../hooks/usePlayerKeyboard'
 import useTimelineViewport from '../hooks/useTimelineViewport'
 import { computeTimelineTicks, formatTimelineTime } from '../utils/playerTimeline'
 import TimelineAxis from './TimelineAxis'
+import TimelinePanSurface from './TimelinePanSurface'
 import TimelinePlayhead from './TimelinePlayhead'
 
 const ZOOM_TAB_ALL = 'all'
@@ -80,13 +81,17 @@ export default function OverlayPlayer({ backgroundMode }) {
   const hasVideo = Boolean(importedVideoPath)
   const hasActivityData = Boolean(playerStore.activitySummary)
   const activityDurationSeconds = playerStore.activitySummary?.durationSeconds ?? 0
+  const [isTimelineDragging, setIsTimelineDragging] = useState(false)
 
-  const { viewport, zoomBy, fitAll, fitVideo, fitActivity, resetView } = useTimelineViewport({
+  const { viewport, zoomBy, fitAll, fitVideo, fitActivity, resetView, panBy } = useTimelineViewport({
     totalDuration,
     videoSyncOffsetSeconds,
     importedVideoDuration,
     activityDurationSeconds,
     fallbackDurationSeconds: playerStore.fallbackDurationSeconds,
+    isPlaying,
+    playheadSecond: clampedPlayhead,
+    isDragging: isTimelineDragging,
   })
 
   const [activeTab, setActiveTab] = useState(ZOOM_TAB_ALL)
@@ -171,6 +176,7 @@ export default function OverlayPlayer({ backgroundMode }) {
 
   const scrubStart = useCallback(
     (second) => {
+      setIsTimelineDragging(true)
       handleTimelineChange([second])
     },
     [handleTimelineChange],
@@ -186,9 +192,18 @@ export default function OverlayPlayer({ backgroundMode }) {
   const scrubEnd = useCallback(
     (second) => {
       handleTimelineCommit([second])
+      setIsTimelineDragging(false)
     },
     [handleTimelineCommit],
   )
+
+  const endTimelineDrag = useCallback(() => {
+    setIsTimelineDragging(false)
+  }, [])
+
+  const startTimelinePan = useCallback(() => {
+    setIsTimelineDragging(true)
+  }, [])
 
   const handleRewindToEnd = useCallback(() => {
     handleTimelineChange([totalDuration])
@@ -334,6 +349,15 @@ export default function OverlayPlayer({ backgroundMode }) {
           onScrubStart={scrubStart}
           onScrubMove={scrubMove}
           onScrubEnd={scrubEnd}
+          onScrubCancel={endTimelineDrag}
+        />
+        <TimelinePanSurface
+          viewStart={viewport.viewStart}
+          viewEnd={viewport.viewEnd}
+          widthPx={widthPx}
+          onPanBy={panBy}
+          onPanStart={startTimelinePan}
+          onPanEnd={endTimelineDrag}
         />
         <div className="pointer-events-none absolute inset-0">
           <TimelinePlayhead
@@ -345,6 +369,7 @@ export default function OverlayPlayer({ backgroundMode }) {
             onScrubStart={scrubStart}
             onScrubMove={scrubMove}
             onScrubEnd={scrubEnd}
+            onScrubCancel={endTimelineDrag}
           />
         </div>
       </div>

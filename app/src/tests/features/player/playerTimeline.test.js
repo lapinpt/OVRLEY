@@ -11,7 +11,9 @@ import {
   computeTimelineTicks,
   fitRangeToViewport,
   fitToFull,
+  followPlayhead,
   getTotalPlaybackDuration,
+  panViewport,
   pointerToSecond,
   resolvePlaybackSource,
   secondsToViewPx,
@@ -300,5 +302,94 @@ describe('fitRangeToViewport', () => {
     const result = fitRangeToViewport({ rangeStart: 50, rangeEnd: 50, totalDuration: 100 })
     const span = result.viewEnd - result.viewStart
     expect(span).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('panViewport', () => {
+  test('shifts viewport right by positive delta seconds', () => {
+    const result = panViewport({ viewStart: 0, viewEnd: 50, deltaSeconds: 10, totalDuration: 200 })
+    expect(result.viewStart).toBe(10)
+    expect(result.viewEnd).toBe(60)
+  })
+
+  test('shifts viewport left by negative delta seconds', () => {
+    const result = panViewport({ viewStart: 20, viewEnd: 70, deltaSeconds: -10, totalDuration: 200 })
+    expect(result.viewStart).toBe(10)
+    expect(result.viewEnd).toBe(60)
+  })
+
+  test('preserves the viewport span', () => {
+    const result = panViewport({ viewStart: 30, viewEnd: 80, deltaSeconds: 5, totalDuration: 200 })
+    expect(result.viewEnd - result.viewStart).toBe(50)
+  })
+
+  test('clamps left edge to 0 when panning left past the start', () => {
+    const result = panViewport({ viewStart: 5, viewEnd: 55, deltaSeconds: -20, totalDuration: 200 })
+    expect(result.viewStart).toBe(0)
+    expect(result.viewEnd).toBe(50)
+  })
+
+  test('clamps right edge to totalDuration when panning right past the end', () => {
+    const result = panViewport({ viewStart: 150, viewEnd: 190, deltaSeconds: 20, totalDuration: 200 })
+    expect(result.viewStart).toBe(160)
+    expect(result.viewEnd).toBe(200)
+  })
+
+  test('returns the same viewport when delta is zero', () => {
+    const result = panViewport({ viewStart: 10, viewEnd: 60, deltaSeconds: 0, totalDuration: 200 })
+    expect(result.viewStart).toBe(10)
+    expect(result.viewEnd).toBe(60)
+  })
+
+  test('is a no-op when the whole timeline already fits', () => {
+    const result = panViewport({ viewStart: 0, viewEnd: 200, deltaSeconds: 30, totalDuration: 200 })
+    expect(result.viewStart).toBe(0)
+    expect(result.viewEnd).toBe(200)
+  })
+})
+
+describe('followPlayhead', () => {
+  test('jumps viewport so playhead sits at 15% from the left when playhead exits right edge', () => {
+    const result = followPlayhead({ playheadSecond: 100, viewStart: 0, viewEnd: 50, totalDuration: 200 })
+    const span = 50
+    expect(result.viewStart).toBeCloseTo(100 - 0.15 * span)
+    expect(result.viewEnd).toBeCloseTo(100 - 0.15 * span + span)
+  })
+
+  test('does not move viewport when playhead is inside the visible window', () => {
+    const result = followPlayhead({ playheadSecond: 25, viewStart: 0, viewEnd: 50, totalDuration: 200 })
+    expect(result.viewStart).toBe(0)
+    expect(result.viewEnd).toBe(50)
+  })
+
+  test('follows when playhead reaches the right edge', () => {
+    const result = followPlayhead({ playheadSecond: 50, viewStart: 0, viewEnd: 50, totalDuration: 200 })
+    expect(result.viewStart).toBeCloseTo(42.5)
+    expect(result.viewEnd).toBeCloseTo(92.5)
+  })
+
+  test('clamps viewport to [0, totalDuration] when follow would push past the end', () => {
+    const result = followPlayhead({ playheadSecond: 195, viewStart: 100, viewEnd: 150, totalDuration: 200 })
+    expect(result.viewEnd).toBe(200)
+    expect(result.viewStart).toBe(150)
+  })
+
+  test('clamps viewport to start when playhead is near 0 and follow would go negative', () => {
+    const result = followPlayhead({ playheadSecond: 2, viewStart: 0, viewEnd: 50, totalDuration: 200 })
+    expect(result.viewStart).toBe(0)
+    expect(result.viewEnd).toBe(50)
+  })
+
+  test('follows when playhead is before viewStart (jumps backward)', () => {
+    const result = followPlayhead({ playheadSecond: 5, viewStart: 20, viewEnd: 70, totalDuration: 200 })
+    const span = 50
+    const rawStart = 5 - 0.15 * span
+    expect(result.viewStart).toBeCloseTo(Math.max(0, rawStart))
+    expect(result.viewEnd).toBeCloseTo(Math.max(0, rawStart) + span)
+  })
+
+  test('preserves the viewport span', () => {
+    const result = followPlayhead({ playheadSecond: 100, viewStart: 0, viewEnd: 50, totalDuration: 200 })
+    expect(result.viewEnd - result.viewStart).toBe(50)
   })
 })

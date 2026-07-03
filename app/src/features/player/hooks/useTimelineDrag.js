@@ -3,10 +3,10 @@ import { useCallback, useRef } from 'react'
 /**
  * Shared pointer-drag primitive for timeline scrub handles/surfaces.
  *
- * @param {{ getValue: function, onDragStart?: function, onDragMove?: function, onDragEnd?: function, stopPropagation?: boolean }} options
+ * @param {{ getValue: function, onDragStart?: function, onDragMove?: function, onDragEnd?: function, onDragCancel?: function, stopPropagation?: boolean }} options
  * @returns {{ onPointerDown: function, onPointerMove: function, onPointerUp: function, onPointerCancel: function }} Pointer handlers.
  */
-export default function useTimelineDrag({ getValue, onDragStart, onDragMove, onDragEnd, stopPropagation = false }) {
+export default function useTimelineDrag({ getValue, onDragStart, onDragMove, onDragEnd, onDragCancel, stopPropagation = false }) {
   const draggingRef = useRef(false)
 
   const readValue = useCallback(
@@ -54,9 +54,14 @@ export default function useTimelineDrag({ getValue, onDragStart, onDragMove, onD
         event.currentTarget.releasePointerCapture(event.pointerId)
       }
 
-      if (shouldCommit && value !== undefined) onDragEnd?.(value, event)
+      if (shouldCommit && value !== undefined) {
+        onDragEnd?.(value, event)
+        return
+      }
+
+      onDragCancel?.(event)
     },
-    [onDragEnd, readValue, stopPropagation],
+    [onDragCancel, onDragEnd, readValue, stopPropagation],
   )
 
   const handlePointerUp = useCallback(

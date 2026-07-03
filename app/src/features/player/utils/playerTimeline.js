@@ -258,6 +258,40 @@ export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration }) {
   return { viewStart, viewEnd }
 }
 
+/**
+ * Shifts the viewport by a delta in seconds, clamped to [0, totalDuration].
+ * No-op when the whole timeline already fits (viewSpan >= totalDuration).
+ *
+ * @param {{ viewStart: number, viewEnd: number, deltaSeconds: number, totalDuration: number }} options
+ * @returns {{ viewStart: number, viewEnd: number }} Panned viewport.
+ */
+export function panViewport({ viewStart, viewEnd, deltaSeconds, totalDuration }) {
+  const safeTotal = Math.max(0, Number(totalDuration) || 0)
+  if (safeTotal <= 0) return { viewStart: 0, viewEnd: 0 }
+  const span = viewEnd - viewStart
+  if (span >= safeTotal) return { viewStart, viewEnd }
+  return clampToView(viewStart + deltaSeconds, viewEnd + deltaSeconds, safeTotal)
+}
+
+const FOLLOW_LEAD_RATIO = 0.15
+
+/**
+ * Computes a new viewport that keeps the playhead visible during playback.
+ * When the playhead is outside the visible window, the viewport jumps so the
+ * playhead sits at 15% from the left of the new window.
+ *
+ * @param {{ playheadSecond: number, viewStart: number, viewEnd: number, totalDuration: number }} options
+ * @returns {{ viewStart: number, viewEnd: number }} Updated viewport (or unchanged if playhead is inside).
+ */
+export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDuration }) {
+  const safeTotal = Math.max(0, Number(totalDuration) || 0)
+  const span = viewEnd - viewStart
+  if (span <= 0 || span >= safeTotal) return { viewStart, viewEnd }
+  if (playheadSecond >= viewStart && playheadSecond < viewEnd) return { viewStart, viewEnd }
+  const newStart = playheadSecond - FOLLOW_LEAD_RATIO * span
+  return clampToView(newStart, newStart + span, safeTotal)
+}
+
 const TICK_TARGET_PX = 90
 const NICE_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200, 1500, 1800, 3600]
 

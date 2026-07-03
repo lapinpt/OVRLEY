@@ -5,9 +5,9 @@ import { pointerToSecond } from '../utils/playerTimeline'
 /**
  * Renders major/minor ticks and serves as the click-to-seek / drag-to-scrub surface.
  *
- * @param {{ viewStart: number, viewEnd: number, totalDuration: number, widthPx: number, ticks: object, onScrubStart: function, onScrubMove: function, onScrubEnd: function }} props
+ * @param {{ viewStart: number, viewEnd: number, totalDuration: number, widthPx: number, ticks: object, onScrubStart: function, onScrubMove: function, onScrubEnd: function, onScrubCancel?: function }} props
  */
-export default function TimelineAxis({ viewStart, viewEnd, totalDuration, widthPx, ticks, onScrubStart, onScrubMove, onScrubEnd }) {
+export default function TimelineAxis({ viewStart, viewEnd, totalDuration, widthPx, ticks, onScrubStart, onScrubMove, onScrubEnd, onScrubCancel }) {
   const axisRef = useRef(null)
 
   const getSecond = useCallback(
@@ -24,6 +24,7 @@ export default function TimelineAxis({ viewStart, viewEnd, totalDuration, widthP
     onDragStart: onScrubStart,
     onDragMove: onScrubMove,
     onDragEnd: onScrubEnd,
+    onDragCancel: onScrubCancel,
   })
 
   const getTickLeftStyle = useCallback((x) => {
@@ -39,7 +40,7 @@ export default function TimelineAxis({ viewStart, viewEnd, totalDuration, widthP
   )
 
   return (
-    <div ref={axisRef} className="relative h-6 w-full cursor-crosshair select-none" {...dragHandlers}>
+    <div ref={axisRef} aria-label="Timeline axis" className="relative h-6 w-full cursor-crosshair select-none" role="group" {...dragHandlers}>
       {/* Minor ticks */}
       {ticks.minor.map((t, i) => (
         <div key={`m-${i}`} className="absolute bottom-0 h-1.5 w-px bg-border/70" style={getTickLeftStyle(t.x)} />
