@@ -16,15 +16,15 @@ This slice establishes the foundational architecture: a local viewport hook hold
 
 ## Acceptance criteria
 
-- [ ] The old scrub slider is gone; a ticked timeline renders in its place, sized in rem.
-- [ ] Major/minor ticks auto-calculate from the measured axis width and full playable range, with timecode labels on majors only, using the 1/2/5 cadence; grid anchored to the step boundary.
-- [ ] A vertical playhead line with a triangle handle spans the axis and moves with playback (sweeps left-to-right).
-- [ ] Clicking the axis seeks the playhead to that position; dragging the axis or the triangle scrubs and commits on release — equivalent to the old slider.
-- [ ] The current-time / total-time readout on the right stays correct during playback and scrubbing.
-- [ ] Keyboard shortcuts (space, arrows) still behave exactly as before.
-- [ ] The view re-fits to the full range when the total playable duration changes.
-- [ ] The playback engine hook and keyboard hook are unchanged (diff is empty).
-- [ ] Pure helpers (tick computation, seconds-to-view-px, clamp-to-view, fit-to-full, pointer-to-second) and the viewport hook have tests.
+- [x] The old scrub slider is gone; a ticked timeline renders in its place, sized in rem.
+- [x] Major/minor ticks auto-calculate from the measured axis width and full playable range, with timecode labels on majors only, using the 1/2/5 cadence; grid anchored to the step boundary.
+- [x] A vertical playhead line with a triangle handle spans the axis and moves with playback (sweeps left-to-right).
+- [x] Clicking the axis seeks the playhead to that position; dragging the axis or the triangle scrubs and commits on release — equivalent to the old slider.
+- [x] The current-time / total-time readout on the right stays correct during playback and scrubbing.
+- [x] Keyboard shortcuts (space, arrows) still behave exactly as before.
+- [x] The view re-fits to the full range when the total playable duration changes.
+- [x] The playback engine hook and keyboard hook are unchanged (diff is empty).
+- [x] Pure helpers (tick computation, seconds-to-view-px, clamp-to-view, fit-to-full, pointer-to-second) and the viewport hook have tests.
 
 ## Blocked by
 
