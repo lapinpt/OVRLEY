@@ -9,11 +9,13 @@ import { describe, expect, test } from 'vitest'
 import {
   clampToView,
   computeTimelineTicks,
+  fitRangeToViewport,
   fitToFull,
   getTotalPlaybackDuration,
   pointerToSecond,
   resolvePlaybackSource,
   secondsToViewPx,
+  zoomRange,
 } from '@/features/player/utils/playerTimeline'
 
 describe('playerTimeline helpers', () => {
@@ -189,5 +191,114 @@ describe('computeTimelineTicks', () => {
     const majorStep = ticks.major[1].second - ticks.major[0].second
     const minorStep = ticks.minor[1].second - ticks.minor[0].second
     expect(majorStep / minorStep).toBeCloseTo(5)
+  })
+})
+
+describe('zoomRange', () => {
+  test('zoom in shrinks span by 1.6x pivoting around the playhead', () => {
+    const result = zoomRange({ viewStart: 0, viewEnd: 100, pivot: 50, direction: 1, totalDuration: 200 })
+    const newSpan = result.viewEnd - result.viewStart
+    expect(newSpan).toBeCloseTo(100 / 1.6)
+    expect(result.viewStart).toBeLessThanOrEqual(50)
+    expect(result.viewEnd).toBeGreaterThanOrEqual(50)
+  })
+
+  test('zoom out grows span by 1.6x pivoting around the playhead', () => {
+    const result = zoomRange({ viewStart: 20, viewEnd: 60, pivot: 40, direction: -1, totalDuration: 200 })
+    const newSpan = result.viewEnd - result.viewStart
+    expect(newSpan).toBeCloseTo(40 * 1.6)
+  })
+
+  test('zoom in clamps pivot into the current view', () => {
+    const result = zoomRange({ viewStart: 20, viewEnd: 40, pivot: 100, direction: 1, totalDuration: 200 })
+    const newSpan = result.viewEnd - result.viewStart
+    expect(newSpan).toBeCloseTo(20 / 1.6)
+    expect(result.viewEnd).toBeLessThanOrEqual(40)
+  })
+
+  test('enforces minimum visible span of 0.5s', () => {
+    const result = zoomRange({ viewStart: 0, viewEnd: 1, pivot: 0.5, direction: 1, totalDuration: 10 })
+    const newSpan = result.viewEnd - result.viewStart
+    expect(newSpan).toBeGreaterThanOrEqual(0.5)
+  })
+
+  test('enforces maximum visible span of totalDuration', () => {
+    const result = zoomRange({ viewStart: 40, viewEnd: 60, pivot: 50, direction: -1, totalDuration: 50 })
+    const newSpan = result.viewEnd - result.viewStart
+    expect(newSpan).toBeLessThanOrEqual(50)
+  })
+
+  test('clamps result to [0, totalDuration]', () => {
+    const result = zoomRange({ viewStart: 0, viewEnd: 10, pivot: 5, direction: -1, totalDuration: 100 })
+    expect(result.viewStart).toBeGreaterThanOrEqual(0)
+    expect(result.viewEnd).toBeLessThanOrEqual(100)
+  })
+
+  test('pivot at viewport start zooms in keeping start anchored', () => {
+    const result = zoomRange({ viewStart: 0, viewEnd: 100, pivot: 0, direction: 1, totalDuration: 200 })
+    expect(result.viewStart).toBe(0)
+    const newSpan = result.viewEnd - result.viewStart
+    expect(newSpan).toBeCloseTo(100 / 1.6)
+  })
+
+  test('pivot at viewport end zooms in keeping end anchored', () => {
+    const result = zoomRange({ viewStart: 0, viewEnd: 100, pivot: 100, direction: 1, totalDuration: 200 })
+    expect(result.viewEnd).toBe(100)
+    const newSpan = result.viewEnd - result.viewStart
+    expect(newSpan).toBeCloseTo(100 / 1.6)
+  })
+})
+
+describe('fitRangeToViewport', () => {
+  test('adds 4% padding on each side of the target range', () => {
+    const result = fitRangeToViewport({ rangeStart: 10, rangeEnd: 90, totalDuration: 100 })
+    const span = result.viewEnd - result.viewStart
+    const expectedRawSpan = 80
+    const expectedPaddedSpan = expectedRawSpan * 1.08
+    expect(result.viewStart).toBeCloseTo(6.8)
+    expect(result.viewEnd).toBeCloseTo(93.2)
+    expect(span).toBeCloseTo(expectedPaddedSpan)
+  })
+
+  test('clamps to [0, totalDuration] when padding extends beyond bounds', () => {
+    const result = fitRangeToViewport({ rangeStart: 0, rangeEnd: 10, totalDuration: 100 })
+    expect(result.viewStart).toBe(0)
+    const span = result.viewEnd - result.viewStart
+    expect(span).toBeGreaterThanOrEqual(10)
+  })
+
+  test('enforces 2s minimum visible span when totalDuration allows', () => {
+    const result = fitRangeToViewport({ rangeStart: 5, rangeEnd: 5.5, totalDuration: 100 })
+    const span = result.viewEnd - result.viewStart
+    expect(span).toBeGreaterThanOrEqual(2)
+  })
+
+  test('does not enforce 2s minimum when totalDuration is too small', () => {
+    const result = fitRangeToViewport({ rangeStart: 0, rangeEnd: 0.5, totalDuration: 1 })
+    expect(result.viewEnd - result.viewStart).toBeLessThanOrEqual(1)
+  })
+
+  test('All target fits to [0, totalDuration]', () => {
+    const result = fitRangeToViewport({ rangeStart: 0, rangeEnd: 100, totalDuration: 100 })
+    expect(result.viewStart).toBe(0)
+    expect(result.viewEnd).toBe(100)
+  })
+
+  test('Video target fits to [videoSyncOffsetSeconds, videoSyncOffsetSeconds + importedVideoDuration]', () => {
+    const result = fitRangeToViewport({ rangeStart: 5, rangeEnd: 25, totalDuration: 60 })
+    expect(result.viewStart).toBeCloseTo(4.2)
+    expect(result.viewEnd).toBeCloseTo(25.8)
+  })
+
+  test('Activity target fits to [0, activitySummary.durationSeconds]', () => {
+    const result = fitRangeToViewport({ rangeStart: 0, rangeEnd: 45, totalDuration: 60 })
+    expect(result.viewStart).toBe(0)
+    expect(result.viewEnd).toBeCloseTo(48.6)
+  })
+
+  test('handles zero-length range by clamping to minimum span', () => {
+    const result = fitRangeToViewport({ rangeStart: 50, rangeEnd: 50, totalDuration: 100 })
+    const span = result.viewEnd - result.viewStart
+    expect(span).toBeGreaterThanOrEqual(2)
   })
 })

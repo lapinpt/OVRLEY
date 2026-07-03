@@ -26,20 +26,20 @@ This adds the zoom/fit pure helpers and the viewport hook's `zoomBy`, `fitAll`, 
 
 ## Acceptance criteria
 
-- [ ] Zoom-in/out buttons zoom 1.6x around the playhead, clamped into the visible window, with a `[0.5s, totalDuration]` visible span.
-- [ ] Ctrl+wheel zooms at the pointer position; plain wheel does nothing.
-- [ ] The left toolbar contains zoom-out, zoom-in, reset-view, and an All / Video / Activity auto-zoom tab selector.
-- [ ] All fits to `[0, totalDuration]`.
-- [ ] Video fits to `[videoSyncOffsetSeconds, videoSyncOffsetSeconds + importedVideoDuration]` and is hidden when no imported video exists.
-- [ ] Activity fits to `[0, activitySummary.durationSeconds]`, falling back to `[0, fallbackDurationSeconds]`, and is hidden when no activity exists.
-- [ ] Auto-zoom tab fits add 4% side padding, clamp to `[0, totalDuration]`, and maintain a 2s minimum visible span where possible.
-- [ ] Reset-view fits to the full range; zoom and fit actions do not move the playhead.
-- [ ] Ticks and playhead x recompute live as the visible window changes.
-- [ ] The center transport is the 5-button set (rewind-to-start, step-back, play/pause toggle, step-forward, rewind-to-end), compact and small.
-- [ ] Rewind-to-end pauses the playhead at the total duration.
-- [ ] The play/pause button reflects the current playing state.
-- [ ] Zoom/fit pure helpers and the viewport hook's zoom/fit actions have tests, including All, Video, and Activity fit targets.
-- [ ] `usePlaybackEngine.js`, `usePlayerKeyboard.js`, and store playback actions remain unchanged.
+- [x] Zoom-in/out buttons zoom 1.6x around the playhead, clamped into the visible window, with a `[0.5s, totalDuration]` visible span.
+- [x] Ctrl+wheel zooms at the pointer position; plain wheel does nothing.
+- [x] The left toolbar contains zoom-out, zoom-in, reset-view, and an All / Video / Activity auto-zoom tab selector.
+- [x] All fits to `[0, totalDuration]`.
+- [x] Video fits to `[videoSyncOffsetSeconds, videoSyncOffsetSeconds + importedVideoDuration]` and is hidden when no imported video exists.
+- [x] Activity fits to `[0, activitySummary.durationSeconds]`, falling back to `[0, fallbackDurationSeconds]`, and is hidden when no activity exists.
+- [x] Auto-zoom tab fits add 4% side padding, clamp to `[0, totalDuration]`, and maintain a 2s minimum visible span where possible.
+- [x] Reset-view fits to the full range; zoom and fit actions do not move the playhead.
+- [x] Ticks and playhead x recompute live as the visible window changes.
+- [x] The center transport is the 5-button set (rewind-to-start, step-back, play/pause toggle, step-forward, rewind-to-end), compact and small.
+- [x] Rewind-to-end pauses the playhead at the total duration.
+- [x] The play/pause button reflects the current playing state.
+- [x] Zoom/fit pure helpers and the viewport hook's zoom/fit actions have tests, including All, Video, and Activity fit targets.
+- [x] `usePlaybackEngine.js`, `usePlayerKeyboard.js`, and store playback actions remain unchanged.
 
 ## Blocked by
 

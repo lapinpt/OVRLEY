@@ -19,6 +19,8 @@ const buttonVariants = cva(
           'border border-input bg-background shadow-xs hover:bg-accent/20 hover:text-accent-foreground disabled:hover:bg-background disabled:hover:text-foreground',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-accent/20 hover:text-accent-foreground',
+        toolbar:
+          'text-muted-foreground font-semibold hover:bg-surface-elevated hover:text-foreground aria-pressed:bg-foreground aria-pressed:text-surface uppercase',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
@@ -28,6 +30,8 @@ const buttonVariants = cva(
         icon: 'size-9',
         'icon-sm': 'size-8',
         'icon-lg': 'size-10',
+        'toolbar-icon': 'h-7 w-7 rounded-md',
+        'toolbar-tab': 'h-5 rounded-sm px-2 text-[0.7rem]',
       },
     },
     defaultVariants: {

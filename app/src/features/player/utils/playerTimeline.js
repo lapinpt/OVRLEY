@@ -183,6 +183,81 @@ export function fitToFull(totalDuration) {
   return { viewStart: 0, viewEnd: safe }
 }
 
+const ZOOM_FACTOR = 1.6
+const MIN_ZOOM_SPAN = 0.5
+const FIT_MIN_SPAN = 2
+const FIT_PADDING_RATIO = 0.04
+
+/**
+ * Zooms the viewport by a factor around a pivot point.
+ *
+ * @param {{ viewStart: number, viewEnd: number, pivot: number, direction: 1|-1, totalDuration: number }} options
+ * @returns {{ viewStart: number, viewEnd: number }} Zoomed viewport.
+ */
+export function zoomRange({ viewStart, viewEnd, pivot, direction, totalDuration }) {
+  const safeTotal = Math.max(0, Number(totalDuration) || 0)
+  const span = viewEnd - viewStart
+  const clampedPivot = clamp(Number(pivot) || 0, viewStart, viewEnd)
+  const ratio = span > 0 ? (clampedPivot - viewStart) / span : 0.5
+
+  const factor = direction >= 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
+  let newSpan = span * factor
+  newSpan = clamp(newSpan, MIN_ZOOM_SPAN, safeTotal)
+
+  let newStart = clampedPivot - ratio * newSpan
+  let newEnd = newStart + newSpan
+
+  if (newStart < 0) {
+    newStart = 0
+    newEnd = newSpan
+  }
+  if (newEnd > safeTotal) {
+    newEnd = safeTotal
+    newStart = Math.max(0, safeTotal - newSpan)
+  }
+
+  return { viewStart: newStart, viewEnd: newEnd }
+}
+
+/**
+ * Fits the viewport to a target range with padding, min span, and clamping.
+ *
+ * @param {{ rangeStart: number, rangeEnd: number, totalDuration: number }} options
+ * @returns {{ viewStart: number, viewEnd: number }} Fitted viewport.
+ */
+export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration }) {
+  const safeTotal = Math.max(0, Number(totalDuration) || 0)
+  const safeStart = Math.max(0, Number(rangeStart) || 0)
+  const safeEnd = Math.min(safeTotal, Math.max(safeStart, Number(rangeEnd) || 0))
+
+  const rangeSpan = safeEnd - safeStart
+  const padding = rangeSpan * FIT_PADDING_RATIO
+
+  let viewStart = safeStart - padding
+  let viewEnd = safeEnd + padding
+  let span = viewEnd - viewStart
+
+  if (span < FIT_MIN_SPAN && safeTotal >= FIT_MIN_SPAN) {
+    const halfExtra = (FIT_MIN_SPAN - span) / 2
+    viewStart -= halfExtra
+    viewEnd += halfExtra
+    span = FIT_MIN_SPAN
+  }
+
+  span = Math.min(span, safeTotal)
+
+  if (viewStart < 0) {
+    viewStart = 0
+    viewEnd = span
+  }
+  if (viewEnd > safeTotal) {
+    viewEnd = safeTotal
+    viewStart = Math.max(0, safeTotal - span)
+  }
+
+  return { viewStart, viewEnd }
+}
+
 const TICK_TARGET_PX = 90
 const NICE_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200, 1500, 1800, 3600]
 
