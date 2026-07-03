@@ -3,11 +3,11 @@ import useTimelineDrag from '../hooks/useTimelineDrag'
 
 /**
  * Lane background drag surface. Dragging left reveals later timeline seconds;
- * dragging right reveals earlier seconds.
+ * dragging right reveals earlier seconds. Accepts children (clip lanes) rendered inside.
  *
- * @param {{ viewStart: number, viewEnd: number, widthPx: number, onPanBy: function, onPanStart: function, onPanEnd: function }} props
+ * @param {{ viewStart: number, viewEnd: number, widthPx: number, onPanBy: function, onPanStart: function, onPanEnd: function, children?: React.ReactNode }} props
  */
-export default function TimelinePanSurface({ viewStart, viewEnd, widthPx, onPanBy, onPanStart, onPanEnd }) {
+export default function TimelinePanSurface({ viewStart, viewEnd, widthPx, onPanBy, onPanStart, onPanEnd, children }) {
   const lastClientXRef = useRef(null)
   const pxPerSecond = widthPx > 0 && viewEnd > viewStart ? widthPx / (viewEnd - viewStart) : 0
 
@@ -48,9 +48,11 @@ export default function TimelinePanSurface({ viewStart, viewEnd, widthPx, onPanB
   return (
     <div
       aria-label="Timeline lane background"
-      className="relative mt-1 h-8.5 w-full cursor-grab select-none border border-border/40 bg-foreground/5 active:cursor-grabbing"
+      className="relative w-full cursor-grab select-none bg-foreground/10 active:cursor-grabbing border border-border/40 space-y-1 py-1"
       role="group"
       {...dragHandlers}
-    />
+    >
+      {children}
+    </div>
   )
 }

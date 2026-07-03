@@ -157,6 +157,23 @@ export function secondsToViewPx(second, viewStart, viewEnd, widthPx) {
 }
 
 /**
+ * Computes the pixel geometry of a clip given its timing and the visible window.
+ *
+ * @param {{ clipStart: number, clipDuration: number, viewStart: number, viewEnd: number, widthPx: number }} options
+ * @returns {{ x: number, width: number, isVisible: boolean }} Pixel position, pixel width, and visibility flag.
+ */
+export function getClipGeometry({ clipStart, clipDuration, viewStart, viewEnd, widthPx }) {
+  const span = viewEnd - viewStart
+  const clipEnd = clipStart + clipDuration
+  if (span <= 0 || widthPx <= 0 || clipEnd <= viewStart || clipStart >= viewEnd || clipDuration <= 0) {
+    return { x: 0, width: 0, isVisible: false }
+  }
+  const x = ((clipStart - viewStart) / span) * widthPx
+  const width = (clipDuration / span) * widthPx
+  return { x, width, isVisible: true }
+}
+
+/**
  * Clamps a viewport [viewStart, viewEnd] so it stays within [0, totalDuration]
  * and never collapses below a single-point range.
  *

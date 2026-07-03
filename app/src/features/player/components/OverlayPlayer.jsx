@@ -13,6 +13,7 @@ import usePlayerKeyboard from '../hooks/usePlayerKeyboard'
 import useTimelineViewport from '../hooks/useTimelineViewport'
 import { computeTimelineTicks, formatTimelineTime } from '../utils/playerTimeline'
 import TimelineAxis from './TimelineAxis'
+import TimelineLane from './TimelineLane'
 import TimelinePanSurface from './TimelinePanSurface'
 import TimelinePlayhead from './TimelinePlayhead'
 
@@ -30,6 +31,7 @@ const ZOOM_TAB_ACTIVITY = 'activity'
 export default function OverlayPlayer({ backgroundMode }) {
   const playerStore = useStore(
     useShallow((state) => ({
+      activityFilename: state.activityFilename,
       activitySummary: state.activitySummary,
       beginPreviewScrub: state.beginPreviewScrub,
       commitPreviewScrub: state.commitPreviewScrub,
@@ -210,6 +212,10 @@ export default function OverlayPlayer({ backgroundMode }) {
     handleTimelineCommit([totalDuration])
   }, [handleTimelineChange, handleTimelineCommit, totalDuration])
 
+  const videoBasename = hasVideo ? (importedVideoPath?.split(/[\\/]/).pop() ?? '') : ''
+  const activityLabel = playerStore.activityFilename || playerStore.activitySummary?.fileName || 'Activity'
+  const activityFormatLabel = playerStore.activitySummary?.fileFormat?.toUpperCase() || 'DATA'
+
   return (
     <div className={hasActivity ? 'shrink-0 border-border/70 bg-black/30 px-5 py-2 backdrop-blur-sm' : 'hidden'}>
       {/* Toolbar: 3 sections */}
@@ -333,7 +339,7 @@ export default function OverlayPlayer({ backgroundMode }) {
         </div>
 
         {/* Right: time display */}
-        <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground w-30 justify-end flex pr-2">
+        <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground w-30 justify-end flex">
           {formatTimelineTime(displayedPlayhead)} / {formatTimelineTime(totalDuration)}
         </span>
       </div>
@@ -358,7 +364,32 @@ export default function OverlayPlayer({ backgroundMode }) {
           onPanBy={panBy}
           onPanStart={startTimelinePan}
           onPanEnd={endTimelineDrag}
-        />
+        >
+          {hasVideo && (
+            <TimelineLane
+              clipStart={videoSyncOffsetSeconds}
+              clipDuration={importedVideoDuration ?? 0}
+              label={videoBasename}
+              formatLabel="MP4"
+              durationSeconds={importedVideoDuration ?? 0}
+              viewStart={viewport.viewStart}
+              viewEnd={viewport.viewEnd}
+              widthPx={widthPx}
+              isVideo
+            />
+          )}
+          <TimelineLane
+            clipStart={0}
+            clipDuration={activityDurationSeconds}
+            label={activityLabel}
+            formatLabel={activityFormatLabel}
+            durationSeconds={activityDurationSeconds}
+            viewStart={viewport.viewStart}
+            viewEnd={viewport.viewEnd}
+            widthPx={widthPx}
+            isVideo={false}
+          />
+        </TimelinePanSurface>
         <div className="pointer-events-none absolute inset-0">
           <TimelinePlayhead
             second={displayedPlayhead}

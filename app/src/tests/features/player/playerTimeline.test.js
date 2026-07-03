@@ -12,6 +12,7 @@ import {
   fitRangeToViewport,
   fitToFull,
   followPlayhead,
+  getClipGeometry,
   getTotalPlaybackDuration,
   panViewport,
   pointerToSecond,
@@ -391,5 +392,60 @@ describe('followPlayhead', () => {
   test('preserves the viewport span', () => {
     const result = followPlayhead({ playheadSecond: 100, viewStart: 0, viewEnd: 50, totalDuration: 200 })
     expect(result.viewEnd - result.viewStart).toBe(50)
+  })
+})
+
+describe('getClipGeometry', () => {
+  test('clip fully within the viewport', () => {
+    const result = getClipGeometry({ clipStart: 10, clipDuration: 20, viewStart: 0, viewEnd: 100, widthPx: 500 })
+    expect(result.isVisible).toBe(true)
+    expect(result.x).toBe(50)
+    expect(result.width).toBe(100)
+  })
+
+  test('clip partially visible (left edge cut off by viewStart)', () => {
+    const result = getClipGeometry({ clipStart: 10, clipDuration: 20, viewStart: 15, viewEnd: 100, widthPx: 500 })
+    expect(result.isVisible).toBe(true)
+    expect(result.x).toBeCloseTo(-29.4118)
+    expect(result.width).toBeCloseTo(117.6471)
+  })
+
+  test('clip partially visible (right edge cut off by viewEnd)', () => {
+    const result = getClipGeometry({ clipStart: 80, clipDuration: 30, viewStart: 0, viewEnd: 100, widthPx: 500 })
+    expect(result.isVisible).toBe(true)
+    expect(result.x).toBe(400)
+    expect(result.width).toBe(150)
+  })
+
+  test('clip fully outside viewport on the left', () => {
+    const result = getClipGeometry({ clipStart: 0, clipDuration: 5, viewStart: 10, viewEnd: 100, widthPx: 500 })
+    expect(result.isVisible).toBe(false)
+  })
+
+  test('clip fully outside viewport on the right', () => {
+    const result = getClipGeometry({ clipStart: 110, clipDuration: 20, viewStart: 0, viewEnd: 100, widthPx: 500 })
+    expect(result.isVisible).toBe(false)
+  })
+
+  test('zero widthPx returns invisible', () => {
+    const result = getClipGeometry({ clipStart: 10, clipDuration: 20, viewStart: 0, viewEnd: 100, widthPx: 0 })
+    expect(result.isVisible).toBe(false)
+  })
+
+  test('zero viewport span returns invisible', () => {
+    const result = getClipGeometry({ clipStart: 10, clipDuration: 20, viewStart: 50, viewEnd: 50, widthPx: 500 })
+    expect(result.isVisible).toBe(false)
+  })
+
+  test('positions a clip with a nonzero start offset', () => {
+    const result = getClipGeometry({ clipStart: 5, clipDuration: 10, viewStart: 0, viewEnd: 30, widthPx: 600 })
+    expect(result.isVisible).toBe(true)
+    expect(result.x).toBe(100)
+    expect(result.width).toBe(200)
+  })
+
+  test('clip with zero duration is not visible', () => {
+    const result = getClipGeometry({ clipStart: 10, clipDuration: 0, viewStart: 0, viewEnd: 100, widthPx: 500 })
+    expect(result.isVisible).toBe(false)
   })
 })

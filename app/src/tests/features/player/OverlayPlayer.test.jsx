@@ -213,4 +213,18 @@ describe('OverlayPlayer S2 toolbar behavior', () => {
       expect(useTimelineViewport).toHaveBeenLastCalledWith(expect.objectContaining({ isDragging: false }))
     })
   })
+
+  test('dragging a clip body does not pan the timeline', () => {
+    renderPlayer()
+
+    const clip = screen.getByLabelText('ride.mp4')
+    const panSurface = screen.getByRole('group', { name: 'Timeline lane background' })
+
+    fireEvent.pointerDown(clip, { button: 0, clientX: 70, pointerId: 1 })
+    fireEvent.pointerMove(panSurface, { clientX: 60, pointerId: 1 })
+    fireEvent.pointerUp(clip, { clientX: 60, pointerId: 1 })
+
+    expect(viewportActions.panBy).not.toHaveBeenCalled()
+    expect(useTimelineViewport).toHaveBeenLastCalledWith(expect.objectContaining({ isDragging: false }))
+  })
 })

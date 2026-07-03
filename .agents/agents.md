@@ -76,9 +76,9 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 ## Testing
 
-- **Frontend**: Vitest + Testing Library. Run with `pnpm test` (or `pnpm test:watch` for watch mode). Test files live in `app/src/tests/`.
-- **Rust backend**: `cargo test` inside `src-tauri/ovrley_core/`. Integration tests in `tests/`, unit tests are `#[cfg(test)] mod tests` blocks inline or in `src/*/tests/`.
-- Run both with `pnpm test && cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml`.
+- **Frontend**: Vitest + Testing Library. Run with `npx vitest run` from inside `app/` directory. Test files live in `app/src/tests/`.
+- **Rust backend**: `cargo test` from inside `src-tauri/ovrley_core/`. Integration tests in `tests/`, unit tests are `#[cfg(test)] mod tests` blocks inline or in `src/*/tests/`.
+- Run both with `npx vitest run test` && cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml`.
 
 ## Agent skills
 

@@ -40,16 +40,16 @@ export default function TimelineAxis({ viewStart, viewEnd, totalDuration, widthP
   )
 
   return (
-    <div ref={axisRef} aria-label="Timeline axis" className="relative h-6 w-full cursor-crosshair select-none" role="group" {...dragHandlers}>
+    <div ref={axisRef} aria-label="Timeline axis" className="relative h-7 w-full cursor-crosshair select-none my-1" role="group" {...dragHandlers}>
       {/* Minor ticks */}
       {ticks.minor.map((t, i) => (
-        <div key={`m-${i}`} className="absolute bottom-0 h-1.5 w-px bg-border/70" style={getTickLeftStyle(t.x)} />
+        <div key={`m-${i}`} className="absolute top-0 h-1.5 w-px bg-border/70" style={getTickLeftStyle(t.x)} />
       ))}
       {/* Major ticks */}
       {ticks.major.map((t, i) => (
         <div key={`M-${i}`}>
-          <div className="absolute bottom-0 h-2.5 w-px bg-border" style={getTickLeftStyle(t.x)} />
-          <span className="absolute bottom-3 -translate-x-1/2 text-[0.6rem] tabular-nums text-muted-foreground" style={getLeftStyle(t.x)}>
+          <div className="absolute top-0 h-2.5 w-px bg-border" style={getTickLeftStyle(t.x)} />
+          <span className="absolute top-3 -translate-x-1/2 text-[0.6rem] tabular-nums text-muted-foreground" style={getLeftStyle(t.x)}>
             {t.label}
           </span>
         </div>
