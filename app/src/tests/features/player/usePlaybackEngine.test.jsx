@@ -1,18 +1,5 @@
-/**
- * Integration tests for playback-engine orchestration.
- *
- * The player should preserve the same user-visible rules while the internals
- * are split apart: video owns playback inside its window, timeline owns the
- * rest, and timeline playback still advances and stops on the exact frame.
- */
-
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-
-vi.mock('@/features/overlay-editor', () => ({
-  getEffectivePreviewFps: vi.fn(() => 10),
-}))
-
 import usePlaybackEngine from '@/features/player/hooks/usePlaybackEngine'
 
 function createOptions(overrides = {}) {
@@ -85,7 +72,7 @@ describe('usePlaybackEngine', () => {
     })
 
     act(() => {
-      result.current.handlePlay()
+      result.current.play()
     })
 
     expect(options.startPreviewPlayback).toHaveBeenCalledWith({
@@ -129,7 +116,7 @@ describe('usePlaybackEngine', () => {
     })
 
     act(() => {
-      result.current.handlePlay()
+      result.current.play()
     })
 
     expect(options.startPreviewPlayback).toHaveBeenCalledWith({
@@ -154,5 +141,44 @@ describe('usePlaybackEngine', () => {
     })
 
     expect(options.pausePreviewPlayback).toHaveBeenCalledWith(3)
+  })
+
+  test('scrubs and commits with direct second values', () => {
+    const options = createOptions()
+    const { result, rerender } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: options,
+    })
+
+    act(() => {
+      result.current.scrubTo(2.25)
+    })
+
+    expect(options.beginPreviewScrub).toHaveBeenCalledWith(2.25)
+
+    rerender({
+      ...options,
+      previewPlaybackState: 'scrubbing',
+    })
+
+    act(() => {
+      result.current.scrubTo(3.5)
+      result.current.commitScrub(3.5)
+    })
+
+    expect(options.updatePreviewScrub).toHaveBeenCalledWith(3.5)
+    expect(options.commitPreviewScrub).toHaveBeenCalledWith(3.5)
+  })
+
+  test('jumpToEnd pauses at total duration without slider-shaped arguments', () => {
+    const options = createOptions()
+    const { result } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: options,
+    })
+
+    act(() => {
+      result.current.jumpToEnd()
+    })
+
+    expect(options.pausePreviewPlayback).toHaveBeenCalledWith(8)
   })
 })

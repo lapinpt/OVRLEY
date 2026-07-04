@@ -1,67 +1,175 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { fitRangeToViewport, fitToFull, followPlayhead, panViewport, zoomRange } from '../utils/playerTimeline'
+/**
+ * Owns timeline viewport state, DOM measurement, fit targets, ticks, zoom, pan, and auto-follow.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { roundToDevicePixel } from '../utils/timelineGeometry'
+import {
+  buildFitTargets,
+  computeTimelineTicks,
+  fitToFull,
+  followPlayhead,
+  getMatchingFitTargetId,
+  panViewport,
+  zoomRange,
+} from '../utils/timelineViewport'
+
+function getDevicePixelRatio() {
+  if (typeof window === 'undefined') return 1
+  return window.devicePixelRatio || 1
+}
+
+function getLeftPercent(x, widthPx) {
+  return widthPx > 0 ? `${(x / widthPx) * 100}%` : '0%'
+}
 
 /**
- * Holds the visible window { viewStart, viewEnd } as local React state
- * and exposes zoom, fit, reset, pan, and follow actions.
+ * Owns timeline viewport state, measurement, fit targets, ticks, zoom, pan, and playback follow.
  *
- * @param {object} options
- * @param {number} options.totalDuration - Total playable duration in seconds.
- * @param {number} [options.videoSyncOffsetSeconds] - Video sync offset for fitVideo.
- * @param {number} [options.importedVideoDuration] - Imported video duration for fitVideo.
- * @param {number} [options.activityDurationSeconds] - Activity duration for fitActivity.
- * @param {number} [options.fallbackDurationSeconds] - Fallback duration for fitActivity.
- * @param {number} [options.widthPx] - Measured timeline width used for the maximum zoom clamp.
- * @param {boolean} [options.isPlaying] - Whether playback is active (drives follow effect).
- * @param {number} [options.playheadSecond] - Current playhead position (drives follow effect).
- * @param {boolean} [options.isDragging] - Whether a scrub/pan drag is active (suspends follow).
- * @returns {{ viewport: { viewStart: number, viewEnd: number }, zoomBy: function, fitAll: function, fitVideo: function, fitActivity: function, resetView: function, panBy: function }}
+ * @param {object} options Timeline viewport inputs.
+ * @param {number} options.totalDuration Total playable duration.
+ * @param {boolean} [options.hasVideo=false] Whether a video lane is present.
+ * @param {number} [options.videoSyncOffsetSeconds=0] Timeline second where the video starts.
+ * @param {number} [options.importedVideoDuration=0] Imported video duration in seconds.
+ * @param {boolean} [options.hasActivityData=false] Whether activity metadata is loaded.
+ * @param {number} [options.activityDurationSeconds=0] Activity duration in seconds.
+ * @param {number} [options.fallbackDurationSeconds=0] Fallback duration for template-only timelines.
+ * @param {boolean} [options.isPlaying=false] Whether playback is active.
+ * @param {number} [options.playheadSecond=0] Current playhead second used as zoom/follow pivot.
+ * @param {boolean} [options.isDragging=false] Whether a pointer interaction should suspend auto-follow.
+ * @returns {object} Viewport state, geometry, and commands.
  */
 export default function useTimelineViewport({
   totalDuration,
+  hasVideo = false,
   videoSyncOffsetSeconds = 0,
   importedVideoDuration = 0,
+  hasActivityData = false,
   activityDurationSeconds = 0,
   fallbackDurationSeconds = 0,
-  widthPx = 0,
   isPlaying = false,
   playheadSecond = 0,
   isDragging = false,
 }) {
+  // Duration ref - viewport actions use the latest duration without recreating every callback.
+  const totalDurationRef = useRef(totalDuration)
+  const [containerElement, setContainerElement] = useState(null)
+  const [widthPx, setWidthPx] = useState(0)
   const [viewport, setViewport] = useState(() => fitToFull(totalDuration))
 
-  const totalDurationRef = useRef(totalDuration)
+  // Callback ref - measurement starts when the timeline actually mounts, including after hidden initial renders.
+  const containerRef = useCallback((element) => {
+    setContainerElement(element)
+  }, [])
+
+  // Media identity - any structural media change should reset stale zoom/pan state to the full range.
+  const mediaIdentity = [
+    totalDuration,
+    hasVideo,
+    videoSyncOffsetSeconds,
+    importedVideoDuration,
+    hasActivityData,
+    activityDurationSeconds,
+    fallbackDurationSeconds,
+  ].join('|')
+
   useEffect(() => {
     totalDurationRef.current = totalDuration
   }, [totalDuration])
 
+  // Full-range reset - loading different media should never leave the user stranded in an old viewport.
   useEffect(() => {
     setViewport(fitToFull(totalDuration))
-  }, [totalDuration])
+  }, [mediaIdentity, totalDuration])
+
+  // Width measurement - immediate rect reads avoid invisible geometry before ResizeObserver fires.
+  useEffect(() => {
+    if (!containerElement) {
+      setWidthPx(0)
+      return undefined
+    }
+
+    const measureWidth = () => {
+      const rect = containerElement.getBoundingClientRect?.()
+      setWidthPx(rect?.width || 0)
+    }
+
+    measureWidth()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener?.('resize', measureWidth)
+      return () => window.removeEventListener?.('resize', measureWidth)
+    }
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setWidthPx(entry.contentRect.width || containerElement.getBoundingClientRect?.().width || 0)
+      }
+    })
+
+    observer.observe(containerElement)
+    return () => observer.disconnect()
+  }, [containerElement])
 
   const didMountRef = useRef(false)
+
+  // Playback follow - while playing and not dragging, keep the playhead visible in a zoomed viewport.
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true
       return
     }
     if (!isPlaying || isDragging) return
-    setViewport((prev) =>
+
+    setViewport((previousViewport) =>
       followPlayhead({
         playheadSecond,
-        viewStart: prev.viewStart,
-        viewEnd: prev.viewEnd,
+        viewStart: previousViewport.viewStart,
+        viewEnd: previousViewport.viewEnd,
         totalDuration: totalDurationRef.current,
       }),
     )
-  }, [isPlaying, playheadSecond, isDragging])
+  }, [isDragging, isPlaying, playheadSecond])
 
+  // Fit targets - tabs are derived from canonical ranges so there is no separate active-tab state.
+  const fitTargets = useMemo(
+    () =>
+      buildFitTargets({
+        totalDuration,
+        hasVideo,
+        videoSyncOffsetSeconds,
+        importedVideoDuration,
+        hasActivityData,
+        activityDurationSeconds,
+        fallbackDurationSeconds,
+      }),
+    [activityDurationSeconds, fallbackDurationSeconds, hasActivityData, hasVideo, importedVideoDuration, totalDuration, videoSyncOffsetSeconds],
+  )
+
+  const displayedFitTargetId = useMemo(() => getMatchingFitTargetId({ viewport, targets: fitTargets }), [fitTargets, viewport])
+  const isFullTimelineVisible = displayedFitTargetId === 'all'
+
+  // Fit command - applies the canonical target range selected by the toolbar.
+  const fitTarget = useCallback(
+    (targetId) => {
+      const target = fitTargets.find((candidate) => candidate.id === targetId)
+      if (target) {
+        setViewport(target.viewport)
+      }
+    },
+    [fitTargets],
+  )
+
+  // Reset command - toolbar reset always returns to the latest full timeline duration.
+  const resetView = useCallback(() => {
+    setViewport(fitToFull(totalDurationRef.current))
+  }, [])
+
+  // Zoom command - pivots around the playhead or wheel pointer while preserving timeline bounds.
   const zoomBy = useCallback(
     (direction, pivot) => {
-      setViewport((prev) =>
+      setViewport((previousViewport) =>
         zoomRange({
-          viewStart: prev.viewStart,
-          viewEnd: prev.viewEnd,
+          viewStart: previousViewport.viewStart,
+          viewEnd: previousViewport.viewEnd,
           pivot,
           direction,
           totalDuration: totalDurationRef.current,
@@ -72,37 +180,75 @@ export default function useTimelineViewport({
     [widthPx],
   )
 
-  const fitAll = useCallback(() => {
-    setViewport(fitToFull(totalDurationRef.current))
-  }, [])
+  const zoomOut = useCallback(() => {
+    zoomBy(-1, playheadSecond)
+  }, [playheadSecond, zoomBy])
 
-  const fitVideo = useCallback(() => {
-    const total = totalDurationRef.current
-    const start = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
-    const end = start + (Number(importedVideoDuration) || 0)
-    setViewport(fitRangeToViewport({ rangeStart: start, rangeEnd: end, totalDuration: total }))
-  }, [videoSyncOffsetSeconds, importedVideoDuration])
+  const zoomIn = useCallback(() => {
+    zoomBy(1, playheadSecond)
+  }, [playheadSecond, zoomBy])
 
-  const fitActivity = useCallback(() => {
-    const total = totalDurationRef.current
-    const duration = activityDurationSeconds > 0 ? activityDurationSeconds : fallbackDurationSeconds
-    setViewport(fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, totalDuration: total }))
-  }, [activityDurationSeconds, fallbackDurationSeconds])
-
-  const resetView = useCallback(() => {
-    setViewport(fitToFull(totalDurationRef.current))
-  }, [])
-
+  // Pan command - lane-background drag passes seconds, while pure helpers enforce clamping.
   const panBy = useCallback((deltaSeconds) => {
-    setViewport((prev) =>
+    setViewport((previousViewport) =>
       panViewport({
-        viewStart: prev.viewStart,
-        viewEnd: prev.viewEnd,
+        viewStart: previousViewport.viewStart,
+        viewEnd: previousViewport.viewEnd,
         deltaSeconds,
         totalDuration: totalDurationRef.current,
       }),
     )
   }, [])
 
-  return { viewport, zoomBy, fitAll, fitVideo, fitActivity, resetView, panBy }
+  // Wheel zoom - Ctrl+wheel zooms around the pointer in the measured timeline element.
+  const handleWheel = useCallback(
+    (event) => {
+      if (!event.ctrlKey) return
+
+      event.preventDefault()
+      const rect = containerElement?.getBoundingClientRect()
+      if (!rect) return
+
+      const pivot = viewport.viewStart + ((event.clientX - rect.left) / rect.width) * (viewport.viewEnd - viewport.viewStart)
+      zoomBy(event.deltaY < 0 ? 1 : -1, pivot)
+    },
+    [containerElement, viewport, zoomBy],
+  )
+
+  // Tick model - presentational components receive rounded pixel positions and percent label positions.
+  const ticks = useMemo(() => {
+    const rawTicks = computeTimelineTicks({ viewStart: viewport.viewStart, viewEnd: viewport.viewEnd, widthPx })
+    const pixelRatio = getDevicePixelRatio()
+
+    return {
+      major: rawTicks.major.map((tick, index) => ({
+        id: `major-${index}`,
+        label: tick.label,
+        lineStyle: { left: roundToDevicePixel(tick.x, pixelRatio) },
+        labelStyle: { left: getLeftPercent(tick.x, widthPx) },
+      })),
+      minor: rawTicks.minor.map((tick, index) => ({
+        id: `minor-${index}`,
+        lineStyle: { left: roundToDevicePixel(tick.x, pixelRatio) },
+      })),
+    }
+  }, [viewport.viewEnd, viewport.viewStart, widthPx])
+
+  // Viewport API - returns render-ready geometry plus commands for toolbar and gesture hooks.
+  return {
+    containerElement,
+    containerRef,
+    displayedFitTargetId,
+    fitTarget,
+    fitTargets,
+    handleWheel,
+    isFullTimelineVisible,
+    panBy,
+    resetView,
+    ticks,
+    viewport,
+    widthPx,
+    zoomIn,
+    zoomOut,
+  }
 }

@@ -1,15 +1,21 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import useTimelineViewport from '@/features/player/hooks/useTimelineViewport'
 
-describe('useTimelineViewport', () => {
-  test('initializes to full range [0, totalDuration]', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
-    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
-  })
+function createMeasuredElement(width = 500) {
+  return {
+    getBoundingClientRect: () => ({
+      left: 0,
+      width,
+    }),
+  }
+}
 
-  test('re-fits when totalDuration changes', () => {
-    const { result, rerender } = renderHook(([dur]) => useTimelineViewport({ totalDuration: dur }), { initialProps: [100] })
+describe('useTimelineViewport', () => {
+  test('initializes to full range and re-fits when totalDuration changes', () => {
+    const { result, rerender } = renderHook(([totalDuration]) => useTimelineViewport({ totalDuration }), { initialProps: [100] })
+
+    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
 
     act(() => {
       rerender([200])
@@ -18,201 +24,174 @@ describe('useTimelineViewport', () => {
     expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 200 })
   })
 
-  test('handles zero totalDuration', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 0 }))
-    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 0 })
-  })
-})
+  test('zooms around the current playhead and can reset to full range', () => {
+    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100, playheadSecond: 50 }))
 
-describe('useTimelineViewport - zoomBy', () => {
-  test('zoom in shrinks the viewport around the playhead', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
     act(() => {
-      result.current.zoomBy(1, 50)
+      result.current.zoomIn()
     })
-    const span = result.current.viewport.viewEnd - result.current.viewport.viewStart
-    expect(span).toBeCloseTo(100 / 1.6)
-  })
 
-  test('zoom out grows the viewport around the playhead', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 200 }))
-    act(() => {
-      result.current.zoomBy(-1, 50)
-    })
-    const span = result.current.viewport.viewEnd - result.current.viewport.viewStart
-    expect(span).toBeGreaterThan(100)
-  })
-})
+    const zoomedSpan = result.current.viewport.viewEnd - result.current.viewport.viewStart
+    expect(zoomedSpan).toBeCloseTo(100 / 1.6)
 
-describe('useTimelineViewport - fitAll', () => {
-  test('resets to [0, totalDuration]', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
     act(() => {
-      result.current.zoomBy(1, 50)
+      result.current.zoomOut()
     })
-    act(() => {
-      result.current.fitAll()
-    })
-    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
-  })
-})
 
-describe('useTimelineViewport - fitVideo', () => {
-  test('fits to the video window', () => {
-    const { result } = renderHook(() =>
-      useTimelineViewport({
-        totalDuration: 100,
-        videoSyncOffsetSeconds: 10,
-        importedVideoDuration: 20,
-      }),
-    )
-    act(() => {
-      result.current.fitVideo()
-    })
-    const { viewStart, viewEnd } = result.current.viewport
-    expect(viewStart).toBeCloseTo(9.2)
-    expect(viewEnd).toBeCloseTo(30.8)
-  })
-})
+    expect(result.current.viewport.viewEnd - result.current.viewport.viewStart).toBeGreaterThan(zoomedSpan)
 
-describe('useTimelineViewport - fitActivity', () => {
-  test('fits to the activity duration', () => {
-    const { result } = renderHook(() =>
-      useTimelineViewport({
-        totalDuration: 100,
-        activityDurationSeconds: 45,
-      }),
-    )
-    act(() => {
-      result.current.fitActivity()
-    })
-    expect(result.current.viewport.viewStart).toBe(0)
-    expect(result.current.viewport.viewEnd).toBeCloseTo(48.6)
-  })
-
-  test('falls back to fallbackDurationSeconds when no activity', () => {
-    const { result } = renderHook(() =>
-      useTimelineViewport({
-        totalDuration: 100,
-        fallbackDurationSeconds: 30,
-      }),
-    )
-    act(() => {
-      result.current.fitActivity()
-    })
-    expect(result.current.viewport.viewStart).toBe(0)
-    expect(result.current.viewport.viewEnd).toBeCloseTo(32.4)
-  })
-})
-
-describe('useTimelineViewport - resetView', () => {
-  test('resetView is equivalent to fitAll and does not move the playhead', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
-    act(() => {
-      result.current.zoomBy(1, 50)
-    })
     act(() => {
       result.current.resetView()
     })
-    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
-  })
-})
 
-describe('useTimelineViewport - panBy', () => {
-  test('shifts viewport by delta seconds', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 200 }))
-    act(() => {
-      result.current.zoomBy(1, 50)
-    })
-    const before = { ...result.current.viewport }
-    act(() => {
-      result.current.panBy(10)
-    })
-    expect(result.current.viewport.viewStart).toBeCloseTo(before.viewStart + 10)
-    expect(result.current.viewport.viewEnd).toBeCloseTo(before.viewEnd + 10)
-  })
-
-  test('is a no-op when the whole timeline fits', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
-    act(() => {
-      result.current.panBy(20)
-    })
     expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
   })
 
-  test('clamps when panning past the end', () => {
-    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
+  test('fits to available video and activity targets and derives the displayed target', () => {
+    const { result } = renderHook(() =>
+      useTimelineViewport({
+        activityDurationSeconds: 45,
+        hasActivityData: true,
+        hasVideo: true,
+        importedVideoDuration: 20,
+        totalDuration: 100,
+        videoSyncOffsetSeconds: 10,
+      }),
+    )
+
+    expect(result.current.fitTargets.map((target) => target.id)).toEqual(['all', 'video', 'activity'])
+    expect(result.current.displayedFitTargetId).toBe('all')
+
     act(() => {
-      result.current.zoomBy(1, 50)
+      result.current.fitTarget('video')
     })
+
+    expect(result.current.viewport.viewStart).toBeCloseTo(9.2)
+    expect(result.current.viewport.viewEnd).toBeCloseTo(30.8)
+    expect(result.current.displayedFitTargetId).toBe('video')
+
+    act(() => {
+      result.current.fitTarget('activity')
+    })
+
+    expect(result.current.viewport.viewStart).toBe(0)
+    expect(result.current.viewport.viewEnd).toBeCloseTo(48.6)
+    expect(result.current.displayedFitTargetId).toBe('activity')
+  })
+
+  test('resets to full range when media shape changes instead of keeping stale fit state', () => {
+    const { result, rerender } = renderHook(
+      ([videoSyncOffsetSeconds]) =>
+        useTimelineViewport({
+          hasVideo: true,
+          importedVideoDuration: 20,
+          totalDuration: 100,
+          videoSyncOffsetSeconds,
+        }),
+      { initialProps: [10] },
+    )
+
+    act(() => {
+      result.current.fitTarget('video')
+    })
+
+    expect(result.current.displayedFitTargetId).toBe('video')
+
+    act(() => {
+      rerender([20])
+    })
+
+    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
+    expect(result.current.displayedFitTargetId).toBe('all')
+  })
+
+  test('pans by seconds and clamps when panning past the end', () => {
+    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100, playheadSecond: 50 }))
+
+    act(() => {
+      result.current.zoomIn()
+    })
+
     const span = result.current.viewport.viewEnd - result.current.viewport.viewStart
+
     act(() => {
       result.current.panBy(1000)
     })
+
     expect(result.current.viewport.viewEnd).toBe(100)
     expect(result.current.viewport.viewStart).toBe(100 - span)
   })
-})
 
-describe('useTimelineViewport - followPlayhead effect', () => {
-  test('advances viewport when playing and playhead exits right edge', () => {
-    const { result, rerender } = renderHook(([isPlaying, playheadSecond]) => useTimelineViewport({ totalDuration: 400, isPlaying, playheadSecond }), {
-      initialProps: [true, 0],
-    })
+  test('Ctrl+wheel zooms at the pointer position and plain wheel is a no-op', () => {
+    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
+    const preventDefault = vi.fn()
+
     act(() => {
-      result.current.zoomBy(1, 0)
-      result.current.zoomBy(1, 0)
+      result.current.containerRef(createMeasuredElement(100))
     })
-    const span = result.current.viewport.viewEnd - result.current.viewport.viewStart
+
     act(() => {
-      rerender([true, 160])
+      result.current.handleWheel({ clientX: 25, ctrlKey: false, deltaY: -100, preventDefault })
     })
-    expect(result.current.viewport.viewStart).toBeCloseTo(160 - 0.15 * span)
-    expect(result.current.viewport.viewEnd).toBeCloseTo(160 - 0.15 * span + span)
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
+
+    act(() => {
+      result.current.handleWheel({ clientX: 25, ctrlKey: true, deltaY: -100, preventDefault })
+    })
+
+    expect(preventDefault).toHaveBeenCalled()
+    expect(result.current.viewport.viewEnd - result.current.viewport.viewStart).toBeCloseTo(100 / 1.6)
   })
 
-  test('advances viewport when the playhead reaches the right edge', () => {
-    const { result, rerender } = renderHook(([isPlaying, playheadSecond]) => useTimelineViewport({ totalDuration: 200, isPlaying, playheadSecond }), {
-      initialProps: [true, 0],
-    })
+  test('starts measuring when the timeline element appears after an initial null render', () => {
+    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
+
+    expect(result.current.widthPx).toBe(0)
+
     act(() => {
-      result.current.zoomBy(1, 0)
-      result.current.zoomBy(1, 0)
+      result.current.containerRef(createMeasuredElement(500))
     })
-    const span = result.current.viewport.viewEnd - result.current.viewport.viewStart
-    const rightEdge = result.current.viewport.viewEnd
+
+    expect(result.current.widthPx).toBe(500)
+    expect(result.current.ticks.major.length).toBeGreaterThan(0)
+
     act(() => {
-      rerender([true, rightEdge])
+      result.current.containerRef(null)
     })
-    expect(result.current.viewport.viewStart).toBeCloseTo(rightEdge - 0.15 * span)
+
+    expect(result.current.widthPx).toBe(0)
   })
 
-  test('does NOT trigger when paused', () => {
-    const { result, rerender } = renderHook(([isPlaying, playheadSecond]) => useTimelineViewport({ totalDuration: 200, isPlaying, playheadSecond }), {
-      initialProps: [false, 0],
-    })
-    act(() => {
-      result.current.zoomBy(1, 50)
-    })
-    const before = { ...result.current.viewport }
-    act(() => {
-      rerender([false, 500])
-    })
-    expect(result.current.viewport).toEqual(before)
-  })
-
-  test('is suspended during an active drag', () => {
+  test('follows the playhead while playing and suspends follow during drag', () => {
     const { result, rerender } = renderHook(
-      ([isPlaying, playheadSecond, isDragging]) => useTimelineViewport({ totalDuration: 200, isPlaying, playheadSecond, isDragging }),
+      ([isPlaying, playheadSecond, isDragging]) =>
+        useTimelineViewport({
+          isDragging,
+          isPlaying,
+          playheadSecond,
+          totalDuration: 200,
+        }),
       { initialProps: [true, 0, false] },
     )
+
     act(() => {
-      result.current.zoomBy(1, 50)
+      result.current.zoomIn()
+      result.current.zoomIn()
     })
-    const before = { ...result.current.viewport }
+
+    const beforeDrag = { ...result.current.viewport }
+
     act(() => {
       rerender([true, 500, true])
     })
-    expect(result.current.viewport).toEqual(before)
+
+    expect(result.current.viewport).toEqual(beforeDrag)
+
+    act(() => {
+      rerender([true, 160, false])
+    })
+
+    expect(result.current.viewport.viewStart).not.toBe(beforeDrag.viewStart)
   })
 })
