@@ -8,7 +8,7 @@ import { formatTimelineTime } from '../utils/playerTiming'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
-const CLIP_SOURCE_COLUMN_WIDTH = '1.5rem'
+const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
 const CLIP_CONTENT_OFFSET_CLASS = 'translate-y-[0.04rem]'
 
 function getRootRemPx() {
@@ -87,7 +87,7 @@ export default function useTimelineClips({
       laneInputs.push({
         ariaLabel: 'Activity clip lane',
         durationSeconds: activityDurationSeconds,
-        formatLabel: activitySummary?.fileFormat?.toUpperCase() || 'DATA',
+        formatLabel: activitySummary?.fileFormat === 'mp4_telemetry' ? 'MP4' : activitySummary?.fileFormat?.toUpperCase() || 'DATA',
         icon: null,
         id: 'activity',
         isVideo: false,

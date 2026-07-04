@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Switch } from '@/components/ui/switch'
+import useStore from '@/store/useStore'
+import { getActivityDurationSeconds, getCustomExportRangeDefault } from '@/features/overlay-editor/utils/exportRange'
 
 function sanitizeTimeInput(value) {
   return String(value)
@@ -31,6 +33,9 @@ function preventDecimalInput(event) {
  * @returns {JSX.Element} Rendered component output.
  */
 export default function ExportRangeSettings({ exportRange, onExportRangeChange, showUseVideoRangeAction = false, onUseVideoRange }) {
+  const parsedActivity = useStore((state) => state.parsedActivity)
+  const activityEndSecond = getActivityDurationSeconds(parsedActivity)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -40,10 +45,14 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange, 
         <Switch
           checked={exportRange.type === 'custom'}
           onCheckedChange={(checked) =>
-            onExportRangeChange({
-              ...exportRange,
-              type: checked ? 'custom' : 'all',
-            })
+            onExportRangeChange(
+              checked
+                ? getCustomExportRangeDefault(exportRange, activityEndSecond)
+                : {
+                    ...exportRange,
+                    type: 'all',
+                  },
+            )
           }
         />
       </div>

@@ -25,11 +25,11 @@ export default function TimelineLane({ lane }) {
                 className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${lane.textClassName}`}
                 style={{ gridTemplateColumns: `${lane.sourceColumnWidth} minmax(0, 1fr) auto` }}
               >
-                <span className={`flex min-w-0 items-center justify-center ${lane.clipContentClassName}`}>
+                <span className={`flex min-w-0 items-center justify-left pl-2 ${lane.clipContentClassName}`}>
                   {Icon ? (
                     <Icon className="h-5 w-5 shrink-0 mr-0.5" strokeWidth={3} aria-hidden="true" />
                   ) : (
-                    <span className="block max-w-full truncate text-[0.9rem] font-black leading-none">{lane.formatLabel}</span>
+                    <span className="block max-w-full truncate text-[0.85rem] font-black leading-none">{lane.formatLabel}</span>
                   )}
                 </span>
                 <span className={`min-w-0 truncate leading-none ${lane.clipContentClassName}`}>{lane.label}</span>

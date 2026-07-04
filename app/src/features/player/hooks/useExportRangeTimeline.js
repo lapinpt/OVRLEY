@@ -10,7 +10,7 @@ import { clamp } from '@/lib/utils'
 import { clampExportRangeMarkerSecond } from '../utils/timelineGeometry'
 
 function getMarkerLabel(marker) {
-  return marker === 'from' ? 'Export in' : 'Export out'
+  return marker === 'from' ? 'Export from' : 'Export to'
 }
 
 /**
