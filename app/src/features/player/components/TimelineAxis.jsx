@@ -40,7 +40,13 @@ export default function TimelineAxis({ viewStart, viewEnd, totalDuration, widthP
   )
 
   return (
-    <div ref={axisRef} aria-label="Timeline axis" className="relative h-7 w-full cursor-crosshair select-none my-1" role="group" {...dragHandlers}>
+    <div
+      ref={axisRef}
+      aria-label="Timeline axis"
+      className="relative h-7 w-full cursor-crosshair select-none mt-4 mb-1"
+      role="group"
+      {...dragHandlers}
+    >
       {/* Minor ticks */}
       {ticks.minor.map((t, i) => (
         <div key={`m-${i}`} className="absolute top-0 h-1.5 w-px bg-border/70" style={getTickLeftStyle(t.x)} />

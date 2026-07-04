@@ -1,5 +1,5 @@
 import { useCallback, useId, useState } from 'react'
-import { Play } from 'lucide-react'
+import { Video } from 'lucide-react'
 import { formatTimelineTime, getClipGeometry } from '../utils/playerTimeline'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
@@ -51,16 +51,13 @@ export default function TimelineLane({ clipStart, clipDuration, label, formatLab
   }, [])
 
   return (
-    <div
-      aria-label={isVideo ? 'Video clip lane' : 'Activity clip lane'}
-      className={`relative w-full  bg-foreground/0 ${isVideo ? 'h-7.5 border-b-0' : 'h-7.5'}`}
-    >
+    <div aria-label={isVideo ? 'Video clip lane' : 'Activity clip lane'} className={`relative w-full ${isVideo ? 'h-6 border-b-0' : 'h-6'}`}>
       <div data-testid="timeline-lane-clip-mask space-y-4" className="absolute inset-0 overflow-hidden">
         {geometry.isVisible && (
           <div
             aria-describedby={showTooltip ? tooltipId : undefined}
             aria-label={label || 'clip'}
-            className={`absolute h-full cursor-default border ${isVideo ? 'border-accent/40 bg-accent/70' : 'border-border/40 bg-foreground/30'}`}
+            className={`absolute h-full cursor-default border ${isVideo ? 'border-accent/40 bg-accent/70' : 'border-border/40 bg-primary/70'}`}
             style={{ left: leftPct, width: widthPct }}
             onClick={stopClipEvent}
             onDoubleClick={stopClipEvent}
@@ -76,9 +73,9 @@ export default function TimelineLane({ clipStart, clipDuration, label, formatLab
               >
                 <span className={`flex min-w-0 items-center justify-center ${CLIP_CONTENT_OFFSET_CLASS}`}>
                   {isVideo ? (
-                    <Play className="h-4 w-4 shrink-0" strokeWidth={3} aria-hidden="true" />
+                    <Video className="h-5 w-5 shrink-0 mr-0.5" strokeWidth={3} aria-hidden="true" />
                   ) : (
-                    <span className="block max-w-full truncate text-[0.9rem] font-extrabold leading-none">{formatLabel}</span>
+                    <span className="block max-w-full truncate text-[0.9rem] font-black leading-none">{formatLabel}</span>
                   )}
                 </span>
                 <span className={`min-w-0 truncate leading-none ${CLIP_CONTENT_OFFSET_CLASS}`}>{label}</span>

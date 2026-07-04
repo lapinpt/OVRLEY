@@ -2,8 +2,8 @@
  * Renders the overlay player portion of the application interface.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Pause, Play, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Rewind, StepBack, StepForward, Pause, Play, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import usePlaybackEngine from '../hooks/usePlaybackEngine'
 import usePlayerKeyboard from '../hooks/usePlayerKeyboard'
 import useTimelineViewport from '../hooks/useTimelineViewport'
-import { computeTimelineTicks, formatTimelineTime } from '../utils/playerTimeline'
+import { computeTimelineTicks, fitRangeToViewport, formatTimelineTime } from '../utils/playerTimeline'
 import TimelineAxis from './TimelineAxis'
 import TimelineLane from './TimelineLane'
 import TimelinePanSurface from './TimelinePanSurface'
@@ -20,6 +20,12 @@ import TimelinePlayhead from './TimelinePlayhead'
 const ZOOM_TAB_ALL = 'all'
 const ZOOM_TAB_VIDEO = 'video'
 const ZOOM_TAB_ACTIVITY = 'activity'
+const VIEWPORT_MATCH_EPSILON_SECONDS = 0.001
+
+function rangesMatch(a, b) {
+  if (!a || !b) return false
+  return Math.abs(a.viewStart - b.viewStart) <= VIEWPORT_MATCH_EPSILON_SECONDS && Math.abs(a.viewEnd - b.viewEnd) <= VIEWPORT_MATCH_EPSILON_SECONDS
+}
 
 /**
  * Timeline playback bar with zoom controls, 5-button NLE transport, a ticked axis,
@@ -101,37 +107,30 @@ export default function OverlayPlayer({ backgroundMode }) {
   const handleTabChange = useCallback(
     (tab) => {
       setActiveTab(tab)
+
+      if (tab === ZOOM_TAB_ALL) {
+        fitAll()
+        return
+      }
+
+      if (tab === ZOOM_TAB_VIDEO) {
+        fitVideo()
+        return
+      }
+
+      if (tab === ZOOM_TAB_ACTIVITY) {
+        fitActivity()
+      }
     },
-    [setActiveTab],
+    [fitActivity, fitAll, fitVideo],
   )
 
   useEffect(() => {
-    if (activeTab === ZOOM_TAB_ALL) {
+    if ((activeTab === ZOOM_TAB_VIDEO && !hasVideo) || (activeTab === ZOOM_TAB_ACTIVITY && !hasActivityData)) {
+      setActiveTab(ZOOM_TAB_ALL)
       fitAll()
-      return
     }
-
-    if (activeTab === ZOOM_TAB_VIDEO) {
-      if (!hasVideo) {
-        setActiveTab(ZOOM_TAB_ALL)
-        fitAll()
-        return
-      }
-
-      fitVideo()
-      return
-    }
-
-    if (activeTab === ZOOM_TAB_ACTIVITY) {
-      if (!hasActivityData) {
-        setActiveTab(ZOOM_TAB_ALL)
-        fitAll()
-        return
-      }
-
-      fitActivity()
-    }
-  }, [activeTab, fitActivity, fitAll, fitVideo, hasActivityData, hasVideo])
+  }, [activeTab, fitAll, hasActivityData, hasVideo])
 
   const handleZoomOut = useCallback(() => {
     zoomBy(-1, clampedPlayhead)
@@ -156,7 +155,27 @@ export default function OverlayPlayer({ backgroundMode }) {
   }, [])
 
   const ticks = computeTimelineTicks({ viewStart: viewport.viewStart, viewEnd: viewport.viewEnd, widthPx })
+  const allViewport = useMemo(() => ({ viewStart: 0, viewEnd: totalDuration }), [totalDuration])
+  const videoViewport = useMemo(() => {
+    if (!hasVideo) return null
+    const start = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
+    const end = start + (Number(importedVideoDuration) || 0)
+    return fitRangeToViewport({ rangeStart: start, rangeEnd: end, totalDuration })
+  }, [hasVideo, importedVideoDuration, totalDuration, videoSyncOffsetSeconds])
+  const activityViewport = useMemo(() => {
+    if (!hasActivityData) return null
+    const duration = activityDurationSeconds > 0 ? activityDurationSeconds : playerStore.fallbackDurationSeconds
+    return fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, totalDuration })
+  }, [activityDurationSeconds, hasActivityData, playerStore.fallbackDurationSeconds, totalDuration])
 
+  const isFullTimelineVisible = rangesMatch(viewport, allViewport)
+  const displayedTab = isFullTimelineVisible
+    ? ZOOM_TAB_ALL
+    : rangesMatch(viewport, videoViewport)
+      ? ZOOM_TAB_VIDEO
+      : rangesMatch(viewport, activityViewport)
+        ? ZOOM_TAB_ACTIVITY
+        : null
   const handleWheel = useCallback(
     (e) => {
       if (!e.ctrlKey) return
@@ -217,7 +236,7 @@ export default function OverlayPlayer({ backgroundMode }) {
   const activityFormatLabel = playerStore.activitySummary?.fileFormat?.toUpperCase() || 'DATA'
 
   return (
-    <div className={hasActivity ? 'shrink-0 border-border/70 bg-black/30 px-5 py-2 backdrop-blur-sm' : 'hidden'}>
+    <div className={hasActivity ? 'shrink-0 border-border/70 bg-black/30 px-8 py-2 backdrop-blur-sm' : 'hidden'}>
       {/* Toolbar: 3 sections */}
       <div className="flex w-full items-center justify-between gap-4">
         {/* Left: zoom controls + auto-zoom tabs */}
@@ -238,6 +257,7 @@ export default function OverlayPlayer({ backgroundMode }) {
               aria-label="Reset view"
               size="toolbar-icon"
               variant="toolbar"
+              disabled={isFullTimelineVisible}
               onClick={() => {
                 resetView()
                 setActiveTab(ZOOM_TAB_ALL)
@@ -246,12 +266,12 @@ export default function OverlayPlayer({ backgroundMode }) {
               <RotateCcw className="h-3 w-3" />
             </Button>
           </SimpleTooltip>
-          <div className="ml-1 flex items-center gap-0.5 rounded-md border border-border/50 p-0.5 uppercase">
+          <div className="ml-1 flex items-center gap-0.5 rounded-sm border border-border/50 p-0.5 uppercase">
             <Button
               type="button"
               size="toolbar-tab"
               variant="toolbar"
-              aria-pressed={activeTab === ZOOM_TAB_ALL}
+              aria-pressed={displayedTab === ZOOM_TAB_ALL}
               onClick={() => handleTabChange(ZOOM_TAB_ALL)}
             >
               All
@@ -261,7 +281,7 @@ export default function OverlayPlayer({ backgroundMode }) {
                 type="button"
                 size="toolbar-tab"
                 variant="toolbar"
-                aria-pressed={activeTab === ZOOM_TAB_VIDEO}
+                aria-pressed={displayedTab === ZOOM_TAB_VIDEO}
                 onClick={() => handleTabChange(ZOOM_TAB_VIDEO)}
               >
                 Video
@@ -272,7 +292,7 @@ export default function OverlayPlayer({ backgroundMode }) {
                 type="button"
                 size="toolbar-tab"
                 variant="toolbar"
-                aria-pressed={activeTab === ZOOM_TAB_ACTIVITY}
+                aria-pressed={displayedTab === ZOOM_TAB_ACTIVITY}
                 onClick={() => handleTabChange(ZOOM_TAB_ACTIVITY)}
               >
                 Activity
@@ -282,64 +302,51 @@ export default function OverlayPlayer({ backgroundMode }) {
         </div>
 
         {/* Center: 5-button NLE transport */}
-        <div className="flex items-center gap-1 rounded-md border border-border/70 p-0.5 shadow-sm">
-          <SimpleTooltip side="top" content="Rewind to start">
-            <Button type="button" aria-label="Rewind to start" size="toolbar-icon" variant="toolbar" disabled={!hasActivity} onClick={handleReset}>
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-          </SimpleTooltip>
-          <SimpleTooltip side="top" content="Step back">
-            <Button
-              type="button"
-              aria-label="Step back"
-              size="toolbar-icon"
-              variant="toolbar"
-              disabled={!hasActivity}
-              onClick={() => handleStepByDirection(-1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </SimpleTooltip>
-          <SimpleTooltip side="top" content={isPlaying ? 'Pause' : 'Play'}>
-            <Button
-              type="button"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-              size="toolbar-icon"
-              variant={isPlaying ? 'secondary' : 'default'}
-              disabled={!hasActivity}
-              onClick={isPlaying ? handlePause : handlePlay}
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </Button>
-          </SimpleTooltip>
-          <SimpleTooltip side="top" content="Step forward">
-            <Button
-              type="button"
-              aria-label="Step forward"
-              size="toolbar-icon"
-              variant="toolbar"
-              disabled={!hasActivity}
-              onClick={() => handleStepByDirection(1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </SimpleTooltip>
-          <SimpleTooltip side="top" content="Rewind to end">
-            <Button
-              type="button"
-              aria-label="Rewind to end"
-              size="toolbar-icon"
-              variant="toolbar"
-              disabled={!hasActivity}
-              onClick={handleRewindToEnd}
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </SimpleTooltip>
+        <div className="flex items-center gap-1 rounded-md border border-border/30 p-0.5 shadow-sm">
+          <Button type="button" aria-label="Rewind to start" size="toolbar-icon" variant="toolbar" disabled={!hasActivity} onClick={handleReset}>
+            <Rewind className="h-3.5 w-3.5" />
+          </Button>
+
+          <Button
+            type="button"
+            aria-label="Step back"
+            size="toolbar-icon"
+            variant="toolbar"
+            disabled={!hasActivity}
+            onClick={() => handleStepByDirection(-1)}
+          >
+            <StepBack className="h-3.5 w-3.5" />
+          </Button>
+
+          <Button
+            type="button"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            size="toolbar-icon"
+            variant={isPlaying ? 'secondary' : 'default'}
+            disabled={!hasActivity}
+            onClick={isPlaying ? handlePause : handlePlay}
+          >
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" strokeWidth={2} />}
+          </Button>
+
+          <Button
+            type="button"
+            aria-label="Step forward"
+            size="toolbar-icon"
+            variant="toolbar"
+            disabled={!hasActivity}
+            onClick={() => handleStepByDirection(1)}
+          >
+            <StepForward className="h-3.5 w-3.5" />
+          </Button>
+
+          <Button type="button" aria-label="Rewind to end" size="toolbar-icon" variant="toolbar" disabled={!hasActivity} onClick={handleRewindToEnd}>
+            <Rewind className="h-3.5 w-3.5 rotate-180" />
+          </Button>
         </div>
 
         {/* Right: time display */}
-        <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground w-30 justify-end flex">
+        <span className="flex w-30 shrink-0 justify-end text-xs font-medium tabular-nums text-muted-foreground">
           {formatTimelineTime(displayedPlayhead)} / {formatTimelineTime(totalDuration)}
         </span>
       </div>

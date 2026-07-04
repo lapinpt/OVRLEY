@@ -48,7 +48,7 @@ export default function TimelinePanSurface({ viewStart, viewEnd, widthPx, onPanB
   return (
     <div
       aria-label="Timeline lane background"
-      className="relative w-full cursor-grab select-none bg-foreground/10 active:cursor-grabbing border border-border/40 space-y-1 py-1"
+      className="relative w-full cursor-e-resize select-none bg-foreground/10 active:cursor-e-resize border border-border/40 space-y-0.5 py-1"
       role="group"
       {...dragHandlers}
     >
