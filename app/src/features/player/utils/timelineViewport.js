@@ -173,11 +173,14 @@ export function buildFitTargets({
   activityDurationSeconds,
   fallbackDurationSeconds,
 }) {
-  const targets = [{ id: 'all', label: 'All', viewport: fitToFull(totalDuration) }]
+  const targets = []
+  let longestComponentDuration = 0
 
   if (hasVideo) {
     const start = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
-    const end = start + (Number(importedVideoDuration) || 0)
+    const duration = Number(importedVideoDuration) || 0
+    const end = start + duration
+    longestComponentDuration = Math.max(longestComponentDuration, duration)
     targets.push({
       id: 'video',
       label: 'Video',
@@ -187,11 +190,16 @@ export function buildFitTargets({
 
   if (hasActivityData) {
     const duration = activityDurationSeconds > 0 ? activityDurationSeconds : fallbackDurationSeconds
+    longestComponentDuration = Math.max(longestComponentDuration, duration)
     targets.push({
       id: 'activity',
       label: 'Activity',
       viewport: fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, totalDuration }),
     })
+  }
+
+  if (totalDuration > longestComponentDuration) {
+    targets.unshift({ id: 'all', label: 'All', viewport: fitToFull(totalDuration) })
   }
 
   return targets
