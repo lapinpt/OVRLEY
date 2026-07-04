@@ -77,7 +77,7 @@ export default function TimelineLane({
           <div
             aria-describedby={showTooltip ? tooltipId : undefined}
             aria-label={label || 'clip'}
-            className={`absolute h-full cursor-default overflow-hidden border ${isVideo ? 'border-accent/40 bg-accent/70' : 'border-foreground/40 bg-foreground/30'}`}
+            className={`absolute h-full cursor-default overflow-hidden ${isVideo ? 'bg-accent/70' : 'bg-primary/80'}`}
             style={{ left: leftPct, width: widthPct }}
             onClick={stopClipEvent}
             onDoubleClick={stopClipEvent}
