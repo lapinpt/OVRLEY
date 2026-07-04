@@ -45,6 +45,7 @@
   --theme-color-accent: #c65102;
   --theme-color-aqua: #40e0d0;
   --theme-color-ice: #86aaaa;
+  --theme-color-success: #37d67a;
   --theme-color-teal: #005b5b;
   --moveable-color: var(--theme-color-accent) !important;
   --background: var(--theme-color-background);
@@ -61,6 +62,7 @@
   --muted-foreground: color-mix(in srgb, var(--theme-color-ice) 72%, var(--theme-color-aqua) 28%);
   --accent: var(--theme-color-aqua);
   --accent-foreground: var(--theme-color-background);
+  --success: var(--theme-color-success);
   --destructive: rgb(196, 23, 23);
   --border: color-mix(in srgb, var(--theme-color-background) 52%, var(--theme-color-ice) 48%);
   --input: color-mix(in srgb, var(--theme-color-background) 70%, var(--theme-color-teal) 30%);

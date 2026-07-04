@@ -173,6 +173,57 @@ export function getClipGeometry({ clipStart, clipDuration, viewStart, viewEnd, w
   return { x, width, isVisible: true }
 }
 
+export const EXPORT_RANGE_MIN_GAP_SECONDS = 1
+
+/**
+ * Clamps a dragged export marker to the legal export window.
+ *
+ * @param {{ marker: 'from'|'to', second: number, fromSecond: number, toSecond: number, totalDuration: number }} options
+ * @returns {number} Clamped marker second.
+ */
+export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSecond, totalDuration }) {
+  const safeTotal = Math.max(0, Number(totalDuration) || 0)
+  const safeSecond = Number(second) || 0
+  const safeFrom = clamp(Number(fromSecond) || 0, 0, safeTotal)
+  const safeTo = clamp(Number(toSecond) || 0, 0, safeTotal)
+
+  if (marker === 'from') {
+    return clamp(safeSecond, 0, Math.max(0, safeTo - EXPORT_RANGE_MIN_GAP_SECONDS))
+  }
+
+  return clamp(safeSecond, Math.min(safeTotal, safeFrom + EXPORT_RANGE_MIN_GAP_SECONDS), safeTotal)
+}
+
+/**
+ * Snaps a dragged export marker to the nearest legal whole second.
+ *
+ * @param {{ marker: 'from'|'to', second: number, fromSecond: number, toSecond: number, totalDuration: number }} options
+ * @returns {number} Snapped marker second.
+ */
+/**
+ * Computes the clip-local overlay used to highlight the active export range.
+ *
+ * @param {{ clipStart: number, clipDuration: number, exportFromSecond: number, exportToSecond: number }} options
+ * @returns {{ isVisible: boolean, leftPercent: number, widthPercent: number }}
+ */
+export function getExportRangeHighlightGeometry({ clipStart, clipDuration, exportFromSecond, exportToSecond }) {
+  if (clipDuration <= 0) return { isVisible: false, leftPercent: 0, widthPercent: 0 }
+
+  const clipEnd = clipStart + clipDuration
+  const highlightStart = Math.max(clipStart, exportFromSecond)
+  const highlightEnd = Math.min(clipEnd, exportToSecond)
+
+  if (!(highlightEnd > highlightStart)) {
+    return { isVisible: false, leftPercent: 0, widthPercent: 0 }
+  }
+
+  return {
+    isVisible: true,
+    leftPercent: ((highlightStart - clipStart) / clipDuration) * 100,
+    widthPercent: ((highlightEnd - highlightStart) / clipDuration) * 100,
+  }
+}
+
 /**
  * Clamps a viewport [viewStart, viewEnd] so it stays within [0, totalDuration]
  * and never collapses below a single-point range.

@@ -50,9 +50,13 @@ export default function TimelinePlayhead({
   return (
     <div ref={containerRef} className="pointer-events-none absolute inset-0">
       {/* Vertical line */}
-      <div className="pointer-events-none absolute bottom-0 top-0 w-px -translate-x-1/2 bg-primary" style={{ left }} />
+      <div className="pointer-events-none absolute bottom-0 top-0 z-30 w-px -translate-x-1/2 bg-primary" style={{ left }} />
       {/* Inverted-house handle */}
-      <div className="pointer-events-auto absolute -top-1 -translate-x-1/2 cursor-grab p-1 active:cursor-grabbing" style={{ left }} {...dragHandlers}>
+      <div
+        className="pointer-events-auto absolute -top-1 z-40 -translate-x-1/2 cursor-grab p-1 active:cursor-grabbing"
+        style={{ left }}
+        {...dragHandlers}
+      >
         <svg width="14" height="13" viewBox="0 0 14 13" className="fill-primary" aria-hidden="true">
           <polygon points="1,0 13,0 13,5 7,13 1,5" />
         </svg>

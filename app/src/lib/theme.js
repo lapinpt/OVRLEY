@@ -7,6 +7,7 @@ const THEME_COLOR_VARS = {
   accent: '--theme-color-accent',
   aqua: '--theme-color-aqua',
   ice: '--theme-color-ice',
+  success: '--theme-color-success',
   teal: '--theme-color-teal',
 }
 

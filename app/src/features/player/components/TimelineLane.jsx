@@ -1,6 +1,6 @@
 import { useCallback, useId, useState } from 'react'
 import { Video } from 'lucide-react'
-import { formatTimelineTime, getClipGeometry } from '../utils/playerTimeline'
+import { formatTimelineTime, getClipGeometry, getExportRangeHighlightGeometry } from '../utils/playerTimeline'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
 const CLIP_CONTENT_OFFSET_CLASS = 'translate-y-[0.04rem]'
@@ -30,10 +30,30 @@ function clampPx(value, min, max) {
  *   viewEnd: number,
  *   widthPx: number,
  *   isVideo: boolean,
+ *   exportHighlightRange?: { fromSecond: number, toSecond: number } | null,
  * }} props
  */
-export default function TimelineLane({ clipStart, clipDuration, label, formatLabel, durationSeconds, viewStart, viewEnd, widthPx, isVideo }) {
+export default function TimelineLane({
+  clipStart,
+  clipDuration,
+  label,
+  formatLabel,
+  durationSeconds,
+  viewStart,
+  viewEnd,
+  widthPx,
+  isVideo,
+  exportHighlightRange = null,
+}) {
   const geometry = getClipGeometry({ clipStart, clipDuration, viewStart, viewEnd, widthPx })
+  const highlight = exportHighlightRange
+    ? getExportRangeHighlightGeometry({
+        clipStart,
+        clipDuration,
+        exportFromSecond: exportHighlightRange.fromSecond,
+        exportToSecond: exportHighlightRange.toSecond,
+      })
+    : null
   const tooltipId = useId()
   const [showTooltip, setShowTooltip] = useState(false)
   const formattedDuration = formatTimelineTime(durationSeconds)
@@ -57,7 +77,7 @@ export default function TimelineLane({ clipStart, clipDuration, label, formatLab
           <div
             aria-describedby={showTooltip ? tooltipId : undefined}
             aria-label={label || 'clip'}
-            className={`absolute h-full cursor-default border ${isVideo ? 'border-accent/40 bg-accent/70' : 'border-border/40 bg-primary/70'}`}
+            className={`absolute h-full cursor-default overflow-hidden border ${isVideo ? 'border-accent/40 bg-accent/70' : 'border-foreground/40 bg-foreground/30'}`}
             style={{ left: leftPct, width: widthPct }}
             onClick={stopClipEvent}
             onDoubleClick={stopClipEvent}
@@ -66,9 +86,16 @@ export default function TimelineLane({ clipStart, clipDuration, label, formatLab
             onPointerDown={stopClipEvent}
             onPointerUp={stopClipEvent}
           >
+            {highlight?.isVisible && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 bg-success/20"
+                style={{ left: `${highlight.leftPercent}%`, width: `${highlight.widthPercent}%` }}
+              />
+            )}
             {showText && (
               <div
-                className={`grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${isVideo ? 'text-accent-foreground' : 'text-background'}`}
+                className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${isVideo ? 'text-accent-foreground' : 'text-background'}`}
                 style={{ gridTemplateColumns: `${CLIP_SOURCE_COLUMN_WIDTH} minmax(0, 1fr) auto` }}
               >
                 <span className={`flex min-w-0 items-center justify-center ${CLIP_CONTENT_OFFSET_CLASS}`}>

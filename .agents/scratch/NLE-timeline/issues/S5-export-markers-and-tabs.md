@@ -14,12 +14,12 @@ This adds the export-marker component (reusing the pointer-drag primitive and th
 
 ## Acceptance criteria
 
-- [ ] When the export range type is "custom", two green vertical in/out lines render spanning axis + lanes; they are absent otherwise.
-- [ ] Dragging an in/out line updates the export range live via the existing setter and the timecode formatter.
-- [ ] from is constrained to `[0, to - 1s]`; to is constrained to `[from + 1s, total duration]`.
-- [ ] The part within the export range is highlighted with a faint, transaprent overlay; it does not block axis seek or lane pan.
-- [ ] Export markers use the new green theme token (added to the theme files); playhead stays orange, clips stay aqua/ice.
-- [ ] Export-marker clamping and fit-video/fit-activity pure helpers have tests.
+- [x] When the export range type is "custom", two green vertical in/out lines render spanning axis + lanes; they are absent otherwise.
+- [x] Dragging an in/out line updates the export range live via the existing setter and the timecode formatter.
+- [x] from is constrained to `[0, to - 1s]`; to is constrained to `[from + 1s, total duration]`.
+- [x] The part within the export range is highlighted with a faint, transaprent overlay; it does not block axis seek or lane pan.
+- [x] Export markers use the new green theme token (added to the theme files); playhead stays orange, clips stay aqua/ice.
+- [x] Export-marker clamping and fit-video/fit-activity pure helpers have tests.
 
 ## Blocked by
 

@@ -8,11 +8,13 @@
 import { describe, expect, test } from 'vitest'
 import {
   clampToView,
+  clampExportRangeMarkerSecond,
   computeTimelineTicks,
   fitRangeToViewport,
   fitToFull,
   followPlayhead,
   getClipGeometry,
+  getExportRangeHighlightGeometry,
   getTotalPlaybackDuration,
   panViewport,
   pointerToSecond,
@@ -446,6 +448,50 @@ describe('getClipGeometry', () => {
 
   test('clip with zero duration is not visible', () => {
     const result = getClipGeometry({ clipStart: 10, clipDuration: 0, viewStart: 0, viewEnd: 100, widthPx: 500 })
+    expect(result.isVisible).toBe(false)
+  })
+})
+
+describe('export range marker helpers', () => {
+  test('from marker is constrained to [0, to - 1s]', () => {
+    const base = { marker: 'from', fromSecond: 10, toSecond: 20, totalDuration: 60 }
+
+    expect(clampExportRangeMarkerSecond({ ...base, second: -5 })).toBe(0)
+    expect(clampExportRangeMarkerSecond({ ...base, second: 19.9 })).toBe(19)
+    expect(clampExportRangeMarkerSecond({ ...base, second: 12 })).toBe(12)
+  })
+
+  test('to marker is constrained to [from + 1s, total duration]', () => {
+    const base = { marker: 'to', fromSecond: 10, toSecond: 20, totalDuration: 60 }
+
+    expect(clampExportRangeMarkerSecond({ ...base, second: 10.2 })).toBe(11)
+    expect(clampExportRangeMarkerSecond({ ...base, second: 90 })).toBe(60)
+    expect(clampExportRangeMarkerSecond({ ...base, second: 30 })).toBe(30)
+  })
+
+  test('export range highlight is clipped to the visible part of the clip', () => {
+    const result = getExportRangeHighlightGeometry({
+      clipStart: 10,
+      clipDuration: 40,
+      exportFromSecond: 20,
+      exportToSecond: 35,
+    })
+
+    expect(result).toEqual({
+      isVisible: true,
+      leftPercent: 25,
+      widthPercent: 37.5,
+    })
+  })
+
+  test('export range highlight is absent when the export range misses the clip', () => {
+    const result = getExportRangeHighlightGeometry({
+      clipStart: 10,
+      clipDuration: 20,
+      exportFromSecond: 40,
+      exportToSecond: 50,
+    })
+
     expect(result.isVisible).toBe(false)
   })
 })

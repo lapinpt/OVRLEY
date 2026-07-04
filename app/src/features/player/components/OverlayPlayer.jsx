@@ -8,11 +8,13 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import usePlaybackEngine from '../hooks/usePlaybackEngine'
 import usePlayerKeyboard from '../hooks/usePlayerKeyboard'
 import useTimelineViewport from '../hooks/useTimelineViewport'
-import { computeTimelineTicks, fitRangeToViewport, formatTimelineTime } from '../utils/playerTimeline'
+import { clamp, computeTimelineTicks, fitRangeToViewport, formatTimelineTime } from '../utils/playerTimeline'
 import TimelineAxis from './TimelineAxis'
+import TimelineExportMarkers from './TimelineExportMarkers'
 import TimelineLane from './TimelineLane'
 import TimelinePanSurface from './TimelinePanSurface'
 import TimelinePlayhead from './TimelinePlayhead'
@@ -25,6 +27,24 @@ const VIEWPORT_MATCH_EPSILON_SECONDS = 0.001
 function rangesMatch(a, b) {
   if (!a || !b) return false
   return Math.abs(a.viewStart - b.viewStart) <= VIEWPORT_MATCH_EPSILON_SECONDS && Math.abs(a.viewEnd - b.viewEnd) <= VIEWPORT_MATCH_EPSILON_SECONDS
+}
+
+function useExportHighlightRange(totalDuration) {
+  const exportRange = useStore((state) => state.exportRange)
+
+  return useMemo(() => {
+    if (exportRange?.type !== 'custom') return null
+
+    return {
+      fromSecond: clamp(timeToSeconds(exportRange.fromTime), 0, totalDuration),
+      toSecond: clamp(timeToSeconds(exportRange.toTime), 0, totalDuration),
+    }
+  }, [exportRange, totalDuration])
+}
+
+function TimelineLaneWithExportHighlight({ totalDuration, exportPreviewRange, ...props }) {
+  const exportHighlightRange = useExportHighlightRange(totalDuration)
+  return <TimelineLane {...props} exportHighlightRange={exportPreviewRange ?? exportHighlightRange} />
 }
 
 /**
@@ -90,6 +110,7 @@ export default function OverlayPlayer({ backgroundMode }) {
   const hasActivityData = Boolean(playerStore.activitySummary)
   const activityDurationSeconds = playerStore.activitySummary?.durationSeconds ?? 0
   const [isTimelineDragging, setIsTimelineDragging] = useState(false)
+  const [exportPreviewRange, setExportPreviewRange] = useState(null)
   const containerRef = useRef(null)
   const [widthPx, setWidthPx] = useState(0)
 
@@ -373,7 +394,7 @@ export default function OverlayPlayer({ backgroundMode }) {
           onPanEnd={endTimelineDrag}
         >
           {hasVideo && (
-            <TimelineLane
+            <TimelineLaneWithExportHighlight
               clipStart={videoSyncOffsetSeconds}
               clipDuration={importedVideoDuration ?? 0}
               label={videoBasename}
@@ -383,10 +404,12 @@ export default function OverlayPlayer({ backgroundMode }) {
               viewEnd={viewport.viewEnd}
               widthPx={widthPx}
               isVideo
+              totalDuration={totalDuration}
+              exportPreviewRange={exportPreviewRange}
             />
           )}
           {hasActivity && (
-            <TimelineLane
+            <TimelineLaneWithExportHighlight
               clipStart={0}
               clipDuration={activityDurationSeconds}
               label={activityLabel}
@@ -396,6 +419,8 @@ export default function OverlayPlayer({ backgroundMode }) {
               viewEnd={viewport.viewEnd}
               widthPx={widthPx}
               isVideo={false}
+              totalDuration={totalDuration}
+              exportPreviewRange={exportPreviewRange}
             />
           )}
         </TimelinePanSurface>
@@ -410,6 +435,13 @@ export default function OverlayPlayer({ backgroundMode }) {
             onScrubMove={scrubMove}
             onScrubEnd={scrubEnd}
             onScrubCancel={endTimelineDrag}
+          />
+          <TimelineExportMarkers
+            viewStart={viewport.viewStart}
+            viewEnd={viewport.viewEnd}
+            totalDuration={totalDuration}
+            widthPx={widthPx}
+            onPreviewRangeChange={setExportPreviewRange}
           />
         </div>
       </div>
