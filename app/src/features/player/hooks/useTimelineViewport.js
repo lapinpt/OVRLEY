@@ -11,6 +11,7 @@ import { fitRangeToViewport, fitToFull, followPlayhead, panViewport, zoomRange }
  * @param {number} [options.importedVideoDuration] - Imported video duration for fitVideo.
  * @param {number} [options.activityDurationSeconds] - Activity duration for fitActivity.
  * @param {number} [options.fallbackDurationSeconds] - Fallback duration for fitActivity.
+ * @param {number} [options.widthPx] - Measured timeline width used for the maximum zoom clamp.
  * @param {boolean} [options.isPlaying] - Whether playback is active (drives follow effect).
  * @param {number} [options.playheadSecond] - Current playhead position (drives follow effect).
  * @param {boolean} [options.isDragging] - Whether a scrub/pan drag is active (suspends follow).
@@ -22,6 +23,7 @@ export default function useTimelineViewport({
   importedVideoDuration = 0,
   activityDurationSeconds = 0,
   fallbackDurationSeconds = 0,
+  widthPx = 0,
   isPlaying = false,
   playheadSecond = 0,
   isDragging = false,
@@ -54,17 +56,21 @@ export default function useTimelineViewport({
     )
   }, [isPlaying, playheadSecond, isDragging])
 
-  const zoomBy = useCallback((direction, pivot) => {
-    setViewport((prev) =>
-      zoomRange({
-        viewStart: prev.viewStart,
-        viewEnd: prev.viewEnd,
-        pivot,
-        direction,
-        totalDuration: totalDurationRef.current,
-      }),
-    )
-  }, [])
+  const zoomBy = useCallback(
+    (direction, pivot) => {
+      setViewport((prev) =>
+        zoomRange({
+          viewStart: prev.viewStart,
+          viewEnd: prev.viewEnd,
+          pivot,
+          direction,
+          totalDuration: totalDurationRef.current,
+          widthPx,
+        }),
+      )
+    },
+    [widthPx],
+  )
 
   const fitAll = useCallback(() => {
     setViewport(fitToFull(totalDurationRef.current))

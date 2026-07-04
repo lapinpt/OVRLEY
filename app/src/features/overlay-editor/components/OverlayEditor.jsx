@@ -355,7 +355,7 @@ function OverlayEditor({
       <div
         ref={setStageElement}
         data-testid="overlay-editor-stage"
-        className="relative flex h-full w-full items-center justify-center overflow-hidden p-8"
+        className="relative flex h-full w-full items-center justify-center overflow-hidden py-8"
         onMouseDown={handleSceneMouseDown}
       >
         <CanvasStatusBadges
@@ -374,7 +374,7 @@ function OverlayEditor({
           style={{ width: overlayState.sceneSize.width * displayScale, height: overlayState.sceneSize.height * displayScale }}
         >
           <div
-            className="absolute left-0 top-0"
+            className="absolute left-0 top-0 mt-4"
             style={{
               width: overlayState.sceneSize.width,
               height: overlayState.sceneSize.height,

@@ -204,22 +204,31 @@ const ZOOM_FACTOR = 1.6
 const MIN_ZOOM_SPAN = 0.5
 const FIT_MIN_SPAN = 2
 const FIT_PADDING_RATIO = 0.04
+const TICK_TARGET_PX = 90
+const MAX_ZOOM_MAJOR_STEP_SECONDS = 2
+
+function getMinimumZoomSpan(widthPx) {
+  const safeWidth = Number(widthPx) || 0
+  if (safeWidth <= 0) return MIN_ZOOM_SPAN
+  return Math.max(MIN_ZOOM_SPAN, (safeWidth / TICK_TARGET_PX) * MAX_ZOOM_MAJOR_STEP_SECONDS)
+}
 
 /**
  * Zooms the viewport by a factor around a pivot point.
  *
- * @param {{ viewStart: number, viewEnd: number, pivot: number, direction: 1|-1, totalDuration: number }} options
+ * @param {{ viewStart: number, viewEnd: number, pivot: number, direction: 1|-1, totalDuration: number, widthPx?: number }} options
  * @returns {{ viewStart: number, viewEnd: number }} Zoomed viewport.
  */
-export function zoomRange({ viewStart, viewEnd, pivot, direction, totalDuration }) {
+export function zoomRange({ viewStart, viewEnd, pivot, direction, totalDuration, widthPx = 0 }) {
   const safeTotal = Math.max(0, Number(totalDuration) || 0)
   const span = viewEnd - viewStart
   const clampedPivot = clamp(Number(pivot) || 0, viewStart, viewEnd)
   const ratio = span > 0 ? (clampedPivot - viewStart) / span : 0.5
+  const minSpan = Math.min(getMinimumZoomSpan(widthPx), safeTotal)
 
   const factor = direction >= 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
   let newSpan = span * factor
-  newSpan = clamp(newSpan, MIN_ZOOM_SPAN, safeTotal)
+  newSpan = clamp(newSpan, minSpan, safeTotal)
 
   let newStart = clampedPivot - ratio * newSpan
   let newEnd = newStart + newSpan
@@ -309,7 +318,6 @@ export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDurati
   return clampToView(newStart, newStart + span, safeTotal)
 }
 
-const TICK_TARGET_PX = 90
 const NICE_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200, 1500, 1800, 3600]
 
 function formatTickLabel(second, step) {

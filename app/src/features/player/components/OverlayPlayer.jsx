@@ -90,6 +90,8 @@ export default function OverlayPlayer({ backgroundMode }) {
   const hasActivityData = Boolean(playerStore.activitySummary)
   const activityDurationSeconds = playerStore.activitySummary?.durationSeconds ?? 0
   const [isTimelineDragging, setIsTimelineDragging] = useState(false)
+  const containerRef = useRef(null)
+  const [widthPx, setWidthPx] = useState(0)
 
   const { viewport, zoomBy, fitAll, fitVideo, fitActivity, resetView, panBy } = useTimelineViewport({
     totalDuration,
@@ -97,6 +99,7 @@ export default function OverlayPlayer({ backgroundMode }) {
     importedVideoDuration,
     activityDurationSeconds,
     fallbackDurationSeconds: playerStore.fallbackDurationSeconds,
+    widthPx,
     isPlaying,
     playheadSecond: clampedPlayhead,
     isDragging: isTimelineDragging,
@@ -139,9 +142,6 @@ export default function OverlayPlayer({ backgroundMode }) {
   const handleZoomIn = useCallback(() => {
     zoomBy(1, clampedPlayhead)
   }, [clampedPlayhead, zoomBy])
-
-  const containerRef = useRef(null)
-  const [widthPx, setWidthPx] = useState(0)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -236,7 +236,7 @@ export default function OverlayPlayer({ backgroundMode }) {
   const activityFormatLabel = playerStore.activitySummary?.fileFormat?.toUpperCase() || 'DATA'
 
   return (
-    <div className={hasActivity ? 'shrink-0 border-border/70 bg-black/30 px-8 py-2 backdrop-blur-sm' : 'hidden'}>
+    <div className={hasActivity || hasVideo ? 'shrink-0 border-border/70 bg-black/30 px-8 py-2 backdrop-blur-sm' : 'hidden'}>
       {/* Toolbar: 3 sections */}
       <div className="flex w-full items-center justify-between gap-4">
         {/* Left: zoom controls + auto-zoom tabs */}
@@ -385,17 +385,19 @@ export default function OverlayPlayer({ backgroundMode }) {
               isVideo
             />
           )}
-          <TimelineLane
-            clipStart={0}
-            clipDuration={activityDurationSeconds}
-            label={activityLabel}
-            formatLabel={activityFormatLabel}
-            durationSeconds={activityDurationSeconds}
-            viewStart={viewport.viewStart}
-            viewEnd={viewport.viewEnd}
-            widthPx={widthPx}
-            isVideo={false}
-          />
+          {hasActivity && (
+            <TimelineLane
+              clipStart={0}
+              clipDuration={activityDurationSeconds}
+              label={activityLabel}
+              formatLabel={activityFormatLabel}
+              durationSeconds={activityDurationSeconds}
+              viewStart={viewport.viewStart}
+              viewEnd={viewport.viewEnd}
+              widthPx={widthPx}
+              isVideo={false}
+            />
+          )}
         </TimelinePanSurface>
         <div className="pointer-events-none absolute inset-0">
           <TimelinePlayhead
