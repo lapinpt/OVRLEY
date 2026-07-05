@@ -1,4 +1,5 @@
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { GripVertical } from 'lucide-react'
 import TimelineLane from './TimelineLane'
 
 /**
@@ -48,16 +49,23 @@ export default function TimelineSurface({ timeline }) {
 
         {timeline.exportMarkers.map((marker) => (
           <div key={marker.marker}>
-            <div className="pointer-events-none absolute bottom-0 top-0 w-px -translate-x-1/2 bg-success" style={marker.lineStyle} />
+            <div className="pointer-events-none absolute bottom-0 top-4 w-px -translate-x-1/2 bg-success" style={marker.lineStyle} />
             <div className="pointer-events-auto absolute -top-1 z-20 -translate-x-1/2" style={marker.style}>
               <SimpleTooltip side="top" content={marker.label}>
                 <button
                   type="button"
                   aria-label={marker.label}
-                  className="flex h-6 w-5 cursor-ew-resize items-start justify-center bg-transparent p-0 text-success outline-none focus-visible:ring-2 focus-visible:ring-success/50 active:cursor-ew-resize"
+                  className="relative flex h-6 w-5 cursor-ew-resize items-start justify-center bg-transparent p-0 text-success outline-none focus-visible:ring-2 focus-visible:ring-success/50 active:cursor-ew-resize"
                   {...marker.markerProps}
                 >
-                  <span aria-hidden="true" className={marker.handleClassName} />
+                  <svg width="14" height="20" viewBox="0 0 14 20" className="mt-1 fill-current" aria-hidden="true">
+                    <rect x="2.5" y="2" width="9" height="16" rx="1.5" />
+                  </svg>
+                  <GripVertical
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-1/2 top-4 h-3 w-3 -translate-x-1/2 -translate-y-1/2 text-background/80"
+                    strokeWidth={2.5}
+                  />
                 </button>
               </SimpleTooltip>
             </div>

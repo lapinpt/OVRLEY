@@ -38,8 +38,15 @@ describe('timelineViewport utilities', () => {
     expect(panViewport({ deltaSeconds: 10, totalDuration: 200, viewEnd: 50, viewStart: 0 })).toEqual({ viewStart: 10, viewEnd: 60 })
 
     const followed = followPlayhead({ playheadSecond: 100, totalDuration: 200, viewEnd: 50, viewStart: 0 })
-    expect(followed.viewStart).toBeCloseTo(100 - 0.15 * 50)
-    expect(followed.viewEnd).toBeCloseTo(100 - 0.15 * 50 + 50)
+    expect(followed.viewStart).toBeCloseTo(100 - 0.85 * 50)
+    expect(followed.viewEnd).toBeCloseTo(100 - 0.85 * 50 + 50)
+  })
+
+  test('follows before the playhead exits the right edge', () => {
+    const viewport = followPlayhead({ playheadSecond: 45, totalDuration: 200, viewEnd: 50, viewStart: 0 })
+
+    expect(viewport.viewStart).toBeCloseTo(45 - 0.85 * 50)
+    expect(viewport.viewEnd - viewport.viewStart).toBeCloseTo(50)
   })
 
   test('builds and matches canonical fit targets', () => {

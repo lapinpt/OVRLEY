@@ -122,7 +122,7 @@ describe('useTimelineViewport', () => {
     expect(result.current.viewport.viewStart).toBe(100 - span)
   })
 
-  test('Ctrl+wheel zooms at the pointer position and plain wheel is a no-op', () => {
+  test('wheel zooms at the pointer position', () => {
     const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100 }))
     const preventDefault = vi.fn()
 
@@ -131,17 +131,31 @@ describe('useTimelineViewport', () => {
     })
 
     act(() => {
-      result.current.handleWheel({ clientX: 25, ctrlKey: false, deltaY: -100, preventDefault })
-    })
-    expect(preventDefault).not.toHaveBeenCalled()
-    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
-
-    act(() => {
-      result.current.handleWheel({ clientX: 25, ctrlKey: true, deltaY: -100, preventDefault })
+      result.current.handleWheel({ clientX: 25, deltaY: -100, preventDefault })
     })
 
     expect(preventDefault).toHaveBeenCalled()
     expect(result.current.viewport.viewEnd - result.current.viewport.viewStart).toBeCloseTo(100 / 1.6)
+  })
+
+  test('Ctrl+wheel pans the visible timeline', () => {
+    const { result } = renderHook(() => useTimelineViewport({ totalDuration: 100, playheadSecond: 50 }))
+    const preventDefault = vi.fn()
+
+    act(() => {
+      result.current.containerRef(createMeasuredElement(100))
+      result.current.zoomIn()
+    })
+
+    const beforePan = { ...result.current.viewport }
+
+    act(() => {
+      result.current.handleWheel({ clientX: 50, ctrlKey: true, deltaY: 10, preventDefault })
+    })
+
+    expect(preventDefault).toHaveBeenCalled()
+    expect(result.current.viewport.viewStart).toBeGreaterThan(beforePan.viewStart)
+    expect(result.current.viewport.viewEnd - result.current.viewport.viewStart).toBeCloseTo(beforePan.viewEnd - beforePan.viewStart)
   })
 
   test('starts measuring when the timeline element appears after an initial null render', () => {

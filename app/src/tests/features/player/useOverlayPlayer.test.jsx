@@ -39,7 +39,7 @@ describe('useOverlayPlayer', () => {
     const { result } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
 
     expect(result.current.isVisible).toBe(true)
-    expect(result.current.toolbar.fitTargets.map((target) => target.id)).toEqual(['all', 'video', 'activity'])
+    expect(result.current.toolbar.fitTargets.map((target) => target.id)).toEqual(['video', 'activity'])
     expect(result.current.timeline.lanes.map((lane) => lane.id)).toEqual(['video', 'activity'])
   })
 

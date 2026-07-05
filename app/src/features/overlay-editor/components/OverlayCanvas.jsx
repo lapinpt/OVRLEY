@@ -282,7 +282,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
       ) : null}
       {backgroundMode === 'video' && videoPreviewMessages.length > 0 ? (
         <div
-          className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex max-w-xl items-start gap-2 rounded-md border border-amber-400/40 bg-black/75 px-3 py-2 text-xs leading-snug text-amber-100 shadow-lg"
+          className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex max-w-xl items-start gap-2 rounded-sm border border-amber-400/40 bg-black/75 px-3 py-2 text-xs leading-snug text-amber-100 shadow-lg"
           aria-live="polite"
         >
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

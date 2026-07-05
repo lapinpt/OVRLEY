@@ -43,13 +43,13 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
         const textPreviewModel = buildTextWidgetPreviewModel({ widget })
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
         const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null)
-        const left = renderGeometry.badgeLeft * displayScale
-        const top = Math.max(renderGeometry.badgeTop * displayScale - 24, 0)
+        const left = renderGeometry.badgeLeft * displayScale - 2
+        const top = Math.max(renderGeometry.badgeTop * displayScale - 8, 0)
 
         return (
           <div
             key={widget.id}
-            className="absolute flex h-5 items-center gap-1 rounded-md border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
+            className="absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
             style={{ left, top }}
           >
             <Icon className="h-3 w-3" />
@@ -67,12 +67,12 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
       {showTemplateStatus ? (
         <Badge
           variant={status === 'Modified' ? 'secondary' : 'outline'}
-          className={`h-6 rounded-full text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft text-primary' : 'bg-card/85'}`}
+          className={`h-6 rounded-xs text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
         >
           {status}
         </Badge>
       ) : null}
-      <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
+      <div className="rounded-xs border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
         {width} &times; {height}
       </div>
     </div>
@@ -103,7 +103,7 @@ function CanvasToolbar({ editorControls, importedBackgroundImageFilename, import
 function EmptyOverlayState() {
   return (
     <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-sm rounded-xl border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+      <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
           <LayoutGrid className="h-6 w-6" />
         </div>

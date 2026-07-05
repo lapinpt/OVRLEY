@@ -20,6 +20,8 @@ import TemplateSection from './TemplateSection'
  * @returns {JSX.Element} Rendered component output.
  */
 export default function AppHeader({ activityControls, backendStatus, onOpenDownloads, renderControls, templateControls, videoControls }) {
+  const rawAppVersion = import.meta.env.VITE_OVRLEY_VERSION?.trim() || '0.00.0'
+  const appVersion = rawAppVersion.startsWith('v') ? rawAppVersion : `v${rawAppVersion}`
   const { activityLabel, onOpenActivityFile } = activityControls
   const { onOpenRenderDialog, onRenderPreviewFrame, renderDisabled, renderPreviewFrameDisabled, renderTooltipContent, renderingVideo } =
     renderControls
@@ -43,6 +45,7 @@ export default function AppHeader({ activityControls, backendStatus, onOpenDownl
           activityLabel={activityLabel}
           onOpenActivityFile={onOpenActivityFile}
           debugModeEnabled={debugModeEnabled}
+          appVersion={appVersion}
           importedMediaFilename={importedMediaFilename}
           handleImportVideo={handleImportVideo}
           clearImportedVideo={clearImportedVideo}

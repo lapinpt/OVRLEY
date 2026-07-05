@@ -15,6 +15,7 @@
 @import './styles/moveable.css';
 @import './styles/utilities.css';
 
+/* #c65102; */
 :root,
 .radix-themes {
   font-family:
@@ -42,7 +43,8 @@
   -moz-osx-font-smoothing: grayscale;
   --radius: 0.625rem;
   --theme-color-background: #00111b;
-  --theme-color-accent: #c65102;
+
+  --theme-color-accent: #ad5013;
   --theme-color-aqua: #40e0d0;
   --theme-color-ice: #86aaaa;
   --theme-color-success: #37d67a;
@@ -85,8 +87,8 @@
   --surface-strong: color-mix(in srgb, var(--theme-color-background) 72%, var(--theme-color-teal) 28%);
   --surface-overlay: color-mix(in srgb, var(--theme-color-background) 92%, transparent);
   --surface-tooltip: color-mix(in srgb, var(--theme-color-background) 64%, var(--theme-color-teal) 36%);
-  --surface-accent-soft: color-mix(in srgb, var(--theme-color-background) 86%, var(--theme-color-accent) 14%);
-  --surface-accent-strong: color-mix(in srgb, var(--theme-color-background) 74%, var(--theme-color-accent) 26%);
+  --surface-accent-soft: color-mix(in srgb, var(--theme-color-background) 76%, var(--theme-color-accent) 24%);
+  --surface-accent-strong: color-mix(in srgb, var(--theme-color-background) 64%, var(--theme-color-accent) 36%);
   --surface-highlight: color-mix(in srgb, var(--theme-color-background) 76%, var(--theme-color-aqua) 24%);
   --surface-highlight-soft: color-mix(in srgb, var(--theme-color-background) 88%, var(--theme-color-aqua) 12%);
   --surface-darken: color-mix(in srgb, var(--theme-color-background) 70%, black 30%);

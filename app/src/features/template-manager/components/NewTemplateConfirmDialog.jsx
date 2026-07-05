@@ -22,7 +22,7 @@ export default function NewTemplateConfirmDialog({ open, onCancel, onConfirm }) 
   return (
     <div className="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md" onClick={onCancel}>
       <div
-        className="w-full max-w-md rounded-2xl border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
+        className="w-full max-w-md rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-4">

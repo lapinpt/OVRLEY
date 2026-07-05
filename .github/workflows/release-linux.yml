@@ -114,6 +114,8 @@ jobs:
 
       - name: Build Tauri Debian package
         run: pnpm tauri build --bundles deb
+        env:
+          VITE_OVRLEY_VERSION: ${{ steps.release_tag.outputs.tag }}
 
       - name: Verify Debian package contains bundled FFmpeg
         shell: bash

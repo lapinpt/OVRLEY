@@ -33,7 +33,7 @@ export default function PlayerToolbar({ toolbar }) {
             <RotateCcw className="h-3 w-3" />
           </Button>
         </SimpleTooltip>
-        <div className="ml-1 flex items-center gap-0.5 rounded-sm border border-border/50 p-0.5 uppercase">
+        <div className="ml-1 flex items-center gap-0.5 rounded-xs border border-border/50 p-0.5 uppercase">
           {toolbar.fitTargets.map((target) => (
             <Button key={target.id} type="button" size="toolbar-tab" variant="toolbar" aria-pressed={target.isActive} onClick={target.onSelect}>
               {target.label}
@@ -42,7 +42,7 @@ export default function PlayerToolbar({ toolbar }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1 rounded-md border border-border/30 p-0.5 shadow-sm">
+      <div className="flex items-center gap-1 rounded-xs border border-border/30 p-0.5 shadow-sm">
         <Button
           type="button"
           aria-label="Rewind to start"

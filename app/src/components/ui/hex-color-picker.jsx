@@ -120,11 +120,11 @@ export default function HexColorPicker({
           <button
             type="button"
             className={cn(
-              'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/70 bg-transparent px-2 text-left shadow-xs transition-colors hover:border-accent-border hover:bg-surface-highlight-soft',
+              'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-border/70 bg-transparent px-2 text-left shadow-xs transition-colors hover:border-accent-border hover:bg-surface-highlight-soft',
               triggerClassName,
             )}
           >
-            <ColorPickerSwatch className={cn('size-5 shrink-0 rounded-[0.4rem] border border-border/70 shadow-sm', swatchClassName)} />
+            <ColorPickerSwatch className={cn('size-5 shrink-0 rounded-xs border border-border/70 shadow-sm', swatchClassName)} />
             {showValue ? (
               <span className={cn('truncate font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground', valueClassName)}>
                 {displayValue}
@@ -136,7 +136,7 @@ export default function HexColorPicker({
         <ColorPickerContent
           align="start"
           sideOffset={8}
-          className=" rounded-md border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40 backdrop-blur-sm"
+          className=" rounded-sm border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40 backdrop-blur-sm"
         >
           <div className="space-y-4">
             <ColorPickerArea
@@ -169,7 +169,7 @@ export default function HexColorPicker({
                   <button
                     key={presetColor}
                     type="button"
-                    className="size-9 rounded-xl border border-border/70 bg-surface shadow-sm transition-transform hover:-translate-y-0.5 hover:border-accent-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="size-9 rounded-xs cursor-pointer border border-border/70 bg-surface shadow-sm transition-transform hover:border-accent-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     style={{ backgroundColor: presetColor }}
                     onClick={() => {
                       const nextValue = normalizeHexColor(presetColor)

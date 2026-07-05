@@ -60,7 +60,7 @@ export default function RenderVideoDialog(props) {
       onMouseDown={ctx.handleBackdropPointerDown}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
+        className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         onMouseDown={(event) => event.stopPropagation()}
       >
         {ctx.isProgress ? (
@@ -119,7 +119,7 @@ export default function RenderVideoDialog(props) {
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Framerate</Label>
                 {isCompositeExport && ctx.importedVideoFps ? (
-                  <div className="flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
+                  <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
                     Locked to video FPS ({Math.round(ctx.importedVideoFps)} fps)
                   </div>
                 ) : (

@@ -55,6 +55,34 @@ export function formatExportRangeTime(seconds) {
 }
 
 /**
+ * Returns the range to use when enabling custom export range controls.
+ * Existing valid custom bounds are preserved; empty/default 0-to-0 bounds are
+ * expanded to cover the full activity range.
+ *
+ * @param {object|null|undefined} exportRange - Current export range config.
+ * @param {number} activityEndSecond - Activity end in seconds.
+ * @returns {{ type: string, fromTime: string, toTime: string }}
+ */
+export function getCustomExportRangeDefault(exportRange, activityEndSecond) {
+  const start = timeToSeconds(exportRange?.fromTime)
+  const end = timeToSeconds(exportRange?.toTime)
+
+  if (end > start) {
+    return {
+      ...exportRange,
+      type: 'custom',
+    }
+  }
+
+  return {
+    ...(exportRange || {}),
+    type: 'custom',
+    fromTime: formatExportRangeTime(0),
+    toTime: formatExportRangeTime(activityEndSecond),
+  }
+}
+
+/**
  * Returns the activity duration in seconds used by export-window helpers.
  *
  * @param {object|null} activity - Parsed activity data.

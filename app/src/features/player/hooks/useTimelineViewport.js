@@ -200,19 +200,24 @@ export default function useTimelineViewport({
     )
   }, [])
 
-  // Wheel zoom - Ctrl+wheel zooms around the pointer in the measured timeline element.
+  // Wheel navigation - scroll zooms around the pointer; Ctrl+scroll pans the visible timeline.
   const handleWheel = useCallback(
     (event) => {
-      if (!event.ctrlKey) return
-
       event.preventDefault()
       const rect = containerElement?.getBoundingClientRect()
       if (!rect) return
 
+      if (event.ctrlKey) {
+        const span = viewport.viewEnd - viewport.viewStart
+        const deltaSeconds = rect.width > 0 ? (event.deltaY / rect.width) * span : 0
+        panBy(deltaSeconds)
+        return
+      }
+
       const pivot = viewport.viewStart + ((event.clientX - rect.left) / rect.width) * (viewport.viewEnd - viewport.viewStart)
       zoomBy(event.deltaY < 0 ? 1 : -1, pivot)
     },
-    [containerElement, viewport, zoomBy],
+    [containerElement, panBy, viewport, zoomBy],
   )
 
   // Tick model - presentational components receive rounded pixel positions and percent label positions.

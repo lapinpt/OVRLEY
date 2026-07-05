@@ -10,7 +10,7 @@ import { clamp } from '@/lib/utils'
 import { clampExportRangeMarkerSecond } from '../utils/timelineGeometry'
 
 function getMarkerLabel(marker) {
-  return marker === 'from' ? 'Export in' : 'Export out'
+  return marker === 'from' ? 'Export from' : 'Export to'
 }
 
 /**
@@ -22,9 +22,10 @@ function getMarkerLabel(marker) {
  */
 export default function useExportRangeTimeline({ totalDuration }) {
   // Store selector - export range inputs remain the source of truth outside active drag preview.
-  const { exportRange, setExportRange } = useStore(
+  const { exportRange, importedVideoPath, setExportRange } = useStore(
     useShallow((state) => ({
       exportRange: state.exportRange,
+      importedVideoPath: state.importedVideoPath,
       setExportRange: state.setExportRange,
     })),
   )
@@ -47,7 +48,7 @@ export default function useExportRangeTimeline({ totalDuration }) {
   }, [exportRange])
 
   // Displayed seconds - preview state temporarily overrides the persisted marker being dragged.
-  const isCustom = exportRange?.type === 'custom'
+  const isCustom = exportRange?.type === 'custom' && !importedVideoPath
   const fromSecond = clamp(timeToSeconds(exportRange?.fromTime), 0, totalDuration)
   const toSecond = clamp(timeToSeconds(exportRange?.toTime), 0, totalDuration)
   const displayedFromSecond = dragPreview?.marker === 'from' ? dragPreview.second : fromSecond

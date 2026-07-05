@@ -83,13 +83,13 @@ export default function VideoSyncSection({
         </div>
       </div>
       {videoSyncWarning && (
-        <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
+        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">{videoSyncWarning}</p>
         </div>
       )}
       {videoResolutionMismatch && (
-        <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
+        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
         </div>
