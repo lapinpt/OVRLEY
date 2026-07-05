@@ -834,7 +834,7 @@ function ColorPickerArea(props) {
       data-slot="color-picker-area"
       {...areaProps}
       className={cn(
-        'relative h-40 w-full cursor-crosshair touch-none rounded-sm border',
+        'relative h-40 w-full cursor-crosshair touch-none rounded-xs border',
         context.disabled && 'pointer-events-none opacity-50',
         className,
       )}
@@ -843,7 +843,7 @@ function ColorPickerArea(props) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div className="absolute inset-0 overflow-hidden rounded-sm">
+      <div className="absolute inset-0 overflow-hidden rounded-xs">
         <div
           className="absolute inset-0"
           style={{
@@ -1271,7 +1271,7 @@ function HexInput(props) {
   }
 
   return (
-    <div data-slot="color-picker-input-wrapper " className={cn(className, 'flex items-center rounded-md w-39 bg-red-300')}>
+    <div data-slot="color-picker-input-wrapper " className={cn(className, 'flex items-center rounded-xs w-39')}>
       <InputGroupItem
         aria-label="Hex color value"
         position="first"
@@ -1428,7 +1428,7 @@ function HslInput(props) {
   )
 
   return (
-    <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-md', className)}>
+    <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-xs', className)}>
       <InputGroupItem
         aria-label="Hue degree (0-360)"
         position="first"
@@ -1527,7 +1527,7 @@ function HsbInput(props) {
   )
 
   return (
-    <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-md', className)}>
+    <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-sm', className)}>
       <InputGroupItem
         aria-label="Hue degree (0-360)"
         position="first"

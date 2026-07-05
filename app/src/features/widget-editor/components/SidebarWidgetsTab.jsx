@@ -67,7 +67,7 @@ export default function SidebarWidgetsTab() {
     <div className="space-y-6">
       <div className="space-y-3">
         {widgets.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/70 py-8 text-center">
+          <div className="rounded-sm border border-dashed border-border/70 py-8 text-center">
             <p className="text-xs text-muted-foreground">No active widgets</p>
           </div>
         ) : (
@@ -85,7 +85,7 @@ export default function SidebarWidgetsTab() {
                 <div key={widget.id}>
                   <AccordionItem
                     value={widget.id}
-                    className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border hover:border-primary"
+                    className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border"
                   >
                     <div className="relative group">
                       <AccordionTrigger className="group w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">

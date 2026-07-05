@@ -17,8 +17,8 @@ describe('useExportRangeTimeline', () => {
     const { result } = renderHook(() => useExportRangeTimeline({ totalDuration: 60 }))
 
     expect(result.current.markers).toEqual([
-      { label: 'Export in', marker: 'from', second: 10 },
-      { label: 'Export out', marker: 'to', second: 20 },
+      { label: 'Export from', marker: 'from', second: 10 },
+      { label: 'Export to', marker: 'to', second: 20 },
     ])
     expect(result.current.highlightRange).toEqual({ fromSecond: 10, toSecond: 20 })
   })
@@ -53,6 +53,15 @@ describe('useExportRangeTimeline', () => {
 
   test('returns no markers when the export range is not custom', () => {
     resetStore({ fromTime: '00:00:00', toTime: '00:01:00', type: 'full' })
+
+    const { result } = renderHook(() => useExportRangeTimeline({ totalDuration: 60 }))
+
+    expect(result.current.markers).toEqual([])
+    expect(result.current.highlightRange).toBeNull()
+  })
+
+  test('returns no markers when a video is imported', () => {
+    useStore.setState({ importedVideoPath: '/videos/ride.mp4' })
 
     const { result } = renderHook(() => useExportRangeTimeline({ totalDuration: 60 }))
 

@@ -13,6 +13,7 @@ import { Activity, Film, X } from 'lucide-react'
  * @param {string} props.activityLabel - Label for the activity file button.
  * @param {function} props.onOpenActivityFile - Opens the activity file picker.
  * @param {boolean} props.debugModeEnabled - Whether debug-only media features are enabled.
+ * @param {string|null} props.appVersion - Build-time app version display label.
  * @param {string|null} props.importedMediaFilename - Filename of the imported background media, or null.
  * @param {function} props.handleImportVideo - Opens the video import picker.
  * @param {function} props.clearImportedVideo - Clears the imported video.
@@ -22,6 +23,7 @@ export default function ActivitySection({
   activityLabel,
   onOpenActivityFile,
   debugModeEnabled,
+  appVersion,
   importedMediaFilename,
   handleImportVideo,
   clearImportedVideo,
@@ -29,7 +31,11 @@ export default function ActivitySection({
   return (
     <div className="flex min-w-0 items-center gap-6 overflow-hidden">
       <div className="flex shrink-0 items-center gap-3">
-        <img src="/logo.svg" alt="OVRLEY" className="h-5" />
+        <img src="/logo.svg" alt="OVRLEY" className="h-5 pr-3" />
+        <div className="h-8 w-px shrink-0 bg-border/60" />
+        {appVersion ? (
+          <div className="text-[0.8rem] font-semibold tabular-nums text-muted-foreground/70 normal-case leading-none pt-1 pl-3">{appVersion}</div>
+        ) : null}
       </div>
 
       <div className="h-8 w-px shrink-0 bg-border/60" />
@@ -42,7 +48,7 @@ export default function ActivitySection({
           </Button>
 
           {importedMediaFilename ? (
-            <div className="w-48 mr-2 flex h-9 shrink-0 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground justify-between">
+            <div className="w-48 mr-2 flex h-9 shrink-0 items-center rounded-sm border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground justify-between">
               <div className="flex items-center gap-2 truncate">
                 <Film className="mr-2 h-4 w-4 text-primary" />
                 <span className="truncate">{importedMediaFilename}</span>

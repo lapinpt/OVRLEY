@@ -69,6 +69,7 @@ describe('AppHeader grouped-props contract', () => {
 
     expect(props).toContain('activityLabel')
     expect(props).toContain('onOpenActivityFile')
+    expect(props).toContain('appVersion')
     expect(props).toContain('handleImportVideo')
     expect(props).toContain('clearImportedVideo')
   })

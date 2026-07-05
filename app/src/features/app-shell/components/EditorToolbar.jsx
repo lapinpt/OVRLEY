@@ -41,7 +41,7 @@ export default function EditorToolbar({
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
+      <div className="flex items-center gap-1 rounded-xs border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
         <SimpleTooltip side="bottom" content="Checkered background">
           <Button
             type="button"

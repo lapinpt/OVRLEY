@@ -13,7 +13,7 @@ const FIT_MIN_SPAN = 2
 const FIT_PADDING_RATIO = 0.04
 const TICK_TARGET_PX = 90
 const MAX_ZOOM_MAJOR_STEP_SECONDS = 2
-const FOLLOW_LEAD_RATIO = 0.15
+const FOLLOW_EDGE_PADDING_RATIO = 0.15
 const NICE_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200, 1500, 1800, 3600]
 
 /**
@@ -153,8 +153,13 @@ export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDurati
   const safeTotal = Math.max(0, Number(totalDuration) || 0)
   const span = viewEnd - viewStart
   if (span <= 0 || span >= safeTotal) return { viewStart, viewEnd }
-  if (playheadSecond >= viewStart && playheadSecond < viewEnd) return { viewStart, viewEnd }
-  const newStart = playheadSecond - FOLLOW_LEAD_RATIO * span
+
+  const followStart = viewStart + FOLLOW_EDGE_PADDING_RATIO * span
+  const followEnd = viewEnd - FOLLOW_EDGE_PADDING_RATIO * span
+  if (playheadSecond >= followStart && playheadSecond <= followEnd) return { viewStart, viewEnd }
+
+  const playheadOffsetRatio = playheadSecond < followStart ? FOLLOW_EDGE_PADDING_RATIO : 1 - FOLLOW_EDGE_PADDING_RATIO
+  const newStart = playheadSecond - playheadOffsetRatio * span
   return clampToView(newStart, newStart + span, safeTotal)
 }
 

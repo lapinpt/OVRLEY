@@ -9,7 +9,7 @@ import { cva } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
@@ -18,20 +18,20 @@ const buttonVariants = cva(
         outline:
           'border border-input bg-background shadow-xs hover:bg-accent/20 hover:text-accent-foreground disabled:hover:bg-background disabled:hover:text-foreground',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent/20 hover:text-accent-foreground',
+        ghost: 'hover:bg-surface-elevated',
         toolbar:
           'text-muted-foreground font-semibold hover:bg-surface-elevated hover:text-foreground aria-pressed:bg-foreground aria-pressed:text-surface uppercase',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
-        sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
-        lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
+        sm: 'h-8 rounded-sm gap-1.5 px-3 has-[>svg]:px-2.5',
+        lg: 'h-10 rounded-sm px-6 has-[>svg]:px-4',
         icon: 'size-9',
         'icon-sm': 'size-8',
         'icon-lg': 'size-10',
         'toolbar-icon': 'h-7 w-7 rounded-sm',
-        'toolbar-tab': 'h-5 rounded-xs px-2 text-[0.7rem]',
+        'toolbar-tab': 'h-5 rounded-none px-2 text-[0.7rem]',
       },
     },
     defaultVariants: {

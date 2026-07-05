@@ -9,7 +9,7 @@ function WidgetButton({ item, onClick }) {
   return (
     <button
       onClick={() => onClick(item.type)}
-      className="group flex flex-col items-center justify-center gap-2 w-full aspect-square rounded-lg border border-border/70 bg-surface transition-all hover:border-accent-border hover:bg-surface-accent-soft cursor-pointer"
+      className="group flex flex-col items-center justify-center gap-2 w-full aspect-square rounded-xs border border-border/70 bg-surface transition-all hover:border-accent-border hover:bg-surface-accent-soft/30 cursor-pointer"
     >
       <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
       <span className="text-[9px] leading-tight text-foreground text-center px-0.5 group-hover:text-primary">{item.label}</span>
