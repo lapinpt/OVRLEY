@@ -5,7 +5,7 @@
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
 import { clamp } from '@/lib/utils'
 import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { buildFrameGeometryUpdate } from '@/lib/widget/metric-widget-resolver'
+import { buildFrameGeometryUpdate } from '@/lib/widget/widget-resolver'
 
 /**
  * Creates resize-related moveable handlers.

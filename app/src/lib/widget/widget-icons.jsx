@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 
-import { Type } from 'lucide-react'
+import { Presentation, Type } from 'lucide-react'
 import { CURRENT_STANDARD_METRIC_WIDGET_TYPES, STANDARD_METRIC_WIDGET_TYPES } from './standard-widgets'
 import { getStandardMetricDefinition } from './standard-metrics'
 import { METRIC_ICON_SVGS } from './widget-icon-data'
@@ -32,6 +32,7 @@ const STANDARD_METRIC_TYPE_LABELS = Object.fromEntries(
 
 // General widget labels used throughout the app.
 export const TYPE_LABELS = {
+  backdrop: 'Backdrop',
   label: 'Text',
   course: 'Route Map',
   elevation: 'Elevation',
@@ -44,6 +45,7 @@ export const TYPE_LABELS = {
 // Labels for the widget drawer, which may be shorter than the general labels
 
 export const WIDGET_DRAWER_LABELS = {
+  backdrop: 'Backdrop',
   label: 'Text',
   elevation: 'Elev.',
   heartrate: 'HR',
@@ -63,7 +65,7 @@ export const WIDGET_DRAWER_LABELS = {
   core_temperature: 'Core T.',
 }
 
-const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => type !== 'label')
+const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => !['backdrop', 'label'].includes(type))
 
 const widgetIconComponents = {}
 widgetTypes.forEach((type) => {
@@ -73,22 +75,27 @@ widgetTypes.forEach((type) => {
 })
 
 export const WIDGET_ICONS = {
+  backdrop: Presentation,
   label: Type,
   ...widgetIconComponents,
 }
 
 export const TYPE_ICONS = {
+  backdrop: Presentation,
   label: Type,
   ...widgetIconComponents,
 }
 
-export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES].map((type) => ({
-  type,
-  icon: TYPE_ICONS[type],
-  label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
-}))
+export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', 'backdrop', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES].map(
+  (type) => ({
+    type,
+    icon: TYPE_ICONS[type],
+    label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
+  }),
+)
 
 const NON_METRIC_CATEGORIES = {
+  backdrop: 'general',
   label: 'general',
   time: 'general',
   elevation: 'general',

@@ -4,8 +4,12 @@
  */
 
 import { createFontSelection } from '@/lib/fonts'
+import { initBackdropVariant } from '@/lib/widget/widget-resolver'
 import { getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
 import {
+  BACKDROP_DEFAULT_DISPLAY_TYPES,
+  BACKDROP_CIRCLE_DEFAULTS,
+  BACKDROP_RECTANGLE_DEFAULTS,
   TEXT_DEFAULTS,
   TEXT_FONT_SIZES,
   TEXT_LABEL_DEFAULTS,
@@ -14,6 +18,23 @@ import {
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
 } from '@/lib/widget/standard-widgets'
+
+const BACKDROP_SHARED_DEFAULT_KEYS = [
+  'x',
+  'y',
+  'opacity',
+  'fill_color',
+  'fill_opacity',
+  'border_thickness',
+  'border_color',
+  'border_opacity',
+  'display_type',
+]
+
+const BACKDROP_DEFAULTS_BY_TYPE = {
+  circle: BACKDROP_CIRCLE_DEFAULTS,
+  rectangle: BACKDROP_RECTANGLE_DEFAULTS,
+}
 
 /**
  * Parses integer.
@@ -97,6 +118,25 @@ export function createLabelDefaults(globalDefaults) {
     color: getGlobalColor(globalDefaults, 'color_text'),
     opacity: globalDefaults?.opacity ?? 1,
   }
+}
+
+/**
+ * Creates backdrop defaults.
+ *
+ * @returns {object} Backdrop data with shared fields at the top level and active geometry nested.
+ */
+export function createBackdropDefaults() {
+  const displayType = BACKDROP_DEFAULT_DISPLAY_TYPES[0]
+  const activeDefaults = BACKDROP_DEFAULTS_BY_TYPE[displayType]
+  const seed = Object.fromEntries(BACKDROP_SHARED_DEFAULT_KEYS.map((key) => [key, activeDefaults[key]]))
+
+  return initBackdropVariant(
+    {
+      ...seed,
+      display_type: displayType,
+    },
+    displayType,
+  )
 }
 
 /**

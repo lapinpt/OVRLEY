@@ -129,6 +129,29 @@ impl DisplayType {
     }
 }
 
+/// Visual representation mode for a backdrop widget.
+///
+/// Backdrops have no legacy representation, so serde deserialization is
+/// intentionally strict: unknown strings and `null` are rejected by serde
+/// instead of falling back to a default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BackdropType {
+    Circle,
+    #[default]
+    Rectangle,
+}
+
+impl BackdropType {
+    /// Serialises the variant to its shared-manifest key.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BackdropType::Circle => "circle",
+            BackdropType::Rectangle => "rectangle",
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for DisplayType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

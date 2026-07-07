@@ -17,14 +17,14 @@ This slice should leave rendering and editor controls to follow-up issues, but i
 
 ## Acceptance criteria
 
-- [ ] The widget manifest uses `{ definitions: { ... } }` for existing plot, gradient, and label sections while preserving their existing defaults.
-- [ ] The manifest contains `backdrops.defaults` with rectangle as the default display type and definitions for `circle` and `rectangle`.
-- [ ] The Rust backend loads `standard-widgets` from the shared manifest with an include-time loader and accessor helpers parallel to the existing metric manifest loader.
-- [ ] A strict backdrop display-type enum supports `circle` and `rectangle`, defaults to rectangle only where an explicit default is needed, and rejects unknown/null serialized values.
-- [ ] Raw render config accepts a top-level `backdrops` array that defaults to empty when omitted.
-- [ ] Validated render config exposes validated backdrops in parallel with labels, values, and plots.
-- [ ] Backdrop styling fields are required by validation rather than silently defaulted by the backend.
-- [ ] Tests cover manifest parsing, expected backdrop keys/defaults, strict display-type deserialization, and existing-template compatibility with missing `backdrops`.
+- [x] The widget manifest uses `{ definitions: { ... } }` for existing plot, gradient, and label sections while preserving their existing defaults.
+- [x] The manifest contains `backdrops.defaults` with rectangle as the default display type and definitions for `circle` and `rectangle`.
+- [x] The Rust backend loads `standard-widgets` from the shared manifest with an include-time loader and accessor helpers parallel to the existing metric manifest loader.
+- [x] A strict backdrop display-type enum supports `circle` and `rectangle`, defaults to rectangle only where an explicit default is needed, and rejects unknown/null serialized values.
+- [x] Raw render config accepts a top-level `backdrops` array that defaults to empty when omitted.
+- [x] Validated render config exposes validated backdrops in parallel with labels, values, and plots.
+- [x] Backdrop styling fields are required by validation rather than silently defaulted by the backend.
+- [x] Tests cover manifest parsing, expected backdrop keys/defaults, strict display-type deserialization, and existing-template compatibility with missing `backdrops`.
 
 ## Blocked by
 

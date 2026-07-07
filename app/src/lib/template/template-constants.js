@@ -17,6 +17,8 @@ import {
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
   DISPLAY_TYPE_DEFINITIONS,
+  BACKDROP_CIRCLE_DEFAULTS,
+  BACKDROP_RECTANGLE_DEFAULTS,
 } from '../widget/standard-widgets'
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,20 @@ export const SCENE_DURABLE_KEYS = ['width', 'height', 'fps', 'updateRate']
 /** Keys preserved when normalizing a label widget. */
 export const LABEL_KEYS = [...Object.keys(TEXT_LABEL_DEFAULTS), 'id']
 
+/** Shared keys preserved when normalizing a backdrop widget. */
+export const BACKDROP_SHARED_KEYS = [
+  'id',
+  'x',
+  'y',
+  'opacity',
+  'display_type',
+  'fill_color',
+  'fill_opacity',
+  'border_thickness',
+  'border_color',
+  'border_opacity',
+]
+
 /** Keys preserved when normalizing a metric value widget. */
 export const VALUE_SHARED_KEYS = [...Object.keys(TEXT_DEFAULTS), 'id', 'value', 'display_variants']
 
@@ -67,3 +83,8 @@ export const DISPLAY_VARIANT_KEYS = Object.freeze(
       .map(([displayType, definition]) => [displayType, [...DISPLAY_VARIANT_FRAME_KEYS, ...Object.keys(definition.defaults || {})]]),
   ),
 )
+
+export const BACKDROP_VARIANT_KEYS = Object.freeze({
+  circle: Object.keys(BACKDROP_CIRCLE_DEFAULTS).filter((key) => !BACKDROP_SHARED_KEYS.includes(key)),
+  rectangle: Object.keys(BACKDROP_RECTANGLE_DEFAULTS).filter((key) => !BACKDROP_SHARED_KEYS.includes(key)),
+})

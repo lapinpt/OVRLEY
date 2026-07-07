@@ -53,12 +53,11 @@ pub fn heading_tape_layout(
         indicator_placement,
         "bottom",
     );
-    let highlight_bar_margin =
-        if heading_tape_has_highlight_bar(show_indicator, indicator_style) {
-            frame_height * HIGHLIGHT_BAR_BODY_MARGIN_FRAME_PCT
-        } else {
-            0.0
-        };
+    let highlight_bar_margin = if heading_tape_has_highlight_bar(show_indicator, indicator_style) {
+        frame_height * HIGHLIGHT_BAR_BODY_MARGIN_FRAME_PCT
+    } else {
+        0.0
+    };
     let ideal_top_slot = if has_top_chevron {
         indicator_size + gap
     } else {

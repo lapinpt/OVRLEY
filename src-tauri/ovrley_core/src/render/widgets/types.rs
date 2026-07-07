@@ -6,8 +6,9 @@
 //! place.
 
 use crate::normalize::{
-    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedLinearGaugeOrientation,
-    ValidatedLinearGaugeWidget, ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
+    ValidatedBackdrop, ValidatedGradientWidget, ValidatedHeading, ValidatedLabel,
+    ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget, ValidatedSceneConfig,
+    ValidatedTimeValue, ValidatedValueWidget,
 };
 use crate::types::{DisplayType, MetricKind};
 use skia_safe::Image;
@@ -116,6 +117,7 @@ impl PreparedValue {
 #[derive(Clone, Debug)]
 pub struct PreparedRenderAssets {
     pub(crate) scene: ValidatedSceneConfig,
+    pub(crate) backdrops: Vec<ValidatedBackdrop>,
     pub(crate) labels: Vec<ValidatedLabel>,
     pub(crate) values: Vec<PreparedValue>,
     pub(crate) route_cache: Option<RouteWidgetCache>,

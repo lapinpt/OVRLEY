@@ -441,6 +441,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
 
     let config = RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![
             serde_json::from_value(heading_tape_at_pos_0).unwrap(),
@@ -524,6 +525,7 @@ fn render_preserves_multiple_boxed_reports() {
     scene["height"] = serde_json::json!(200);
     let config = RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![heading_tape, speed_text],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -617,6 +619,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
     scene["height"] = serde_json::json!(200);
     let config = RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![heading_tape_left, heading_tape_right],
         plots: serde_json::Value::Object(serde_json::Map::new()),

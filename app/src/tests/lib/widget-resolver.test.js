@@ -1,11 +1,95 @@
 import { describe, expect, test } from 'vitest'
 import {
+  resolveActiveBackdropData,
+  initBackdropVariant,
   resolveActiveMetricWidgetData,
   initDisplayVariant,
   resetCurrentDisplayConfig,
   buildFrameGeometryUpdate,
-} from '@/lib/widget/metric-widget-resolver'
+} from '@/lib/widget/widget-resolver'
+import { createBackdropDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import { HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
+
+// ---------------------------------------------------------------------------
+// Backdrop resolvers
+// ---------------------------------------------------------------------------
+
+describe('backdrop widget resolver', () => {
+  test('createBackdropDefaults stores shared fields at top level and rectangle geometry in the active variant', () => {
+    const backdrop = createBackdropDefaults()
+
+    expect(backdrop).toMatchObject({
+      x: 100,
+      y: 100,
+      opacity: 1,
+      display_type: 'rectangle',
+      fill_color: '#ffffff',
+      fill_opacity: 1,
+      border_thickness: 0,
+      border_color: '#ffffff',
+      border_opacity: 1,
+    })
+    expect(backdrop.width).toBeUndefined()
+    expect(backdrop.height).toBeUndefined()
+    expect(backdrop.display_variants).toEqual({
+      rectangle: {
+        width: 200,
+        height: 120,
+        corner_radius: 0,
+        round_top_left: false,
+        round_top_right: false,
+        round_bottom_left: false,
+        round_bottom_right: false,
+      },
+    })
+  })
+
+  test('resolveActiveBackdropData flattens the active rectangle variant for preview rendering', () => {
+    const backdrop = createBackdropDefaults()
+    const resolved = resolveActiveBackdropData(backdrop)
+
+    expect(resolved.width).toBe(200)
+    expect(resolved.height).toBe(120)
+    expect(resolved.display_type).toBe('rectangle')
+    expect(resolved.fill_color).toBe('#ffffff')
+  })
+
+  test('resolveActiveBackdropData applies preview overrides when provided', () => {
+    const backdrop = createBackdropDefaults()
+    const resolved = resolveActiveBackdropData(backdrop, { opacity: 0.5, width: 400 })
+
+    expect(resolved.opacity).toBe(0.5)
+    expect(resolved.width).toBe(400)
+    expect(resolved.height).toBe(120)
+    expect(resolved.display_type).toBe('rectangle')
+  })
+
+  test('resolveActiveBackdropData returns resolved data without overrides when not provided', () => {
+    const backdrop = createBackdropDefaults()
+    const resolved = resolveActiveBackdropData(backdrop)
+
+    expect(resolved.opacity).toBe(1)
+    expect(resolved.width).toBe(200)
+  })
+
+  test('initBackdropVariant preserves existing variants while seeding missing geometry', () => {
+    const backdrop = {
+      display_type: 'rectangle',
+      display_variants: {
+        rectangle: { width: 240, height: 140, corner_radius: 8 },
+      },
+    }
+
+    const result = initBackdropVariant(backdrop, 'circle')
+
+    expect(result.display_variants.rectangle).toEqual(backdrop.display_variants.rectangle)
+    expect(result.display_variants.circle).toEqual({ diameter: 200 })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Metric resolvers
+// ---------------------------------------------------------------------------
 
 describe('resolveActiveMetricWidgetData', () => {
   test('returns flat data as-is for text display_type', () => {

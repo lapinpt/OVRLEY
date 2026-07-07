@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayPlayer from '@/features/player/components/OverlayPlayer'
 import useStore from '@/store/useStore'
@@ -47,8 +47,7 @@ describe('OverlayPlayer', () => {
 
     expect(screen.getByRole('group', { name: 'Timeline' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Activity' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('ride.fit')).toBeInTheDocument()
   })
 
@@ -87,7 +86,7 @@ describe('OverlayPlayer', () => {
 
     expect(screen.queryByRole('group', { name: 'Timeline' })).not.toBeInTheDocument()
 
-    resetStore()
+    act(() => resetStore())
     rerender(<OverlayPlayer backgroundMode="black" />)
 
     const clip = screen.getByLabelText('ride.fit')

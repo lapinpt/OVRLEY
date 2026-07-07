@@ -25,7 +25,8 @@ fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
     }
     if start >= duration {
         return Err(CoreError::Activity(
-            "The video starts after the activity ends. The activity has no data for the video.".into(),
+            "The video starts after the activity ends. The activity has no data for the video."
+                .into(),
         ));
     }
     if end <= start {

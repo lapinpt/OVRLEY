@@ -75,18 +75,18 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     expect(getInterpolatedActivityValue(baseActivity, 'iso', 5)).toBe(1600)
   })
 
-  test('hold metric falls back to DEFAULT_ACTIVITY_PREVIEW when series missing', () => {
-    // speed is not in baseActivity, falls back to preview default
-    expect(getInterpolatedActivityValue(baseActivity, 'speed', 1)).toBe(8.4)
+  test('hold metric returns null when series missing', () => {
+    // speed is not in baseActivity, no fallback configured
+    expect(getInterpolatedActivityValue(baseActivity, 'speed', 1)).toBeNull()
   })
 
-  test('hold metric falls back to DEFAULT_ACTIVITY_PREVIEW when activity is null', () => {
-    expect(getInterpolatedActivityValue(null, 'iso', 1)).toBe(400)
+  test('hold metric returns null when activity is null', () => {
+    expect(getInterpolatedActivityValue(null, 'iso', 1)).toBeNull()
   })
 
-  test('hold metric falls back to DEFAULT_ACTIVITY_PREVIEW when series key is missing from activity', () => {
+  test('hold metric returns null when series key is missing from activity', () => {
     const emptyActivity = { sample_elapsed_seconds: [0, 1] }
-    expect(getInterpolatedActivityValue(emptyActivity, 'iso', 1)).toBe(400)
+    expect(getInterpolatedActivityValue(emptyActivity, 'iso', 1)).toBeNull()
   })
 
   test('hold metric with sparse data returns last known value skipping nulls', () => {

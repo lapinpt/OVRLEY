@@ -32,6 +32,9 @@ vi.mock('@/features/widget-preview/components/LinearGaugeRenderer', () => ({
     <div data-testid="linear-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
   ),
 }))
+vi.mock('@/features/widget-preview/components/BackdropRenderer', () => ({
+  default: (props) => <div data-testid="backdrop-renderer" data-widget-type={props.widget.type} />,
+}))
 
 import WidgetPreview from '@/features/widget-preview/components/WidgetPreview'
 
@@ -41,6 +44,25 @@ describe('WidgetPreview dispatch by display_type', () => {
   test('label widgets always use the text renderer', () => {
     const { getByTestId } = render(<WidgetPreview widget={{ type: 'label', category: 'labels', data: { text: 'Hi', x: 0, y: 0 } }} />)
     expect(getByTestId('text-renderer')).toBeTruthy()
+  })
+
+  test('backdrop widgets use the backdrop renderer', () => {
+    const { getByTestId } = render(
+      <WidgetPreview
+        widget={{
+          type: 'backdrop',
+          category: 'backdrops',
+          data: {
+            display_type: 'rectangle',
+            x: 0,
+            y: 0,
+            fill_color: '#ffffff',
+            display_variants: { rectangle: { width: 200, height: 120 } },
+          },
+        }}
+      />,
+    )
+    expect(getByTestId('backdrop-renderer')).toBeTruthy()
   })
 
   test('course widgets use the route renderer', () => {

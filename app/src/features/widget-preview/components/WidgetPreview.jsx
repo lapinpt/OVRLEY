@@ -32,8 +32,9 @@ import { OverlayRouteWidget } from './RouteRenderer'
 import { OverlayElevationWidget } from './ElevationRenderer'
 import { OverlayHeadingWidget } from './HeadingRenderer'
 import { OverlayLinearGaugeWidget } from './LinearGaugeRenderer'
+import OverlayBackdropWidget from './BackdropRenderer'
 import { isBoxedDisplayType, getDisplayTypeLabel, getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
-import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
+import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
 /**
  * Registry mapping boxed display_type values to their preview components.
@@ -79,6 +80,10 @@ function WidgetPreview({
   valueFont,
   exportRange,
 }) {
+  if (widget.type === 'backdrop') {
+    return <OverlayBackdropWidget widget={widget} globalOpacity={globalOpacity} globalScale={globalScale} />
+  }
+
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} sceneStyle={sceneStyle} textPreviewModel={textPreviewModel} />
   }

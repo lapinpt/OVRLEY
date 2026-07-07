@@ -22,7 +22,7 @@
 
 import { createFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/theme'
-import { resolveActiveMetricWidgetData } from '../widget/metric-widget-resolver'
+import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '../widget/widget-resolver'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
 import {
   applyPreviewOverrides,
@@ -81,6 +81,7 @@ function buildEffectivePlotData(widgetData = {}, globals, previewOverrides = nul
 
 export function getEffectiveWidgetData(widget, globals, previewOverrides = null) {
   if (!widget) return widget
+  if (widget.category === 'backdrops') return resolveActiveBackdropData(widget.data, previewOverrides)
   if (widget.category === 'labels') return buildEffectiveLabelData(widget.data, globals, previewOverrides)
   if (widget.category === 'values') return buildEffectiveValueData(widget.data, globals, previewOverrides)
   if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals, previewOverrides)
@@ -101,9 +102,14 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
   const nextConfig = {
     ...config,
     scene: buildEffectiveSceneData(config.scene, normalizedGlobals),
+    backdrops: config.backdrops,
     labels: config.labels,
     values: config.values,
     plots: config.plots,
+  }
+  if (Array.isArray(config.backdrops)) {
+    nextConfig.backdrops = []
+    for (const backdrop of config.backdrops) nextConfig.backdrops.push(resolveActiveBackdropData(backdrop))
   }
   if (Array.isArray(config.labels)) {
     nextConfig.labels = []

@@ -30,7 +30,6 @@ export { WIDGET_ICONS }
 
 /**
  * Default activity metric values used as fallback when no real activity is loaded.
-  Leaving this empty, ti was getting confusin
-* @type {Object<string, number|string>}
+ * @type {Object<string, number|string>}
  */
 export const DEFAULT_ACTIVITY_PREVIEW = {}

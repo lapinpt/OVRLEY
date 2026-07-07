@@ -19,9 +19,10 @@ import {
   updateWidgetsInConfig,
 } from '@/lib/widget/widget-config'
 
-function makeConfig({ labels = [], values = [], plots = [] } = {}) {
+function makeConfig({ backdrops = [], labels = [], values = [], plots = [] } = {}) {
   return {
     scene: { width: 1920, height: 1080, fps: 30 },
+    backdrops,
     labels,
     values,
     plots,
@@ -29,6 +30,17 @@ function makeConfig({ labels = [], values = [], plots = [] } = {}) {
 }
 
 describe('widget-config stable identity', () => {
+  test('buildConfigWidgets emits backdrops before labels, values, and plots', () => {
+    const config = makeConfig({
+      backdrops: [{ id: 'widget-backdrop', display_type: 'rectangle', x: 0, y: 0 }],
+      labels: [{ id: 'widget-label', text: 'Label', x: 10, y: 10 }],
+      values: [{ id: 'widget-value', value: 'speed', x: 20, y: 20 }],
+      plots: [{ id: 'widget-plot', value: 'course', x: 30, y: 30 }],
+    })
+
+    expect(buildConfigWidgets(config).map((widget) => widget.category)).toEqual(['backdrops', 'labels', 'values', 'plots'])
+  })
+
   test('buildConfigWidgets preserves persisted widget ids instead of deriving ids from array position', () => {
     const config = makeConfig({
       labels: [

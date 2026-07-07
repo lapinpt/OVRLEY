@@ -29,7 +29,8 @@ const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1[out]";
 
-const VAAPI_FILTER: &str = "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[main_hw];\
+const VAAPI_FILTER: &str =
+    "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[main_hw];\
 [1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[overlay_hw];\
 [main_hw][overlay_hw]overlay_vaapi=x=0:y=0:eof_action=repeat:shortest=1[out]";
 

@@ -20,6 +20,7 @@ export const DEFAULT_CONFIG = {
     color: '#ffffff',
     font_size: 30,
   },
+  backdrops: [],
   labels: [],
   values: [],
   plots: [],

@@ -72,10 +72,7 @@ pub fn backend_current_os() -> Value {
 /// The core command owns JSON serialization at the framework-agnostic boundary
 /// so the Tauri layer can stay a thin string-in/string-out adapter while tests
 /// exercise the same backend finalization path.
-pub fn backend_finalize_activity(
-    paths: &AppPaths,
-    raw_activity_json: &str,
-) -> CoreResult<Value> {
+pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> CoreResult<Value> {
     serde_json::to_value(crate::activity::finalize::finalize_raw_activity_json(
         raw_activity_json,
         Some(&paths.repo_root),

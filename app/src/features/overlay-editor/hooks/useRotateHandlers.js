@@ -3,7 +3,7 @@
  */
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
-import { buildFrameGeometryUpdate } from '@/lib/widget/metric-widget-resolver'
+import { buildFrameGeometryUpdate } from '@/lib/widget/widget-resolver'
 
 /**
  * Creates rotate-related moveable handlers.

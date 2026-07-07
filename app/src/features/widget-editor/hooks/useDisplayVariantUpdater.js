@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { buildFrameGeometryUpdate } from '@/lib/widget/metric-widget-resolver'
+import { buildFrameGeometryUpdate } from '@/lib/widget/widget-resolver'
 
 const GEOMETRY_KEYS = ['width', 'height', 'rotation']
 

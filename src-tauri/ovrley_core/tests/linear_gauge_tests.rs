@@ -125,6 +125,7 @@ fn gauge_labels_format_integer_and_decimal_ranges() {
 fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -154,6 +155,7 @@ fn preview_render_reports_linear_gauge_without_text_fallback() {
     scene["height"] = serde_json::json!(120);
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),

@@ -132,8 +132,12 @@ impl AvailableCodecs {
             CompositeAvailabilityRule::HevcAmf => self.hevc_amf,
             CompositeAvailabilityRule::H264Videotoolbox => self.h264_videotoolbox,
             CompositeAvailabilityRule::HevcVideotoolbox => self.hevc_videotoolbox,
-            CompositeAvailabilityRule::H264VaapiWithFullFilters => self.h264_vaapi && self.vaapi_full,
-            CompositeAvailabilityRule::HevcVaapiWithFullFilters => self.hevc_vaapi && self.vaapi_full,
+            CompositeAvailabilityRule::H264VaapiWithFullFilters => {
+                self.h264_vaapi && self.vaapi_full
+            }
+            CompositeAvailabilityRule::HevcVaapiWithFullFilters => {
+                self.hevc_vaapi && self.vaapi_full
+            }
             CompositeAvailabilityRule::H264NvencWithCudaFilters => self.h264_nvenc && self.nnvgpu,
             CompositeAvailabilityRule::HevcNvencWithCudaFilters => self.hevc_nvenc && self.nnvgpu,
             CompositeAvailabilityRule::H264QsvWithFullFilters => self.h264_qsv && self.qsv_full,

@@ -9,7 +9,7 @@
 import { getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
 import { SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
-import { initDisplayVariant } from '@/lib/widget/metric-widget-resolver'
+import { initDisplayVariant } from '@/lib/widget/widget-resolver'
 import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
 import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'

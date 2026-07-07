@@ -171,9 +171,7 @@ pub fn finalize_activity_columns(
 /// must preserve gap-fill details from the normalization phase without
 /// recomputing the activity or threading debug state through render-facing
 /// schemas.
-fn finalize_raw_activity_with_debug(
-    raw_activity: &RawActivity,
-) -> CoreResult<FinalizedActivity> {
+fn finalize_raw_activity_with_debug(raw_activity: &RawActivity) -> CoreResult<FinalizedActivity> {
     let (normalized_raw_samples, gap_debug) = if raw_activity.options.skip_idle_gap_fill {
         (raw_activity.raw_samples.clone(), skipped_gap_debug())
     } else {

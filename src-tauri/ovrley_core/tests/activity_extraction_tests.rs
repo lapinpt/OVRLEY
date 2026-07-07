@@ -62,7 +62,7 @@ fn extract_activity_from_telemetry_fixtures() {
             );
         }
 
-        // All metric series must match the GPS-cadence length
+        // Core telemetry series must match the GPS-cadence length.
         assert_eq!(
             n,
             activity.sample_distance_progress.len(),
@@ -80,15 +80,19 @@ fn extract_activity_from_telemetry_fixtures() {
         assert_eq!(n, activity.heading.len(), "{stem}: heading");
         assert_eq!(n, activity.time.len(), "{stem}: time");
         assert_eq!(n, activity.g_force.len(), "{stem}: g_force");
-        assert_eq!(n, activity.iso.len(), "{stem}: iso");
-        assert_eq!(n, activity.aperture.len(), "{stem}: aperture");
-        assert_eq!(n, activity.shutter_speed.len(), "{stem}: shutter_speed");
-        assert_eq!(n, activity.focal_length.len(), "{stem}: focal_length");
-        assert_eq!(n, activity.ev.len(), "{stem}: ev");
-        assert_eq!(
+
+        // Camera metadata can be frame-aligned when present, or stripped to an
+        // empty series when the fixture has no usable camera samples.
+        assert_aligned_or_stripped(&activity.iso, n, stem, "iso");
+        assert_aligned_or_stripped(&activity.aperture, n, stem, "aperture");
+        assert_aligned_or_stripped(&activity.shutter_speed, n, stem, "shutter_speed");
+        assert_aligned_or_stripped(&activity.focal_length, n, stem, "focal_length");
+        assert_aligned_or_stripped(&activity.ev, n, stem, "ev");
+        assert_aligned_or_stripped(
+            &activity.color_temperature,
             n,
-            activity.color_temperature.len(),
-            "{stem}: color_temperature"
+            stem,
+            "color_temperature",
         );
 
         let has_usable_gps = fixture_has_usable_gps(filename);
@@ -221,6 +225,19 @@ fn assert_absent_metric(series: &[Option<f64>], stem: &str, metric: &str) {
     assert!(
         series.iter().all(Option::is_none),
         "{stem}: {metric} must contain no values"
+    );
+}
+
+fn assert_aligned_or_stripped(
+    series: &[Option<f64>],
+    expected_len: usize,
+    stem: &str,
+    metric: &str,
+) {
+    assert!(
+        series.is_empty() || series.len() == expected_len,
+        "{stem}: {metric} length must be {expected_len} when present or 0 when missing, got {}",
+        series.len()
     );
 }
 

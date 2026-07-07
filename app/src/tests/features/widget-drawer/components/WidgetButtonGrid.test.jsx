@@ -33,6 +33,7 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByText('Map')).toBeInTheDocument()
     expect(screen.getByText('Time')).toBeInTheDocument()
     expect(screen.getByText('Grad.')).toBeInTheDocument()
+    expect(screen.getByText('Backdrop')).toBeInTheDocument()
     expect(screen.getByText('Temp.')).toBeInTheDocument()
     expect(screen.getByText('G-Force')).toBeInTheDocument()
     expect(screen.getByText('Air Press.')).toBeInTheDocument()
@@ -54,6 +55,16 @@ describe('WidgetButtonGrid', () => {
     await user.click(screen.getByText('Speed').closest('button'))
 
     expect(onAddWidget).toHaveBeenCalledWith('speed')
+  })
+
+  test('clicking the backdrop button calls onAddWidget with backdrop', async () => {
+    const onAddWidget = vi.fn()
+    const user = userEvent.setup()
+    render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
+
+    await user.click(screen.getByText('Backdrop').closest('button'))
+
+    expect(onAddWidget).toHaveBeenCalledWith('backdrop')
   })
 
   test('clicking a button does not auto-close the drawer', async () => {

@@ -5,6 +5,8 @@
 //! widget-local geometry, builds static layers, and precomputes marker states so
 //! video rendering can draw each frame with predictable cost.
 
+/// Static backdrop widget implementation.
+pub(crate) mod backdrop;
 /// Shared geometry, style, and drawing helpers for all widgets.
 pub(crate) mod common;
 /// Elevation profile widget implementation.
@@ -38,6 +40,7 @@ use crate::paths::AppPaths;
 use crate::render::widgets::types::PreparedValue;
 use std::collections::BTreeMap;
 
+pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
 pub use linear_gauge::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
 pub use metric_presentation::draw_metric_presentation;
@@ -72,11 +75,13 @@ pub fn prepare_render_assets(
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<PreparedRenderAssets> {
     let scene = config.scene.clone();
+    let backdrops = config.backdrops.clone();
     let labels = config.labels.clone();
     let values = config.values.clone();
 
     let mut assets = PreparedRenderAssets {
         scene,
+        backdrops,
         labels,
         values,
         route_cache: None,

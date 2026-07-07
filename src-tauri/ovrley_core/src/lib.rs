@@ -36,8 +36,10 @@ pub mod rdp;
 pub mod render;
 /// Shared standard-metric widget definitions.
 pub mod standard_metrics;
+/// Shared standard-widget definitions.
+pub mod standard_widgets;
 /// Cross-cutting domain types (MetricKind, etc.) shared by config, render, and activity.
 pub mod types;
 
 pub use error::{CoreError, CoreResult};
-pub use types::{DisplayType, MetricKind};
+pub use types::{BackdropType, DisplayType, MetricKind};

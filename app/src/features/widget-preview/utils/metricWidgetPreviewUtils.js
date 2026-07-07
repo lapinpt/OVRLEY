@@ -19,7 +19,7 @@ import { formatStandardMetricDisplay, formatTimeValue } from './formatUtils'
 import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily } from './textMeasurement'
 import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
 import { getStandardMetricDefinition, isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
-import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
+import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
 function getLastFiniteValue(series) {
   if (!Array.isArray(series)) {

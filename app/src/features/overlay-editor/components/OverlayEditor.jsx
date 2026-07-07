@@ -23,7 +23,7 @@ import { useDragHandlers } from '../hooks/useDragHandlers'
 import { useResizeHandlers } from '../hooks/useResizeHandlers'
 import { useScaleHandlers } from '../hooks/useScaleHandlers'
 import { useRotateHandlers } from '../hooks/useRotateHandlers'
-import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
+import { isBackdropWidget, isBoxedMetricWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { buildRenderedGeometrySignature, resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
 
 function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgetPreviews, widgets }) {
@@ -295,11 +295,12 @@ function OverlayEditor({
   }, [overlayState.moveableRef, selectedRenderedGeometryVersion])
 
   // Capability flags
+  const isBackdropSelected = isBackdropWidget(selection.selectedWidget)
   const canResizeSelected = !selection.isGroupSelection && isBoxedMetricWidget(selection.selectedWidget)
   const showEdgeResizeHandles = canResizeSelected && selection.selectedWidget?.type === 'elevation'
-  const canScaleSelected = Boolean(!selection.isGroupSelection && selection.selectedWidget && !isBoxedMetricWidget(selection.selectedWidget))
+  const canScaleSelected = Boolean(!selection.isGroupSelection && selection.selectedWidget && !isFramedWidget(selection.selectedWidget))
   const canRotateSelected = !selection.isGroupSelection && selection.selectedWidget?.type === 'course'
-  const maintainAspectRatio = !selection.isGroupSelection && (selection.selectedWidget?.type === 'course' || canScaleSelected)
+  const maintainAspectRatio = !selection.isGroupSelection && !isBackdropSelected && (selection.selectedWidget?.type === 'course' || canScaleSelected)
 
   // Marquee cleanup
   useEffect(
