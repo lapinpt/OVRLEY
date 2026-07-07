@@ -111,6 +111,7 @@
     "definitions": {
       "circle": {
         "label": "Circle",
+        "icon": { "source": "shared", "assetFile": "display-type-circle.svg" },
         "defaults": {
           "display_type": "circle",
           "x": 100,
@@ -126,6 +127,7 @@
       },
       "rectangle": {
         "label": "Rectangle",
+        "icon": { "source": "shared", "assetFile": "display-type-rectangle.svg" },
         "defaults": {
           "display_type": "rectangle",
           "x": 100,

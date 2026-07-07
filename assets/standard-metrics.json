@@ -3,6 +3,7 @@
     "definitions": {
       "text": {
         "label": "Text",
+        "icon": { "source": "shared", "assetFile": "display-type-text.svg" },
         "layoutMode": "intrinsic",
         "defaults": {
           "x": 100,
@@ -45,6 +46,7 @@
       },
       "heading_tape": {
         "label": "Heading Tape",
+        "icon": { "source": "shared", "assetFile": "display-type-heading-tape.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 600,
         "defaultFrameHeight": 100,
@@ -77,6 +79,7 @@
       },
       "linear": {
         "label": "Linear",
+        "icon": { "source": "shared", "assetFile": "display-type-linear.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
         "defaultFrameHeight": 30,
@@ -100,18 +103,21 @@
       },
       "bars": {
         "label": "Bars",
+        "icon": { "source": "shared", "assetFile": "display-type-bars.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
         "defaultFrameHeight": 60
       },
       "arc": {
         "label": "Arc",
+        "icon": { "source": "shared", "assetFile": "display-type-arc.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 120,
         "defaultFrameHeight": 120
       },
       "corner": {
         "label": "Corner",
+        "icon": { "source": "shared", "assetFile": "display-type-corner.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
         "defaultFrameHeight": 60

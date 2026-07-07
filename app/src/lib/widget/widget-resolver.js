@@ -10,7 +10,7 @@
  */
 
 import { TEXT_DEFAULTS, BACKDROP_CIRCLE_DEFAULTS, BACKDROP_RECTANGLE_DEFAULTS } from './standard-widgets'
-import { getDefaultFrameDimensions, getDisplayVariantNonGeometryDefaults } from './standard-metrics'
+import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults } from './standard-metrics'
 
 // ---------------------------------------------------------------------------
 // Backdrop constants
@@ -169,7 +169,7 @@ export function initDisplayVariant(widgetData, displayType) {
   const variants = widgetData.display_variants || {}
   const currentVariant = variants[displayType]
   const frameDefaults = getDefaultFrameDimensions(displayType)
-  const nonGeometryDefaults = getDisplayVariantNonGeometryDefaults(displayType)
+  const nonGeometryDefaults = getDisplayTypeConfigDefaults(displayType)
 
   if (!frameDefaults && !nonGeometryDefaults) return widgetData
 
@@ -216,7 +216,7 @@ export function resetCurrentDisplayConfig(widgetData) {
   }
 
   const frameDefaults = getDefaultFrameDimensions(displayType)
-  const nonGeometryDefaults = getDisplayVariantNonGeometryDefaults(displayType)
+  const nonGeometryDefaults = getDisplayTypeConfigDefaults(displayType)
 
   if (!frameDefaults && !nonGeometryDefaults) return widgetData
 

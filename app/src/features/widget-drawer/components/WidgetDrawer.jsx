@@ -15,8 +15,8 @@ export function WidgetDrawer() {
   const { closeWidgetDrawer, widgetDrawerOpen, toggleWidgetDrawer } = useLayoutStore()
   const { addWidget } = useWidgetManager()
 
-  const handleAddWidget = (type) => {
-    addWidget(type)
+  const handleAddWidget = (type, displayType) => {
+    addWidget(type, displayType)
     closeWidgetDrawer()
   }
 

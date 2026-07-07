@@ -5,7 +5,7 @@
 
 import { createFontSelection } from '@/lib/fonts'
 import { initBackdropVariant } from '@/lib/widget/widget-resolver'
-import { getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
+import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults } from '@/lib/widget/standard-metrics'
 import {
   BACKDROP_DEFAULT_DISPLAY_TYPES,
   BACKDROP_CIRCLE_DEFAULTS,
@@ -123,19 +123,20 @@ export function createLabelDefaults(globalDefaults) {
 /**
  * Creates backdrop defaults.
  *
+ * @param {string} [displayType] - Optional display type override (e.g. "circle", "rectangle").
  * @returns {object} Backdrop data with shared fields at the top level and active geometry nested.
  */
-export function createBackdropDefaults() {
-  const displayType = BACKDROP_DEFAULT_DISPLAY_TYPES[0]
-  const activeDefaults = BACKDROP_DEFAULTS_BY_TYPE[displayType]
+export function createBackdropDefaults(displayType) {
+  const resolvedType = displayType || BACKDROP_DEFAULT_DISPLAY_TYPES[0]
+  const activeDefaults = BACKDROP_DEFAULTS_BY_TYPE[resolvedType]
   const seed = Object.fromEntries(BACKDROP_SHARED_DEFAULT_KEYS.map((key) => [key, activeDefaults[key]]))
 
   return initBackdropVariant(
     {
       ...seed,
-      display_type: displayType,
+      display_type: resolvedType,
     },
-    displayType,
+    resolvedType,
   )
 }
 
@@ -144,14 +145,17 @@ export function createBackdropDefaults() {
  *
  * @param {*} type - Widget or value type identifier.
  * @param {*} globalDefaults - Value for global defaults.
+ * @param {string} [displayType] - Optional display type override (e.g. "text", "linear", "heading_tape").
  * @returns {object} Derived data structure for downstream use.
  */
-export function createMetricValueDefaults(type, globalDefaults) {
+export function createMetricValueDefaults(type, globalDefaults, displayType) {
   const font = globalDefaults?.font_values || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
+  const resolvedDisplayType = displayType || 'text'
   const sharedDefaults = {
     ...TEXT_DEFAULTS,
     value: type,
+    display_type: resolvedDisplayType,
     ...fontSelection,
     font_size: TEXT_FONT_SIZES[type] || TEXT_FONT_SIZES.default,
     color: getGlobalColor(globalDefaults, 'color_values'),
@@ -164,27 +168,39 @@ export function createMetricValueDefaults(type, globalDefaults) {
       unit_color: getGlobalColor(globalDefaults, 'color_units'),
     }
   }
-  if (type === 'heading') {
+
+  // Build display_variants for boxed display types
+  const displayVariants = {}
+  if (type === 'heading' || resolvedDisplayType === 'heading_tape') {
     const frameDefaults = getDefaultFrameDimensions('heading_tape')
-    return {
-      ...sharedDefaults,
-      icon_color: getGlobalColor(globalDefaults, 'color_icons'),
-      unit_color: getGlobalColor(globalDefaults, 'color_units'),
-      ...TYPE_DEFAULTS[type],
-      display_variants: {
-        heading_tape: {
-          ...HEADING_TAPE_DEFAULTS,
-          ...(frameDefaults || {}),
-        },
-      },
+    displayVariants.heading_tape = {
+      ...HEADING_TAPE_DEFAULTS,
+      ...(frameDefaults || {}),
     }
   }
-  return {
+  if (resolvedDisplayType !== 'text' && !displayVariants[resolvedDisplayType]) {
+    const variantDefaults = getDisplayTypeConfigDefaults(resolvedDisplayType)
+    const frameDefaults = getDefaultFrameDimensions(resolvedDisplayType)
+    if (variantDefaults || frameDefaults) {
+      displayVariants[resolvedDisplayType] = {
+        ...(variantDefaults || {}),
+        ...(frameDefaults || {}),
+      }
+    }
+  }
+
+  const result = {
     ...sharedDefaults,
     icon_color: getGlobalColor(globalDefaults, 'color_icons'),
     unit_color: getGlobalColor(globalDefaults, 'color_units'),
     ...TYPE_DEFAULTS[type],
   }
+
+  if (Object.keys(displayVariants).length > 0) {
+    result.display_variants = displayVariants
+  }
+
+  return result
 }
 
 /**

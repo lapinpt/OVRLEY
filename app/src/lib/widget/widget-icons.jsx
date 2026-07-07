@@ -1,14 +1,18 @@
 /* eslint-disable react-refresh/only-export-components */
 
 import { Presentation, Type } from 'lucide-react'
-import { CURRENT_STANDARD_METRIC_WIDGET_TYPES, STANDARD_METRIC_WIDGET_TYPES } from './standard-widgets'
-import { getStandardMetricDefinition } from './standard-metrics'
-import { METRIC_ICON_SVGS } from './widget-icon-data'
+import {
+  CURRENT_STANDARD_METRIC_WIDGET_TYPES,
+  STANDARD_METRIC_WIDGET_TYPES,
+  BACKDROP_TYPE_DEFINITIONS,
+  DISPLAY_TYPE_LABELS,
+} from './standard-widgets'
+import { getStandardMetricDefinition, getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
+import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS } from './widget-icon-data'
 
-export { METRIC_ICON_SVGS }
+export { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS }
 
-export function WidgetIcon({ type, className, ...props }) {
-  const data = METRIC_ICON_SVGS[type]
+function ParsedSvgIcon({ data, className, ...props }) {
   if (!data?.innerMarkup) return null
   return (
     <svg
@@ -24,6 +28,14 @@ export function WidgetIcon({ type, className, ...props }) {
       dangerouslySetInnerHTML={{ __html: data.innerMarkup }}
     />
   )
+}
+
+export function WidgetIcon({ type, ...props }) {
+  return <ParsedSvgIcon data={METRIC_ICON_SVGS[type]} {...props} />
+}
+
+export function DisplayTypeIcon({ displayType, ...props }) {
+  return <ParsedSvgIcon data={DISPLAY_TYPE_ICON_SVGS[displayType]} {...props} />
 }
 
 const STANDARD_METRIC_TYPE_LABELS = Object.fromEntries(
@@ -86,11 +98,27 @@ export const TYPE_ICONS = {
   ...widgetIconComponents,
 }
 
+export const DISPLAY_TYPE_ICONS = Object.fromEntries(
+  Object.keys(DISPLAY_TYPE_ICON_SVGS).map((dt) => [dt, (props) => <DisplayTypeIcon displayType={dt} {...props} />]),
+)
+
+const BACKDROP_DISPLAY_TYPES = Object.keys(BACKDROP_TYPE_DEFINITIONS)
+
+export function getWidgetDisplayTypes(type) {
+  if (type === 'backdrop') return BACKDROP_DISPLAY_TYPES
+  if (isStandardMetricWidgetType(type)) return getSupportedDisplayTypes(type)
+  return ['text']
+}
+
 export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', 'backdrop', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES].map(
   (type) => ({
     type,
     icon: TYPE_ICONS[type],
     label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
+    displayTypes: getWidgetDisplayTypes(type).map((value) => ({
+      value,
+      label: DISPLAY_TYPE_LABELS[value] ?? value,
+    })),
   }),
 )
 

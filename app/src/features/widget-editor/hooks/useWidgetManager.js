@@ -62,13 +62,13 @@ export function useWidgetManager() {
   }
 
   // Add widget — creates a new widget of the given type with defaults and appends to config
-  const addWidget = (type) => {
+  const addWidget = (type, displayType) => {
     const nextConfig = structuredClone(config)
     let targetCategory = null
 
     if (type === 'backdrop') {
       if (!nextConfig.backdrops) nextConfig.backdrops = []
-      nextConfig.backdrops.push(createBackdropDefaults())
+      nextConfig.backdrops.push(createBackdropDefaults(displayType))
       targetCategory = 'backdrops'
     } else if (type === 'label') {
       if (!nextConfig.labels) nextConfig.labels = []
@@ -76,7 +76,7 @@ export function useWidgetManager() {
       targetCategory = 'labels'
     } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
       if (!nextConfig.values) nextConfig.values = []
-      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults))
+      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults, displayType))
       targetCategory = 'values'
     } else if (['course', 'elevation'].includes(type)) {
       if (!nextConfig.plots) nextConfig.plots = []
