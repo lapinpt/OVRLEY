@@ -63,7 +63,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
   if (presentation.mode === 'metric' && presentation.metricLayout) {
     return (
       <div
-        className="relative"
+        className="pointer-events-none relative"
         style={{
           width: presentation.renderWidth,
           height: presentation.renderHeight,
@@ -138,7 +138,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
         width={presentation.gradientLayout.width}
         height={presentation.gradientLayout.height}
         viewBox={`0 0 ${presentation.gradientLayout.width} ${presentation.gradientLayout.height}`}
-        className="block overflow-visible"
+        className="pointer-events-none block overflow-visible"
       >
         {presentation.gradientValuePrefix ? (
           <PreviewSvgText

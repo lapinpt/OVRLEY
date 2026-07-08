@@ -8,7 +8,7 @@ import {
   buildFrameGeometryUpdate,
 } from '@/lib/widget/widget-resolver'
 import { createBackdropDefaults } from '@/features/widget-editor/utils/widgetUtils'
-import { HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
+import { BACKDROP_RECTANGLE_DEFAULTS, HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 // ---------------------------------------------------------------------------
 // Backdrop resolvers
@@ -17,29 +17,21 @@ import { HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 describe('backdrop widget resolver', () => {
   test('createBackdropDefaults stores shared fields at top level and rectangle geometry in the active variant', () => {
     const backdrop = createBackdropDefaults()
+    const { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right, ...sharedDefaults } =
+      BACKDROP_RECTANGLE_DEFAULTS
 
-    expect(backdrop).toMatchObject({
-      x: 100,
-      y: 100,
-      opacity: 1,
-      display_type: 'rectangle',
-      fill_color: '#ffffff',
-      fill_opacity: 1,
-      border_thickness: 0,
-      border_color: '#ffffff',
-      border_opacity: 1,
-    })
+    expect(backdrop).toMatchObject(sharedDefaults)
     expect(backdrop.width).toBeUndefined()
     expect(backdrop.height).toBeUndefined()
     expect(backdrop.display_variants).toEqual({
       rectangle: {
-        width: 200,
-        height: 120,
-        corner_radius: 0,
-        round_top_left: false,
-        round_top_right: false,
-        round_bottom_left: false,
-        round_bottom_right: false,
+        width,
+        height,
+        corner_radius,
+        round_top_left,
+        round_top_right,
+        round_bottom_left,
+        round_bottom_right,
       },
     })
   })
@@ -48,10 +40,10 @@ describe('backdrop widget resolver', () => {
     const backdrop = createBackdropDefaults()
     const resolved = resolveActiveBackdropData(backdrop)
 
-    expect(resolved.width).toBe(200)
-    expect(resolved.height).toBe(120)
+    expect(resolved.width).toBe(BACKDROP_RECTANGLE_DEFAULTS.width)
+    expect(resolved.height).toBe(BACKDROP_RECTANGLE_DEFAULTS.height)
     expect(resolved.display_type).toBe('rectangle')
-    expect(resolved.fill_color).toBe('#ffffff')
+    expect(resolved.fill_color).toBe(BACKDROP_RECTANGLE_DEFAULTS.fill_color)
   })
 
   test('resolveActiveBackdropData applies preview overrides when provided', () => {
@@ -60,8 +52,20 @@ describe('backdrop widget resolver', () => {
 
     expect(resolved.opacity).toBe(0.5)
     expect(resolved.width).toBe(400)
-    expect(resolved.height).toBe(120)
+    expect(resolved.height).toBe(BACKDROP_RECTANGLE_DEFAULTS.height)
     expect(resolved.display_type).toBe('rectangle')
+  })
+
+  test('resolveActiveBackdropData lets live rectangle frame drafts override variant dimensions', () => {
+    const backdrop = {
+      ...createBackdropDefaults(),
+      width: 260,
+      height: 160,
+    }
+    const resolved = resolveActiveBackdropData(backdrop)
+
+    expect(resolved.width).toBe(260)
+    expect(resolved.height).toBe(160)
   })
 
   test('resolveActiveBackdropData returns resolved data without overrides when not provided', () => {
@@ -69,7 +73,7 @@ describe('backdrop widget resolver', () => {
     const resolved = resolveActiveBackdropData(backdrop)
 
     expect(resolved.opacity).toBe(1)
-    expect(resolved.width).toBe(200)
+    expect(resolved.width).toBe(BACKDROP_RECTANGLE_DEFAULTS.width)
   })
 
   test('initBackdropVariant preserves existing variants while seeding missing geometry', () => {
@@ -84,6 +88,36 @@ describe('backdrop widget resolver', () => {
 
     expect(result.display_variants.rectangle).toEqual(backdrop.display_variants.rectangle)
     expect(result.display_variants.circle).toEqual({ diameter: 200 })
+  })
+
+  test('initBackdropVariant leaves an existing backdrop variant untouched', () => {
+    const backdrop = {
+      display_type: 'circle',
+      diameter: 200,
+      display_variants: {
+        rectangle: { width: 240, height: 140, corner_radius: 8, custom: 'preserved' },
+        circle: { diameter: 260, custom: 'preserved' },
+      },
+    }
+
+    expect(initBackdropVariant(backdrop, 'circle')).toBe(backdrop)
+    expect(initBackdropVariant(backdrop, 'rectangle')).toBe(backdrop)
+  })
+
+  test('resolveActiveBackdropData exposes circle diameter as a square frame', () => {
+    const backdrop = createBackdropDefaults('circle')
+
+    expect(resolveActiveBackdropData(backdrop)).toMatchObject({
+      diameter: 200,
+      width: 200,
+      height: 200,
+    })
+
+    expect(resolveActiveBackdropData(backdrop, { width: 240, height: 220 })).toMatchObject({
+      diameter: 240,
+      width: 240,
+      height: 240,
+    })
   })
 })
 
@@ -390,5 +424,34 @@ describe('buildFrameGeometryUpdate', () => {
     expect(patch.display_variants.linear.orientation).toBe('horizontal')
     expect(resolved.width).toBe(320)
     expect(resolved.height).toBe(90)
+  })
+
+  test('writes rectangle backdrop resize geometry into the active variant', () => {
+    const data = createBackdropDefaults('rectangle')
+
+    const patch = buildFrameGeometryUpdate(data, { x: 120, y: 140, width: 320, height: 180 })
+
+    expect(patch).toMatchObject({
+      x: 120,
+      y: 140,
+      display_variants: {
+        rectangle: {
+          width: 320,
+          height: 180,
+        },
+      },
+    })
+    expect(patch.width).toBeUndefined()
+    expect(patch.height).toBeUndefined()
+  })
+
+  test('writes circle backdrop resize geometry as diameter', () => {
+    const data = createBackdropDefaults('circle')
+
+    const patch = buildFrameGeometryUpdate(data, { x: 120, y: 140, width: 260, height: 240 })
+
+    expect(patch.display_variants.circle.diameter).toBe(260)
+    expect(patch.width).toBeUndefined()
+    expect(patch.height).toBeUndefined()
   })
 })

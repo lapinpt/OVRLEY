@@ -15,15 +15,15 @@ The rectangle editor should use the agreed compact layout: shared styling contro
 
 ## Acceptance criteria
 
-- [ ] Rectangle editor controls update fill color, fill opacity, border thickness, border color, border opacity, and top-level opacity on the backdrop's shared fields.
-- [ ] Rectangle editor controls update width, height, corner radius, and each per-corner rounding flag on the active rectangle display variant.
-- [ ] The per-corner rounding control is a spatial 2-by-2 clickable grid, not four standalone text-heavy toggles.
-- [ ] Frontend rectangle preview renders fill and border with alpha composition equivalent to `color alpha * element opacity * widget opacity`.
-- [ ] Rust rectangle rendering matches preview semantics for fill, border, top-level opacity, and total outer dimensions.
-- [ ] Border thickness of zero disables the border without affecting fill rendering.
-- [ ] The validator rejects missing styling fields, invalid hex colors, out-of-range opacity values, non-positive width/height, negative border thickness, and border thickness that cannot fit within the rectangle dimensions.
-- [ ] Rectangle corner radius is rejected when negative, crash-clamped to half the smaller dimension, and clamped down to border thickness only for rounded corners when the agreed condition applies.
-- [ ] Tests cover rectangle validation failures, accepted/clamped rectangle validation output, resolver/editor updates for shared and rectangle-specific fields, and corner-grid user interactions.
+- [x] Rectangle editor controls update fill color, fill opacity, border thickness, border color, border opacity, and top-level opacity on the backdrop's shared fields.
+- [x] Rectangle editor controls update width, height, corner radius, and each per-corner rounding flag on the active rectangle display variant.
+- [x] The per-corner rounding control is a spatial 2-by-2 clickable grid, not four standalone text-heavy toggles.
+- [x] Frontend rectangle preview renders fill and border with alpha composition equivalent to `color alpha * element opacity * widget opacity`.
+- [x] Rust rectangle rendering matches preview semantics for fill, border, top-level opacity, and total outer dimensions.
+- [x] Border thickness of zero disables the border without affecting fill rendering.
+- [x] The validator rejects missing styling fields, invalid hex colors, out-of-range opacity values, non-positive width/height, negative border thickness, and border thickness that cannot fit within the rectangle dimensions.
+- [x] Rectangle corner radius is rejected when negative, crash-clamped to half the smaller dimension, and clamped down to border thickness only for rounded corners when the agreed condition applies.
+- [x] Tests cover rectangle validation failures, accepted/clamped rectangle validation output, resolver/editor updates for shared and rectangle-specific fields, and corner-grid user interactions.
 
 ## Blocked by
 

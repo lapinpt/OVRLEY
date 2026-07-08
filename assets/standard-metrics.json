@@ -78,7 +78,7 @@
         }
       },
       "linear": {
-        "label": "Linear",
+        "label": "Linear Bar",
         "icon": { "source": "shared", "assetFile": "display-type-linear.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,

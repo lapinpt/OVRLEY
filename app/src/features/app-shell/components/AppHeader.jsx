@@ -6,6 +6,8 @@
 import ActivitySection from './ActivitySection'
 import ActionButtons from './ActionButtons'
 import TemplateSection from './TemplateSection'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { isInteractiveElement } from '@/lib/utils'
 
 /**
  * Renders the app header component.
@@ -38,8 +40,22 @@ export default function AppHeader({ activityControls, backendStatus, onOpenDownl
   } = templateControls
   const { debugModeEnabled, importedMediaFilename, handleImportVideo, clearImportedVideo } = videoControls
 
+  const handleHeaderMouseDown = (event) => {
+    if (event.button !== 0 || event.defaultPrevented || isInteractiveElement(event.target)) {
+      return
+    }
+
+    try {
+      getCurrentWindow()
+        .startDragging()
+        .catch(() => {})
+    } catch {
+      return
+    }
+  }
+
   return (
-    <header className="relative z-50 shrink-0 border-b border-border/70 bg-card backdrop-blur-sm">
+    <header className="relative z-50 shrink-0 select-none border-b border-border/70 bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
       <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
         <ActivitySection
           activityLabel={activityLabel}

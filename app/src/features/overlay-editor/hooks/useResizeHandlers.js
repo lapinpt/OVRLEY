@@ -4,8 +4,8 @@
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
 import { clamp } from '@/lib/utils'
-import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { buildFrameGeometryUpdate } from '@/lib/widget/widget-resolver'
+import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
+import { buildFrameGeometryUpdate, resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
 /**
  * Creates resize-related moveable handlers.
@@ -38,12 +38,15 @@ export function useResizeHandlers({
         dragStart.set([0, 0])
       }
 
+      const frameData = isBackdropWidget(selectedWidget)
+        ? resolveActiveBackdropData(selectedWidget.data)
+        : resolveActiveMetricWidgetData(selectedWidget.data)
       interactionStartRef.current = {
         id: selectedWidget.id,
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
-        width: selectedWidget.data.width ?? 0,
-        height: selectedWidget.data.height ?? 0,
+        width: frameData?.width ?? selectedWidget.data.width ?? 0,
+        height: frameData?.height ?? selectedWidget.data.height ?? 0,
         markerSize: selectedWidget.data.marker_size ?? null,
         type: 'resize',
       }
@@ -55,7 +58,7 @@ export function useResizeHandlers({
 
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
-      const dimensionScale = isBoxedMetricWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
+      const dimensionScale = isFramedWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
       const widthScale = origin.width ? nextWidth / origin.width : 1
@@ -73,7 +76,7 @@ export function useResizeHandlers({
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)
-      if (isBoxedMetricWidget(selectedWidget)) {
+      if (isFramedWidget(selectedWidget)) {
         applyLiveWidgetStyles(target ?? drag.target, selectedWidget, nextDraft, globalScale)
       }
     },

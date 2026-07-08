@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event'
 import useStore from '@/store/useStore'
 import { cloneSerializable, DEFAULT_CONFIG } from '@/store/store-utils'
 import { WidgetDrawer } from '@/features/widget-drawer/components/WidgetDrawer'
+import { BACKDROP_RECTANGLE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 beforeEach(() => {
   useStore.setState({
@@ -99,6 +100,8 @@ describe('WidgetDrawer', () => {
     await user.click(tab)
 
     await user.click(screen.getByText('HR').closest('button'))
+    const textOptions = screen.getAllByRole('button', { name: 'Text' })
+    await user.click(textOptions[textOptions.length - 1])
 
     expect(tab).toHaveAttribute('aria-label', 'Open widget drawer')
   })
@@ -109,28 +112,15 @@ describe('WidgetDrawer', () => {
 
     await user.click(screen.getByRole('button', { name: /drawer/i }))
     await user.click(screen.getByText('Backdrop').closest('button'))
+    await user.click(screen.getByRole('button', { name: 'Rectangle' }))
 
     const [backdrop] = useStore.getState().config.backdrops
+    const { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right, ...sharedDefaults } =
+      BACKDROP_RECTANGLE_DEFAULTS
     expect(backdrop).toMatchObject({
-      display_type: 'rectangle',
-      x: 100,
-      y: 100,
-      opacity: 1,
-      fill_color: '#ffffff',
-      fill_opacity: 1,
-      border_thickness: 0,
-      border_color: '#ffffff',
-      border_opacity: 1,
+      ...sharedDefaults,
       display_variants: {
-        rectangle: {
-          width: 200,
-          height: 120,
-          corner_radius: 0,
-          round_top_left: false,
-          round_top_right: false,
-          round_bottom_left: false,
-          round_bottom_right: false,
-        },
+        rectangle: { width, height, corner_radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right },
       },
     })
     expect(backdrop.id).toMatch(/^widget-\d+$/)

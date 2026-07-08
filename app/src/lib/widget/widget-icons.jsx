@@ -5,6 +5,7 @@ import {
   CURRENT_STANDARD_METRIC_WIDGET_TYPES,
   STANDARD_METRIC_WIDGET_TYPES,
   BACKDROP_TYPE_DEFINITIONS,
+  BACKDROP_TYPE_LABELS,
   DISPLAY_TYPE_LABELS,
 } from './standard-widgets'
 import { getStandardMetricDefinition, getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
@@ -117,7 +118,7 @@ export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradien
     label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
     displayTypes: getWidgetDisplayTypes(type).map((value) => ({
       value,
-      label: DISPLAY_TYPE_LABELS[value] ?? value,
+      label: type === 'backdrop' ? (BACKDROP_TYPE_LABELS[value] ?? value) : (DISPLAY_TYPE_LABELS[value] ?? value),
     })),
   }),
 )

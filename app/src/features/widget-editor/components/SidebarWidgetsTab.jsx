@@ -10,6 +10,7 @@ import { TYPE_ICONS } from '@/lib/widget/widget-icons'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
 import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
+import BackdropWidgetEditor from './BackdropWidgetEditor'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
 import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
@@ -26,6 +27,7 @@ import TimeWidgetEditor from './TimeWidgetEditor'
  * isStandardMetricWidgetType().
  */
 const WIDGET_EDITOR_MAP = {
+  backdrop: BackdropWidgetEditor,
   label: TextWidgetEditor,
   time: TimeWidgetEditor,
   gradient: GradientWidgetEditor,
@@ -90,11 +92,11 @@ export default function SidebarWidgetsTab() {
                     <div className="relative group">
                       <AccordionTrigger className="group w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded group-hover:bg-surface-accent-strong ">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded">
                             <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />
                           </div>
                           <div className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
-                            <span className="w-full truncate text-left text-xs font-semibold group-data-[state=open]:text-primary">
+                            <span className="w-full truncate text-left text-sm font-semibold group-data-[state=open]:text-primary">
                               {widget.name}
                             </span>
                           </div>

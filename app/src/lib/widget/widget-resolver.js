@@ -69,6 +69,8 @@ export function resolveActiveBackdropData(widgetData, previewOverrides = null) {
   const resolved = {
     ...widgetData,
     ...variantConfig,
+    ...(widgetData.width !== undefined ? { width: widgetData.width } : {}),
+    ...(widgetData.height !== undefined ? { height: widgetData.height } : {}),
     id: widgetData.id,
     x: widgetData.x,
     y: widgetData.y,
@@ -81,7 +83,13 @@ export function resolveActiveBackdropData(widgetData, previewOverrides = null) {
     border_opacity: widgetData.border_opacity,
   }
 
-  return previewOverrides ? { ...resolved, ...previewOverrides } : resolved
+  const nextResolved = previewOverrides ? { ...resolved, ...previewOverrides } : resolved
+  if (displayType === 'circle') {
+    const diameter = nextResolved.width ?? nextResolved.height ?? nextResolved.diameter
+    return { ...nextResolved, diameter, width: diameter, height: diameter }
+  }
+
+  return nextResolved
 }
 
 /**
@@ -100,6 +108,8 @@ export function initBackdropVariant(widgetData, displayType) {
 
   const variants = widgetData.display_variants || {}
   const currentVariant = variants[displayType]
+  if (currentVariant) return widgetData
+
   const variantDefaults = Object.fromEntries(geometryKeys.map((key) => [key, currentVariant?.[key] ?? widgetData[key] ?? defaults[key]]))
 
   return {
@@ -249,6 +259,32 @@ export function buildFrameGeometryUpdate(widgetData, geometryPatch) {
   if (!widgetData || !geometryPatch) return geometryPatch
 
   const displayType = widgetData.display_type || 'text'
+  if (BACKDROP_GEOMETRY_KEYS_BY_TYPE[displayType]) {
+    const variants = widgetData.display_variants || {}
+    const currentVariant = variants[displayType] || {}
+    const variantPatch = {}
+
+    if (displayType === 'circle') {
+      variantPatch.diameter = geometryPatch.width ?? geometryPatch.height ?? currentVariant.diameter
+    } else {
+      variantPatch.width = geometryPatch.width
+      variantPatch.height = geometryPatch.height
+    }
+
+    const patch = {
+      display_variants: {
+        ...variants,
+        [displayType]: {
+          ...currentVariant,
+          ...variantPatch,
+        },
+      },
+    }
+    if (geometryPatch.x !== undefined) patch.x = geometryPatch.x
+    if (geometryPatch.y !== undefined) patch.y = geometryPatch.y
+    return patch
+  }
+
   if (displayType === 'text') return geometryPatch
 
   const variants = widgetData.display_variants || {}

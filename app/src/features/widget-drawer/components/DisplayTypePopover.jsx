@@ -19,7 +19,7 @@ export function DisplayTypePopover({ displayTypes, onSelect, children }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent side="right" align="start" sideOffset={6.8} className="-ml-2 mt-6 w-32 p-[0.2rem] rounded-none">
+      <PopoverContent side="right" align="start" sideOffset={6.8} className="-ml-2 mt-6 w-48 p-[0.2rem] rounded-none">
         <div className="flex flex-col gap-[0.11rem]">
           {displayTypes.map((dt) => (
             <button
@@ -28,9 +28,9 @@ export function DisplayTypePopover({ displayTypes, onSelect, children }) {
                 onSelect(dt.value)
                 setOpen(false)
               }}
-              className="group flex items-center gap-[0.7rem] px-[0.4rem] py-[0.3rem] rounded-none hover:bg-surface-accent-soft/40 text-[0.65rem] hover:text-primary cursor-pointer text-left"
+              className="group flex items-center gap-4 px-[0.4rem] py-[0.3rem] rounded-none hover:bg-accent text-[0.85rem] hover:text-accent-foreground cursor-pointer text-left"
             >
-              <DisplayTypeIcon displayType={dt.value} className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-primary" />
+              <DisplayTypeIcon displayType={dt.value} className="h-4.5 w-4.5 shrink-0 text-muted-foreground group-hover:text-accent-foreground" />
               <span>{dt.label}</span>
             </button>
           ))}

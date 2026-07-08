@@ -9,6 +9,7 @@ import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditor from '@/features/overlay-editor/components/OverlayEditor'
 import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
+import { createBackdropDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
@@ -51,9 +52,9 @@ vi.mock('@/features/widget-preview/utils/textMeasurement', () => ({
 }))
 
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: ({ moveableRef }) => {
+  default: ({ canResizeSelected, maintainAspectRatio, moveableRef }) => {
     moveableRef.current = { updateRect: moveableUpdateRectMock }
-    return null
+    return <div data-testid="moveable-props" data-can-resize={String(canResizeSelected)} data-maintain-ratio={String(maintainAspectRatio)} />
   },
 }))
 
@@ -408,6 +409,44 @@ describe('OverlayEditor selection flow', () => {
 
     expect(renderGeometry.width).toBe(400)
     expect(renderGeometry.height).toBe(80)
+  })
+
+  test('enables resize handles for selected backdrop frames', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      backdrops: [{ ...createBackdropDefaults('rectangle'), id: 'widget-backdrop' }],
+      labels: [],
+      plots: [],
+      values: [],
+    }
+
+    useStore.getState().setConfig(config)
+
+    const { container, getByTestId } = render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const backdrop = container.querySelector('[data-widget-id="widget-backdrop"]')
+    expect(backdrop).toBeTruthy()
+
+    fireEvent.mouseDown(backdrop, { button: 0 })
+
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'false')
   })
 
   test('renders the canvas toolbar centered above the preview area', () => {
