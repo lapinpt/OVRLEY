@@ -94,9 +94,8 @@ pub fn validate_arc_gauge(value: ValueConfig, index: usize) -> CoreResult<Valida
             p("track_corner_radius")
         )));
     }
-    // Skia arc caps are either butt or fully round. Clamp the shared radius
-    // contract to the largest meaningful cap radius, matching linear gauges'
-    // half-thickness maximum without introducing custom arc geometry.
+    // Arc tracks use a filled outline with endpoint fillets. Keep the shared
+    // radius contract bounded by the track half-width, matching linear gauges.
     let track_corner_radius = raw_corner_radius.min(track_thickness * 0.5);
 
     let track_border_thickness =

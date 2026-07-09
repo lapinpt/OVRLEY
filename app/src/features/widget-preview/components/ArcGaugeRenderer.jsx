@@ -8,7 +8,7 @@
  */
 
 import { useId } from 'react'
-import { getArcGaugeLayout, getArcInnerWidgetLayout, getArcLabelGap, getArcPoint, getArcSvgPath } from '../utils/arcGaugeGeometry'
+import { getArcFilledTrackPath, getArcGaugeLayout, getArcInnerWidgetLayout, getArcLabelGap, getArcPoint } from '../utils/arcGaugeGeometry'
 import { buildArcGaugeInnerWidgetModel } from '../utils/metricWidgetPreviewUtils'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { normalizeSvgShadowColor, sanitizeSvgId } from '../utils/svgPreviewUtils'
@@ -49,41 +49,10 @@ function labelLayout(layout, minLabel, maxLabel, fontFamily, fontSize) {
   }
 }
 
-function ArcStroke({ layout, sweepAngle, stroke, strokeWidth, strokeOpacity = 1, strokeLinecap, mask, dataTestId }) {
-  if (sweepAngle <= 0 || layout.radius <= 0 || strokeWidth <= 0) return null
-
-  const isFullCircle = layout.fullCircle && sweepAngle >= 360
-  const arcStroke = isFullCircle ? (
-    <circle
-      data-testid={dataTestId}
-      cx={layout.centerX}
-      cy={layout.centerY}
-      r={layout.radius}
-      fill="none"
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeOpacity={strokeOpacity}
-      strokeLinecap={strokeLinecap}
-    />
-  ) : (
-    <path
-      data-testid={dataTestId}
-      d={getArcSvgPath({
-        centerX: layout.centerX,
-        centerY: layout.centerY,
-        radius: layout.radius,
-        startAngle: layout.startAngle,
-        sweepAngle,
-      })}
-      fill="none"
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeOpacity={strokeOpacity}
-      strokeLinecap={strokeLinecap}
-    />
-  )
-
-  return mask ? <g mask={mask}>{arcStroke}</g> : arcStroke
+function ArcTrackPath({ d, fill, fillOpacity = 1, mask, dataTestId }) {
+  if (!d) return null
+  const trackPath = <path data-testid={dataTestId} d={d} fill={fill} fillOpacity={fillOpacity} fillRule="evenodd" />
+  return mask ? <g mask={mask}>{trackPath}</g> : trackPath
 }
 
 export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalOpacity = 1, globalScale = 1, sceneStyle }) {
@@ -118,7 +87,39 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   if (!innerModel) return null
 
   const opacity = (data.opacity ?? 1) * globalOpacity
-  const strokeLinecap = (data.track_corner_radius ?? 0) > 0 ? 'round' : 'butt'
+  const trackCornerRadius = Math.min(layout.trackThickness * 0.5, Math.max(0, Number(data.track_corner_radius) || 0))
+  const outerTrackThickness = layout.outerStrokeWidth
+  const outerCornerRadius = trackCornerRadius + borderThickness
+  const trackPath = getArcFilledTrackPath({
+    centerX: layout.centerX,
+    centerY: layout.centerY,
+    radius: layout.radius,
+    startAngle: layout.startAngle,
+    sweepAngle: layout.sweepAngle,
+    trackThickness: layout.trackThickness,
+    cornerRadius: trackCornerRadius,
+  })
+  const outerTrackPath = getArcFilledTrackPath({
+    centerX: layout.centerX,
+    centerY: layout.centerY,
+    radius: layout.radius,
+    startAngle: layout.startAngle,
+    sweepAngle: layout.sweepAngle,
+    trackThickness: outerTrackThickness,
+    cornerRadius: outerCornerRadius,
+  })
+  const fillTrackPath =
+    layout.fill > 0
+      ? getArcFilledTrackPath({
+          centerX: layout.centerX,
+          centerY: layout.centerY,
+          radius: layout.radius,
+          startAngle: layout.startAngle,
+          sweepAngle: layout.sweepAngle * layout.fill,
+          trackThickness: layout.trackThickness,
+          cornerRadius: trackCornerRadius,
+        })
+      : ''
   const showLabels = Boolean(data.show_min_max_labels)
   const minLabel = Number.isInteger(layout.min) ? `${layout.min}` : layout.min.toFixed(1)
   const maxLabel = Number.isInteger(layout.max) ? `${layout.max}` : layout.max.toFixed(1)
@@ -147,7 +148,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const labelShadowFilterId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-label-shadow`)
   const borderMaskId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-border-mask`)
   const shadowColor = shadow ? normalizeSvgShadowColor(shadow.color, opacity) : null
-  const outerStrokeWidth = layout.outerStrokeWidth
+  const outerStrokeWidth = outerTrackThickness
   const borderMask = borderThickness > 0 ? `url(#${borderMaskId})` : undefined
   const maskPadding = outerStrokeWidth + 1
 
@@ -171,20 +172,8 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
             height={height + maskPadding * 2}
             style={{ maskType: 'luminance' }}
           >
-            <ArcStroke
-              layout={layout}
-              sweepAngle={layout.sweepAngle}
-              stroke="#ffffff"
-              strokeWidth={outerStrokeWidth}
-              strokeLinecap={strokeLinecap}
-            />
-            <ArcStroke
-              layout={layout}
-              sweepAngle={layout.sweepAngle}
-              stroke="#000000"
-              strokeWidth={layout.trackThickness}
-              strokeLinecap={strokeLinecap}
-            />
+            <ArcTrackPath d={outerTrackPath} fill="#ffffff" />
+            <ArcTrackPath d={trackPath} fill="#000000" />
           </mask>
         </defs>
       ) : null}
@@ -194,45 +183,23 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
           filter={shadow.strength > 0 ? `url(#${shadowFilterId})` : undefined}
           mask={borderMask}
         >
-          <ArcStroke
-            layout={layout}
-            sweepAngle={layout.sweepAngle}
-            stroke={shadowColor.color}
-            strokeWidth={outerStrokeWidth}
-            strokeOpacity={shadowColor.opacity}
-            strokeLinecap={strokeLinecap}
-          />
+          <ArcTrackPath d={outerTrackPath} fill={shadowColor.color} fillOpacity={shadowColor.opacity} />
         </g>
       ) : null}
       {borderThickness > 0 ? (
-        <ArcStroke
-          layout={layout}
-          sweepAngle={layout.sweepAngle}
-          stroke={data.track_border_color}
-          strokeWidth={layout.outerStrokeWidth}
-          strokeOpacity={opacity}
-          strokeLinecap={strokeLinecap}
-          mask={borderMask}
-          dataTestId="arc-gauge-border"
-        />
+        <ArcTrackPath d={outerTrackPath} fill={data.track_border_color} fillOpacity={opacity} mask={borderMask} dataTestId="arc-gauge-border" />
       ) : null}
-      <ArcStroke
-        layout={layout}
-        sweepAngle={layout.sweepAngle}
-        stroke={data.track_empty_color}
-        strokeWidth={layout.trackThickness}
-        strokeOpacity={(data.track_empty_opacity ?? 1) * opacity}
-        strokeLinecap={strokeLinecap}
+      <ArcTrackPath
+        d={trackPath}
+        fill={data.track_empty_color}
+        fillOpacity={(data.track_empty_opacity ?? 1) * opacity}
         dataTestId="arc-gauge-empty-track"
       />
-      {layout.fill > 0 ? (
-        <ArcStroke
-          layout={layout}
-          sweepAngle={layout.sweepAngle * layout.fill}
-          stroke={data.track_filled_color}
-          strokeWidth={layout.trackThickness}
-          strokeOpacity={(data.track_filled_opacity ?? 1) * opacity}
-          strokeLinecap={strokeLinecap}
+      {fillTrackPath ? (
+        <ArcTrackPath
+          d={fillTrackPath}
+          fill={data.track_filled_color}
+          fillOpacity={(data.track_filled_opacity ?? 1) * opacity}
           dataTestId="arc-gauge-filled-track"
         />
       ) : null}

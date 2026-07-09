@@ -1,7 +1,7 @@
 //! Arc gauge metric widget rendering.
 //!
-//! An arc gauge uses a cached static layer for its empty stroked track, border,
-//! labels, and unit. Each frame only draws a partial stroked arc and the
+//! An arc gauge uses a cached static layer for its empty filled track, border,
+//! labels, and unit. Each frame only draws a partial filled arc and the
 //! formatted numeric value in the centre of that arc.
 
 use crate::activity::schema::DenseActivityReport;
@@ -26,9 +26,7 @@ use crate::render::widgets::types::{
 use crate::render::widgets::value::metric_vertical_metrics_text;
 use crate::types::DisplayType;
 use skia_safe::{
-    image_filters,
-    paint::{Cap, Style},
-    BlendMode, Canvas, Paint, Point, Rect,
+    image_filters, paint::Style, BlendMode, Canvas, Paint, PathBuilder, PathFillType, Point,
 };
 use std::path::PathBuf;
 
@@ -37,6 +35,8 @@ const INNER_WIDGET_LINE_HEIGHT: f32 = 0.92;
 const INNER_WIDGET_UNIT_RATIO: f32 = 0.28;
 const INNER_WIDGET_MIN_UNIT_FONT_SIZE: f32 = 12.0;
 const INNER_WIDGET_GAP_PX: f32 = 4.0;
+const ARC_PATH_EPSILON: f32 = 0.001;
+const ARC_QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_76;
 
 /// Arc geometry shared by static and dynamic drawing. Angles use Skia's
 /// screen-space convention: 0° is right, 90° is down, and increasing angles
@@ -67,7 +67,7 @@ pub fn arc_start_end_angles(arc_angle: f32) -> (f32, f32) {
     (270.0 - angle * 0.5, 270.0 + angle * 0.5)
 }
 
-/// Calculates an arc radius that keeps the stroked track and its border inside
+/// Calculates an arc radius that keeps the filled track and its border inside
 /// the widget's smaller dimension.
 pub fn arc_radius(width: f32, height: f32, track_thickness: f32, border_thickness: f32) -> f32 {
     let outer_half_thickness = track_thickness.max(0.0) * 0.5 + border_thickness.max(0.0);
@@ -138,7 +138,6 @@ pub fn prepare_arc_gauge_cache(
                     format_validated_metric_parts(&gauge.inner_value, dense_activity, frame_index)
                         .expect("validated arc gauge metric must have a formatter");
                 ArcGaugeFrameState {
-                    value,
                     fill01: fill_percentage(value, min_value, max_value),
                     value_text: parts.value_text,
                 }
@@ -200,7 +199,6 @@ pub fn prepare_arc_gauge_cache(
             radius: geometry.radius,
             track_thickness,
             track_corner_radius: gauge.track_corner_radius * scale,
-            track_border_thickness,
             track_filled_color: gauge.track_filled_color.clone(),
             track_filled_opacity: gauge.track_filled_opacity,
             text_style,
@@ -249,9 +247,8 @@ pub fn draw_arc_gauge_widget(
                 .arc_angle
                 .clamp(MIN_ARC_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES),
         };
-        let cap = arc_stroke_cap(cache.track_corner_radius);
         if state.fill01 > 0.0 && geometry.radius > 0.0 {
-            draw_arc_stroke(
+            draw_arc_track(
                 canvas,
                 geometry,
                 geometry.sweep_angle * state.fill01,
@@ -260,7 +257,7 @@ pub fn draw_arc_gauge_widget(
                     &cache.track_filled_color,
                     cache.track_filled_opacity * cache.text_style.opacity,
                 ),
-                cap,
+                cache.track_corner_radius,
                 None,
             );
         }
@@ -333,8 +330,9 @@ fn draw_static_arc_layer(
 ) -> CoreResult<()> {
     let track_thickness = gauge.track_thickness * scale;
     let border_thickness = gauge.track_border_thickness * scale;
-    let outer_stroke_width = track_thickness + border_thickness * 2.0;
-    let cap = arc_stroke_cap(gauge.track_corner_radius * scale);
+    let outer_track_thickness = track_thickness + border_thickness * 2.0;
+    let inner_corner_radius = gauge.track_corner_radius * scale;
+    let outer_corner_radius = inner_corner_radius + border_thickness;
     let shadow = if border_thickness > 0.0 {
         normalize_shadow_style_validated(
             &scene.shadow_color,
@@ -356,53 +354,40 @@ fn draw_static_arc_layer(
             None,
         )
     }) {
-        let outer_color = if border_thickness > 0.0 {
-            parse_color(&gauge.track_border_color, text_style.opacity)
-        } else {
-            parse_color(
-                &gauge.track_empty_color,
-                gauge.track_empty_opacity * text_style.opacity,
-            )
-        };
-        let shadow_width = if border_thickness > 0.0 {
-            outer_stroke_width
-        } else {
-            track_thickness
-        };
-        draw_arc_stroke(
+        draw_arc_track(
             canvas,
             geometry,
             geometry.sweep_angle,
-            shadow_width,
-            outer_color,
-            cap,
+            outer_track_thickness,
+            parse_color(&gauge.track_border_color, text_style.opacity),
+            outer_corner_radius,
             Some(shadow),
         );
     }
 
     if border_thickness > 0.0 {
-        draw_arc_stroke(
+        draw_arc_track(
             canvas,
             geometry,
             geometry.sweep_angle,
-            outer_stroke_width,
+            outer_track_thickness,
             parse_color(&gauge.track_border_color, text_style.opacity),
-            cap,
+            outer_corner_radius,
             None,
         );
-        // Match the linear gauge's ring construction. The empty stroke can
+        // Match the linear gauge's ring construction. The empty track can
         // be translucent, so it must be drawn over a transparent interior
         // rather than over the border colour.
-        clear_arc_stroke(
+        clear_arc_track(
             canvas,
             geometry,
             geometry.sweep_angle,
             track_thickness,
-            cap,
+            inner_corner_radius,
         );
     }
 
-    draw_arc_stroke(
+    draw_arc_track(
         canvas,
         geometry,
         geometry.sweep_angle,
@@ -411,7 +396,7 @@ fn draw_static_arc_layer(
             &gauge.track_empty_color,
             gauge.track_empty_opacity * text_style.opacity,
         ),
-        cap,
+        inner_corner_radius,
         None,
     );
 
@@ -574,70 +559,315 @@ fn arc_static_layer_padding(
     track_padding.max(labels_padding).max(unit_padding)
 }
 
-fn draw_arc_stroke(
+/// Draws one closed filled arc-track outline. This deliberately avoids Skia's
+/// binary stroke-cap modes so `track_corner_radius` remains continuous.
+fn draw_arc_track(
     canvas: &Canvas,
     geometry: ArcGaugeGeometry,
     sweep_angle: f32,
     stroke_width: f32,
     color: skia_safe::Color,
-    cap: Cap,
+    corner_radius: f32,
     image_filter: Option<skia_safe::ImageFilter>,
 ) {
-    if geometry.radius <= 0.0 || sweep_angle <= 0.0 || stroke_width <= 0.0 {
+    let Some(path) = arc_filled_track_path(geometry, sweep_angle, stroke_width, corner_radius)
+    else {
         return;
-    }
+    };
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
-    paint.set_style(Style::Stroke);
-    paint.set_stroke_width(stroke_width);
-    paint.set_stroke_cap(cap);
+    paint.set_style(Style::Fill);
     paint.set_color(color);
     if let Some(image_filter) = image_filter {
         paint.set_image_filter(image_filter);
     }
-    let bounds = Rect::from_xywh(
-        geometry.center_x - geometry.radius,
-        geometry.center_y - geometry.radius,
-        geometry.radius * 2.0,
-        geometry.radius * 2.0,
-    );
-    canvas.draw_arc(bounds, geometry.start_angle, sweep_angle, false, &paint);
+    canvas.draw_path(&path, &paint);
 }
 
 /// Erases the inside of a bordered arc before a translucent empty track is
 /// drawn. This produces a real border ring rather than compositing the empty
 /// colour over the border colour.
-fn clear_arc_stroke(
+fn clear_arc_track(
     canvas: &Canvas,
     geometry: ArcGaugeGeometry,
     sweep_angle: f32,
     stroke_width: f32,
-    cap: Cap,
+    corner_radius: f32,
 ) {
-    if geometry.radius <= 0.0 || sweep_angle <= 0.0 || stroke_width <= 0.0 {
+    let Some(path) = arc_filled_track_path(geometry, sweep_angle, stroke_width, corner_radius)
+    else {
         return;
-    }
+    };
     let mut clear_paint = Paint::default();
     clear_paint.set_anti_alias(true);
-    clear_paint.set_style(Style::Stroke);
-    clear_paint.set_stroke_width(stroke_width);
-    clear_paint.set_stroke_cap(cap);
+    clear_paint.set_style(Style::Fill);
     clear_paint.set_blend_mode(BlendMode::Clear);
-    let bounds = Rect::from_xywh(
-        geometry.center_x - geometry.radius,
-        geometry.center_y - geometry.radius,
-        geometry.radius * 2.0,
-        geometry.radius * 2.0,
-    );
-    canvas.draw_arc(bounds, geometry.start_angle, sweep_angle, false, &clear_paint);
+    canvas.draw_path(&path, &clear_paint);
 }
 
-fn arc_stroke_cap(track_corner_radius: f32) -> Cap {
-    if track_corner_radius > 0.0 {
-        Cap::Round
-    } else {
-        Cap::Butt
+/// Builds the same outline as `getArcFilledTrackPath` in the SVG preview.
+/// The outer and inner circular edges are cubic Beziers, joined at each end
+/// by true corner fillets. With a radius of half the track width, the two
+/// fillets meet as a semicircle; at zero they collapse to a flat radial edge.
+fn arc_filled_track_path(
+    geometry: ArcGaugeGeometry,
+    sweep_angle: f32,
+    track_thickness: f32,
+    corner_radius: f32,
+) -> Option<skia_safe::Path> {
+    let sweep = sweep_angle.clamp(0.0, MAX_ARC_ANGLE_DEGREES);
+    let half_thickness = track_thickness.max(0.0) * 0.5;
+    let outer_radius = geometry.radius + half_thickness;
+    let inner_radius = geometry.radius - half_thickness;
+    if sweep <= ARC_PATH_EPSILON
+        || half_thickness <= ARC_PATH_EPSILON
+        || inner_radius <= ARC_PATH_EPSILON
+    {
+        return None;
     }
+
+    let start = geometry.start_angle;
+    let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
+    path.move_to(arc_point(
+        geometry.center_x,
+        geometry.center_y,
+        outer_radius,
+        start,
+    ));
+
+    if sweep >= MAX_ARC_ANGLE_DEGREES - ARC_PATH_EPSILON {
+        append_circular_arc(
+            &mut path,
+            geometry.center_x,
+            geometry.center_y,
+            outer_radius,
+            start,
+            MAX_ARC_ANGLE_DEGREES,
+        );
+        path.close();
+        path.move_to(arc_point(
+            geometry.center_x,
+            geometry.center_y,
+            inner_radius,
+            start,
+        ));
+        append_circular_arc(
+            &mut path,
+            geometry.center_x,
+            geometry.center_y,
+            inner_radius,
+            start,
+            -MAX_ARC_ANGLE_DEGREES,
+        );
+        path.close();
+        return Some(path.detach());
+    }
+
+    let end = start + sweep;
+    let fillet_radius = corner_radius.clamp(0.0, half_thickness);
+    append_circular_arc(
+        &mut path,
+        geometry.center_x,
+        geometry.center_y,
+        outer_radius,
+        start,
+        sweep,
+    );
+    append_outer_to_inner_fillet(
+        &mut path,
+        arc_point(geometry.center_x, geometry.center_y, geometry.radius, end),
+        arc_path_tangent(end),
+        arc_path_normal(end),
+        half_thickness,
+        fillet_radius,
+    );
+    append_circular_arc(
+        &mut path,
+        geometry.center_x,
+        geometry.center_y,
+        inner_radius,
+        end,
+        -sweep,
+    );
+    let start_tangent = arc_path_tangent(start);
+    append_inner_to_outer_fillet(
+        &mut path,
+        arc_point(geometry.center_x, geometry.center_y, geometry.radius, start),
+        Point::new(-start_tangent.x, -start_tangent.y),
+        arc_path_normal(start),
+        half_thickness,
+        fillet_radius,
+    );
+    path.close();
+    Some(path.detach())
+}
+
+fn append_circular_arc(
+    path: &mut PathBuilder,
+    center_x: f32,
+    center_y: f32,
+    radius: f32,
+    start_angle: f32,
+    sweep_angle: f32,
+) {
+    let segment_count = ((sweep_angle.abs() / 90.0).ceil() as u32).max(1);
+    let segment_sweep = sweep_angle / segment_count as f32;
+
+    for index in 0..segment_count {
+        let angle0 = start_angle + segment_sweep * index as f32;
+        let angle1 = angle0 + segment_sweep;
+        let control_distance = radius * (4.0 / 3.0) * ((angle1 - angle0).to_radians() * 0.25).tan();
+        let start = arc_point(center_x, center_y, radius, angle0);
+        let end = arc_point(center_x, center_y, radius, angle1);
+        let start_tangent = arc_path_tangent(angle0);
+        let end_tangent = arc_path_tangent(angle1);
+        path.cubic_to(
+            Point::new(
+                start.x + start_tangent.x * control_distance,
+                start.y + start_tangent.y * control_distance,
+            ),
+            Point::new(
+                end.x - end_tangent.x * control_distance,
+                end.y - end_tangent.y * control_distance,
+            ),
+            end,
+        );
+    }
+}
+
+fn append_outer_to_inner_fillet(
+    path: &mut PathBuilder,
+    origin: Point,
+    tangent: Point,
+    normal: Point,
+    half_thickness: f32,
+    corner_radius: f32,
+) {
+    if corner_radius <= ARC_PATH_EPSILON {
+        path.line_to(local_arc_path_point(
+            origin,
+            tangent,
+            normal,
+            0.0,
+            -half_thickness,
+        ));
+        return;
+    }
+
+    let kappa = corner_radius * ARC_QUARTER_CIRCLE_KAPPA;
+    let upper_end = local_arc_path_point(
+        origin,
+        tangent,
+        normal,
+        corner_radius,
+        half_thickness - corner_radius,
+    );
+    let lower_start = local_arc_path_point(
+        origin,
+        tangent,
+        normal,
+        corner_radius,
+        -half_thickness + corner_radius,
+    );
+    path.cubic_to(
+        local_arc_path_point(origin, tangent, normal, kappa, half_thickness),
+        local_arc_path_point(
+            origin,
+            tangent,
+            normal,
+            corner_radius,
+            half_thickness - corner_radius + kappa,
+        ),
+        upper_end,
+    );
+    path.line_to(lower_start);
+    path.cubic_to(
+        local_arc_path_point(
+            origin,
+            tangent,
+            normal,
+            corner_radius,
+            -half_thickness + corner_radius - kappa,
+        ),
+        local_arc_path_point(origin, tangent, normal, kappa, -half_thickness),
+        local_arc_path_point(origin, tangent, normal, 0.0, -half_thickness),
+    );
+}
+
+fn append_inner_to_outer_fillet(
+    path: &mut PathBuilder,
+    origin: Point,
+    tangent: Point,
+    normal: Point,
+    half_thickness: f32,
+    corner_radius: f32,
+) {
+    if corner_radius <= ARC_PATH_EPSILON {
+        path.line_to(local_arc_path_point(
+            origin,
+            tangent,
+            normal,
+            0.0,
+            half_thickness,
+        ));
+        return;
+    }
+
+    let kappa = corner_radius * ARC_QUARTER_CIRCLE_KAPPA;
+    let lower_end = local_arc_path_point(
+        origin,
+        tangent,
+        normal,
+        corner_radius,
+        -half_thickness + corner_radius,
+    );
+    let upper_start = local_arc_path_point(
+        origin,
+        tangent,
+        normal,
+        corner_radius,
+        half_thickness - corner_radius,
+    );
+    path.cubic_to(
+        local_arc_path_point(origin, tangent, normal, kappa, -half_thickness),
+        local_arc_path_point(
+            origin,
+            tangent,
+            normal,
+            corner_radius,
+            -half_thickness + corner_radius - kappa,
+        ),
+        lower_end,
+    );
+    path.line_to(upper_start);
+    path.cubic_to(
+        local_arc_path_point(
+            origin,
+            tangent,
+            normal,
+            corner_radius,
+            half_thickness - corner_radius + kappa,
+        ),
+        local_arc_path_point(origin, tangent, normal, kappa, half_thickness),
+        local_arc_path_point(origin, tangent, normal, 0.0, half_thickness),
+    );
+}
+
+fn arc_path_tangent(angle: f32) -> Point {
+    let radians = angle.to_radians();
+    Point::new(-radians.sin(), radians.cos())
+}
+
+fn arc_path_normal(angle: f32) -> Point {
+    let radians = angle.to_radians();
+    Point::new(radians.cos(), radians.sin())
+}
+
+fn local_arc_path_point(origin: Point, tangent: Point, normal: Point, x: f32, y: f32) -> Point {
+    Point::new(
+        origin.x + tangent.x * x + normal.x * y,
+        origin.y + tangent.y * x + normal.y * y,
+    )
 }
 
 fn arc_label_angles(geometry: ArcGaugeGeometry) -> (f32, f32) {

@@ -306,7 +306,6 @@ pub struct ArcGaugeCache {
     pub radius: f32,
     pub track_thickness: f32,
     pub track_corner_radius: f32,
-    pub track_border_thickness: f32,
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
     pub text_style: crate::render::text::ResolvedTextStyle,
@@ -321,11 +320,10 @@ pub struct ArcGaugeCache {
     pub frame_states: Vec<ArcGaugeFrameState>,
 }
 
-/// Per-frame arc gauge state: source value, fill fraction, and formatted
-/// value text for the dynamic inner metric layer.
+/// Per-frame arc gauge state: fill fraction and formatted value text for the
+/// dynamic inner metric layer.
 #[derive(Clone, Debug)]
 pub struct ArcGaugeFrameState {
-    pub value: f64,
     pub fill01: f32,
     pub value_text: String,
 }

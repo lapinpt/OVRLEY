@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { getArcAngles, getArcGaugeLayout, getArcInnerWidgetLayout, getArcRadius } from '@/features/widget-preview/utils/arcGaugeGeometry'
+import {
+  getArcAngles,
+  getArcFilledTrackPath,
+  getArcGaugeLayout,
+  getArcInnerWidgetLayout,
+  getArcRadius,
+} from '@/features/widget-preview/utils/arcGaugeGeometry'
 
 describe('arcGaugeGeometry', () => {
   test('uses vertically symmetric start and end angles for the supported range', () => {
@@ -51,5 +57,24 @@ describe('arcGaugeGeometry', () => {
     expect(layout.unit.top).toBeGreaterThan(layout.value.top)
     expect(layout.unit.baseline).toBeGreaterThan(layout.value.baseline)
     expect(layout.centerX).toBe(98)
+  })
+
+  test('builds one closed filled outline with continuous endpoint fillets', () => {
+    const shared = {
+      centerX: 80,
+      centerY: 80,
+      radius: 64,
+      startAngle: 180,
+      sweepAngle: 180,
+      trackThickness: 12,
+    }
+    const flat = getArcFilledTrackPath({ ...shared, cornerRadius: 0 })
+    const partial = getArcFilledTrackPath({ ...shared, cornerRadius: 3 })
+    const round = getArcFilledTrackPath({ ...shared, cornerRadius: 6 })
+
+    expect(flat).toMatch(/^M /)
+    expect(flat).toMatch(/ Z$/)
+    expect(partial).not.toBe(flat)
+    expect(round).not.toBe(partial)
   })
 })

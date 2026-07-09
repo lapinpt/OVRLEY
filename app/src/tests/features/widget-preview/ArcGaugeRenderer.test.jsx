@@ -57,28 +57,42 @@ describe('OverlayArcGaugeWidget', () => {
     expect(svg).toHaveAttribute('viewBox', '0 0 160 160')
   })
 
-  test('renders a rounded stroked fill and vertically stacked inner metric text', () => {
+  test('renders a filled track path with vertically stacked inner metric text', () => {
     render(<OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.5} globalScale={1} />)
 
-    const svg = screen.getByTestId('arc-gauge-preview')
     const filledTrack = screen.getByTestId('arc-gauge-filled-track')
-    expect(filledTrack).toHaveAttribute('stroke', '#40e0d0')
-    expect(filledTrack).toHaveAttribute('stroke-linecap', 'round')
-    expect(filledTrack.getAttribute('d')).toContain('A')
+    expect(filledTrack).toHaveAttribute('fill', '#40e0d0')
+    expect(filledTrack).toHaveAttribute('fill-rule', 'evenodd')
+    expect(filledTrack.getAttribute('d')).toContain('C')
     expect(screen.getByText('180')).toBeInTheDocument()
     expect(screen.getByText('KM/H')).toBeInTheDocument()
-    expect(svg.querySelectorAll('path').length).toBeGreaterThanOrEqual(3)
   })
 
-  test('uses circle strokes for a full arc while keeping labels separate', () => {
+  test('uses filled ring paths for a full arc while keeping labels separate', () => {
     render(<OverlayArcGaugeWidget widget={makeWidget({ arc_angle: 360 })} activity={activity} previewSecond={0.5} globalScale={1} />)
 
     const border = screen.getByTestId('arc-gauge-border')
-    expect(border.tagName).toBe('circle')
+    expect(border.tagName).toBe('path')
     expect(border.parentElement).toHaveAttribute('mask')
-    expect(screen.getByTestId('arc-gauge-empty-track').tagName).toBe('circle')
+    expect(screen.getByTestId('arc-gauge-empty-track').tagName).toBe('path')
     expect(screen.getByText('0')).toBeInTheDocument()
     expect(screen.getByText('100')).toBeInTheDocument()
+  })
+
+  test('changes the filled outline continuously as the configured corner radius changes', () => {
+    const { rerender } = render(
+      <OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 0 })} activity={activity} previewSecond={0.5} globalScale={1} />,
+    )
+    const flatPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
+
+    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 3 })} activity={activity} previewSecond={0.5} globalScale={1} />)
+    const partialPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
+
+    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 6 })} activity={activity} previewSecond={0.5} globalScale={1} />)
+    const fullPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
+
+    expect(partialPath).not.toBe(flatPath)
+    expect(fullPath).not.toBe(partialPath)
   })
 
   test('renders no icon even when an inherited text-widget icon flag is present', () => {

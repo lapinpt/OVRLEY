@@ -127,6 +127,155 @@ export function getArcSvgPath({ centerX, centerY, radius, startAngle, sweepAngle
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`
 }
 
+const ARC_PATH_EPSILON = 0.001
+const ARC_QUARTER_CIRCLE_KAPPA = 0.5522847498
+
+function formatArcPathNumber(value) {
+  return Number(finiteNumber(value).toFixed(3))
+}
+
+function arcPathPoint(centerX, centerY, radius, angle) {
+  return getArcPoint(centerX, centerY, radius, angle)
+}
+
+function arcPathTangent(angle) {
+  const radians = (finiteNumber(angle) * Math.PI) / 180
+  return { x: -Math.sin(radians), y: Math.cos(radians) }
+}
+
+function arcPathNormal(angle) {
+  const radians = (finiteNumber(angle) * Math.PI) / 180
+  return { x: Math.cos(radians), y: Math.sin(radians) }
+}
+
+function localArcPathPoint(origin, tangent, normal, x, y) {
+  return {
+    x: origin.x + tangent.x * x + normal.x * y,
+    y: origin.y + tangent.y * x + normal.y * y,
+  }
+}
+
+function pathMove(point) {
+  return `M ${formatArcPathNumber(point.x)} ${formatArcPathNumber(point.y)}`
+}
+
+function pathLine(point) {
+  return `L ${formatArcPathNumber(point.x)} ${formatArcPathNumber(point.y)}`
+}
+
+function pathCubic(control1, control2, end) {
+  return `C ${formatArcPathNumber(control1.x)} ${formatArcPathNumber(control1.y)} ${formatArcPathNumber(control2.x)} ${formatArcPathNumber(control2.y)} ${formatArcPathNumber(end.x)} ${formatArcPathNumber(end.y)}`
+}
+
+function appendCircularArc(commands, centerX, centerY, radius, startAngle, sweepAngle) {
+  const segmentCount = Math.max(1, Math.ceil(Math.abs(sweepAngle) / 90))
+  const segmentSweep = sweepAngle / segmentCount
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const angle0 = startAngle + segmentSweep * index
+    const angle1 = angle0 + segmentSweep
+    const controlDistance = radius * ((4 / 3) * Math.tan(((angle1 - angle0) * Math.PI) / 720))
+    const end = arcPathPoint(centerX, centerY, radius, angle1)
+    const startTangent = arcPathTangent(angle0)
+    const endTangent = arcPathTangent(angle1)
+    const start = arcPathPoint(centerX, centerY, radius, angle0)
+    commands.push(
+      pathCubic(
+        { x: start.x + startTangent.x * controlDistance, y: start.y + startTangent.y * controlDistance },
+        { x: end.x - endTangent.x * controlDistance, y: end.y - endTangent.y * controlDistance },
+        end,
+      ),
+    )
+  }
+}
+
+function appendOuterToInnerFillet(commands, origin, tangent, normal, halfThickness, cornerRadius) {
+  if (cornerRadius <= ARC_PATH_EPSILON) {
+    commands.push(pathLine(localArcPathPoint(origin, tangent, normal, 0, -halfThickness)))
+    return
+  }
+
+  const kappa = cornerRadius * ARC_QUARTER_CIRCLE_KAPPA
+  const upperEnd = localArcPathPoint(origin, tangent, normal, cornerRadius, halfThickness - cornerRadius)
+  const lowerStart = localArcPathPoint(origin, tangent, normal, cornerRadius, -halfThickness + cornerRadius)
+  const innerEnd = localArcPathPoint(origin, tangent, normal, 0, -halfThickness)
+  commands.push(
+    pathCubic(
+      localArcPathPoint(origin, tangent, normal, kappa, halfThickness),
+      localArcPathPoint(origin, tangent, normal, cornerRadius, halfThickness - cornerRadius + kappa),
+      upperEnd,
+    ),
+    pathLine(lowerStart),
+    pathCubic(
+      localArcPathPoint(origin, tangent, normal, cornerRadius, -halfThickness + cornerRadius - kappa),
+      localArcPathPoint(origin, tangent, normal, kappa, -halfThickness),
+      innerEnd,
+    ),
+  )
+}
+
+function appendInnerToOuterFillet(commands, origin, tangent, normal, halfThickness, cornerRadius) {
+  if (cornerRadius <= ARC_PATH_EPSILON) {
+    commands.push(pathLine(localArcPathPoint(origin, tangent, normal, 0, halfThickness)))
+    return
+  }
+
+  const kappa = cornerRadius * ARC_QUARTER_CIRCLE_KAPPA
+  const lowerEnd = localArcPathPoint(origin, tangent, normal, cornerRadius, -halfThickness + cornerRadius)
+  const upperStart = localArcPathPoint(origin, tangent, normal, cornerRadius, halfThickness - cornerRadius)
+  const outerEnd = localArcPathPoint(origin, tangent, normal, 0, halfThickness)
+  commands.push(
+    pathCubic(
+      localArcPathPoint(origin, tangent, normal, kappa, -halfThickness),
+      localArcPathPoint(origin, tangent, normal, cornerRadius, -halfThickness + cornerRadius - kappa),
+      lowerEnd,
+    ),
+    pathLine(upperStart),
+    pathCubic(
+      localArcPathPoint(origin, tangent, normal, cornerRadius, halfThickness - cornerRadius + kappa),
+      localArcPathPoint(origin, tangent, normal, kappa, halfThickness),
+      outerEnd,
+    ),
+  )
+}
+
+/**
+ * Creates one closed, filled arc-track outline. Its endpoint corners are true
+ * continuous fillets: 0px is a flat radial face and half the track thickness
+ * becomes a semicircular cap. The same cubic construction is used by Skia.
+ */
+export function getArcFilledTrackPath({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, cornerRadius = 0 }) {
+  const sweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(0, finiteNumber(sweepAngle)))
+  const halfThickness = Math.max(0, finiteNumber(trackThickness)) * 0.5
+  const outerRadius = finiteNumber(radius) + halfThickness
+  const innerRadius = finiteNumber(radius) - halfThickness
+  if (sweep <= ARC_PATH_EPSILON || halfThickness <= ARC_PATH_EPSILON || innerRadius <= ARC_PATH_EPSILON) return ''
+
+  const start = finiteNumber(startAngle)
+  const outerStart = arcPathPoint(centerX, centerY, outerRadius, start)
+  const commands = [pathMove(outerStart)]
+
+  if (sweep >= ARC_MAX_ANGLE_DEGREES - ARC_PATH_EPSILON) {
+    appendCircularArc(commands, centerX, centerY, outerRadius, start, ARC_MAX_ANGLE_DEGREES)
+    commands.push('Z', pathMove(arcPathPoint(centerX, centerY, innerRadius, start)))
+    appendCircularArc(commands, centerX, centerY, innerRadius, start, -ARC_MAX_ANGLE_DEGREES)
+    commands.push('Z')
+    return commands.join(' ')
+  }
+
+  const end = start + sweep
+  const endCenter = arcPathPoint(centerX, centerY, radius, end)
+  const startCenter = arcPathPoint(centerX, centerY, radius, start)
+  const filletRadius = Math.min(halfThickness, Math.max(0, finiteNumber(cornerRadius)))
+  appendCircularArc(commands, centerX, centerY, outerRadius, start, sweep)
+  appendOuterToInnerFillet(commands, endCenter, arcPathTangent(end), arcPathNormal(end), halfThickness, filletRadius)
+  appendCircularArc(commands, centerX, centerY, innerRadius, end, -sweep)
+  const startTangent = arcPathTangent(start)
+  appendInnerToOuterFillet(commands, startCenter, { x: -startTangent.x, y: -startTangent.y }, arcPathNormal(start), halfThickness, filletRadius)
+  commands.push('Z')
+  return commands.join(' ')
+}
+
 /**
  * Calculates the positions for the value/unit inner widget. Measurements are
  * supplied by the renderer so this function remains pure and unit-testable.
