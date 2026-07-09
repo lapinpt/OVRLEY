@@ -515,5 +515,3 @@ If the editor has hardcoded field lists, add the gauge-specific fields there (e.
 - [ ] 13. Editor field config — add gauge-specific fields to editor UI
 - [ ] 14. Rust tests: deserialization, geometry, cache, preview render
 - [ ] 15. JS tests: geometry unit tests, renderer tests
-
-No single step should take more than ~50 lines of new code. If it does, you're probably adding logic that belongs in a shared utility.

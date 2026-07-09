@@ -32,6 +32,11 @@ vi.mock('@/features/widget-preview/components/LinearGaugeRenderer', () => ({
     <div data-testid="linear-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
   ),
 }))
+vi.mock('@/features/widget-preview/components/ArcGaugeRenderer', () => ({
+  OverlayArcGaugeWidget: (props) => (
+    <div data-testid="arc-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
+  ),
+}))
 vi.mock('@/features/widget-preview/components/BackdropRenderer', () => ({
   default: (props) => <div data-testid="backdrop-renderer" data-widget-type={props.widget.type} />,
 }))
@@ -126,5 +131,15 @@ describe('WidgetPreview dispatch by display_type', () => {
       />,
     )
     expect(getByTestId('linear-gauge-renderer')).toBeTruthy()
+  })
+
+  test('arc display_type uses the arc gauge renderer', () => {
+    const { getByTestId } = render(
+      <WidgetPreview
+        widget={{ type: 'speed', category: 'values', data: { display_type: 'arc', x: 0, y: 0, width: 160, height: 160 } }}
+        activity={ACTIVITY}
+      />,
+    )
+    expect(getByTestId('arc-gauge-renderer')).toBeTruthy()
   })
 })

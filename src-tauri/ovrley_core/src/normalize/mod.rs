@@ -4,6 +4,7 @@
 //! owns zero render-affecting defaults — missing fields are rejected. The
 //! frontend must materialise all defaults before sending the config.
 
+mod arc_gauge;
 mod backdrop;
 mod elevation;
 mod gradient;
@@ -29,6 +30,9 @@ pub use raw::{
     TEMPLATE_FILE_VERSION,
 };
 
+pub use arc_gauge::{
+    validate_arc_gauge, ValidatedArcGaugeWidget, MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES,
+};
 pub use backdrop::{validate_backdrop, ValidatedBackdrop};
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
@@ -123,6 +127,10 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
             if value.display_type == DisplayType::Linear {
                 let value = value.with_promoted_display_variant("linear")?;
                 return validate_linear_gauge(value, idx).map(PreparedValue::LinearGauge);
+            }
+            if value.display_type == DisplayType::Arc {
+                let value = value.with_promoted_display_variant("arc")?;
+                return validate_arc_gauge(value, idx).map(PreparedValue::ArcGauge);
             }
             validate_value_widget(value, idx).map(PreparedValue::StandardText)
         })

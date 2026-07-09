@@ -32,6 +32,7 @@ import { OverlayRouteWidget } from './RouteRenderer'
 import { OverlayElevationWidget } from './ElevationRenderer'
 import { OverlayHeadingWidget } from './HeadingRenderer'
 import { OverlayLinearGaugeWidget } from './LinearGaugeRenderer'
+import { OverlayArcGaugeWidget } from './ArcGaugeRenderer'
 import OverlayBackdropWidget from './BackdropRenderer'
 import { isBoxedDisplayType, getDisplayTypeLabel, getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
 import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
@@ -44,6 +45,7 @@ import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 const BOXED_PREVIEW_COMPONENTS = {
   heading_tape: OverlayHeadingWidget,
   linear: OverlayLinearGaugeWidget,
+  arc: OverlayArcGaugeWidget,
 }
 
 /**

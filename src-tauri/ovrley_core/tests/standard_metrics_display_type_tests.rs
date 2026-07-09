@@ -30,7 +30,7 @@ fn display_type_definitions_load_from_manifest() {
     assert!(text.default_frame_height.is_none());
 
     let linear = display_type_definition("linear").expect("linear must exist");
-    assert_eq!(linear.label, "Linear");
+    assert_eq!(linear.label, "Linear Bar");
     assert_eq!(linear.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(linear.default_frame_width, Some(200));
     assert_eq!(linear.default_frame_height, Some(30));
@@ -52,7 +52,7 @@ fn display_type_definitions_load_from_manifest() {
 fn display_type_label_returns_label_or_key() {
     assert_eq!(display_type_label("text"), "Text");
     assert_eq!(display_type_label("heading_tape"), "Heading Tape");
-    assert_eq!(display_type_label("linear"), "Linear");
+    assert_eq!(display_type_label("linear"), "Linear Bar");
     assert_eq!(display_type_label("unknown_type"), "unknown_type");
 }
 
@@ -88,6 +88,7 @@ fn supported_display_types_per_metric() {
     let speed = supported_display_types(MetricKind::Speed);
     assert!(speed.iter().any(|dt| dt == "text"));
     assert!(speed.iter().any(|dt| dt == "linear"));
+    assert!(speed.iter().any(|dt| dt == "arc"));
 
     let core_temp = supported_display_types(MetricKind::CoreTemperature);
     assert_eq!(core_temp.len(), 1);
@@ -106,6 +107,7 @@ fn supported_display_types_per_metric() {
 fn is_display_type_supported_checks_permitted_types() {
     assert!(is_display_type_supported(MetricKind::Speed, "text"));
     assert!(is_display_type_supported(MetricKind::Speed, "linear"));
+    assert!(is_display_type_supported(MetricKind::Speed, "arc"));
     assert!(!is_display_type_supported(MetricKind::Heading, "linear"));
     assert!(is_display_type_supported(
         MetricKind::Heading,

@@ -19,6 +19,7 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::render::text::ResolvedTextStyle;
+use crate::render::widgets::arc_gauge::draw_arc_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
 use crate::render::widgets::linear_gauge::draw_linear_gauge_widget;
 use crate::render::widgets::types::{PresentationCache, WidgetRenderReport};
@@ -68,7 +69,13 @@ pub fn draw_metric_presentation(
             frame_index,
             frame_profiler,
         ),
-        DisplayType::Bars | DisplayType::Arc | DisplayType::Corner => None,
+        DisplayType::Arc => draw_arc_presentation(
+            canvas,
+            presentation_caches.get(&value_idx),
+            frame_index,
+            frame_profiler,
+        ),
+        DisplayType::Bars | DisplayType::Corner => None,
     }
 }
 
@@ -84,6 +91,20 @@ fn draw_linear_presentation(
         return None;
     };
     draw_linear_gauge_widget(canvas, gauge_cache, frame_index, frame_profiler)
+}
+
+/// Draws the arc gauge presentation for a single frame. The cache owns the
+/// static track/unit layer and all dynamic value/fill state.
+fn draw_arc_presentation(
+    canvas: &Canvas,
+    cache: Option<&PresentationCache>,
+    frame_index: usize,
+    frame_profiler: &mut RenderProfiler,
+) -> Option<WidgetRenderReport> {
+    let PresentationCache::ArcGauge(gauge_cache) = cache? else {
+        return None;
+    };
+    draw_arc_gauge_widget(canvas, gauge_cache, frame_index, frame_profiler)
 }
 
 /// Draws the heading tape presentation for a heading metric value.

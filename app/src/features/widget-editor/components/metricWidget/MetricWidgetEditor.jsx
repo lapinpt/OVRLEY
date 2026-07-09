@@ -13,6 +13,7 @@ import { initDisplayVariant } from '@/lib/widget/widget-resolver'
 import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
 import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
+import ArcDisplaySection from './ArcDisplaySection'
 import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
 
 /**
@@ -23,6 +24,7 @@ import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
 const DISPLAY_SECTION = {
   heading_tape: HeadingTapeDisplaySection,
   linear: LinearDisplaySection,
+  arc: ArcDisplaySection,
 }
 
 /**

@@ -56,7 +56,8 @@ describe('WidgetButtonGrid', () => {
     const textOptions = screen.getAllByRole('button', { name: 'Text' })
     const textDisplayOption = textOptions[textOptions.length - 1]
     expect(textDisplayOption).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Linear' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Linear Bar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Arc' })).toBeInTheDocument()
     await user.click(textDisplayOption)
 
     expect(onAddWidget).toHaveBeenCalledWith('speed', 'text')

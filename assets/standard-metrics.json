@@ -113,7 +113,24 @@
         "icon": { "source": "shared", "assetFile": "display-type-arc.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 120,
-        "defaultFrameHeight": 120
+        "defaultFrameHeight": 120,
+        "defaults": {
+          "arc_angle": 180,
+          "inner_widget_offset_x": 0,
+          "inner_widget_offset_y": 0,
+          "track_thickness": 12,
+          "track_corner_radius": 6,
+          "track_border_thickness": 2,
+          "track_border_color": "#ffffff",
+          "track_empty_color": "#222222",
+          "track_empty_opacity": 0.3,
+          "track_filled_color": "#40e0d0",
+          "track_filled_opacity": 1,
+          "show_min_max_labels": false,
+          "min_max_label_font": "Arial.ttf",
+          "min_max_label_font_size": 12,
+          "min_max_label_color": "#ffffff"
+        }
       },
       "corner": {
         "label": "Corner",
@@ -124,7 +141,7 @@
       }
     },
     "variantFrameKeys": ["width", "height", "rotation"],
-    "defaults": ["text", "linear"],
+    "defaults": ["text", "linear", "arc"],
     "overrides": {
       "heading": ["text", "heading_tape"],
       "core_temperature": ["text"],

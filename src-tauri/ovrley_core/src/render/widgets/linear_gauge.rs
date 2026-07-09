@@ -531,7 +531,7 @@ pub fn format_linear_gauge_label(value: f64) -> String {
     }
 }
 
-fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
+pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
     let mut min_value = f64::INFINITY;
     let mut max_value = f64::NEG_INFINITY;
     for value in metric_values(series, metric).iter().flatten() {
@@ -545,7 +545,7 @@ fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
     }
 }
 
-fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &[Option<f64>] {
+pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &[Option<f64>] {
     match metric {
         MetricKind::Speed => &series.speed,
         MetricKind::Distance => &series.distance,

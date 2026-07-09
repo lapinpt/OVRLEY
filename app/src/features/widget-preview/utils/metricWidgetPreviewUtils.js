@@ -36,7 +36,7 @@ function getLastFiniteValue(series) {
   return null
 }
 
-function formatDistancePreviewDisplay(activity, previewSecond, widgetData) {
+export function formatDistancePreviewDisplay(activity, previewSecond, widgetData) {
   const currentDistance = getInterpolatedActivityValue(activity, 'distance', previewSecond)
   const current = formatStandardMetricDisplay('distance', currentDistance, widgetData)
   const showFullDistance = widgetData.show_full_distance ?? true
@@ -58,6 +58,38 @@ function formatDistancePreviewDisplay(activity, previewSecond, widgetData) {
   return {
     value: `${current.value}/${total.value}`,
     units: current.units,
+  }
+}
+
+/**
+ * Builds the text content consumed by boxed gauges that retain the metric
+ * value in their frame. Unlike the intrinsic metric model, this deliberately
+ * has no icon layout: arc gauges stack value and unit vertically.
+ *
+ * @param {object} params
+ * @param {object} params.widget - Resolved metric widget.
+ * @param {object} params.activity - Activity data with metric series.
+ * @param {number} params.previewSecond - Current preview time.
+ * @returns {{ valueText: string, unitText: string, fontFamily: string, fontSize: number }|null}
+ */
+export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond }) {
+  if (!widget || !isStandardMetricWidgetType(widget.type)) {
+    return null
+  }
+
+  const data = resolveActiveMetricWidgetData(widget.data)
+  const definition = getStandardMetricDefinition(widget.type)
+  const formatted =
+    widget.type === 'distance'
+      ? formatDistancePreviewDisplay(activity, previewSecond, data)
+      : formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), data)
+  const showUnits = data.show_units ?? definition?.showUnitsByDefault ?? false
+
+  return {
+    valueText: `${data.prefix ?? ''}${formatted.value}${data.suffix ?? ''}`,
+    unitText: showUnits ? formatted.units : '',
+    fontFamily: getPreviewFontFamily(data.font || data.font_family),
+    fontSize: data.font_size ?? 60,
   }
 }
 

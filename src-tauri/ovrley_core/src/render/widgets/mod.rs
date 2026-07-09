@@ -5,6 +5,8 @@
 //! widget-local geometry, builds static layers, and precomputes marker states so
 //! video rendering can draw each frame with predictable cost.
 
+/// Arc gauge metric widget implementation.
+pub mod arc_gauge;
 /// Static backdrop widget implementation.
 pub(crate) mod backdrop;
 /// Shared geometry, style, and drawing helpers for all widgets.
@@ -40,6 +42,7 @@ use crate::paths::AppPaths;
 use crate::render::widgets::types::PreparedValue;
 use std::collections::BTreeMap;
 
+pub use arc_gauge::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
 pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
 pub use linear_gauge::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
@@ -135,6 +138,19 @@ pub fn prepare_render_assets(
                 assets
                     .presentation_caches
                     .insert(idx, types::PresentationCache::LinearGauge(cache));
+            }
+            PreparedValue::ArcGauge(validated) => {
+                let cache = arc_gauge::prepare_arc_gauge_cache(
+                    validated,
+                    dense_activity,
+                    &assets.scene,
+                    assets.scene.scale,
+                    &paths.font_dirs,
+                    prepare_profiler,
+                )?;
+                assets
+                    .presentation_caches
+                    .insert(idx, types::PresentationCache::ArcGauge(cache));
             }
             _ => {}
         }

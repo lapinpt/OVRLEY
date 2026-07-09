@@ -265,6 +265,14 @@ pub struct ValueConfig {
     #[serde(default)]
     pub orientation: Option<String>,
     #[serde(default)]
+    pub arc_angle: Option<f32>,
+    #[serde(default)]
+    pub inner_widget_offset_x: Option<f32>,
+    #[serde(default)]
+    pub inner_widget_offset_y: Option<f32>,
+    #[serde(default)]
+    pub track_thickness: Option<f32>,
+    #[serde(default)]
     pub track_corner_radius: Option<f32>,
     #[serde(default)]
     pub track_border_thickness: Option<f32>,

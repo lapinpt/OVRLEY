@@ -84,19 +84,41 @@ pub struct ValidatedValueWidget {
 pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<ValidatedValueWidget> {
     let p = |f: &str| format!("values[{index}].{f}");
 
-    if !is_standard_metric(value.value) {
-        return Err(CoreError::Config(format!(
-            "{}: metric {:?} is outside the standard metric text/value validation slice",
-            p("value"),
-            value.value
-        )));
-    }
-
     if value.display_type != DisplayType::Text {
         return Err(CoreError::Config(format!(
             "{}: display_type '{}' is outside the standard metric text/value validation slice",
             p("display_type"),
             value.display_type.as_str()
+        )));
+    }
+
+    validate_value_widget_fields(value, index, true)
+}
+
+/// Validates the text fields used inside a boxed arc gauge.
+///
+/// Arc gauges deliberately do not render icons, so icon configuration is not
+/// required for this path. All fields which affect the inner value or unit are
+/// still validated explicitly before drawing.
+pub(super) fn validate_arc_inner_value_widget(
+    value: ValueConfig,
+    index: usize,
+) -> CoreResult<ValidatedValueWidget> {
+    validate_value_widget_fields(value, index, false)
+}
+
+fn validate_value_widget_fields(
+    value: ValueConfig,
+    index: usize,
+    require_icon_fields: bool,
+) -> CoreResult<ValidatedValueWidget> {
+    let p = |f: &str| format!("values[{index}].{f}");
+
+    if !is_standard_metric(value.value) {
+        return Err(CoreError::Config(format!(
+            "{}: metric {:?} is outside the standard metric text/value validation slice",
+            p("value"),
+            value.value
         )));
     }
 
@@ -123,22 +145,36 @@ pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<Val
     let colour_hex = require_str(value.color.as_deref(), &p("color"))?;
     let color = rgba_from_hex(colour_hex, &p("color"), opacity)?;
 
-    // -- icon -- all explicit ---------------------------------------------
-    let show_icon = require_bool(value.show_icon, &p("show_icon"))?;
-    let icon_color = rgba_from_hex(
-        require_str(value.icon_color.as_deref(), &p("icon_color"))?,
-        &p("icon_color"),
-        opacity,
-    )?;
-    let icon_size = require_f32(value.icon_size, &p("icon_size"))?;
-    if icon_size < 0.0 {
-        return Err(CoreError::Config(format!(
-            "{}: must be >= 0, got {icon_size}",
-            p("icon_size")
-        )));
-    }
-    let icon_offset_x = require_f32(value.icon_offset_x, &p("icon_offset_x"))?;
-    let icon_offset_y = require_f32(value.icon_offset_y, &p("icon_offset_y"))?;
+    // -- icon --------------------------------------------------------------
+    // Arc gauges have no icon. Keep the validated struct shape shared with
+    // normal metric formatting, while avoiding needless required fields for a
+    // visual element that this presentation never draws.
+    let (show_icon, icon_color, icon_size, icon_offset_x, icon_offset_y) = if require_icon_fields {
+        let show_icon = require_bool(value.show_icon, &p("show_icon"))?;
+        let icon_color = rgba_from_hex(
+            require_str(value.icon_color.as_deref(), &p("icon_color"))?,
+            &p("icon_color"),
+            opacity,
+        )?;
+        let icon_size = require_f32(value.icon_size, &p("icon_size"))?;
+        if icon_size < 0.0 {
+            return Err(CoreError::Config(format!(
+                "{}: must be >= 0, got {icon_size}",
+                p("icon_size")
+            )));
+        }
+        let icon_offset_x = require_f32(value.icon_offset_x, &p("icon_offset_x"))?;
+        let icon_offset_y = require_f32(value.icon_offset_y, &p("icon_offset_y"))?;
+        (
+            show_icon,
+            icon_color,
+            icon_size,
+            icon_offset_x,
+            icon_offset_y,
+        )
+    } else {
+        (false, [0, 0, 0, 0], 0.0, 0.0, 0.0)
+    };
 
     // -- units -- all explicit --------------------------------------------
     let show_units = require_bool(value.show_units, &p("show_units"))?;

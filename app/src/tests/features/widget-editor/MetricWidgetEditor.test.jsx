@@ -203,3 +203,65 @@ describe('MetricWidgetEditor linear gauge controls', () => {
     )
   })
 })
+
+describe('MetricWidgetEditor arc gauge controls', () => {
+  test('renders arc geometry, inner-widget, and shared track controls without an icon section', async () => {
+    const user = userEvent.setup()
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'arc',
+          font: 'Arial.ttf',
+          font_size: 40,
+          color: '#ffffff',
+          show_units: true,
+          unit_color: '#ffffff',
+          display_unit: 'kmh',
+          display_variants: {
+            arc: {
+              width: 160,
+              height: 160,
+              rotation: 0,
+              arc_angle: 180,
+              inner_widget_offset_x: 0,
+              inner_widget_offset_y: 0,
+              track_thickness: 12,
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Arc Track')).toBeInTheDocument()
+    expect(screen.getByText('Arc Angle')).toBeInTheDocument()
+    expect(screen.getByText('Inner Widget Position')).toBeInTheDocument()
+    expect(screen.getByText('Inner Value')).toBeInTheDocument()
+    expect(screen.getByText('Inner Unit')).toBeInTheDocument()
+    expect(screen.queryByText('Icon')).not.toBeInTheDocument()
+
+    const switches = screen.getAllByRole('switch')
+    await user.click(switches[switches.length - 1])
+    expect(updateWidgetData).toHaveBeenCalledWith(
+      'value-0',
+      expect.objectContaining({
+        display_variants: expect.objectContaining({
+          arc: expect.objectContaining({ show_min_max_labels: true }),
+        }),
+      }),
+    )
+  })
+})

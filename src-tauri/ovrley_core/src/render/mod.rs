@@ -524,7 +524,9 @@ fn render_frame_to_surface(
                         validated_time: None,
                     })?;
                 }
-                PreparedValue::HeadingTape(_) | PreparedValue::LinearGauge(_) => {}
+                PreparedValue::HeadingTape(_)
+                | PreparedValue::LinearGauge(_)
+                | PreparedValue::ArcGauge(_) => {}
             }
         }
         Ok(())
