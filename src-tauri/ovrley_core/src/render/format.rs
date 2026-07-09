@@ -395,13 +395,13 @@ fn format_validated_standard_metric_parts(
         Some(StandardMetricFormatterKind::Decimal) => raw
             .map(|value| {
                 if kind == MetricKind::Distance {
-                    let current = format_number_fixed(
+                    let current = format_number(
                         convert_standard_metric_value(kind, display_unit, value),
                         decimals,
                     );
                     if validated.show_full_distance == Some(true) {
                         if let Some(total) = dense_activity.full_activity_distance {
-                            let total = format_number_fixed(
+                            let total = format_number(
                                 convert_standard_metric_value(kind, display_unit, total),
                                 decimals,
                             );
@@ -530,28 +530,11 @@ where
     }
 }
 
-// Converts a number to display text, trimming unnecessary fractional zeros.
+// Converts a number to display text, preserving requested fractional places.
 //
 // Zero-decimal values intentionally round instead of truncating so backend
 // preview PNGs match the editor canvas' metric formatting.
 fn format_number(value: f64, decimals: usize) -> String {
-    if decimals == 0 {
-        return value.round().to_string();
-    }
-
-    let factor = 10_f64.powi(decimals as i32);
-    let rounded = (value * factor).round() / factor;
-    let mut text = format!("{rounded:.decimals$}");
-    while text.contains('.') && text.ends_with('0') {
-        text.pop();
-    }
-    if text.ends_with('.') {
-        text.pop();
-    }
-    text
-}
-
-fn format_number_fixed(value: f64, decimals: usize) -> String {
     if decimals == 0 {
         return value.round().to_string();
     }
@@ -671,7 +654,7 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
 
 #[cfg(test)]
 mod tests {
-    use super::{format_balance_value, format_number_fixed};
+    use super::{format_balance_value, format_number};
 
     #[test]
     fn balance_percent_label_omits_spaces_around_slash() {
@@ -689,8 +672,8 @@ mod tests {
     }
 
     #[test]
-    fn fixed_number_preserves_trailing_zeroes() {
-        assert_eq!(format_number_fixed(2.0, 1), "2.0");
-        assert_eq!(format_number_fixed(2.3, 2), "2.30");
+    fn number_format_preserves_requested_trailing_zeroes() {
+        assert_eq!(format_number(2.0, 1), "2.0");
+        assert_eq!(format_number(2.3, 2), "2.30");
     }
 }

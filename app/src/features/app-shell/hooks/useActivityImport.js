@@ -1,5 +1,5 @@
 /**
- * Activity import - GPX/FIT file selection and import.
+ * Activity import - GPX/FIT/SRT/IGC file selection and import.
  */
 
 import { useCallback } from 'react'
@@ -17,7 +17,7 @@ export default function useActivityImport() {
       let selected = null
 
       if (hasTauriRuntime()) {
-        const selectedPath = await openSinglePath([{ name: 'GPX, FIT or SRT', extensions: ['gpx', 'fit', 'srt'] }], {
+        const selectedPath = await openSinglePath([{ name: 'GPX, FIT, SRT or IGC', extensions: ['gpx', 'fit', 'srt', 'igc'] }], {
           lastDirectoryKey: 'last-activity-import-dir',
         })
 
@@ -25,7 +25,7 @@ export default function useActivityImport() {
           selected = await fileFromSelectedPath(selectedPath, 'activity')
         }
       } else {
-        selected = await selectBrowserFile('.gpx,.fit,.srt')
+        selected = await selectBrowserFile('.gpx,.fit,.srt,.igc')
       }
 
       if (!selected) return
@@ -33,8 +33,8 @@ export default function useActivityImport() {
       setProcessing(true)
       await importActivityFile(selected, useStore.getState())
     } catch (error) {
-      console.error('GPX selection failed:', error)
-      setErrorMessage(`GPX Selection failed: ${error.message}`)
+      console.error('Activity selection failed:', error)
+      setErrorMessage(`Activity selection failed: ${error.message}`)
     } finally {
       setProcessing(false)
     }

@@ -207,6 +207,29 @@ describe('metric widget preview model standard metric units', () => {
     expect(model?.unitText).toBe('MIN/KM')
   })
 
+  test('preserves requested decimal places for vertical speed widgets', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'vertical_speed',
+        data: {
+          display_unit: 'mps',
+          decimals: 1,
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        vertical_speed: [2],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('2.0')
+    expect(model?.unitText).toBe('M/S')
+  })
+
   test('gear_position formats as integer with gear unit', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: {

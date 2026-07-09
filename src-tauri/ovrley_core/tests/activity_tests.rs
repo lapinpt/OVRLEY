@@ -251,6 +251,31 @@ fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
 }
 
 #[test]
+fn finalizes_igc_raw_activity_fixture() {
+    let raw_activity_json = fs::read_to_string(common::test_config::igc_raw_activity_path()).unwrap();
+    let activity = finalize_raw_activity_json(&raw_activity_json, None)
+        .unwrap()
+        .parsed_activity;
+
+    let n = activity.sample_elapsed_seconds.len();
+    assert!(n > 0, "expected IGC elapsed samples");
+    assert_eq!(activity.file_format.as_deref(), Some("igc"));
+    assert_eq!(activity.sample_course_points.len(), n);
+    assert_eq!(activity.time.len(), n);
+    assert!(
+        activity
+            .sample_course_points
+            .iter()
+            .any(|(lat, lon)| lat.is_some() && lon.is_some()),
+        "expected IGC course points"
+    );
+    assert!(
+        activity.time.iter().any(Option::is_some),
+        "expected IGC timestamp series"
+    );
+}
+
+#[test]
 fn builds_dense_report_for_full_fixture() {
     let activity_json = fs::read_to_string(common::test_config::parsed_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();

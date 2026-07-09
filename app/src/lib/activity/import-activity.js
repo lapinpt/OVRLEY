@@ -9,6 +9,7 @@ import useStore from '@/store/useStore'
 import { syncSceneTimingToConfig } from '@/store/store-utils'
 import parseFitActivityFile from './fit-parser.js'
 import { parseGpxActivityFile } from './gpx-parser.js'
+import { parseIgcActivityFile } from './igc-parser.js'
 import { parseSrtActivityFile } from './srt-parser.js'
 
 /**
@@ -23,6 +24,7 @@ async function parseActivityFile(file) {
   if (lowerName.endsWith('.fit')) rawActivity = await parseFitActivityFile(file)
   else if (lowerName.endsWith('.srt')) rawActivity = parseSrtActivityFile(await file.text(), file.name)
   else if (lowerName.endsWith('.gpx')) rawActivity = parseGpxActivityFile(file, await file.text())
+  else if (lowerName.endsWith('.igc')) rawActivity = await parseIgcActivityFile(file)
   else throw new Error(`Unsupported activity file format: ${file.name}`)
 
   const finalized = await backend.finalizeActivity(rawActivity)

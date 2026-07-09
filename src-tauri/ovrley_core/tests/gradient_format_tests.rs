@@ -48,7 +48,7 @@ fn format_gradient(raw: Option<f64>, overrides: &[(&str, &str)]) -> String {
 
 #[test]
 fn positive_gradient_with_sign() {
-    assert_eq!(format_gradient(Some(5.0), &[]), "+5%");
+    assert_eq!(format_gradient(Some(5.0), &[]), "+5.0%");
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn negative_gradient_with_sign() {
 
 #[test]
 fn zero_gradient_no_sign() {
-    assert_eq!(format_gradient(Some(0.0), &[]), "0%");
+    assert_eq!(format_gradient(Some(0.0), &[]), "0.0%");
 }
 
 #[test]
@@ -68,12 +68,12 @@ fn missing_data_shows_placeholder() {
 
 #[test]
 fn sign_hidden_when_show_sign_false() {
-    assert_eq!(format_gradient(Some(5.0), &[("show_sign", "false")]), "5%");
+    assert_eq!(format_gradient(Some(5.0), &[("show_sign", "false")]), "5.0%");
 }
 
 #[test]
 fn negative_hidden_when_show_sign_false() {
-    assert_eq!(format_gradient(Some(-3.0), &[("show_sign", "false")]), "3%");
+    assert_eq!(format_gradient(Some(-3.0), &[("show_sign", "false")]), "3.0%");
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn two_decimals() {
 fn prefix_applied() {
     assert_eq!(
         format_gradient(Some(5.0), &[("prefix", "\"Grade: \"")]),
-        "Grade: +5%"
+        "Grade: +5.0%"
     );
 }
 
@@ -98,7 +98,7 @@ fn prefix_applied() {
 fn suffix_applied() {
     assert_eq!(
         format_gradient(Some(5.0), &[("suffix", "\" slope\"")]),
-        "+5% slope"
+        "+5.0% slope"
     );
 }
 
@@ -106,18 +106,18 @@ fn suffix_applied() {
 fn prefix_and_suffix_applied() {
     assert_eq!(
         format_gradient(Some(5.0), &[("prefix", "\"[\""), ("suffix", "\"]\"")]),
-        "[+5%]"
+        "[+5.0%]"
     );
 }
 
 #[test]
 fn large_positive_gradient() {
-    assert_eq!(format_gradient(Some(25.0), &[]), "+25%");
+    assert_eq!(format_gradient(Some(25.0), &[]), "+25.0%");
 }
 
 #[test]
 fn large_negative_gradient() {
-    assert_eq!(format_gradient(Some(-25.0), &[]), "-25%");
+    assert_eq!(format_gradient(Some(-25.0), &[]), "-25.0%");
 }
 
 #[test]

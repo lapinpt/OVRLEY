@@ -89,7 +89,7 @@ export function formatPace(value, unit) {
   }
 }
 
-function formatRoundedMetric(value, units, decimals = 0, preserveTrailingZeros = false) {
+function formatRoundedMetric(value, units, decimals = 0) {
   if (value === null || value === undefined) {
     return {
       value: '--',
@@ -98,12 +98,7 @@ function formatRoundedMetric(value, units, decimals = 0, preserveTrailingZeros =
   }
 
   const numericValue = Number(value)
-  const roundedValue =
-    decimals > 0
-      ? preserveTrailingZeros
-        ? numericValue.toFixed(decimals)
-        : numericValue.toFixed(decimals).replace(/\.?0+$/, '')
-      : Math.round(numericValue).toString()
+  const roundedValue = decimals > 0 ? numericValue.toFixed(decimals) : Math.round(numericValue).toString()
 
   return {
     value: roundedValue,
@@ -122,7 +117,7 @@ function formatDistanceValue(value, unit, decimals = 1, showUnits = true) {
 
   const currentValue = Number(value)
   return {
-    value: formatRoundedMetric(currentValue, '', decimals, true).value,
+    value: formatRoundedMetric(currentValue, '', decimals).value,
     units,
   }
 }
@@ -215,8 +210,8 @@ function formatBalance(value, decimals = 0, balanceFormat = 'percent_label') {
 
   const leftValue = Math.min(Math.max(Number(value), 0), 100)
   const rightValue = Math.min(Math.max(100 - leftValue, 0), 100)
-  const leftText = decimals > 0 ? leftValue.toFixed(decimals).replace(/\.?0+$/, '') : Math.round(leftValue).toString()
-  const rightText = decimals > 0 ? rightValue.toFixed(decimals).replace(/\.?0+$/, '') : Math.round(rightValue).toString()
+  const leftText = decimals > 0 ? leftValue.toFixed(decimals) : Math.round(leftValue).toString()
+  const rightText = decimals > 0 ? rightValue.toFixed(decimals) : Math.round(rightValue).toString()
 
   return {
     value: fmt.valueTemplate(leftText, rightText),
