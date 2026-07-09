@@ -1,4 +1,4 @@
-# IGC Parsing Implementation Plan
+# IGC Parsing Implementation Plan - DONE
 
 ## Goal
 
@@ -25,19 +25,19 @@ The package is TypeScript-compiled-to-JS exposed via CommonJS (`module.exports =
 Async adapter `parseIgcActivityFile(file)`:
 
 ```js
-import IGCParser from 'igc-parser'
-import { safeNumber } from './raw-sample-utils.js'
+import IGCParser from "igc-parser";
+import { safeNumber } from "./raw-sample-utils.js";
 
 export default async function parseIgcActivityFile(file) {
-  const result = IGCParser.parse(await file.text(), { lenient: true })
-  if (!result.fixes?.length) throw new Error('The IGC file does not contain any fix records.')
+  const result = IGCParser.parse(await file.text(), { lenient: true });
+  if (!result.fixes?.length) throw new Error("The IGC file does not contain any fix records.");
 
-  const firstTimestamp = result.fixes[0].timestamp
+  const firstTimestamp = result.fixes[0].timestamp;
   const raw_samples = result.fixes.map((fix) => {
-    const ts = new Date(fix.timestamp).toISOString()
-    const elapsed_seconds = (fix.timestamp - firstTimestamp) / 1000
-    const elevation = safeNumber(fix.gpsAltitude)
-    const altitude = safeNumber(fix.pressureAltitude)
+    const ts = new Date(fix.timestamp).toISOString();
+    const elapsed_seconds = (fix.timestamp - firstTimestamp) / 1000;
+    const elevation = safeNumber(fix.gpsAltitude);
+    const altitude = safeNumber(fix.pressureAltitude);
     if (!fix.valid) {
       return {
         timestamp: ts,
@@ -46,11 +46,11 @@ export default async function parseIgcActivityFile(file) {
         longitude: null,
         elevation: null,
         altitude: null,
-        speed: readExt(fix, 'GSP', (v) => safeNumber(v) / 3.6),
-        heading: readExt(fix, 'TRT', safeNumber),
-        vertical_speed: readExt(fix, 'VAT', (v) => safeNumber(v) / 10),
-        temperature: readExt(fix, 'OAT', readOat),
-      }
+        speed: readExt(fix, "GSP", (v) => safeNumber(v) / 3.6),
+        heading: readExt(fix, "TRT", safeNumber),
+        vertical_speed: readExt(fix, "VAT", (v) => safeNumber(v) / 10),
+        temperature: readExt(fix, "OAT", readOat),
+      };
     }
     return {
       timestamp: ts,
@@ -59,20 +59,18 @@ export default async function parseIgcActivityFile(file) {
       longitude: safeNumber(fix.longitude),
       elevation,
       altitude,
-      speed: readExt(fix, 'GSP', (v) => safeNumber(v) / 3.6),
-      heading: readExt(fix, 'TRT', safeNumber),
-      vertical_speed: readExt(fix, 'VAT', (v) => safeNumber(v) / 10),
-      temperature: readExt(fix, 'OAT', readOat),
-    }
-  })
+      speed: readExt(fix, "GSP", (v) => safeNumber(v) / 3.6),
+      heading: readExt(fix, "TRT", safeNumber),
+      vertical_speed: readExt(fix, "VAT", (v) => safeNumber(v) / 10),
+      temperature: readExt(fix, "OAT", readOat),
+    };
+  });
 
   return {
     file_name: file.name,
-    file_format: 'igc',
+    file_format: "igc",
     metadata: {
-      activity_name: result.date && result.pilot
-        ? `${result.date} – ${result.pilot}`
-        : (result.date || null),
+      activity_name: result.date && result.pilot ? `${result.date} – ${result.pilot}` : result.date || null,
       date: result.date,
       glider_type: result.gliderType,
       timezone: result.timezone,
@@ -84,10 +82,10 @@ export default async function parseIgcActivityFile(file) {
     options: {
       skip_idle_gap_fill: false,
       smoothing: {
-        heading: { enabled: true, method: 'circular_ema', window_seconds: 0.5 },
+        heading: { enabled: true, method: "circular_ema", window_seconds: 0.5 },
       },
     },
-  }
+  };
 }
 ```
 
@@ -96,11 +94,13 @@ export default async function parseIgcActivityFile(file) {
 **Parse mode:** `lenient: true` — per-line errors are collected in `result.errors` and parsing continues. Adapter still throws when no usable fixes are produced. Robust across diverse IGC logger vendors.
 
 **Timestamp representation:** RFC3339 string + explicit `elapsed_seconds`.
+
 - `fix.timestamp` is Unix epoch ms from the parser; the parser already advances the day when fixes cross midnight, so its epoch values are correct.
 - `timestamp = new Date(fix.timestamp).toISOString()` — backend's `build_time_series` only parses RFC3339 strings; numeric epochs would be silently dropped.
 - `elapsed_seconds = (fix.timestamp - fixes[0].timestamp) / 1000` — explicit elapsed lets `build_elapsed_series`'s `last_value = last_value.max(current)` dedupe cleanly. IGC loggers occasionally emit duplicate timestamps for the same second at 1Hz.
 
 **Altitude mapping:**
+
 - `gpsAltitude` (WGS84 ellipsoidal, meters) → `elevation` — drives elevation/gradient widgets.
 - `pressureAltitude` (barometric, meters) → `altitude` — alternate channel preserved as its own metric.
 - Both `null` when source is `null` (encoded as `00000`).
@@ -109,24 +109,26 @@ export default async function parseIgcActivityFile(file) {
 
 **Record extensions (`fix.extensions` 3-letter codes → RawSample series):**
 
-| Code | RawSample slot | Conversion | Why |
-|---|---|---|---|
-| GSP | `speed` | km/h → m/s (÷3.6) | Standard IGC ground speed |
-| TRT | `heading` | degrees, ÷1 | Track true |
-| VAT | `vertical_speed` | m/s×10 → m/s (÷10) | Variometer, widely-agreed convention |
-| OAT | `temperature` | 4-digit → ÷100; ≤3-digit → ÷1 | Outside air temp; scale is ambiguous across vendors, heuristic best-effort |
-| TAS | — | skipped | No `airspeed` RawSample slot; preserve `speed` as ground speed |
-| ENL | — | skipped | No RawSample slot; `igc-parser` already exposes `fix.enl` normalized 0..1 if wanted later |
-| FXA | — | skipped | No RawSample slot; `igc-parser` already exposes `fix.fixAccuracy` (meters) if wanted later |
+| Code | RawSample slot   | Conversion                    | Why                                                                                        |
+| ---- | ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| GSP  | `speed`          | km/h → m/s (÷3.6)             | Standard IGC ground speed                                                                  |
+| TRT  | `heading`        | degrees, ÷1                   | Track true                                                                                 |
+| VAT  | `vertical_speed` | m/s×10 → m/s (÷10)            | Variometer, widely-agreed convention                                                       |
+| OAT  | `temperature`    | 4-digit → ÷100; ≤3-digit → ÷1 | Outside air temp; scale is ambiguous across vendors, heuristic best-effort                 |
+| TAS  | —                | skipped                       | No `airspeed` RawSample slot; preserve `speed` as ground speed                             |
+| ENL  | —                | skipped                       | No RawSample slot; `igc-parser` already exposes `fix.enl` normalized 0..1 if wanted later  |
+| FXA  | —                | skipped                       | No RawSample slot; `igc-parser` already exposes `fix.fixAccuracy` (meters) if wanted later |
 
 Raw extension data takes priority over backend derivation when present; the backend's `derive_activity_metric_series` still backfills `speed`/`heading`/`gradient`/`vertical_speed` from the GPS course + elevation deltas when the source file omits GSP/TRT/VAT.
 
 **Metadata shape (trimmed):** The backend's `metadata` field is opaque `serde_json::Value` passed through; the only fields actually consumed anywhere (frontend `createMediaSlice.js:123-130`) are the ones the backend injects post-finalize (`sync_time`, `duration_seconds`, `end_time`, `sample_count`, `total_distance_m`). Format-specific provenance is preserved for forward-compat but never read by widgets. Keep the minimal useful set:
+
 - `activity_name` (`<date> – <pilot>` when both exist, else `date`, else `null`)
 - `date`, `glider_type`, `timezone`, `logger_manufacturer`, `logger_type`
 - `parse_errors` (array of error messages from lenient mode, or `null`)
 
 **RawActivityOptions:** Mirror FIT/GPX.
+
 - `skip_idle_gap_fill: false` — IGC B-records are 1Hz continuous GPS fixes; idle-gap-fill runs over natural pre/post-flight dead time like the analogous binary/text parsers.
 - `smoothing: { heading: { enabled: true, method: 'circular_ema', window_seconds: 0.5 } }` — only heading needs wraparound-safe smoothing. Backend's own metric derivation handles noise in derived `speed`/`vertical_speed`/`gradient`; raw VAT-promoted vertical speed is trusted as-is.
 
