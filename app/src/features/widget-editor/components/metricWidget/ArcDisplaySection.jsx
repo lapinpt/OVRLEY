@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Move, SlidersHorizontal, Tags } from 'lucide-react'
+import { SlidersHorizontal, Tags } from 'lucide-react'
 import {
   getStandardMetricDefinition,
   getStandardMetricDisplayUnit,
@@ -10,7 +10,7 @@ import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
-import { ColorField, NumberField, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, SliderField, ToggleField } from '../widgetFormControls'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
@@ -41,6 +41,17 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
     <>
       <div className="space-y-4">
         <SectionHeading icon={SlidersHorizontal} title="Arc Track" />
+        <div className="grid grid-cols-1 gap-4 pt-2">
+          <SliderField
+            label="Arc Angle"
+            value={arcData.arc_angle}
+            min={ARC_MIN_ANGLE}
+            max={ARC_MAX_ANGLE}
+            step={5}
+            valueDisplay={`${arcData.arc_angle}°`}
+            onSliderChange={(arc_angle) => updateArc({ arc_angle })}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
             label="Width"
@@ -59,24 +70,6 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             step={1}
             valueDisplay={`${arcData.height}px`}
             onSliderChange={(height) => updateArc({ height })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4 pt-2">
-          <SliderField
-            label="Arc Angle"
-            value={arcData.arc_angle}
-            min={ARC_MIN_ANGLE}
-            max={ARC_MAX_ANGLE}
-            step={1}
-            valueDisplay={`${arcData.arc_angle}°`}
-            onSliderChange={(arc_angle) => updateArc({ arc_angle })}
-          />
-          <NumberField
-            label="Angle (°)"
-            value={arcData.arc_angle}
-            min={ARC_MIN_ANGLE}
-            max={ARC_MAX_ANGLE}
-            onChange={(value) => updateBoundedNumber('arc_angle', value, ARC_MIN_ANGLE, ARC_MAX_ANGLE)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -142,23 +135,27 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
         </div>
       </div>
 
-      <div className="space-y-4">
-        <SectionHeading icon={Move} title="Inner Widget Position" />
-        <div className="grid grid-cols-2 gap-4 pt-2">
-          <NumberField
-            label="Horizontal Offset"
-            value={arcData.inner_widget_offset_x}
-            onChange={(value) => updateBoundedNumber('inner_widget_offset_x', value, -10_000, 10_000)}
-          />
-          <NumberField
-            label="Vertical Offset"
-            value={arcData.inner_widget_offset_y}
-            onChange={(value) => updateBoundedNumber('inner_widget_offset_y', value, -10_000, 10_000)}
-          />
-        </div>
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Inner Label" fontSizeLabel="Font Size" />
+      <div className="grid grid-cols-2 gap-4">
+        <SliderField
+          label="Horizontal Offset"
+          value={arcData.inner_widget_offset_x}
+          min={-50}
+          max={50}
+          step={1}
+          valueDisplay={`${arcData.inner_widget_offset_x}px`}
+          onSliderChange={(value) => updateBoundedNumber('inner_widget_offset_x', value, -10_000, 10_000)}
+        />
+        <SliderField
+          label="Horizontal Offset"
+          value={arcData.inner_widget_offset_y}
+          min={-50}
+          max={50}
+          step={1}
+          valueDisplay={`${arcData.inner_widget_offset_y}px`}
+          onSliderChange={(value) => updateBoundedNumber('inner_widget_offset_y', value, -10_000, 10_000)}
+        />
       </div>
-
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Inner Value" fontSizeLabel="Value Font Size" />
 
       {unitsMode !== 'hidden' ? (
         <UnitsControlRow

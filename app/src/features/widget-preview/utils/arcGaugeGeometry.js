@@ -1,7 +1,7 @@
 /**
  * Pure geometry and layout helpers for arc gauges.
  *
- * The functions in this module mirror `render/widgets/arc_gauge.rs`: angles
+ * The functions in this module mirror `render/widgets/gauges/arc/path.rs`: angles
  * use Skia/SVG screen-space coordinates (0° right, 90° down), a 180° gauge
  * runs from left to right over the top, and radius leaves room for the stroke
  * and border inside the smallest widget dimension.

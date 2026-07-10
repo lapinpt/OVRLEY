@@ -1,5 +1,9 @@
 # IGC Parsing Implementation Plan - DONE
 
+**.IGC flight-log parsing** is now supported and extracts gps location, altitude, speed, true heading, vertical speed, and temperature. It attempts to calculate the missing metrics when the IGC file does not provide them.
+
+- Fixed a bug in some metric widgetswhere decimal places with value '0' were being trimmed and the values displayed as integers instead.
+
 ## Goal
 
 Add `.igc` flight-log parsing to the activity import pipeline, mirroring the existing FIT/GPX/SRT flow. The backend stays format-agnostic: a new frontend adapter converts `igc-parser` output into the `RawActivity` JSON contract, then the generic finalizer in `src-tauri/ovrley_core/src/activity/finalize.rs` does the rest.
