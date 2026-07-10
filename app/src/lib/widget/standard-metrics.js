@@ -156,6 +156,19 @@ export function getDisplayTypeConfigDefaults(displayType) {
   return definition.defaults
 }
 
+/**
+ * Returns the initial shared value-font size for a display type, when it
+ * supplies one. Unlike display config defaults, this value is not persisted
+ * into the display variant and therefore remains editable as `font_size`.
+ *
+ * @param {string} displayType - display_type key
+ * @returns {number|null} configured default font size, or null
+ */
+export function getDisplayTypeDefaultFontSize(displayType) {
+  const fontSize = DISPLAY_TYPE_DEFINITIONS[displayType]?.defaultFontSize
+  return Number.isFinite(fontSize) ? fontSize : null
+}
+
 // ---------------------------------------------------------------------------
 // Interpolation + units policy
 // ---------------------------------------------------------------------------

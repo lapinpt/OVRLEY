@@ -114,9 +114,9 @@
         "layoutMode": "boxed",
         "defaultFrameWidth": 220,
         "defaultFrameHeight": 220,
+        "defaultFontSize": 60,
         "defaults": {
           "arc_angle": 225,
-          "font_size": 60,
           "inner_widget_offset_x": 0,
           "inner_widget_offset_y": 0,
           "track_thickness": 30,

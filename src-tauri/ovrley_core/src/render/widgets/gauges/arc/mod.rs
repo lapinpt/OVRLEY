@@ -214,7 +214,11 @@ pub fn draw_arc_gauge_widget(
         )
         .ok()?;
         let mut value_style = cache.text_style.clone();
-        value_style.x = origin_x_for_centered_text(&state.value_text, inner_layout.center_x, &font);
+        // The live value must stay anchored by its advance. Ink bounds vary
+        // between digits even when their advances are identical, which would
+        // otherwise make a monospaced numeric readout jump horizontally.
+        let (value_advance, _) = font.measure_str(&state.value_text, None);
+        value_style.x = inner_layout.center_x - value_advance * 0.5;
         value_style.y = inner_layout.value_top;
         value_style.line_height = cache.text_style.font_size * LINE_HEIGHT;
         draw_text_with_vertical_metrics_text(

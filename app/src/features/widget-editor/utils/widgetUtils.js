@@ -5,7 +5,7 @@
 
 import { createFontSelection } from '@/lib/fonts'
 import { initBackdropVariant } from '@/lib/widget/widget-resolver'
-import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults } from '@/lib/widget/standard-metrics'
+import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults, getDisplayTypeDefaultFontSize } from '@/lib/widget/standard-metrics'
 import {
   BACKDROP_DEFAULT_DISPLAY_TYPES,
   BACKDROP_CIRCLE_DEFAULTS,
@@ -157,7 +157,7 @@ export function createMetricValueDefaults(type, globalDefaults, displayType) {
     value: type,
     display_type: resolvedDisplayType,
     ...fontSelection,
-    font_size: TEXT_FONT_SIZES[type] || TEXT_FONT_SIZES.default,
+    font_size: getDisplayTypeDefaultFontSize(resolvedDisplayType) ?? TEXT_FONT_SIZES[type] ?? TEXT_FONT_SIZES.default,
     color: getGlobalColor(globalDefaults, 'color_values'),
     opacity: globalDefaults?.opacity ?? 1,
   }

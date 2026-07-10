@@ -304,9 +304,10 @@ export function getArcInnerWidgetLayout({
   const valueMetrics = valueVerticalMeasure || valueTextMeasure
   const valueGlyphHeight = finiteNumber(valueMetrics.glyphHeight)
   const valueAscent = finiteNumber(valueMetrics.ascent)
-  const valueX =
-    contentCenterX -
-    (finiteNumber(valueTextMeasure.boundsLeft) + finiteNumber(valueTextMeasure.boundsRight, finiteNumber(valueTextMeasure.width))) * 0.5
+  // The value changes every frame. Centre its advance rather than its painted
+  // bounds so equal-width digits keep a stable origin even when their ink
+  // side-bearings differ (for example in a monospaced font).
+  const valueX = contentCenterX - finiteNumber(valueTextMeasure.width) * 0.5
   const valueBaseline = groupTop + (valueLineHeight - valueGlyphHeight) * 0.5 + valueAscent
 
   const unit = unitVisible

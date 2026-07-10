@@ -21,6 +21,13 @@ describe('template snapshot standard metric schema', () => {
     expect(temperatureDefaults).not.toHaveProperty('temperature_unit')
   })
 
+  test('seeds the arc font size as shared widget data rather than variant data', () => {
+    const speedDefaults = createMetricValueDefaults('speed', undefined, 'arc')
+
+    expect(speedDefaults.font_size).toBe(60)
+    expect(speedDefaults.display_variants.arc).not.toHaveProperty('font_size')
+  })
+
   test('normalizes standard metric widgets with display_unit and strips legacy unit fields', () => {
     const normalized = normalizeTemplateConfig({
       scene: {},

@@ -30,9 +30,21 @@ function centeredTextBaseline(measurement, centerY) {
   return centerY + ((measurement.ascent ?? 0) - (measurement.descent ?? 0)) * 0.5
 }
 
+// Canvas exposes `actualBoundingBoxLeft` as a positive distance to the left
+// of the text origin. Skia exposes the equivalent value as the signed left
+// edge of its bounds. Arc gauge geometry mirrors the Skia renderer, so adapt
+// only these preview measurements before using its centering formula.
+function measureArcPreviewText(text, fontSize, fontFamily) {
+  const measurement = measurePreviewText(text, fontSize, fontFamily)
+  return {
+    ...measurement,
+    boundsLeft: -(measurement.boundsLeft ?? 0),
+  }
+}
+
 function labelLayout(layout, minLabel, maxLabel, fontFamily, fontSize) {
-  const minMeasurement = measurePreviewText(minLabel, fontSize, fontFamily)
-  const maxMeasurement = measurePreviewText(maxLabel, fontSize, fontFamily)
+  const minMeasurement = measureArcPreviewText(minLabel, fontSize, fontFamily)
+  const maxMeasurement = measureArcPreviewText(maxLabel, fontSize, fontFamily)
   const labelRadius = layout.radius + layout.trackThickness * 0.5 + layout.borderThickness + getArcLabelGap(fontSize)
   const minAnchor = getArcPoint(layout.centerX, layout.centerY, labelRadius, layout.labelAngles.min)
   const maxAnchor = getArcPoint(layout.centerX, layout.centerY, labelRadius, layout.labelAngles.max)
@@ -124,11 +136,11 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const minLabel = Number.isInteger(layout.min) ? `${layout.min}` : layout.min.toFixed(1)
   const maxLabel = Number.isInteger(layout.max) ? `${layout.max}` : layout.max.toFixed(1)
   const labels = showLabels ? labelLayout(layout, minLabel, maxLabel, labelFontFamily, labelFontSize) : null
-  const valueMeasurement = measurePreviewText(innerModel.valueText, innerModel.fontSize, innerModel.fontFamily)
+  const valueMeasurement = measureArcPreviewText(innerModel.valueText, innerModel.fontSize, innerModel.fontFamily)
   const verticalText = /^[0-9:.%+-]+$/.test(innerModel.valueText) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : innerModel.valueText
-  const valueVerticalMeasurement = measurePreviewText(verticalText, innerModel.fontSize, innerModel.fontFamily)
+  const valueVerticalMeasurement = measureArcPreviewText(verticalText, innerModel.fontSize, innerModel.fontFamily)
   const unitMeasurement = innerModel.unitText
-    ? measurePreviewText(innerModel.unitText, Math.max(innerModel.fontSize * 0.28, 12), innerModel.fontFamily)
+    ? measureArcPreviewText(innerModel.unitText, Math.max(innerModel.fontSize * 0.28, 12), innerModel.fontFamily)
     : null
   const innerLayout = getArcInnerWidgetLayout({
     centerX: layout.centerX,

@@ -59,6 +59,20 @@ describe('arcGaugeGeometry', () => {
     expect(layout.centerX).toBe(98)
   })
 
+  test('centers the dynamic value from its advance, not its glyph bounds', () => {
+    const layout = getArcInnerWidgetLayout({
+      centerX: 100,
+      centerY: 80,
+      fontSize: 40,
+      // Two equal-advance digit runs can have different ink side-bearings.
+      // The origin must remain at 80 for either one.
+      valueMeasure: { width: 40, boundsLeft: -4, boundsRight: 36, glyphHeight: 28, ascent: 22, descent: 6 },
+      valueVerticalMeasure: { glyphHeight: 28, ascent: 22, descent: 6 },
+    })
+
+    expect(layout.value.x).toBe(80)
+  })
+
   test('builds one closed filled outline with continuous endpoint fillets', () => {
     const shared = {
       centerX: 80,
