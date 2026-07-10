@@ -5,20 +5,18 @@
 //! widget-local geometry, builds static layers, and precomputes marker states so
 //! video rendering can draw each frame with predictable cost.
 
-/// Arc gauge metric widget implementation.
-pub mod arc_gauge;
 /// Static backdrop widget implementation.
 pub(crate) mod backdrop;
 /// Shared geometry, style, and drawing helpers for all widgets.
 pub(crate) mod common;
 /// Elevation profile widget implementation.
 pub(crate) mod elevation;
+/// Gauge renderers and gauge-specific shared infrastructure.
+pub mod gauges;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
 /// Heading compass tape widget implementation.
 pub mod heading;
-/// Linear gauge metric widget implementation.
-pub mod linear_gauge;
 /// Marker and dot drawing helpers.
 mod marker;
 /// DisplayType-driven metric presentation dispatch.
@@ -42,10 +40,10 @@ use crate::paths::AppPaths;
 use crate::render::widgets::types::PreparedValue;
 use std::collections::BTreeMap;
 
-pub use arc_gauge::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
 pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
-pub use linear_gauge::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
+pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
+pub use gauges::linear::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
 pub use types::{
@@ -127,7 +125,7 @@ pub fn prepare_render_assets(
                     .insert(idx, types::PresentationCache::HeadingTape(cache));
             }
             PreparedValue::LinearGauge(validated) => {
-                let cache = linear_gauge::prepare_linear_gauge_cache(
+                let cache = gauges::linear::prepare_linear_gauge_cache(
                     validated,
                     dense_activity,
                     &assets.scene,
@@ -140,7 +138,7 @@ pub fn prepare_render_assets(
                     .insert(idx, types::PresentationCache::LinearGauge(cache));
             }
             PreparedValue::ArcGauge(validated) => {
-                let cache = arc_gauge::prepare_arc_gauge_cache(
+                let cache = gauges::arc::prepare_arc_gauge_cache(
                     validated,
                     dense_activity,
                     &assets.scene,

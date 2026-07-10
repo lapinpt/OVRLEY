@@ -19,9 +19,9 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::render::text::ResolvedTextStyle;
-use crate::render::widgets::arc_gauge::draw_arc_gauge_widget;
+use crate::render::widgets::gauges::arc::draw_arc_gauge_widget;
+use crate::render::widgets::gauges::linear::draw_linear_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
-use crate::render::widgets::linear_gauge::draw_linear_gauge_widget;
 use crate::render::widgets::types::{PresentationCache, WidgetRenderReport};
 use crate::types::{DisplayType, MetricKind};
 use skia_safe::Canvas;

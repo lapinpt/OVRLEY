@@ -5,7 +5,9 @@
 //! background + border + labels) is pre-rendered into a cached image; the
 //! dynamic filled portion is drawn per-frame on top.
 
-use crate::activity::schema::{DenseActivityReport, DenseSeriesReport};
+use super::labels::format_gauge_label;
+use super::range::{fill_percentage as shared_fill_percentage, metric_range, metric_values};
+use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{
@@ -19,7 +21,7 @@ use crate::render::widgets::types::{
     LinearGaugeCache, LinearGaugeFrameState, WidgetFrameReport, WidgetGeometryReport,
     WidgetRenderReport,
 };
-use crate::types::{DisplayType, MetricKind};
+use crate::types::DisplayType;
 use skia_safe::{
     image_filters, BlendMode, Canvas, Paint, PathBuilder, PathFillType, Point, RRect, Rect,
 };
@@ -54,13 +56,9 @@ impl From<ValidatedLinearGaugeOrientation> for LinearGaugeOrientation {
     }
 }
 
-/// Computes the fill fraction for a value within a min-max range.
-/// Returns a value clamped between 0.0 and 1.0, or 0.0 if the range is invalid.
+/// Backwards-compatible public entry point for the shared gauge range helper.
 pub fn fill_percentage(value: f64, min: f64, max: f64) -> f32 {
-    if max <= min {
-        return 0.0;
-    }
-    ((value - min) / (max - min)).clamp(0.0, 1.0) as f32
+    shared_fill_percentage(value, min, max)
 }
 
 /// Computes the filled-bar rect without border insetting.
@@ -521,59 +519,7 @@ fn linear_gauge_label_layout(
     }
 }
 
-/// Formats a gauge boundary value for display. Integers show no decimal;
-/// non-integers show one decimal place.
+/// Backwards-compatible public entry point for shared gauge label formatting.
 pub fn format_linear_gauge_label(value: f64) -> String {
-    if (value.fract()).abs() < f64::EPSILON {
-        format!("{value:.0}")
-    } else {
-        format!("{value:.1}")
-    }
-}
-
-pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
-    let mut min_value = f64::INFINITY;
-    let mut max_value = f64::NEG_INFINITY;
-    for value in metric_values(series, metric).iter().flatten() {
-        min_value = min_value.min(*value);
-        max_value = max_value.max(*value);
-    }
-    if min_value.is_finite() && max_value.is_finite() && max_value > min_value {
-        (min_value, max_value)
-    } else {
-        (0.0, 100.0)
-    }
-}
-
-pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &[Option<f64>] {
-    match metric {
-        MetricKind::Speed => &series.speed,
-        MetricKind::Distance => &series.distance,
-        MetricKind::Elevation => &series.elevation,
-        MetricKind::Heartrate => &series.heartrate,
-        MetricKind::Cadence => &series.cadence,
-        MetricKind::Power => &series.power,
-        MetricKind::Temperature => &series.temperature,
-        MetricKind::Pace => &series.pace,
-        MetricKind::GForce => &series.g_force,
-        MetricKind::AirPressure => &series.air_pressure,
-        MetricKind::GroundContactTime => &series.ground_contact_time,
-        MetricKind::StrideLength => &series.stride_length,
-        MetricKind::StrokeRate => &series.stroke_rate,
-        MetricKind::Torque => &series.torque,
-        MetricKind::VerticalSpeed => &series.vertical_speed,
-        MetricKind::Altitude => &series.altitude,
-        MetricKind::Iso => &series.iso,
-        MetricKind::Aperture => &series.aperture,
-        MetricKind::ShutterSpeed => &series.shutter_speed,
-        MetricKind::FocalLength => &series.focal_length,
-        MetricKind::Ev => &series.ev,
-        MetricKind::ColorTemperature => &series.color_temperature,
-        MetricKind::GearPosition => &series.gear_position,
-        MetricKind::VerticalRatio => &series.vertical_ratio,
-        MetricKind::VerticalOscillation => &series.vertical_oscillation,
-        MetricKind::CoreTemperature => &series.core_temperature,
-        MetricKind::Heading => &series.heading,
-        MetricKind::LeftRightBalance | MetricKind::Gradient | MetricKind::Time => &[],
-    }
+    format_gauge_label(value)
 }

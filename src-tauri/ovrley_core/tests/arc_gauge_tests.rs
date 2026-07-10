@@ -5,7 +5,7 @@ use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::{RenderConfig, ValueConfig};
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::arc_gauge::{
+use ovrley_core::render::widgets::gauges::arc::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles,
 };
 use ovrley_core::render::widgets::types::PresentationCache;

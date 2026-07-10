@@ -6,7 +6,7 @@ use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::raw::ValueConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::linear_gauge::{
+use ovrley_core::render::widgets::gauges::linear::{
     bar_fill_rect, bordered_bar_fill_rect, fill_percentage, format_linear_gauge_label,
     LinearGaugeOrientation,
 };
