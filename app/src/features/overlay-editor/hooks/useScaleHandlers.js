@@ -2,9 +2,8 @@
  * Scale handler group for OverlayMoveable.
  */
 
-import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from '../data/overlayEditorConstants'
 import { applyLiveScalePositionStyles, getWidgetVisualBoundsFromTarget } from '../utils/widgetDomHelpers'
-import { buildScaledWidgetDataDraft } from '../utils/overlayEditorHelpers'
+import { buildScaleDraft } from '../utils/widgetResizeScaling'
 import { flushSync } from 'react-dom'
 
 /**
@@ -49,14 +48,9 @@ export function useScaleHandlers({
 
       interactionStartRef.current = {
         id: selectedWidget.id,
+        data: selectedWidget.data,
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
-        fontSize: selectedWidget.data.font_size ?? 60,
-        iconSize: selectedWidget.data.icon_size ?? 28,
-        iconOffsetX: selectedWidget.data.icon_offset_x ?? 0,
-        iconOffsetY: selectedWidget.data.icon_offset_y ?? 0,
-        triangleWidth: selectedWidget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
-        valueOffset: selectedWidget.data.value_offset ?? 0,
         renderedWidth: startTarget?.offsetWidth ?? 0,
         renderedHeight: startTarget?.offsetHeight ?? 0,
         renderedMinX: currentBounds?.minX ?? 0,
@@ -79,7 +73,7 @@ export function useScaleHandlers({
       const tx = drag?.beforeTranslate?.[0] ?? 0
       const ty = drag?.beforeTranslate?.[1] ?? 0
 
-      const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.valueOffset) : 0
+      const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.data.value_offset) : 0
       const nextX = origin.x + tx + origin.renderedMinX * (1 - uniformScale) * globalScale
       const nextY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - uniformScale)
 
@@ -127,11 +121,11 @@ export function useScaleHandlers({
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
         const finalScale = draft.scaleFactor ?? 1
-        const scaledDraft = buildScaledWidgetDataDraft(origin, finalScale, selectedWidget, { round: true })
+        const scaledDraft = buildScaleDraft(origin.data, finalScale, selectedWidget, { round: true })
 
         const tx = draft.translateX ?? 0
         const ty = draft.translateY ?? 0
-        const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.valueOffset) : 0
+        const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.data.value_offset) : 0
         const finalX = origin.x + tx + origin.renderedMinX * (1 - finalScale) * globalScale
         const finalY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - finalScale)
 

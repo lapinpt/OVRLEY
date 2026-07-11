@@ -89,7 +89,7 @@ export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond 
     valueText: `${data.prefix ?? ''}${formatted.value}${data.suffix ?? ''}`,
     unitText: showUnits ? formatted.units : '',
     fontFamily: getPreviewFontFamily(data.font || data.font_family),
-    fontSize: data.font_size ?? 60,
+    fontSize: data.font_size,
   }
 }
 

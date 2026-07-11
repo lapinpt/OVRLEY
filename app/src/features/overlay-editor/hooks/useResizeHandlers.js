@@ -3,9 +3,10 @@
  */
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
+import { buildResizeContentDraft, buildResizeUpdate, captureResizeOrigin, getResizeScaleFactor } from '../utils/widgetResizeScaling'
 import { clamp } from '@/lib/utils'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { buildFrameGeometryUpdate, resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
+import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
 /**
  * Creates resize-related moveable handlers.
@@ -41,14 +42,17 @@ export function useResizeHandlers({
       const frameData = isBackdropWidget(selectedWidget)
         ? resolveActiveBackdropData(selectedWidget.data)
         : resolveActiveMetricWidgetData(selectedWidget.data)
+      const scaleOrigin = captureResizeOrigin(selectedWidget)
       interactionStartRef.current = {
         id: selectedWidget.id,
+        widgetData: selectedWidget.data,
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
         width: frameData?.width ?? selectedWidget.data.width ?? 0,
         height: frameData?.height ?? selectedWidget.data.height ?? 0,
         markerSize: selectedWidget.data.marker_size ?? null,
         type: 'resize',
+        ...(scaleOrigin || {}),
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
@@ -61,6 +65,8 @@ export function useResizeHandlers({
       const dimensionScale = isFramedWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
+      const scaleFactor = getResizeScaleFactor(origin, nextWidth, nextHeight)
+      const contentDraft = buildResizeContentDraft(selectedWidget, origin, scaleFactor)
       const widthScale = origin.width ? nextWidth / origin.width : 1
       const heightScale = origin.height ? nextHeight / origin.height : 1
       const markerScale = (widthScale + heightScale) / 2
@@ -72,6 +78,7 @@ export function useResizeHandlers({
         y: nextY,
         width: nextWidth,
         height: nextHeight,
+        ...contentDraft,
         ...(nextMarkerSize === undefined ? {} : { marker_size: nextMarkerSize }),
       }
 
@@ -93,7 +100,9 @@ export function useResizeHandlers({
           height: Math.max(Math.round(draft.height ?? 0), 0),
           ...(draft.marker_size === undefined ? {} : { marker_size: Math.max(Math.round(draft.marker_size), 0) }),
         }
-        commitWidgetUpdate(origin.id, buildFrameGeometryUpdate(selectedWidget?.data, geometryPatch))
+        const scaleFactor = getResizeScaleFactor(origin, geometryPatch.width, geometryPatch.height)
+        const contentDraft = buildResizeContentDraft(selectedWidget, origin, scaleFactor, { round: true })
+        commitWidgetUpdate(origin.id, buildResizeUpdate(origin.widgetData, geometryPatch, contentDraft))
       }
 
       clearWidgetDraft(origin.id)

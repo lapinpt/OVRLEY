@@ -78,9 +78,9 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const data = widget.data
   const generatedId = useId()
   const valueFontFamily = getPreviewFontFamily(data.font || data.font_family)
-  const valueFontSize = data.font_size ?? 60
+  const valueFontSize = data.font_size
   const labelFontFamily = getPreviewFontFamily(data.min_max_label_font)
-  const labelFontSize = data.min_max_label_font_size ?? 12
+  const labelFontSize = data.min_max_label_font_size
   useFontMetricsVersion(valueFontFamily, valueFontSize)
   useFontMetricsVersion(labelFontFamily, labelFontSize)
 
@@ -88,11 +88,11 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
 
   const width = data.width
   const height = data.height
-  const scale = globalScale || 1
-  const trackThickness = data.track_thickness ?? 12
-  const borderThickness = data.track_border_thickness ?? 0
+  const scale = globalScale
+  const trackThickness = data.track_thickness
+  const borderThickness = data.track_border_thickness
   const values = seriesForWidget(activity, widget)
-  const value = getInterpolatedActivityValue(activity, data.value || widget.type, previewSecond)
+  const value = getInterpolatedActivityValue(activity, data.value, previewSecond)
   const layout = getArcGaugeLayout({
     value,
     values,
@@ -105,8 +105,8 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond })
   if (!innerModel) return null
 
-  const opacity = (data.opacity ?? 1) * globalOpacity
-  const trackCornerRadius = Math.min(layout.trackThickness * 0.5, Math.max(0, Number(data.track_corner_radius) || 0))
+  const opacity = data.opacity * globalOpacity
+  const trackCornerRadius = Math.min(layout.trackThickness * 0.5, data.track_corner_radius)
   const fillIsFlat = Boolean(data.track_fill_flat)
   const fillEndCornerRadius = fillIsFlat ? 0 : trackCornerRadius
   const outerTrackThickness = layout.outerStrokeWidth
@@ -239,18 +239,13 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
       {borderThickness > 0 ? (
         <ArcTrackPath d={outerTrackPath} fill={data.track_border_color} fillOpacity={opacity} mask={borderMask} dataTestId="arc-gauge-border" />
       ) : null}
-      <ArcTrackPath
-        d={trackPath}
-        fill={data.track_empty_color}
-        fillOpacity={(data.track_empty_opacity ?? 1) * opacity}
-        dataTestId="arc-gauge-empty-track"
-      />
+      <ArcTrackPath d={trackPath} fill={data.track_empty_color} fillOpacity={data.track_empty_opacity * opacity} dataTestId="arc-gauge-empty-track" />
       {fillClipPath ? (
         <g clipPath={`url(#${fillClipId})`}>
           <ArcTrackPath
             d={fillSourceTrackPath}
             fill={data.track_filled_color}
-            fillOpacity={(data.track_filled_opacity ?? 1) * opacity}
+            fillOpacity={data.track_filled_opacity * opacity}
             dataTestId="arc-gauge-filled-track"
           />
         </g>
