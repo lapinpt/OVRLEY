@@ -449,6 +449,58 @@ describe('OverlayEditor selection flow', () => {
     expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'false')
   })
 
+  test('maintains a square frame for selected arc widgets', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      backdrops: [],
+      labels: [],
+      plots: [],
+      values: [
+        {
+          id: 'widget-arc',
+          value: 'speed',
+          x: 0,
+          y: 0,
+          display_type: 'arc',
+          display_variants: {
+            arc: {
+              width: 220,
+              height: 220,
+            },
+          },
+        },
+      ],
+    }
+
+    useStore.getState().setConfig(config)
+
+    const { container, getByTestId } = render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const arc = container.querySelector('[data-widget-id="widget-arc"]')
+    expect(arc).toBeTruthy()
+
+    fireEvent.mouseDown(arc, { button: 0 })
+
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'true')
+  })
+
   test('renders the canvas toolbar centered above the preview area', () => {
     const config = makeConfig([makeLabel('A', { id: 'widget-1' })])
 

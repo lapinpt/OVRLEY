@@ -295,15 +295,22 @@ function OverlayEditor({
   }, [overlayState.moveableRef, selectedRenderedGeometryVersion])
 
   // Capability flags
-  const isBackdropSelected = isBackdropWidget(selection.selectedWidget)
-  const isCircleBackdropSelected = isBackdropSelected && selection.selectedWidget?.data?.display_type === 'circle'
-  const canResizeSelected = !selection.isGroupSelection && isFramedWidget(selection.selectedWidget)
-  const showEdgeResizeHandles = canResizeSelected && selection.selectedWidget?.type === 'elevation'
-  const canScaleSelected = Boolean(!selection.isGroupSelection && selection.selectedWidget && !isFramedWidget(selection.selectedWidget))
-  const canRotateSelected = !selection.isGroupSelection && selection.selectedWidget?.type === 'course'
+  const selectedWidget = selection.selectedWidget
+  const hasSingleSelection = Boolean(selectedWidget) && !selection.isGroupSelection
+  const isBackdropSelected = isBackdropWidget(selectedWidget)
+  const isFramedSelected = isFramedWidget(selectedWidget)
+  const selectedDisplayType = selectedWidget?.data?.display_type
+
+  const canResizeSelected = hasSingleSelection && isFramedSelected
+  const showEdgeResizeHandles = canResizeSelected && selectedWidget?.type === 'elevation'
+  const canScaleSelected = hasSingleSelection && !isFramedSelected
+  const canRotateSelected = hasSingleSelection && selectedWidget?.type === 'course'
   const maintainAspectRatio =
-    !selection.isGroupSelection &&
-    (isCircleBackdropSelected || (!isBackdropSelected && (selection.selectedWidget?.type === 'course' || canScaleSelected)))
+    hasSingleSelection &&
+    (selectedDisplayType === 'arc' ||
+      (isBackdropSelected && selectedDisplayType === 'circle') ||
+      selectedWidget?.type === 'course' ||
+      !isFramedSelected)
 
   // Marquee cleanup
   useEffect(
