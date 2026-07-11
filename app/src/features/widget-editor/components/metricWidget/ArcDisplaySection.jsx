@@ -132,6 +132,10 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             valueDisplay={`${Math.round((arcData.track_filled_opacity ?? 0) * 100)}%`}
             onSliderChange={(track_filled_opacity) => updateArc({ track_filled_opacity })}
           />
+          <div className="flex items-center justify-between gap-2 px-1 self-end pb-2 pt-2">
+            <span className="text-[9px] text-muted-foreground uppercase font-bold">Flat</span>
+            <ToggleField checked={arcData.track_fill_flat} onCheckedChange={(track_fill_flat) => updateArc({ track_fill_flat })} />
+          </div>
         </div>
       </div>
 
@@ -147,7 +151,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
           onSliderChange={(value) => updateBoundedNumber('inner_widget_offset_x', value, -10_000, 10_000)}
         />
         <SliderField
-          label="Horizontal Offset"
+          label="Vertical Offset"
           value={arcData.inner_widget_offset_y}
           min={-50}
           max={50}

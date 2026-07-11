@@ -8,7 +8,14 @@
  */
 
 import { useId } from 'react'
-import { getArcFilledTrackPath, getArcGaugeLayout, getArcInnerWidgetLayout, getArcLabelGap, getArcPoint } from '../utils/arcGaugeGeometry'
+import {
+  getArcFilledTrackPath,
+  getArcFilledTrackRevealSpec,
+  getArcGaugeLayout,
+  getArcInnerWidgetLayout,
+  getArcLabelGap,
+  getArcPoint,
+} from '../utils/arcGaugeGeometry'
 import { buildArcGaugeInnerWidgetModel } from '../utils/metricWidgetPreviewUtils'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { normalizeSvgShadowColor, sanitizeSvgId } from '../utils/svgPreviewUtils'
@@ -100,6 +107,8 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
 
   const opacity = (data.opacity ?? 1) * globalOpacity
   const trackCornerRadius = Math.min(layout.trackThickness * 0.5, Math.max(0, Number(data.track_corner_radius) || 0))
+  const fillIsFlat = Boolean(data.track_fill_flat)
+  const fillEndCornerRadius = fillIsFlat ? 0 : trackCornerRadius
   const outerTrackThickness = layout.outerStrokeWidth
   const outerCornerRadius = trackCornerRadius + borderThickness
   const trackPath = getArcFilledTrackPath({
@@ -111,6 +120,18 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
     trackThickness: layout.trackThickness,
     cornerRadius: trackCornerRadius,
   })
+  const fillSourceTrackPath = fillIsFlat
+    ? getArcFilledTrackPath({
+        centerX: layout.centerX,
+        centerY: layout.centerY,
+        radius: layout.radius,
+        startAngle: layout.startAngle,
+        sweepAngle: layout.sweepAngle,
+        trackThickness: layout.trackThickness,
+        startCornerRadius: trackCornerRadius,
+        endCornerRadius: fillEndCornerRadius,
+      })
+    : trackPath
   const outerTrackPath = getArcFilledTrackPath({
     centerX: layout.centerX,
     centerY: layout.centerY,
@@ -120,16 +141,25 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
     trackThickness: outerTrackThickness,
     cornerRadius: outerCornerRadius,
   })
-  const fillTrackPath =
-    layout.fill > 0
+  const fillReveal = getArcFilledTrackRevealSpec({
+    radius: layout.radius,
+    startAngle: layout.startAngle,
+    sweepAngle: layout.sweepAngle,
+    startCornerRadius: trackCornerRadius,
+    endCornerRadius: fillEndCornerRadius,
+    fill: layout.fill,
+  })
+  const fillClipPath =
+    fillReveal != null
       ? getArcFilledTrackPath({
           centerX: layout.centerX,
           centerY: layout.centerY,
           radius: layout.radius,
-          startAngle: layout.startAngle,
-          sweepAngle: layout.sweepAngle * layout.fill,
+          startAngle: fillReveal.startAngle,
+          sweepAngle: fillReveal.sweepAngle,
           trackThickness: layout.trackThickness,
-          cornerRadius: trackCornerRadius,
+          startCornerRadius: fillReveal.startCornerRadius,
+          endCornerRadius: fillReveal.endCornerRadius,
         })
       : ''
   const showLabels = Boolean(data.show_min_max_labels)
@@ -159,6 +189,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const unitShadowFilterId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-unit-shadow`)
   const labelShadowFilterId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-label-shadow`)
   const borderMaskId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-border-mask`)
+  const fillClipId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-fill-clip`)
   const shadowColor = shadow ? normalizeSvgShadowColor(shadow.color, opacity) : null
   const outerStrokeWidth = outerTrackThickness
   const borderMask = borderThickness > 0 ? `url(#${borderMaskId})` : undefined
@@ -173,20 +204,27 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
       data-testid="arc-gauge-preview"
     >
       {shadow ? <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadow} /> : null}
-      {borderThickness > 0 ? (
+      {borderThickness > 0 || fillClipPath ? (
         <defs>
-          <mask
-            id={borderMaskId}
-            maskUnits="userSpaceOnUse"
-            x={-maskPadding}
-            y={-maskPadding}
-            width={width + maskPadding * 2}
-            height={height + maskPadding * 2}
-            style={{ maskType: 'luminance' }}
-          >
-            <ArcTrackPath d={outerTrackPath} fill="#ffffff" />
-            <ArcTrackPath d={trackPath} fill="#000000" />
-          </mask>
+          {borderThickness > 0 ? (
+            <mask
+              id={borderMaskId}
+              maskUnits="userSpaceOnUse"
+              x={-maskPadding}
+              y={-maskPadding}
+              width={width + maskPadding * 2}
+              height={height + maskPadding * 2}
+              style={{ maskType: 'luminance' }}
+            >
+              <ArcTrackPath d={outerTrackPath} fill="#ffffff" />
+              <ArcTrackPath d={trackPath} fill="#000000" />
+            </mask>
+          ) : null}
+          {fillClipPath ? (
+            <clipPath id={fillClipId}>
+              <path data-testid="arc-gauge-fill-clip" d={fillClipPath} fillRule="evenodd" clipRule="evenodd" />
+            </clipPath>
+          ) : null}
         </defs>
       ) : null}
       {shadow && shadowColor ? (
@@ -207,13 +245,15 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
         fillOpacity={(data.track_empty_opacity ?? 1) * opacity}
         dataTestId="arc-gauge-empty-track"
       />
-      {fillTrackPath ? (
-        <ArcTrackPath
-          d={fillTrackPath}
-          fill={data.track_filled_color}
-          fillOpacity={(data.track_filled_opacity ?? 1) * opacity}
-          dataTestId="arc-gauge-filled-track"
-        />
+      {fillClipPath ? (
+        <g clipPath={`url(#${fillClipId})`}>
+          <ArcTrackPath
+            d={fillSourceTrackPath}
+            fill={data.track_filled_color}
+            fillOpacity={(data.track_filled_opacity ?? 1) * opacity}
+            dataTestId="arc-gauge-filled-track"
+          />
+        </g>
       ) : null}
       {showLabels ? (
         <>

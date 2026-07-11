@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   getArcAngles,
   getArcFilledTrackPath,
+  getArcFilledTrackRevealSpec,
   getArcGaugeLayout,
   getArcInnerWidgetLayout,
   getArcRadius,
@@ -85,10 +86,54 @@ describe('arcGaugeGeometry', () => {
     const flat = getArcFilledTrackPath({ ...shared, cornerRadius: 0 })
     const partial = getArcFilledTrackPath({ ...shared, cornerRadius: 3 })
     const round = getArcFilledTrackPath({ ...shared, cornerRadius: 6 })
+    const rightFlat = getArcFilledTrackPath({ ...shared, cornerRadius: 6, endCornerRadius: 0 })
 
     expect(flat).toMatch(/^M /)
     expect(flat).toMatch(/ Z$/)
     expect(partial).not.toBe(flat)
     expect(round).not.toBe(partial)
+    expect(rightFlat).not.toBe(flat)
+    expect(rightFlat).not.toBe(round)
+  })
+
+  test('keeps any positive rounded fill drawable while reserving no path for zero', () => {
+    const shared = {
+      centerX: 80,
+      centerY: 80,
+      radius: 64,
+      startAngle: 180,
+      trackThickness: 12,
+      cornerRadius: 6,
+    }
+
+    expect(getArcFilledTrackPath({ ...shared, sweepAngle: 0 })).toBe('')
+    expect(getArcFilledTrackPath({ ...shared, sweepAngle: 0.0001 })).toMatch(/^M /)
+    expect(getArcFilledTrackPath({ ...shared, sweepAngle: 0.0001, endCornerRadius: 0 })).toMatch(/^M /)
+  })
+
+  test('reveals a full track from its left edge while keeping the moving end rounded', () => {
+    const lowFill = getArcFilledTrackRevealSpec({
+      radius: 64,
+      startAngle: 180,
+      sweepAngle: 180,
+      startCornerRadius: 6,
+      endCornerRadius: 6,
+      fill: 0.001,
+    })
+    const halfway = getArcFilledTrackRevealSpec({
+      radius: 64,
+      startAngle: 180,
+      sweepAngle: 180,
+      startCornerRadius: 6,
+      endCornerRadius: 6,
+      fill: 0.5,
+    })
+
+    expect(lowFill.startAngle).toBeCloseTo(174.644, 3)
+    expect(lowFill.startCornerRadius).toBe(0)
+    expect(lowFill.endCornerRadius).toBeGreaterThan(0)
+    expect(lowFill.endCornerRadius).toBeLessThan(6)
+    expect(halfway.sweepAngle).toBeCloseTo(90, 3)
+    expect(halfway.endCornerRadius).toBe(6)
   })
 })

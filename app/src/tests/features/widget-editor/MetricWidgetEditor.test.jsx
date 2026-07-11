@@ -234,6 +234,7 @@ describe('MetricWidgetEditor arc gauge controls', () => {
               track_empty_opacity: 0.5,
               track_filled_color: '#40e0d0',
               track_filled_opacity: 1,
+              track_fill_flat: false,
               show_min_max_labels: false,
               min_max_label_font: 'Arial.ttf',
               min_max_label_font_size: 12,
@@ -248,10 +249,20 @@ describe('MetricWidgetEditor arc gauge controls', () => {
 
     expect(screen.getByText('Arc Track')).toBeInTheDocument()
     expect(screen.getByText('Arc Angle')).toBeInTheDocument()
-    expect(screen.getByText('Inner Widget Position')).toBeInTheDocument()
-    expect(screen.getByText('Inner Value')).toBeInTheDocument()
+    expect(screen.getByText('Inner Label')).toBeInTheDocument()
     expect(screen.getByText('Inner Unit')).toBeInTheDocument()
+    expect(screen.getByText('Flat')).toBeInTheDocument()
     expect(screen.queryByText('Icon')).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Flat').parentElement.querySelector('[role="switch"]'))
+    expect(updateWidgetData).toHaveBeenCalledWith(
+      'value-0',
+      expect.objectContaining({
+        display_variants: expect.objectContaining({
+          arc: expect.objectContaining({ track_fill_flat: true }),
+        }),
+      }),
+    )
 
     const switches = screen.getAllByRole('switch')
     await user.click(switches[switches.length - 1])

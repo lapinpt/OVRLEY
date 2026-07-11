@@ -4,7 +4,7 @@
 //! circular offset curves and endpoint fillets, while linear gauges use RRects.
 
 use crate::normalize::{MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES};
-use skia_safe::{Canvas, Paint, Path, PathBuilder, PathFillType, Point};
+use skia_safe::{Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType, Point};
 
 const PATH_EPSILON: f32 = 0.001;
 const QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_76;
@@ -29,7 +29,8 @@ pub(crate) struct ArcTrackSpec {
     pub geometry: ArcGaugeGeometry,
     pub sweep_angle: f32,
     pub thickness: f32,
-    pub corner_radius: f32,
+    pub start_corner_radius: f32,
+    pub end_corner_radius: f32,
 }
 
 impl ArcTrackSpec {
@@ -38,15 +39,62 @@ impl ArcTrackSpec {
             geometry,
             sweep_angle: geometry.sweep_angle,
             thickness,
-            corner_radius,
+            start_corner_radius: corner_radius,
+            end_corner_radius: corner_radius,
         }
     }
 
-    pub(crate) fn partial(self, fill01: f32) -> Self {
+    /// Overrides the cap at the advancing end of the sweep while retaining the
+    /// configured start cap.
+    pub(crate) fn with_end_corner_radius(self, end_corner_radius: f32) -> Self {
         Self {
-            sweep_angle: self.sweep_angle * fill01.clamp(0.0, 1.0),
+            end_corner_radius,
             ..self
         }
+    }
+
+    /// Builds an anchored reveal clip for this complete source track. The clip
+    /// progresses across the track's visible caps rather than redrawing a tiny
+    /// partial track as a full-sized dot.
+    fn reveal_clip(self, fill01: f32) -> Option<Self> {
+        let fill = fill01.clamp(0.0, 1.0);
+        let sweep = self.sweep_angle.clamp(0.0, MAX_ARC_ANGLE_DEGREES);
+        let radius = self.geometry.radius.max(0.0);
+        if fill <= 0.0 || sweep <= 0.0 || radius <= PATH_EPSILON {
+            return None;
+        }
+
+        let full_circle = sweep >= MAX_ARC_ANGLE_DEGREES - PATH_EPSILON;
+        let half_thickness = self.thickness.max(0.0) * 0.5;
+        let start_corner_radius = if full_circle {
+            0.0
+        } else {
+            self.start_corner_radius.clamp(0.0, half_thickness)
+        };
+        let end_corner_radius = if full_circle {
+            0.0
+        } else {
+            self.end_corner_radius.clamp(0.0, half_thickness)
+        };
+        let start_cap_angle = arc_cap_angle_degrees(radius, start_corner_radius);
+        let end_cap_angle = arc_cap_angle_degrees(radius, end_corner_radius);
+        let revealed_sweep = (sweep + start_cap_angle + end_cap_angle) * fill;
+        let revealed_end_corner_radius =
+            end_corner_radius.min(radius * revealed_sweep.to_radians());
+        let revealed_end_cap_angle = arc_cap_angle_degrees(radius, revealed_end_corner_radius);
+        let body_sweep = (revealed_sweep - revealed_end_cap_angle).max(PATH_EPSILON);
+
+        Some(Self {
+            geometry: ArcGaugeGeometry {
+                start_angle: self.geometry.start_angle - start_cap_angle,
+                sweep_angle: body_sweep,
+                ..self.geometry
+            },
+            sweep_angle: body_sweep,
+            thickness: self.thickness,
+            start_corner_radius: 0.0,
+            end_corner_radius: revealed_end_corner_radius,
+        })
     }
 
     /// Returns a concentric border shape around this track.
@@ -54,7 +102,8 @@ impl ArcTrackSpec {
         let border = border_thickness.max(0.0);
         Self {
             thickness: self.thickness + border * 2.0,
-            corner_radius: self.corner_radius + border,
+            start_corner_radius: self.start_corner_radius + border,
+            end_corner_radius: self.end_corner_radius + border,
             ..self
         }
     }
@@ -64,7 +113,10 @@ impl ArcTrackSpec {
         let half_thickness = self.thickness.max(0.0) * 0.5;
         let outer_radius = self.geometry.radius + half_thickness;
         let inner_radius = self.geometry.radius - half_thickness;
-        if sweep <= PATH_EPSILON || half_thickness <= PATH_EPSILON || inner_radius <= PATH_EPSILON {
+        // A zero sweep is an empty fill, but every positive sweep represents a
+        // real value. In particular, a short rounded fill is a cap rather than
+        // an empty track, so do not discard it based on a geometric epsilon.
+        if sweep <= 0.0 || half_thickness <= PATH_EPSILON || inner_radius <= PATH_EPSILON {
             return None;
         }
 
@@ -106,7 +158,8 @@ impl ArcTrackSpec {
         }
 
         let end = start + sweep;
-        let fillet_radius = self.corner_radius.clamp(0.0, half_thickness);
+        let start_fillet_radius = self.start_corner_radius.clamp(0.0, half_thickness);
+        let end_fillet_radius = self.end_corner_radius.clamp(0.0, half_thickness);
         append_circular_arc(
             &mut path,
             self.geometry.center_x,
@@ -126,7 +179,7 @@ impl ArcTrackSpec {
             path_tangent(end),
             path_normal(end),
             half_thickness,
-            fillet_radius,
+            end_fillet_radius,
         );
         append_circular_arc(
             &mut path,
@@ -148,7 +201,7 @@ impl ArcTrackSpec {
             Point::new(-start_tangent.x, -start_tangent.y),
             path_normal(start),
             half_thickness,
-            fillet_radius,
+            start_fillet_radius,
         );
         path.close();
         Some(path.detach())
@@ -161,6 +214,27 @@ pub(crate) fn draw_arc_track(canvas: &Canvas, spec: ArcTrackSpec, paint: &Paint)
     if let Some(path) = spec.filled_path() {
         canvas.draw_path(&path, paint);
     }
+}
+
+/// Reveals a full source track from its visible start edge through `fill01`.
+/// The source preserves its fixed start geometry; the clip controls only how
+/// much of that source is visible.
+pub(crate) fn draw_revealed_arc_track(
+    canvas: &Canvas,
+    source: ArcTrackSpec,
+    fill01: f32,
+    paint: &Paint,
+) {
+    let Some(clip) = source.reveal_clip(fill01) else {
+        return;
+    };
+    let Some(clip_path) = clip.filled_path() else {
+        return;
+    };
+    canvas.save();
+    canvas.clip_path(&clip_path, ClipOp::Intersect, true);
+    draw_arc_track(canvas, source, paint);
+    canvas.restore();
 }
 
 /// Returns the start and end angles for a vertically symmetric arc.
@@ -183,6 +257,14 @@ pub fn arc_point(center_x: f32, center_y: f32, radius: f32, angle: f32) -> Point
         center_x + radius * radians.cos(),
         center_y + radius * radians.sin(),
     )
+}
+
+fn arc_cap_angle_degrees(radius: f32, corner_radius: f32) -> f32 {
+    if radius <= PATH_EPSILON || corner_radius <= 0.0 {
+        0.0
+    } else {
+        corner_radius.atan2(radius).to_degrees()
+    }
 }
 
 /// Builds all geometry needed to draw an arc in widget-local coordinates.
@@ -357,4 +439,48 @@ fn local_point(origin: Point, tangent: Point, normal: Point, x: f32, y: f32) -> 
         origin.x + tangent.x * x + normal.x * y,
         origin.y + tangent.y * x + normal.y * y,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reveal_clip_handles_zero_and_tiny_fills() {
+        let geometry = arc_gauge_geometry(160.0, 160.0, 180.0, 12.0, 2.0);
+        let rounded = ArcTrackSpec::full(geometry, 12.0, 6.0);
+        let minimum_positive_fill = 0.000_001;
+
+        assert!(rounded.reveal_clip(0.0).is_none());
+        assert!(rounded
+            .reveal_clip(minimum_positive_fill)
+            .and_then(ArcTrackSpec::filled_path)
+            .is_some());
+        assert!(rounded
+            .with_end_corner_radius(0.0)
+            .reveal_clip(minimum_positive_fill)
+            .and_then(ArcTrackSpec::filled_path)
+            .is_some());
+    }
+
+    #[test]
+    fn reveal_clip_anchors_start_and_rounds_end() {
+        let geometry = ArcGaugeGeometry {
+            center_x: 80.0,
+            center_y: 80.0,
+            radius: 64.0,
+            start_angle: 180.0,
+            sweep_angle: 180.0,
+        };
+        let source = ArcTrackSpec::full(geometry, 12.0, 6.0);
+        let low_fill = source.reveal_clip(0.001).unwrap();
+        let halfway = source.reveal_clip(0.5).unwrap();
+
+        assert!(low_fill.geometry.start_angle < geometry.start_angle);
+        assert_eq!(low_fill.start_corner_radius, 0.0);
+        assert!(low_fill.end_corner_radius > 0.0 && low_fill.end_corner_radius < 6.0);
+        assert!((halfway.geometry.start_angle - 174.644).abs() < 0.001);
+        assert!((halfway.sweep_angle - 90.0).abs() < 0.001);
+        assert_eq!(halfway.end_corner_radius, 6.0);
+    }
 }

@@ -1,4 +1,10 @@
-Status: ready-for-agent
+Status: wontfix
+
+## Superseded by
+
+`#06-segmented-bars-fill-style-toggle.md` — segmented bars are now an alternative
+`track_fill_style` on linear/arc gauges rather than a standalone `bars` display
+type.
 
 ## Parent
 

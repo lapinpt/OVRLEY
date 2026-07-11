@@ -35,6 +35,7 @@ pub struct ValidatedArcGaugeWidget {
     pub track_empty_opacity: f32,
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
+    pub track_fill_flat: bool,
     pub show_min_max_labels: bool,
     pub min_max_label_font: String,
     pub min_max_label_font_size: f32,
@@ -144,6 +145,7 @@ pub fn validate_arc_gauge(value: ValueConfig, index: usize) -> CoreResult<Valida
         require_string(value.track_empty_color.clone(), &p("track_empty_color"))?;
     let track_filled_color =
         require_string(value.track_filled_color.clone(), &p("track_filled_color"))?;
+    let track_fill_flat = require_bool(value.track_fill_flat, &p("track_fill_flat"))?;
     let show_min_max_labels = require_bool(value.show_min_max_labels, &p("show_min_max_labels"))?;
     let min_max_label_font =
         require_string(value.min_max_label_font.clone(), &p("min_max_label_font"))?;
@@ -171,6 +173,7 @@ pub fn validate_arc_gauge(value: ValueConfig, index: usize) -> CoreResult<Valida
         track_empty_opacity,
         track_filled_color,
         track_filled_opacity,
+        track_fill_flat,
         show_min_max_labels,
         min_max_label_font,
         min_max_label_font_size,

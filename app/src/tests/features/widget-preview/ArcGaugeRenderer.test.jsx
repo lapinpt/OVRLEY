@@ -23,6 +23,7 @@ function makeWidget(overrides = {}) {
       track_empty_opacity: 0.5,
       track_filled_color: '#40e0d0',
       track_filled_opacity: 1,
+      track_fill_flat: false,
       show_min_max_labels: true,
       min_max_label_font: 'Arial.ttf',
       min_max_label_font_size: 12,
@@ -93,6 +94,39 @@ describe('OverlayArcGaugeWidget', () => {
 
     expect(partialPath).not.toBe(flatPath)
     expect(fullPath).not.toBe(partialPath)
+  })
+
+  test('uses the reveal clip to flatten the advancing fill end while retaining its configured source caps', () => {
+    const { rerender } = render(<OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.5} globalScale={1} />)
+    const roundedFillPath = screen.getByTestId('arc-gauge-filled-track').getAttribute('d')
+    const roundedFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
+    const roundedTrackPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
+
+    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_fill_flat: true })} activity={activity} previewSecond={0.5} globalScale={1} />)
+    const flatFillPath = screen.getByTestId('arc-gauge-filled-track').getAttribute('d')
+    const flatFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
+    const flatTrackPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
+
+    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 0 })} activity={activity} previewSecond={0.5} globalScale={1} />)
+    const fullyFlatFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
+
+    expect(flatFillPath).not.toBe(roundedFillPath)
+    expect(flatTrackPath).toBe(roundedTrackPath)
+    expect(flatFillClipPath).not.toBe(roundedFillClipPath)
+    expect(flatFillClipPath).not.toBe(fullyFlatFillClipPath)
+  })
+
+  test('grows a low fill through its reveal clip instead of redrawing a fixed cap', () => {
+    const { rerender } = render(<OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.001} globalScale={1} />)
+    const lowFillSourcePath = screen.getByTestId('arc-gauge-filled-track').getAttribute('d')
+    const lowFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
+
+    rerender(<OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.02} globalScale={1} />)
+    const higherFillSourcePath = screen.getByTestId('arc-gauge-filled-track').getAttribute('d')
+    const higherFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
+
+    expect(higherFillSourcePath).toBe(lowFillSourcePath)
+    expect(higherFillClipPath).not.toBe(lowFillClipPath)
   })
 
   test('renders no icon even when an inherited text-widget icon flag is present', () => {

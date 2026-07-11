@@ -131,7 +131,10 @@ const ARC_PATH_EPSILON = 0.001
 const ARC_QUARTER_CIRCLE_KAPPA = 0.5522847498
 
 function formatArcPathNumber(value) {
-  return Number(finiteNumber(value).toFixed(3))
+  // A fill may be a very small but valid fraction of the track. Keep enough
+  // precision for its arc segment to survive serialization into SVG rather
+  // than collapsing it to the zero-length path reserved for an empty fill.
+  return Number(finiteNumber(value).toFixed(6))
 }
 
 function arcPathPoint(centerX, centerY, radius, angle) {
@@ -242,14 +245,28 @@ function appendInnerToOuterFillet(commands, origin, tangent, normal, halfThickne
 /**
  * Creates one closed, filled arc-track outline. Its endpoint corners are true
  * continuous fillets: 0px is a flat radial face and half the track thickness
- * becomes a semicircular cap. The same cubic construction is used by Skia.
+ * becomes a semicircular cap. Endpoint radii may be controlled independently;
+ * the same cubic construction is used by Skia.
  */
-export function getArcFilledTrackPath({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, cornerRadius = 0 }) {
+export function getArcFilledTrackPath({
+  centerX,
+  centerY,
+  radius,
+  startAngle,
+  sweepAngle,
+  trackThickness,
+  cornerRadius = 0,
+  startCornerRadius = cornerRadius,
+  endCornerRadius = cornerRadius,
+}) {
   const sweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(0, finiteNumber(sweepAngle)))
   const halfThickness = Math.max(0, finiteNumber(trackThickness)) * 0.5
   const outerRadius = finiteNumber(radius) + halfThickness
   const innerRadius = finiteNumber(radius) - halfThickness
-  if (sweep <= ARC_PATH_EPSILON || halfThickness <= ARC_PATH_EPSILON || innerRadius <= ARC_PATH_EPSILON) return ''
+  // Zero is the only empty-fill value. A positive sweep can be shorter than
+  // the endpoint cap geometry, but it still represents a real value and the
+  // cap supplies a visible, non-empty fill.
+  if (sweep <= 0 || halfThickness <= ARC_PATH_EPSILON || innerRadius <= ARC_PATH_EPSILON) return ''
 
   const start = finiteNumber(startAngle)
   const outerStart = arcPathPoint(centerX, centerY, outerRadius, start)
@@ -266,14 +283,53 @@ export function getArcFilledTrackPath({ centerX, centerY, radius, startAngle, sw
   const end = start + sweep
   const endCenter = arcPathPoint(centerX, centerY, radius, end)
   const startCenter = arcPathPoint(centerX, centerY, radius, start)
-  const filletRadius = Math.min(halfThickness, Math.max(0, finiteNumber(cornerRadius)))
+  const startFilletRadius = Math.min(halfThickness, Math.max(0, finiteNumber(startCornerRadius)))
+  const endFilletRadius = Math.min(halfThickness, Math.max(0, finiteNumber(endCornerRadius)))
   appendCircularArc(commands, centerX, centerY, outerRadius, start, sweep)
-  appendOuterToInnerFillet(commands, endCenter, arcPathTangent(end), arcPathNormal(end), halfThickness, filletRadius)
+  appendOuterToInnerFillet(commands, endCenter, arcPathTangent(end), arcPathNormal(end), halfThickness, endFilletRadius)
   appendCircularArc(commands, centerX, centerY, innerRadius, end, -sweep)
   const startTangent = arcPathTangent(start)
-  appendInnerToOuterFillet(commands, startCenter, { x: -startTangent.x, y: -startTangent.y }, arcPathNormal(start), halfThickness, filletRadius)
+  appendInnerToOuterFillet(commands, startCenter, { x: -startTangent.x, y: -startTangent.y }, arcPathNormal(start), halfThickness, startFilletRadius)
   commands.push('Z')
   return commands.join(' ')
+}
+
+function arcCapAngle(radius, cornerRadius) {
+  const safeRadius = Math.max(0, finiteNumber(radius))
+  const safeCornerRadius = Math.max(0, finiteNumber(cornerRadius))
+  return safeRadius > ARC_PATH_EPSILON && safeCornerRadius > 0 ? (Math.atan2(safeCornerRadius, safeRadius) * 180) / Math.PI : 0
+}
+
+/**
+ * Builds the clip geometry used to reveal a fill from the track's actual start
+ * edge. The source remains the complete track, so a low nonzero fill grows out
+ * of the left endpoint instead of becoming an unanchored, full-sized cap.
+ */
+export function getArcFilledTrackRevealSpec({ radius, startAngle, sweepAngle, startCornerRadius = 0, endCornerRadius = startCornerRadius, fill }) {
+  const safeRadius = Math.max(0, finiteNumber(radius))
+  const safeSweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(0, finiteNumber(sweepAngle)))
+  const fraction = Math.min(1, Math.max(0, finiteNumber(fill)))
+  if (safeRadius <= ARC_PATH_EPSILON || safeSweep <= 0 || fraction <= 0) return null
+
+  const fullCircle = safeSweep >= ARC_MAX_ANGLE_DEGREES - ARC_PATH_EPSILON
+  const startRadius = fullCircle ? 0 : Math.max(0, finiteNumber(startCornerRadius))
+  const endRadius = fullCircle ? 0 : Math.max(0, finiteNumber(endCornerRadius))
+  const startCapAngle = arcCapAngle(safeRadius, startRadius)
+  const endCapAngle = arcCapAngle(safeRadius, endRadius)
+  const revealedSweep = (safeSweep + startCapAngle + endCapAngle) * fraction
+  const availableEndCapLength = safeRadius * ((revealedSweep * Math.PI) / 180)
+  const revealedEndRadius = Math.min(endRadius, availableEndCapLength)
+  const revealedEndCapAngle = arcCapAngle(safeRadius, revealedEndRadius)
+
+  return {
+    startAngle: finiteNumber(startAngle) - startCapAngle,
+    // Retain a nonzero body for a positive reveal whose rounded end consumes
+    // all available length. Its size is below visual precision but keeps the
+    // clip path valid in both SVG and Skia.
+    sweepAngle: Math.max(ARC_PATH_EPSILON, revealedSweep - revealedEndCapAngle),
+    startCornerRadius: 0,
+    endCornerRadius: revealedEndRadius,
+  }
 }
 
 /**

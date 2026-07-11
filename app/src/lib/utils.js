@@ -28,6 +28,6 @@ export function clamp(value, min, max) {
  * @returns {boolean} True if target is inside an interactive element.
  */
 export function isInteractiveElement(target) {
-  if (!(target instanceof HTMLElement)) return false
+  if (!(target instanceof Element)) return false
   return Boolean(target.closest('input, textarea, select, button, a, [role="slider"], [contenteditable="true"]'))
 }

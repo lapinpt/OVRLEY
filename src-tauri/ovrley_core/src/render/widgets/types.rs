@@ -308,6 +308,7 @@ pub struct ArcGaugeCache {
     pub track_corner_radius: f32,
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
+    pub track_fill_flat: bool,
     pub text_style: crate::render::text::ResolvedTextStyle,
     pub has_unit: bool,
     pub unit_font_size: f32,

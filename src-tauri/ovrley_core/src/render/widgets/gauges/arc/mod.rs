@@ -10,7 +10,7 @@ mod path;
 use self::inner_widget::{
     draw_static_unit, inner_widget_layout, unit_font_size, DEFAULT_GAP_PX, LINE_HEIGHT,
 };
-use self::path::{draw_arc_track, ArcTrackSpec};
+use self::path::{draw_arc_track, draw_revealed_arc_track, ArcTrackSpec};
 use super::labels::format_gauge_label;
 use super::range::{fill_percentage, metric_range, metric_values};
 use crate::activity::schema::DenseActivityReport;
@@ -139,6 +139,7 @@ pub fn prepare_arc_gauge_cache(
             track_corner_radius: gauge.track_corner_radius * scale,
             track_filled_color: gauge.track_filled_color.clone(),
             track_filled_opacity: gauge.track_filled_opacity,
+            track_fill_flat: gauge.track_fill_flat,
             text_style,
             has_unit: unit_text.is_some(),
             unit_font_size: static_unit_font_size,
@@ -186,9 +187,14 @@ pub fn draw_arc_gauge_widget(
                 .clamp(MIN_ARC_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES),
         };
         if state.fill01 > 0.0 && geometry.radius > 0.0 {
+            let fill_end_corner_radius = if cache.track_fill_flat {
+                0.0
+            } else {
+                cache.track_corner_radius
+            };
             let track =
                 ArcTrackSpec::full(geometry, cache.track_thickness, cache.track_corner_radius)
-                    .partial(state.fill01);
+                    .with_end_corner_radius(fill_end_corner_radius);
             let paint = track_paint(
                 parse_color(
                     &cache.track_filled_color,
@@ -196,7 +202,7 @@ pub fn draw_arc_gauge_widget(
                 ),
                 None,
             );
-            draw_arc_track(canvas, track, &paint);
+            draw_revealed_arc_track(canvas, track, state.fill01, &paint);
         }
 
         let inner_layout = inner_widget_layout(

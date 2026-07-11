@@ -24,7 +24,8 @@ fn value_config_deserializes_arc_gauge_specific_fields() {
         "arc_angle": 210,
         "inner_widget_offset_x": -12,
         "inner_widget_offset_y": 8,
-        "track_thickness": 14
+        "track_thickness": 14,
+        "track_fill_flat": true
     }))
     .unwrap();
 
@@ -33,6 +34,7 @@ fn value_config_deserializes_arc_gauge_specific_fields() {
     assert_eq!(value.inner_widget_offset_x, Some(-12.0));
     assert_eq!(value.inner_widget_offset_y, Some(8.0));
     assert_eq!(value.track_thickness, Some(14.0));
+    assert_eq!(value.track_fill_flat, Some(true));
 }
 
 #[test]
@@ -94,7 +96,9 @@ fn arc_angle_validation_enforces_the_persisted_range() {
 
 #[test]
 fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
-    let config = validate_single_arc(full_arc_gauge_config(20, 30)).unwrap();
+    let mut raw_config = full_arc_gauge_config(20, 30);
+    raw_config["track_fill_flat"] = serde_json::json!(true);
+    let config = validate_single_arc(raw_config).unwrap();
     let paths = test_paths();
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
@@ -115,6 +119,7 @@ fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
         "the unit belongs to the cached static layer"
     );
     assert_eq!(cache.track_thickness, 12.0);
+    assert!(cache.track_fill_flat);
 }
 
 #[test]
@@ -189,6 +194,7 @@ fn full_arc_gauge_config(x: i32, y: i32) -> serde_json::Value {
         "track_empty_opacity": 0.5,
         "track_filled_color": "#40e0d0",
         "track_filled_opacity": 1,
+        "track_fill_flat": false,
         "show_min_max_labels": true,
         "min_max_label_font": "Arial.ttf",
         "min_max_label_font_size": 12,
