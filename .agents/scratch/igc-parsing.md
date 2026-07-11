@@ -2,6 +2,8 @@
 
 **.IGC flight-log parsing** is now supported and extracts gps location, altitude, speed, true heading, vertical speed, and temperature. It attempts to calculate the missing metrics when the IGC file does not provide them.
 
+- Added ability to mute the video in preview.
+
 - Fixed a bug in some metric widgetswhere decimal places with value '0' were being trimmed and the values displayed as integers instead.
 - Fixed a bug where min/max values of linear/arc widgets was derived only from the exported part of the activity, not the entire activity.
 - Fixed a bug where minimize/maximize/close buttons of the window were unresponsive.

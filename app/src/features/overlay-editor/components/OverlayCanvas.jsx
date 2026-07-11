@@ -239,6 +239,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const { widgets, activity, previewSecond, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
+  const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const { videoSrc, importId, frozenFrameSecond, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
   const hasTransparentBackground = backgroundMode === 'transparent'
@@ -274,6 +275,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           className={videoBackgroundClassName}
           preload="metadata"
           playsInline
+          muted={isVideoMuted}
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
       )}

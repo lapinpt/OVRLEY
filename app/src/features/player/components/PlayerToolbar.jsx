@@ -1,4 +1,4 @@
-import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, ZoomIn, ZoomOut } from 'lucide-react'
+import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
@@ -95,9 +95,21 @@ export default function PlayerToolbar({ toolbar }) {
         </Button>
       </div>
 
-      <span className="flex w-30 shrink-0 justify-end text-xs font-medium tabular-nums text-muted-foreground">
-        {toolbar.timeLabel.current} / {toolbar.timeLabel.total}
-      </span>
+      <div className="flex w-48 shrink-0 items-center justify-end gap-4">
+        <Button
+          type="button"
+          aria-label={toolbar.isMuted ? 'Unmute video' : 'Mute video'}
+          aria-pressed={toolbar.isMuted}
+          variant="ghost"
+          size="toolbar-icon"
+          onClick={toolbar.toggleMute}
+        >
+          {toolbar.isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </Button>
+        <span className="text-xs font-medium tabular-nums text-muted-foreground">
+          {toolbar.timeLabel.current} / {toolbar.timeLabel.total}
+        </span>
+      </div>
     </div>
   )
 }

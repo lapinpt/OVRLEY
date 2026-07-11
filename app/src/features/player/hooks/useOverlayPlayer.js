@@ -44,6 +44,8 @@ export default function useOverlayPlayer({ backgroundMode }) {
       importedVideoDuration: state.importedVideoDuration,
       importedVideoPath: state.importedVideoPath,
       pausePreviewPlayback: state.pausePreviewPlayback,
+      toggleVideoMute: state.toggleVideoMute,
+      isVideoMuted: state.isVideoMuted,
       previewPlaybackSource: state.previewPlaybackSource,
       previewPlaybackState: state.previewPlaybackState,
       sceneFps: state.config?.scene?.fps ?? 30,
@@ -243,6 +245,8 @@ export default function useOverlayPlayer({ backgroundMode }) {
         current: formatTimelineTime(playback.displayedPlayhead),
         total: formatTimelineTime(playback.totalDuration),
       },
+      isMuted: playerStore.isVideoMuted,
+      toggleMute: playerStore.toggleVideoMute,
       transport: {
         isDisabled: !playback.hasActivity,
         isPlaying: playback.isPlaying,

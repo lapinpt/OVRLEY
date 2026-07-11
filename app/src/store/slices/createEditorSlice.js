@@ -108,6 +108,7 @@ export function createEditorSlice(set, get) {
     selectedSecond: 0,
     previewPlaybackState: 'paused',
     previewPlaybackSource: 'timeline',
+    isVideoMuted: false,
     config: cloneSerializable(DEFAULT_CONFIG),
     autoRender: false,
 
@@ -197,6 +198,11 @@ export function createEditorSlice(set, get) {
         state.selectedSecond = safeSecond
       })
     },
+
+    toggleVideoMute: () =>
+      set((state) => {
+        state.isVideoMuted = !state.isVideoMuted
+      }),
 
     beginPreviewScrub: (second) => {
       const safeSecond = normalizePreviewSecond(second)
