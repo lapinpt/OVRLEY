@@ -49,6 +49,13 @@ const activity = {
 }
 
 describe('OverlayArcGaugeWidget', () => {
+  test('renders preview defaults when activity is unavailable', () => {
+    render(<OverlayArcGaugeWidget widget={makeWidget()} activity={null} previewSecond={0} globalOpacity={1} globalScale={1} />)
+
+    expect(screen.getByTestId('arc-gauge-preview')).toBeInTheDocument()
+    expect(screen.getByTestId('arc-gauge-filled-track')).toBeInTheDocument()
+  })
+
   test('uses global scale while retaining local SVG arc geometry', () => {
     render(<OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.5} globalScale={2} />)
 

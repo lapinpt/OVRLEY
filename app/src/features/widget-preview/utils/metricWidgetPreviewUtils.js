@@ -16,11 +16,16 @@
  */
 
 import { formatStandardMetricDisplay, formatTimeValue } from './formatUtils'
-import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily } from './textMeasurement'
-import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
+import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily, measurePreviewText } from './textMeasurement'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue, NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor'
 import { getStandardMetricDefinition, isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
+/**
+ * Returns the last finite numeric value in a metric series.
+ * @param {unknown[]} series - Activity metric samples.
+ * @returns {number|null} Last finite value, or null when none exists.
+ */
 function getLastFiniteValue(series) {
   if (!Array.isArray(series)) {
     return null
@@ -36,6 +41,19 @@ function getLastFiniteValue(series) {
   return null
 }
 
+/** Measures inner gauge text with the bounds convention used by arc geometry. */
+function measureArcPreviewText(text, fontSize, fontFamily) {
+  const measurement = measurePreviewText(text, fontSize, fontFamily)
+  return { ...measurement, boundsLeft: -measurement.boundsLeft }
+}
+
+/**
+ * Formats current distance, optionally paired with the activity's total distance.
+ * @param {object} activity - Activity data containing distance samples.
+ * @param {number} previewSecond - Current preview time.
+ * @param {object} widgetData - Normalized distance-widget data.
+ * @returns {{value: string, units: string}} Formatted distance display.
+ */
 export function formatDistancePreviewDisplay(activity, previewSecond, widgetData) {
   const currentDistance = getInterpolatedActivityValue(activity, 'distance', previewSecond)
   const current = formatStandardMetricDisplay('distance', currentDistance, widgetData)
@@ -70,7 +88,7 @@ export function formatDistancePreviewDisplay(activity, previewSecond, widgetData
  * @param {object} params.widget - Resolved metric widget.
  * @param {object} params.activity - Activity data with metric series.
  * @param {number} params.previewSecond - Current preview time.
- * @returns {{ valueText: string, unitText: string, fontFamily: string, fontSize: number }|null}
+ * @returns {{ valueText: string, unitText: string, fontFamily: string, fontSize: number, valueMeasure: object, valueVerticalMeasure: object, unitMeasure: object|null }|null}
  */
 export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond }) {
   if (!widget || !isStandardMetricWidgetType(widget.type)) {
@@ -78,21 +96,37 @@ export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond 
   }
 
   const data = resolveActiveMetricWidgetData(widget.data)
-  const definition = getStandardMetricDefinition(widget.type)
   const formatted =
     widget.type === 'distance'
       ? formatDistancePreviewDisplay(activity, previewSecond, data)
       : formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), data)
-  const showUnits = data.show_units ?? definition?.showUnitsByDefault ?? false
+  const fontFamily = getPreviewFontFamily(data.font)
+  const valueText = `${data.prefix}${formatted.value}${data.suffix}`
+  const unitText = data.show_units ? formatted.units : ''
+  const valueMeasure = measureArcPreviewText(valueText, data.font_size, fontFamily)
+  const valueVerticalMeasure = measureArcPreviewText(
+    /^[0-9:.%+-]+$/.test(valueText) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : valueText,
+    data.font_size,
+    fontFamily,
+  )
+  const unitMeasure = unitText ? measureArcPreviewText(unitText, Math.max(data.font_size * 0.28, 12), fontFamily) : null
 
   return {
-    valueText: `${data.prefix ?? ''}${formatted.value}${data.suffix ?? ''}`,
-    unitText: showUnits ? formatted.units : '',
-    fontFamily: getPreviewFontFamily(data.font || data.font_family),
+    valueText,
+    unitText,
+    fontFamily,
     fontSize: data.font_size,
+    valueMeasure,
+    valueVerticalMeasure,
+    unitMeasure,
   }
 }
 
+/**
+ * Builds the formatted layout model for an intrinsic metric widget preview.
+ * @param {object} params - Widget and current activity preview state.
+ * @returns {object|null} Metric presentation model, or null for unsupported presentations.
+ */
 export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
   // Guard — skip non-value widgets and gradient type (handled separately).
   if (!widget || widget.type === 'gradient') {

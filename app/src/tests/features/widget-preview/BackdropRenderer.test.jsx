@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import OverlayBackdropWidget from '@/features/widget-preview/components/BackdropRenderer'
+import { resolveActiveBackdropData } from '@/lib/widget/widget-resolver'
 
 function makeBackdropWidget(data = {}) {
-  return {
+  const widget = {
     id: 'backdrop-1',
     type: 'backdrop',
     category: 'backdrops',
@@ -32,11 +33,12 @@ function makeBackdropWidget(data = {}) {
       ...data,
     },
   }
+  return { ...widget, data: resolveActiveBackdropData(widget.data) }
 }
 
 describe('OverlayBackdropWidget', () => {
   test('renders rectangle fill inset by border thickness with composed opacity attributes', () => {
-    render(<OverlayBackdropWidget widget={makeBackdropWidget()} globalScale={2} />)
+    render(<OverlayBackdropWidget widget={makeBackdropWidget()} globalOpacity={1} globalScale={2} />)
 
     const svg = screen.getByTestId('backdrop-preview')
     const fill = screen.getByTestId('backdrop-fill')
@@ -73,6 +75,8 @@ describe('OverlayBackdropWidget', () => {
             },
           },
         })}
+        globalOpacity={1}
+        globalScale={1}
       />,
     )
 
@@ -90,6 +94,7 @@ describe('OverlayBackdropWidget', () => {
             circle: { diameter: 100 },
           },
         })}
+        globalOpacity={1}
         globalScale={2}
       />,
     )
@@ -131,6 +136,8 @@ describe('OverlayBackdropWidget', () => {
             },
           },
         })}
+        globalOpacity={1}
+        globalScale={1}
       />,
     )
 

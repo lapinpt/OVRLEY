@@ -71,6 +71,8 @@ export function useResizeHandlers({
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
         ...resizeUpdate,
+        width: nextWidth,
+        height: nextHeight,
         ...(nextMarkerSize === undefined ? {} : { marker_size: nextMarkerSize }),
       }
 

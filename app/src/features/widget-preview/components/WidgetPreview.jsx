@@ -35,7 +35,7 @@ import { OverlayLinearGaugeWidget } from './LinearGaugeRenderer'
 import { OverlayArcGaugeWidget } from './ArcGaugeRenderer'
 import OverlayBackdropWidget from './BackdropRenderer'
 import { isBoxedDisplayType, getDisplayTypeLabel, getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
-import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
+import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
 /**
  * Registry mapping boxed display_type values to their preview components.
@@ -69,6 +69,11 @@ function UnsupportedBoxedPreview({ widget, displayType }) {
   )
 }
 
+/**
+ * Dispatches a widget to the preview renderer for its type and presentation.
+ * @param {object} props - Widget, activity, presentation models, and scene preview state.
+ * @returns {JSX.Element} The selected widget preview.
+ */
 function WidgetPreview({
   widget,
   activity,
@@ -84,7 +89,13 @@ function WidgetPreview({
   exportRange,
 }) {
   if (widget.type === 'backdrop') {
-    return <OverlayBackdropWidget widget={widget} globalOpacity={globalOpacity} globalScale={globalScale} />
+    return (
+      <OverlayBackdropWidget
+        widget={{ ...widget, data: resolveActiveBackdropData(widget.data) }}
+        globalOpacity={globalOpacity}
+        globalScale={globalScale}
+      />
+    )
   }
 
   if (widget.type === 'label') {

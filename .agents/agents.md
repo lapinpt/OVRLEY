@@ -1,5 +1,16 @@
 # OVRLEY — Agent Guide
 
+## Non-negotiable code rules
+
+These rules are mandatory for all new and modified code:
+
+- Required data MUST be consumed as a strict contract and malformed input MUST fail loudly. Fallbacks are permitted only for documented optional absence; they MUST NOT repair malformed present data.
+- The codebase MUST use one canonical naming scheme and data shape. API mismatches MUST be fixed at their owner, never hidden behind aliases, remapped objects, compatibility branches, or secondary adapters.
+- Validation and normalization MUST happen once at ingress. Consumers MUST NOT repeat coercion or defensive checks such as `typeof`, `Boolean`, `Number.isFinite`, or `Number.isInteger` for validated fields.
+- Components MUST be presentational. Stateful and reusable presentation logic MUST live in hooks; pure computation, formatting, and transformation MUST live in utilities.
+- Conditionals MUST represent product behavior or documented optionality. Broken required state MUST NOT degrade into defaults, generated identities, `null`, or empty output.
+- Adapters are permitted only at genuine external-system boundaries and MUST translate once into the internal canonical model.
+
 ## Project
 
 Desktop app that turns `.fit`/`.gpx` activity data into customizable video overlays (speed, HR, elevation, map route, etc.).
