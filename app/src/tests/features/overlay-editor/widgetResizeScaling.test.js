@@ -1,22 +1,21 @@
 import { describe, expect, test } from 'vitest'
 import {
-  buildResizeContentDraft,
   buildResizeUpdate,
   buildScaleDraft,
+  buildUniformResizeUpdate,
   captureResizeOrigin,
-  getResizeScaleFactor,
 } from '@/features/overlay-editor/utils/widgetResizeScaling'
 
-function makeArcWidget() {
+function makeGaugeWidget(displayType = 'arc') {
   return {
     id: 'arc-1',
     type: 'speed',
     category: 'values',
     data: {
-      display_type: 'arc',
+      display_type: displayType,
       font_size: 60,
       display_variants: {
-        arc: {
+        [displayType]: {
           width: 220,
           height: 220,
           arc_angle: 225,
@@ -34,31 +33,10 @@ function makeArcWidget() {
 }
 
 describe('widgetResizeScaling', () => {
-  test('scales arc content while preserving unrelated variant settings', () => {
-    const widget = makeArcWidget()
-    const origin = { width: 220, height: 220, ...captureResizeOrigin(widget) }
-    const draft = buildResizeContentDraft(widget, origin, 2)
-
-    expect(draft.font_size).toBe(120)
-    expect(draft.display_variants.arc).toMatchObject({
-      width: 220,
-      height: 220,
-      arc_angle: 225,
-      track_thickness: 48,
-      track_corner_radius: 24,
-      track_border_thickness: 4,
-      inner_widget_offset_x: 10,
-      inner_widget_offset_y: -6,
-      min_max_label_font_size: 24,
-      track_empty_color: '#222222',
-    })
-  })
-
-  test('merges scaled content with frame geometry without losing variant data', () => {
-    const widget = makeArcWidget()
-    const origin = { width: 220, height: 220, ...captureResizeOrigin(widget) }
-    const contentDraft = buildResizeContentDraft(widget, origin, 2, { round: true })
-    const update = buildResizeUpdate(widget.data, { x: 30, y: 40, width: 440, height: 440 }, contentDraft)
+  test('builds a complete arc resize update without losing variant data', () => {
+    const widget = makeGaugeWidget()
+    const origin = captureResizeOrigin(widget)
+    const update = buildResizeUpdate(origin, { x: 30, y: 40, width: 440, height: 440 }, { round: true })
 
     expect(update).toMatchObject({ x: 30, y: 40, width: 440, height: 440, font_size: 120 })
     expect(update.display_variants.arc).toMatchObject({
@@ -70,11 +48,27 @@ describe('widgetResizeScaling', () => {
     })
   })
 
-  test('derives a uniform resize factor from either frame dimension', () => {
-    const origin = { width: 220, height: 220 }
+  test('uses the same content policy for corner handle and Size-slider updates', () => {
+    const widget = makeGaugeWidget('corner')
+    const handleUpdate = buildResizeUpdate(captureResizeOrigin(widget), { width: 440, height: 440 }, { round: true })
+    const sliderUpdate = buildUniformResizeUpdate(widget, 440)
 
-    expect(getResizeScaleFactor(origin, 440, 440)).toBe(2)
-    expect(getResizeScaleFactor(origin, 330, 330)).toBe(1.5)
+    expect(sliderUpdate).toEqual(handleUpdate)
+    expect(sliderUpdate).toMatchObject({
+      font_size: 120,
+      display_variants: {
+        corner: {
+          width: 440,
+          height: 440,
+          track_thickness: 48,
+          track_corner_radius: 24,
+          track_border_thickness: 4,
+          inner_widget_offset_x: 10,
+          inner_widget_offset_y: -6,
+          min_max_label_font_size: 24,
+        },
+      },
+    })
   })
 
   test('keeps the existing intrinsic-widget scale policy in the shared module', () => {

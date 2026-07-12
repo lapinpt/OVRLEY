@@ -16,21 +16,23 @@ function scaleNumber(value, scaleFactor, { min = -Infinity, max = Infinity, roun
   return clamp(roundedValue, min, max)
 }
 
-function getResizePolicy(widget) {
-  return RESIZE_POLICIES.find(({ matches }) => matches(widget)) || null
+const GAUGE_DISPLAY_TYPES = new Set(['arc', 'corner'])
+
+function isGauge(widget) {
+  return GAUGE_DISPLAY_TYPES.has(widget?.data?.display_type)
 }
 
-function captureArcResizeOrigin(widget) {
-  const data = resolveActiveMetricWidgetData(widget.data)
+function captureGaugeResizeOrigin(widget, data) {
+  const displayType = widget.data.display_type
 
   return {
-    variants: widget.data.display_variants,
+    displayType,
     data,
+    variant: widget.data.display_variants?.[displayType] ?? {},
   }
 }
 
-function buildArcResizeContentDraft(origin, scaleFactor, { round = true } = {}) {
-  const arcVariant = origin.variants.arc
+function buildGaugeResizeContentDraft(origin, scaleFactor, { round = true } = {}) {
   const { data } = origin
   const trackThickness = scaleNumber(data.track_thickness, scaleFactor, { min: 1, max: 100, round })
   const trackCornerRadius = scaleNumber(data.track_corner_radius, scaleFactor, {
@@ -42,9 +44,8 @@ function buildArcResizeContentDraft(origin, scaleFactor, { round = true } = {}) 
   return {
     font_size: scaleNumber(data.font_size, scaleFactor, { min: 8, max: 400, round }),
     display_variants: {
-      ...origin.variants,
-      arc: {
-        ...arcVariant,
+      [origin.displayType]: {
+        ...origin.variant,
         track_thickness: trackThickness,
         track_corner_radius: trackCornerRadius,
         track_border_thickness: scaleNumber(data.track_border_thickness, scaleFactor, { min: 0, max: 24, round }),
@@ -56,50 +57,31 @@ function buildArcResizeContentDraft(origin, scaleFactor, { round = true } = {}) 
   }
 }
 
-const RESIZE_POLICIES = [
-  {
-    matches: (widget) => widget?.data?.display_type === 'arc',
-    captureOrigin: captureArcResizeOrigin,
-    buildDraft: buildArcResizeContentDraft,
-  },
-]
-
-/**
- * Captures presentation-specific dimensional values at resize start.
- *
- * @param {object|null} widget - Selected editor widget.
- * @returns {object|null} Scale origin or null when the widget has no strategy.
- */
-export function captureResizeOrigin(widget) {
-  const policy = getResizePolicy(widget)
-  return policy ? policy.captureOrigin(widget) : null
-}
-
-/**
- * Returns a uniform frame scale for a ratio-preserving resize.
- *
- * @param {object} origin - Resize origin containing width and height.
- * @param {number} width - Current frame width in widget coordinates.
- * @param {number} height - Current frame height in widget coordinates.
- * @returns {number} Uniform scale factor.
- */
-export function getResizeScaleFactor(origin, width, height) {
+function getResizeScaleFactor(origin, width, height) {
   return (width / origin.width + height / origin.height) * 0.5
 }
 
+function buildResizeContentDraft(origin, scaleFactor, options) {
+  return GAUGE_DISPLAY_TYPES.has(origin.displayType) ? buildGaugeResizeContentDraft(origin, scaleFactor, options) : {}
+}
+
 /**
- * Builds a live content draft for a ratio-preserving resize.
+ * Captures all data needed to produce resize updates from a widget frame.
  *
  * @param {object|null} widget - Selected editor widget.
- * @param {object} origin - Resize origin with strategy-specific values.
- * @param {number} scaleFactor - Uniform frame scale.
- * @param {object} [options]
- * @param {boolean} [options.round=false] - Round values for persistence.
- * @returns {object} Top-level and nested content draft.
+ * @param {object} [frameData] - Resolved active frame data, when the caller has it.
+ * @returns {object|null} Resize origin or null when the widget has no data.
  */
-export function buildResizeContentDraft(widget, origin, scaleFactor, { round = false } = {}) {
-  const policy = getResizePolicy(widget)
-  return policy ? policy.buildDraft(origin, scaleFactor, { round }) : {}
+export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidgetData(widget?.data)) {
+  if (!widget?.data) return null
+
+  const origin = {
+    widgetData: widget.data,
+    width: frameData?.width ?? widget.data.width ?? 0,
+    height: frameData?.height ?? widget.data.height ?? 0,
+  }
+
+  return isGauge(widget) ? { ...origin, ...captureGaugeResizeOrigin(widget, frameData) } : origin
 }
 
 /**
@@ -112,7 +94,7 @@ export function buildResizeContentDraft(widget, origin, scaleFactor, { round = f
  * @param {object} contentDraft - Presentation-specific scaled content.
  * @returns {object} Commit-ready widget update patch.
  */
-export function buildResizeUpdate(widgetData, framePatch, contentDraft = {}) {
+function mergeResizeUpdate(widgetData, framePatch, contentDraft = {}) {
   const frameUpdate = buildFrameGeometryUpdate(widgetData, framePatch)
   const { display_variants: contentVariants, ...topLevelContent } = contentDraft
 
@@ -146,6 +128,54 @@ export function buildResizeUpdate(widgetData, framePatch, contentDraft = {}) {
     ...topLevelContent,
     display_variants: displayVariants,
   }
+}
+
+/**
+ * Builds a complete resize update from a frame patch, using the same content
+ * scaling and durable geometry merge as a resize-handle commit.
+ *
+ * @param {object} origin - Resize origin from captureResizeOrigin.
+ * @param {object} framePatch - Updated frame geometry.
+ * @param {object} [options]
+ * @param {boolean} [options.round=false] - Round scaled content for persistence.
+ * @returns {object} Commit-ready widget update patch.
+ */
+export function buildResizeUpdate(origin, framePatch, { round = false } = {}) {
+  const scaleFactor = getResizeScaleFactor(origin, framePatch.width, framePatch.height)
+  const contentDraft = buildResizeContentDraft(origin, scaleFactor, { round })
+
+  return mergeResizeUpdate(origin.widgetData, framePatch, contentDraft)
+}
+
+/**
+ * Builds the same persisted update produced by a ratio-preserving resize
+ * handle, with its target width supplied as one Size value.
+ *
+ * @param {object} widget - Widget definition being resized.
+ * @param {number} size - Target frame width in widget coordinates.
+ * @returns {object|null} Commit-ready widget update patch, or null for invalid geometry.
+ */
+export function buildUniformResizeUpdate(widget, size) {
+  const origin = captureResizeOrigin(widget)
+  const nextWidth = Number(size)
+
+  if (
+    !origin ||
+    !Number.isFinite(origin.width) ||
+    !Number.isFinite(origin.height) ||
+    origin.width <= 0 ||
+    origin.height <= 0 ||
+    !Number.isFinite(nextWidth)
+  ) {
+    return null
+  }
+
+  const framePatch = {
+    width: Math.round(nextWidth),
+    height: Math.round(origin.height * (nextWidth / origin.width)),
+  }
+
+  return buildResizeUpdate(origin, framePatch, { round: true })
 }
 
 /**

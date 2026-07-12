@@ -308,6 +308,7 @@ function OverlayEditor({
   const maintainAspectRatio =
     hasSingleSelection &&
     (selectedDisplayType === 'arc' ||
+      selectedDisplayType === 'corner' ||
       (isBackdropSelected && selectedDisplayType === 'circle') ||
       selectedWidget?.type === 'course' ||
       !isFramedSelected)

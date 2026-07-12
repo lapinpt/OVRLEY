@@ -151,7 +151,7 @@
         "layoutMode": "boxed",
         "defaultFrameWidth": 220,
         "defaultFrameHeight": 220,
-        "defaultFontSize": 60,
+        "defaultFontSize": 35,
         "defaults": {
           "corner_orientation": "bottom-left",
           "inner_widget_offset_x": 0,

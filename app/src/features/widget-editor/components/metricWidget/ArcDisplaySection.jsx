@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
+import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
 import {
   getStandardMetricDefinition,
   getStandardMetricDisplayUnit,
@@ -36,11 +37,17 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
   const unitsMode = getStandardMetricUnitsMode(widget.type)
   const supportsUnitSelection = unitOptions.length > 1
   const cornerRadiusMax = Math.max(0, (arcData.track_thickness ?? 0) * 0.5)
+  const size = widget.data.width ?? arcData.width
 
   const updateBoundedNumber = (key, rawValue, min, max) => {
     const value = Number(rawValue)
     if (!Number.isFinite(value)) return
     updateArc({ [key]: Math.min(max, Math.max(min, value)) })
+  }
+
+  const handleSizeChange = (nextSize) => {
+    const update = buildUniformResizeUpdate(widget, nextSize)
+    if (update) updateWidgetData(widget.id, update)
   }
 
   return (
@@ -67,24 +74,15 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             />
           )}
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <SliderField
-            label="Width"
-            value={arcData.width}
+            label="Size"
+            value={size}
             min={30}
             max={600}
             step={1}
-            valueDisplay={`${arcData.width}px`}
-            onSliderChange={(width) => updateArc({ width })}
-          />
-          <SliderField
-            label="Height"
-            value={arcData.height}
-            min={30}
-            max={600}
-            step={1}
-            valueDisplay={`${arcData.height}px`}
-            onSliderChange={(height) => updateArc({ height })}
+            valueDisplay={`${Math.round(size)}px`}
+            onSliderChange={handleSizeChange}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
