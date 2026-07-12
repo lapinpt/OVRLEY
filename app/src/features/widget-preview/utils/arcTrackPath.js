@@ -126,6 +126,40 @@ function appendInnerToOuterFillet(commands, frame, halfThickness, cornerRadius) 
 }
 
 /**
+ * Builds a closed filled disk used as the low-fill clip (Option B). The disk is
+ * centered on the track centerline at `capOffset` along the sweep tangent from
+ * the start. Sliding the disk backward (negative capOffset) hides it behind the
+ * start edge; at capOffset = 0 its front half sits inside the track annulus and
+ * reads as the fully-formed end cap. Intersecting this disk with the annular
+ * track clip produces a crescent that grows monotonically with fill.
+ * @param {object} params - Track geometry, disk radius, and tangential offset.
+ * @returns {string} Closed SVG disk path, or '' when degenerate.
+ */
+function buildTranslatedCapPath({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, capRadius, capOffset }) {
+  const direction = Math.sign(sweepAngle)
+  if (direction === 0 || capRadius <= ARC_PATH_EPSILON) return ''
+
+  const r = Math.min(trackThickness * 0.5, capRadius)
+  if (r <= ARC_PATH_EPSILON) return ''
+
+  const startCenter = getArcPoint(centerX, centerY, radius, startAngle)
+  const sweepForward = (() => {
+    const t = arcPathTangent(startAngle)
+    return { x: t.x * direction, y: t.y * direction }
+  })()
+
+  const capCenter = {
+    x: startCenter.x + sweepForward.x * capOffset,
+    y: startCenter.y + sweepForward.y * capOffset,
+  }
+
+  const commands = [pathMove(getArcPoint(capCenter.x, capCenter.y, r, 0))]
+  appendCircularArc(commands, capCenter.x, capCenter.y, r, 0, ARC_MAX_ANGLE_DEGREES)
+  commands.push('Z')
+  return commands.join(' ')
+}
+
+/**
  * Creates one closed filled arc-track outline with independently rounded caps.
  * @param {object} geometry - Arc centerline, thickness, and cap geometry.
  * @returns {string} Closed SVG path.
@@ -140,7 +174,22 @@ export function getArcFilledTrackPath({
   cornerRadius = 0,
   startCornerRadius = cornerRadius,
   endCornerRadius = cornerRadius,
+  capMode,
+  capOffset = 0,
 }) {
+  if (capMode === 'translate') {
+    return buildTranslatedCapPath({
+      centerX,
+      centerY,
+      radius,
+      startAngle,
+      sweepAngle,
+      trackThickness,
+      capRadius: endCornerRadius || cornerRadius,
+      capOffset,
+    })
+  }
+
   const sweepMagnitude = Math.abs(sweepAngle)
   const direction = Math.sign(sweepAngle)
   const halfThickness = trackThickness * 0.5
@@ -190,10 +239,25 @@ function arcCapAngle(radius, cornerRadius) {
 
 /**
  * Builds clip geometry that reveals a fill from the track's actual start edge.
+ *
+ * Below a threshold fill (where the end cap is not yet fully formed), the clip
+ * is a translated rounded cap (Option B): the same cap shape used by the normal
+ * path, slid backward along the sweep tangent and clipped at the start radial
+ * line by the annular track intersection. This keeps the leading edge a true
+ * circular arc of the full cap radius at every fill level, so the handoff to the
+ * normal arc+cap path above the threshold is seamless.
  * @param {object} geometry - Track geometry and fill fraction.
  * @returns {object|null} Reveal path overrides, or null for an empty fill.
  */
-export function getArcFilledTrackRevealSpec({ radius, startAngle, sweepAngle, startCornerRadius = 0, endCornerRadius = startCornerRadius, fill }) {
+export function getArcFilledTrackRevealSpec({
+  radius,
+  startAngle,
+  sweepAngle,
+  trackThickness = 0,
+  startCornerRadius = 0,
+  endCornerRadius = startCornerRadius,
+  fill,
+}) {
   if (fill === 0) return null
 
   const sweepMagnitude = Math.abs(sweepAngle)
@@ -203,10 +267,25 @@ export function getArcFilledTrackRevealSpec({ radius, startAngle, sweepAngle, st
   const endRadius = fullCircle ? 0 : endCornerRadius
   const startCapAngle = arcCapAngle(radius, startRadius)
   const endCapAngle = arcCapAngle(radius, endRadius)
-  const revealedSweep = (sweepMagnitude + startCapAngle + endCapAngle) * fill
+  const totalSpan = sweepMagnitude + startCapAngle + endCapAngle
+  const revealedSweep = totalSpan * fill
   const availableEndCapLength = radius * ((revealedSweep * Math.PI) / 180)
   const revealedEndRadius = Math.min(endRadius, availableEndCapLength)
   const revealedEndCapAngle = arcCapAngle(radius, revealedEndRadius)
+
+  const effectiveEndRadius = Math.min(trackThickness * 0.5, endRadius)
+  if (effectiveEndRadius > ARC_PATH_EPSILON && !fullCircle && totalSpan > ARC_PATH_EPSILON) {
+    const capDiameterAngularLength = (2 * effectiveEndRadius * 180) / (radius * Math.PI)
+    const thresholdFill = capDiameterAngularLength / totalSpan
+    if (fill < thresholdFill) {
+      const phase = fill / thresholdFill
+      return {
+        capMode: 'translate',
+        cornerRadius: effectiveEndRadius,
+        capOffset: -2 * effectiveEndRadius * (1 - phase),
+      }
+    }
+  }
 
   return {
     startAngle: startAngle - direction * startCapAngle,

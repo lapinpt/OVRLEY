@@ -57,27 +57,17 @@ describe('arcTrackPath', () => {
   })
 
   test('reveals a full track from its left edge while keeping the moving end rounded', () => {
-    const lowFill = getArcFilledTrackRevealSpec({
-      radius: 64,
-      startAngle: 180,
-      sweepAngle: 180,
-      startCornerRadius: 6,
-      endCornerRadius: 6,
-      fill: 0.001,
-    })
-    const halfway = getArcFilledTrackRevealSpec({
-      radius: 64,
-      startAngle: 180,
-      sweepAngle: 180,
-      startCornerRadius: 6,
-      endCornerRadius: 6,
-      fill: 0.5,
-    })
+    const shared = { radius: 64, startAngle: 180, sweepAngle: 180, trackThickness: 12, startCornerRadius: 6, endCornerRadius: 6 }
+    const lowFill = getArcFilledTrackRevealSpec({ ...shared, fill: 0.001 })
+    const halfway = getArcFilledTrackRevealSpec({ ...shared, fill: 0.5 })
 
-    expect(lowFill.startAngle).toBeCloseTo(174.644, 3)
-    expect(lowFill.startCornerRadius).toBe(0)
-    expect(lowFill.endCornerRadius).toBeGreaterThan(0)
-    expect(lowFill.endCornerRadius).toBeLessThan(6)
+    expect(lowFill.capMode).toBe('translate')
+    expect(lowFill.cornerRadius).toBe(6)
+    expect(lowFill.capOffset).toBeLessThan(0)
+    expect(lowFill.capOffset).toBeGreaterThan(-12)
+    const atThreshold = getArcFilledTrackRevealSpec({ ...shared, fill: 0.06 })
+    expect(atThreshold.capMode).not.toBe('translate')
+    expect(atThreshold.startAngle).toBeCloseTo(180 - 5.373, 1)
     expect(halfway.sweepAngle).toBeCloseTo(90, 3)
     expect(halfway.endCornerRadius).toBe(6)
   })

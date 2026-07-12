@@ -39,6 +39,35 @@ pub(crate) struct ArcTrackSpec {
     pub end_corner_radius: f32,
 }
 
+/// Reveal clip geometry produced by [`ArcTrackSpec::reveal_clip`]. Below the
+/// low-fill threshold the clip is a translated filled disk whose intersection
+/// with the annular source track forms a crescent (Option B); above the
+/// threshold it is a normal partial-track shape. Keeping the leading edge a
+/// true circular arc of the full cap radius at every fill level makes the
+/// handoff between the two variants seamless.
+#[derive(Clone, Copy, Debug)]
+enum RevealClip {
+    Track(ArcTrackSpec),
+    TranslatedCap {
+        cap_radius: f32,
+        cap_offset: f32,
+    },
+}
+
+impl RevealClip {
+    /// Builds the concrete clip path for this variant. `TranslatedCap` borrows
+    /// the source geometry (center, radius, start angle, sweep, thickness).
+    fn path(self, source: &ArcTrackSpec) -> Option<Path> {
+        match self {
+            RevealClip::Track(spec) => spec.filled_path(),
+            RevealClip::TranslatedCap {
+                cap_radius,
+                cap_offset,
+            } => source.translated_cap_path(cap_radius, cap_offset),
+        }
+    }
+}
+
 impl ArcTrackSpec {
     pub(crate) fn full(geometry: ArcGaugeGeometry, thickness: f32, corner_radius: f32) -> Self {
         Self {
@@ -59,10 +88,13 @@ impl ArcTrackSpec {
         }
     }
 
-    /// Builds an anchored reveal clip for this complete source track. The clip
-    /// progresses across the track's visible caps rather than redrawing a tiny
-    /// partial track as a full-sized dot.
-    fn reveal_clip(self, fill01: f32) -> Option<Self> {
+    /// Builds the reveal clip for this complete source track. Below a
+    /// threshold fill the clip is a translated filled disk (Option B): it
+    /// slides backward along the sweep tangent from the start so its
+    /// intersection with the annular source produces a crescent that grows
+    /// monotonically. At or above the threshold the clip is a normal partial
+    /// track shape with an anchored start and a progressively revealed end cap.
+    fn reveal_clip(self, fill01: f32) -> Option<RevealClip> {
         let fill = fill01.clamp(0.0, 1.0);
         let sweep = self
             .sweep_angle
@@ -88,13 +120,27 @@ impl ArcTrackSpec {
         };
         let start_cap_angle = arc_cap_angle_degrees(radius, start_corner_radius);
         let end_cap_angle = arc_cap_angle_degrees(radius, end_corner_radius);
-        let revealed_sweep = (sweep_magnitude + start_cap_angle + end_cap_angle) * fill;
+        let total_span = sweep_magnitude + start_cap_angle + end_cap_angle;
+        let revealed_sweep = total_span * fill;
         let revealed_end_corner_radius =
             end_corner_radius.min(radius * revealed_sweep.to_radians());
         let revealed_end_cap_angle = arc_cap_angle_degrees(radius, revealed_end_corner_radius);
         let body_sweep = (revealed_sweep - revealed_end_cap_angle).max(PATH_EPSILON);
 
-        Some(Self {
+        let effective_cap_radius = end_corner_radius.min(half_thickness);
+        if effective_cap_radius > PATH_EPSILON && !full_circle && total_span > PATH_EPSILON {
+            let cap_diameter_angular = (2.0 * effective_cap_radius / radius).to_degrees();
+            let threshold_fill = cap_diameter_angular / total_span;
+            if fill < threshold_fill {
+                let phase = fill / threshold_fill;
+                return Some(RevealClip::TranslatedCap {
+                    cap_radius: effective_cap_radius,
+                    cap_offset: -2.0 * effective_cap_radius * (1.0 - phase),
+                });
+            }
+        }
+
+        Some(RevealClip::Track(ArcTrackSpec {
             geometry: ArcGaugeGeometry {
                 start_angle: self.geometry.start_angle - direction * start_cap_angle,
                 sweep_angle: direction * body_sweep,
@@ -104,7 +150,7 @@ impl ArcTrackSpec {
             thickness: self.thickness,
             start_corner_radius: 0.0,
             end_corner_radius: revealed_end_corner_radius,
-        })
+        }))
     }
 
     /// Returns a concentric border shape around this track.
@@ -221,6 +267,54 @@ impl ArcTrackSpec {
         path.close();
         Some(path.detach())
     }
+
+    /// Builds a closed filled disk centered on the track centerline at
+    /// `cap_offset` along the sweep tangent from the start. Used as the
+    /// low-fill clip; its intersection with the annular source track produces a
+    /// crescent that grows monotonically with fill. `cap_offset = 0` places the
+    /// disk's center on the start radial, so the front half reads as the
+    /// fully-formed end cap; negative `cap_offset` slides the disk behind the
+    /// start, shrinking the visible crescent.
+    fn translated_cap_path(self, cap_radius: f32, cap_offset: f32) -> Option<Path> {
+        let sweep = self
+            .sweep_angle
+            .clamp(-MAX_ARC_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES);
+        let direction = sweep.signum();
+        let half_thickness = self.thickness.max(0.0) * 0.5;
+        if direction == 0.0 || cap_radius <= PATH_EPSILON || half_thickness <= PATH_EPSILON {
+            return None;
+        }
+        let r = cap_radius.min(half_thickness);
+        if r <= PATH_EPSILON {
+            return None;
+        }
+
+        let start_center = arc_point(
+            self.geometry.center_x,
+            self.geometry.center_y,
+            self.geometry.radius,
+            self.geometry.start_angle,
+        );
+        let start_tangent = path_tangent(self.geometry.start_angle);
+        let sweep_forward = Point::new(start_tangent.x * direction, start_tangent.y * direction);
+        let cap_center = Point::new(
+            start_center.x + sweep_forward.x * cap_offset,
+            start_center.y + sweep_forward.y * cap_offset,
+        );
+
+        let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
+        path.move_to(arc_point(cap_center.x, cap_center.y, r, 0.0));
+        append_circular_arc(
+            &mut path,
+            cap_center.x,
+            cap_center.y,
+            r,
+            0.0,
+            MAX_ARC_ANGLE_DEGREES,
+        );
+        path.close();
+        Some(path.detach())
+    }
 }
 
 /// Draws a track using the supplied paint. Use `BlendMode::Clear` on the
@@ -243,7 +337,7 @@ pub(crate) fn draw_revealed_arc_track(
     let Some(clip) = source.reveal_clip(fill01) else {
         return;
     };
-    let Some(clip_path) = clip.filled_path() else {
+    let Some(clip_path) = clip.path(&source) else {
         return;
     };
     canvas.save();
@@ -530,17 +624,17 @@ mod tests {
         assert!(rounded.reveal_clip(0.0).is_none());
         assert!(rounded
             .reveal_clip(minimum_positive_fill)
-            .and_then(ArcTrackSpec::filled_path)
+            .and_then(|clip| clip.path(&rounded))
             .is_some());
         assert!(rounded
             .with_end_corner_radius(0.0)
             .reveal_clip(minimum_positive_fill)
-            .and_then(ArcTrackSpec::filled_path)
+            .and_then(|clip| clip.path(&rounded))
             .is_some());
     }
 
     #[test]
-    fn reveal_clip_anchors_start_and_rounds_end() {
+    fn reveal_clip_translates_below_threshold_and_anchors_above() {
         let geometry = ArcGaugeGeometry {
             center_x: 80.0,
             center_y: 80.0,
@@ -552,13 +646,39 @@ mod tests {
         };
         let source = ArcTrackSpec::full(geometry, 12.0, 6.0);
         let low_fill = source.reveal_clip(0.001).unwrap();
+        let just_above_threshold = source.reveal_clip(0.06).unwrap();
         let halfway = source.reveal_clip(0.5).unwrap();
 
-        assert!(low_fill.geometry.start_angle < geometry.start_angle);
-        assert_eq!(low_fill.start_corner_radius, 0.0);
-        assert!(low_fill.end_corner_radius > 0.0 && low_fill.end_corner_radius < 6.0);
-        assert!((halfway.geometry.start_angle - 174.644).abs() < 0.001);
-        assert!((halfway.sweep_angle - 90.0).abs() < 0.001);
-        assert_eq!(halfway.end_corner_radius, 6.0);
+        match low_fill {
+            RevealClip::TranslatedCap {
+                cap_radius,
+                cap_offset,
+            } => {
+                assert!((cap_radius - 6.0).abs() < PATH_EPSILON);
+                assert!(cap_offset < 0.0 && cap_offset > -12.0);
+            }
+            _ => panic!("expected TranslatedCap below threshold, got {:?}", low_fill),
+        }
+
+        match just_above_threshold {
+            RevealClip::Track(spec) => {
+                let expected_start = 180.0 - arc_cap_angle_degrees(64.0, 6.0);
+                assert!((spec.geometry.start_angle - expected_start).abs() < PATH_EPSILON);
+                assert!((spec.end_corner_radius - 6.0).abs() < PATH_EPSILON);
+            }
+            _ => panic!(
+                "expected Track above threshold, got {:?}",
+                just_above_threshold
+            ),
+        }
+
+        match halfway {
+            RevealClip::Track(spec) => {
+                assert!((spec.geometry.start_angle - 174.644).abs() < 0.01);
+                assert!((spec.sweep_angle - 90.0).abs() < 0.001);
+                assert_eq!(spec.end_corner_radius, 6.0);
+            }
+            _ => panic!("expected Track at halfway, got {:?}", halfway),
+        }
     }
 }
