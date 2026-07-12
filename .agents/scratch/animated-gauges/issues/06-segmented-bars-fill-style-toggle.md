@@ -109,7 +109,8 @@ config merely because it was resolved for rendering.
 ### Automatic bar geometry
 
 Resolve automatic values from logical (pre-output-scale) track geometry in one
-shared Rust helper and one exactly mirrored frontend helper:
+shared Rust helper and one frontend helper implementing the same documented
+contract:
 
 - `S` is the available span along the track: the linear track extent or the
   arc centerline length `abs(sweep_radians) * radius`.
@@ -130,7 +131,9 @@ These constants are shared visual-design constants, not manifest defaults.
 They intentionally make density follow the live geometry. Explicit
 `bar_count` and/or `bar_gap` override only their corresponding automatic
 input; for example, an explicit gap with auto count participates in the count
-formula. Rust and SVG preview must produce the same resolved values.
+formula. Both implementations consume the constants and formulas documented
+here; cross-renderer parity validation is handled separately by the product
+owner as described below.
 
 `track_fill_flat` (the existing per-gauge toggle) is **ignored** in bars mode.
 Ignoring it is the only sensible behaviour: in bars mode each segment is
@@ -152,8 +155,8 @@ clamped to `[0,1]`: the highest filled bar index is
 (0-indexed, advancing in the gauge's native fill direction) is **filled** iff
 `i <= i_max`.
 
-Equivalently (and matching the formula in the original bars issue for parity
-testing): bar `i` is filled iff
+Equivalently (and retaining the formula in the original bars issue): bar `i`
+is filled iff
 `value >= min + ((i + 1) / bar_count) * (max - min)`,
 with `value` clamped to `[min, max]` first.
 
@@ -169,7 +172,8 @@ Shared helper location:
   against the count.
 - JS: `widget-preview/utils/gaugeBarGeometry.js` (new) —
   `getBarFillCount(fill01, barCount)` and `getBarGeometry({ ... })` helpers
-  consumed by both renderers. Mirror the Rust formula exactly.
+  consumed by both renderers. Implement the documented bucket contract
+  directly; do not add cross-backend parity harnesses or fixtures.
 
 ### Linear gauge — bars behaviour
 
@@ -308,6 +312,39 @@ three. The `"bars"` definition in `displayTypes.definitions` is
 `BarsGauge` renderer was ever registered. Removing it keeps the
 display-type dropdown free of a dead entry.
 
+## Required implementation order
+
+Implement this issue in the following order. The ordering is part of the
+acceptance contract:
+
+1. Complete the full production implementation and author the required tests,
+   but do **not** execute any test, formatter, linter, type-check, or other
+   verification command yet.
+2. Apply the repository's `/debloat` skill to every production and test file
+   touched by this issue. Establish the canonical Auto/Custom config contract,
+   remove consumer-side repair and duplicate geometry vocabulary, keep
+   automatic resolution at its owning geometry boundary, move reusable logic
+   out of renderer/editor components, and prune unused helpers and branches.
+3. Inspect/search the complete touched-file diff as required by `/debloat` and
+   finish all cleanup edits.
+4. Only after the debloat pass is complete, run focused tests followed by the
+   repository's formatter, linter, type checks, broader relevant test suites,
+   and `git diff --check`.
+
+Writing tests during implementation is expected; running them before the
+debloat gate is not. If the post-debloat verification exposes a failure, fix
+it, reapply `/debloat` to the newly touched code, and only then rerun tests.
+
+### Parity testing ownership
+
+Do not author or execute Rust-versus-SVG parity tests, golden-image comparisons,
+cross-backend fixture comparisons, or manual parity checks as part of this
+implementation. Parity testing and parity sign-off belong to the product owner
+after implementation handoff. This exclusion applies both before and after the
+debloat gate. Ordinary backend/frontend unit and renderer tests may verify
+their own observable behavior independently, but must not claim parity between
+the two implementations.
+
 ## Acceptance criteria
 
 ### Backend
@@ -323,8 +360,9 @@ display-type dropdown free of a dead entry.
       `render/widgets/gauges/range.rs`; `fill_percentage` and `metric_range`
       are reused unchanged.
 - [ ] Shared automatic-geometry helper resolves absent count/gap from live
-      logical track span and thickness using the documented constants. Rust
-      and frontend results match, and resolved values are not persisted.
+      logical track span and thickness using the documented constants in each
+      runtime, and resolved values are not persisted. Implementation does not
+      add or run a cross-runtime parity harness.
 - [ ] `ValidatedLinearGaugeWidget` and `ValidatedArcGaugeWidget` gain
       `track_fill_style` and resolved concrete bar geometry. Validators resolve
       a missing style to `Fill`; in bars mode, absent count/gap select auto and
@@ -381,6 +419,24 @@ display-type dropdown free of a dead entry.
 - [ ] Frontend tests for `gaugeBarGeometry` (bucket count, sizing clamping,
       automatic density, resize recomputation, angular gap) and renderer tests
       asserting bars-mode SVG output for linear, arc, and corner gauges.
+
+### Cleanup and verification gate
+
+- [ ] Full implementation and all intended test cases are written before any
+      tests or other verification commands are executed.
+- [ ] `/debloat` is applied to every file touched by this issue before tests
+      run; its contract, ownership, one-language, pruning, and changed-path
+      search checks are completed.
+- [ ] No derived Auto count/gap is persisted, no renderer or editor repairs
+      malformed required data, and Rust/JS geometry does not develop duplicate
+      naming schemes or parallel formulas during implementation.
+- [ ] Only after the debloat gate passes, focused tests, formatting, linting,
+      type checks, broader relevant suites, and `git diff --check` are run.
+- [ ] Any verification-driven fix is debloated before the affected checks are
+      rerun.
+- [ ] No parity test, parity fixture, golden-image comparison, or manual parity
+      check is authored or executed; parity validation is left for the product
+      owner after handoff.
 
 ## Blocked by
 
