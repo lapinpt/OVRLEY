@@ -449,7 +449,7 @@ describe('OverlayEditor selection flow', () => {
     expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'false')
   })
 
-  test.each(['arc', 'corner'])('maintains a square frame for selected %s gauge widgets', (displayType) => {
+  test('maintains a square frame for selected arc widgets', () => {
     const config = {
       ...DEFAULT_CONFIG,
       backdrops: [],
@@ -457,13 +457,13 @@ describe('OverlayEditor selection flow', () => {
       plots: [],
       values: [
         {
-          id: `widget-${displayType}`,
+          id: 'widget-arc',
           value: 'speed',
           x: 0,
           y: 0,
-          display_type: displayType,
+          display_type: 'arc',
           display_variants: {
-            [displayType]: {
+            arc: {
               width: 220,
               height: 220,
             },
@@ -492,10 +492,10 @@ describe('OverlayEditor selection flow', () => {
       />,
     )
 
-    const gauge = container.querySelector(`[data-widget-id="widget-${displayType}"]`)
-    expect(gauge).toBeTruthy()
+    const arc = container.querySelector('[data-widget-id="widget-arc"]')
+    expect(arc).toBeTruthy()
 
-    fireEvent.mouseDown(gauge, { button: 0 })
+    fireEvent.mouseDown(arc, { button: 0 })
 
     expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
     expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'true')

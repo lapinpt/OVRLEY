@@ -39,10 +39,10 @@ pub(crate) fn inner_widget_layout(
     } else {
         value_line_height
     };
-    let top = geometry.center_y + offset_y - group_height * 0.5;
+    let top = geometry.inner_widget_center_y + offset_y - group_height * 0.5;
 
     ArcInnerWidgetLayout {
-        center_x: geometry.center_x + offset_x,
+        center_x: geometry.inner_widget_center_x + offset_x,
         value_top: top,
         unit_top: unit_font_size.map(|_| top + value_line_height + gap),
     }

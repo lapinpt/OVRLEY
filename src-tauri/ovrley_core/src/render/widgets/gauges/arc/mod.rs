@@ -59,6 +59,7 @@ pub fn prepare_arc_gauge_cache(
                 scaled_height as f32,
                 orientation,
                 track_thickness,
+                gauge.track_corner_radius * scale,
                 track_border_thickness,
             ),
             None => arc_gauge_geometry(
@@ -141,6 +142,10 @@ pub fn prepare_arc_gauge_cache(
             height: scaled_height,
             rotation: gauge.rotation,
             display_type: gauge.display_type,
+            center_x: geometry.center_x,
+            center_y: geometry.center_y,
+            inner_widget_center_x: geometry.inner_widget_center_x,
+            inner_widget_center_y: geometry.inner_widget_center_y,
             start_angle: geometry.start_angle,
             sweep_angle: geometry.sweep_angle,
             radius: geometry.radius,
@@ -187,8 +192,10 @@ pub fn draw_arc_gauge_widget(
             .get(frame_index)
             .or_else(|| cache.frame_states.last())?;
         let geometry = ArcGaugeGeometry {
-            center_x: cache.x + cache.width as f32 * 0.5,
-            center_y: cache.y + cache.height as f32 * 0.5,
+            center_x: cache.x + cache.center_x,
+            center_y: cache.y + cache.center_y,
+            inner_widget_center_x: cache.x + cache.inner_widget_center_x,
+            inner_widget_center_y: cache.y + cache.inner_widget_center_y,
             radius: cache.radius,
             start_angle: cache.start_angle,
             sweep_angle: cache.sweep_angle,

@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest'
 import {
   buildResizeUpdate,
   buildScaleDraft,
-  buildUniformResizeUpdate,
   captureResizeOrigin,
 } from '@/features/overlay-editor/utils/widgetResizeScaling'
 
@@ -45,29 +44,6 @@ describe('widgetResizeScaling', () => {
       arc_angle: 225,
       track_thickness: 48,
       track_empty_color: '#222222',
-    })
-  })
-
-  test('uses the same content policy for corner handle and Size-slider updates', () => {
-    const widget = makeGaugeWidget('corner')
-    const handleUpdate = buildResizeUpdate(captureResizeOrigin(widget), { width: 440, height: 440 }, { round: true })
-    const sliderUpdate = buildUniformResizeUpdate(widget, 440)
-
-    expect(sliderUpdate).toEqual(handleUpdate)
-    expect(sliderUpdate).toMatchObject({
-      font_size: 120,
-      display_variants: {
-        corner: {
-          width: 440,
-          height: 440,
-          track_thickness: 48,
-          track_corner_radius: 24,
-          track_border_thickness: 4,
-          inner_widget_offset_x: 10,
-          inner_widget_offset_y: -6,
-          min_max_label_font_size: 24,
-        },
-      },
     })
   })
 

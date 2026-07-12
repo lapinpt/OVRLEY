@@ -10,6 +10,8 @@ use skia_safe::{Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType, Point};
 
 const PATH_EPSILON: f32 = 0.001;
 const QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_76;
+const CORNER_GAUGE_DEFAULT_FRAME_SIZE: f32 = 110.0;
+const CORNER_GAUGE_INNER_INSET: f32 = 22.0;
 
 /// Arc geometry shared by static and dynamic drawing. Angles use Skia's
 /// screen-space convention: 0° is right, 90° is down, and increasing angles
@@ -18,6 +20,8 @@ const QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_76;
 pub struct ArcGaugeGeometry {
     pub center_x: f32,
     pub center_y: f32,
+    pub inner_widget_center_x: f32,
+    pub inner_widget_center_y: f32,
     pub radius: f32,
     pub start_angle: f32,
     pub sweep_angle: f32,
@@ -299,9 +303,13 @@ pub fn arc_gauge_geometry(
     border_thickness: f32,
 ) -> ArcGaugeGeometry {
     let (start_angle, end_angle) = arc_start_end_angles(arc_angle);
+    let center_x = width * 0.5;
+    let center_y = height * 0.5;
     ArcGaugeGeometry {
-        center_x: width * 0.5,
-        center_y: height * 0.5,
+        center_x,
+        center_y,
+        inner_widget_center_x: center_x,
+        inner_widget_center_y: center_y,
         radius: arc_radius(width, height, track_thickness, border_thickness),
         start_angle,
         sweep_angle: end_angle - start_angle,
@@ -316,13 +324,33 @@ pub fn corner_gauge_geometry(
     height: f32,
     orientation: ValidatedCornerGaugeOrientation,
     track_thickness: f32,
+    track_corner_radius: f32,
     border_thickness: f32,
 ) -> ArcGaugeGeometry {
     let (start_angle, end_angle) = corner_start_end_angles(orientation);
+    let frame_size = width.min(height).max(0.0);
+    let track_thickness = track_thickness.max(0.0);
+    let border_thickness = border_thickness.max(0.0);
+    let cap_padding =
+        (track_corner_radius.clamp(0.0, track_thickness * 0.5) + border_thickness).min(frame_size);
+    let inner_inset = frame_size * CORNER_GAUGE_INNER_INSET / CORNER_GAUGE_DEFAULT_FRAME_SIZE;
+    let is_bottom_right = orientation == ValidatedCornerGaugeOrientation::BottomRight;
+    let center_x = if is_bottom_right {
+        width - cap_padding
+    } else {
+        cap_padding
+    };
+
     ArcGaugeGeometry {
-        center_x: width * 0.5,
-        center_y: height * 0.5,
-        radius: arc_radius(width, height, track_thickness, border_thickness),
+        center_x,
+        center_y: height - cap_padding,
+        inner_widget_center_x: if is_bottom_right {
+            width - inner_inset
+        } else {
+            inner_inset
+        },
+        inner_widget_center_y: height - inner_inset,
+        radius: (frame_size - cap_padding - track_thickness * 0.5 - border_thickness).max(0.0),
         start_angle,
         sweep_angle: end_angle - start_angle,
     }
@@ -516,6 +544,8 @@ mod tests {
         let geometry = ArcGaugeGeometry {
             center_x: 80.0,
             center_y: 80.0,
+            inner_widget_center_x: 80.0,
+            inner_widget_center_y: 80.0,
             radius: 64.0,
             start_angle: 180.0,
             sweep_angle: 180.0,

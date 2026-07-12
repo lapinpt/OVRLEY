@@ -14,6 +14,8 @@ export const ARC_INNER_WIDGET_LINE_HEIGHT = 0.92
 export const ARC_INNER_WIDGET_UNIT_RATIO = 0.28
 export const ARC_INNER_WIDGET_MIN_UNIT_FONT_SIZE = 12
 export const ARC_INNER_WIDGET_GAP_PX = 4
+export const CORNER_GAUGE_DEFAULT_FRAME_SIZE = 110
+export const CORNER_GAUGE_INNER_INSET = 22
 
 function finiteNumber(value, fallback = 0) {
   const numeric = Number(value)
@@ -109,30 +111,66 @@ export function getArcGaugeLayout({ value, values, width, height, arcAngle, trac
 }
 
 /**
- * Produces the fixed bottom-corner layout using the same radius, ranges, and
- * labels as the configurable arc gauge.
+ * Produces a compact bottom-corner layout. The circle center sits in the
+ * gauge corner so its fixed 90° track fills the widget frame.
  */
-export function getCornerGaugeLayout({ value, values, width, height, cornerOrientation, trackThickness, borderThickness = 0 }) {
+export function getCornerGaugeLayout({
+  value,
+  values,
+  width,
+  height,
+  cornerOrientation,
+  trackThickness,
+  trackCornerRadius = 0,
+  borderThickness = 0,
+}) {
+  const safeWidth = finiteNumber(width)
+  const safeHeight = finiteNumber(height)
+  const frameSize = Math.min(safeWidth, safeHeight)
+  const thickness = Math.max(0, finiteNumber(trackThickness))
+  const border = Math.max(0, finiteNumber(borderThickness))
+  const outerHalfThickness = thickness * 0.5 + border
+  const capPadding = Math.min(frameSize, Math.min(thickness * 0.5, Math.max(0, finiteNumber(trackCornerRadius))) + border)
+  const isBottomRight = cornerOrientation === 'bottom-right'
+  const innerInset = (frameSize * CORNER_GAUGE_INNER_INSET) / CORNER_GAUGE_DEFAULT_FRAME_SIZE
+
   return getArcShapedGaugeLayout({
     value,
     values,
-    width,
-    height,
+    width: safeWidth,
+    height: safeHeight,
     trackThickness,
     borderThickness,
     angles: getCornerGaugeAngles(cornerOrientation),
+    centerX: isBottomRight ? safeWidth - capPadding : capPadding,
+    centerY: safeHeight - capPadding,
+    radius: Math.max(0, frameSize - capPadding - outerHalfThickness),
+    innerAnchor: {
+      x: isBottomRight ? safeWidth - innerInset : innerInset,
+      y: safeHeight - innerInset,
+    },
   })
 }
 
-function getArcShapedGaugeLayout({ value, values, width, height, trackThickness, borderThickness, angles }) {
+function getArcShapedGaugeLayout({
+  value,
+  values,
+  width,
+  height,
+  trackThickness,
+  borderThickness,
+  angles,
+  centerX = finiteNumber(width) * 0.5,
+  centerY = finiteNumber(height) * 0.5,
+  radius,
+  innerAnchor,
+}) {
   const range = getArcGaugeRange(values)
   const hasValue = typeof value === 'number' && Number.isFinite(value)
   const fill = hasValue ? getArcFillPercentage(value, range.min, range.max) : 0.5
-  const centerX = finiteNumber(width) * 0.5
-  const centerY = finiteNumber(height) * 0.5
   const thickness = Math.max(0, finiteNumber(trackThickness))
   const border = Math.max(0, finiteNumber(borderThickness))
-  const radius = getArcRadius({ width, height, trackThickness: thickness, borderThickness: border })
+  const gaugeRadius = radius ?? getArcRadius({ width, height, trackThickness: thickness, borderThickness: border })
   const fullCircle = Math.abs(angles.sweepAngle) >= ARC_MAX_ANGLE_DEGREES
   const labelAngles = fullCircle ? { min: 180, max: 0 } : { min: angles.startAngle, max: angles.endAngle }
 
@@ -142,14 +180,15 @@ function getArcShapedGaugeLayout({ value, values, width, height, trackThickness,
     fill,
     centerX,
     centerY,
-    radius,
+    radius: gaugeRadius,
     trackThickness: thickness,
     borderThickness: border,
     outerStrokeWidth: thickness + border * 2,
     fullCircle,
-    startPoint: getArcPoint(centerX, centerY, radius, angles.startAngle),
-    endPoint: getArcPoint(centerX, centerY, radius, angles.endAngle),
-    fillEndPoint: getArcPoint(centerX, centerY, radius, angles.startAngle + angles.sweepAngle * fill),
+    innerAnchor,
+    startPoint: getArcPoint(centerX, centerY, gaugeRadius, angles.startAngle),
+    endPoint: getArcPoint(centerX, centerY, gaugeRadius, angles.endAngle),
+    fillEndPoint: getArcPoint(centerX, centerY, gaugeRadius, angles.startAngle + angles.sweepAngle * fill),
     labelAngles,
   }
 }

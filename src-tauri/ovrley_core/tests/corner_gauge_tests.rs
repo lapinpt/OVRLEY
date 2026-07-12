@@ -45,6 +45,7 @@ fn corner_geometry_places_the_track_opposite_the_gauge_corner() {
         160.0,
         ValidatedCornerGaugeOrientation::BottomLeft,
         12.0,
+        6.0,
         2.0,
     );
     let bottom_right = corner_gauge_geometry(
@@ -52,6 +53,7 @@ fn corner_geometry_places_the_track_opposite_the_gauge_corner() {
         160.0,
         ValidatedCornerGaugeOrientation::BottomRight,
         12.0,
+        6.0,
         2.0,
     );
 

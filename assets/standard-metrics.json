@@ -149,8 +149,8 @@
           "assetFile": "display-type-corner.svg"
         },
         "layoutMode": "boxed",
-        "defaultFrameWidth": 220,
-        "defaultFrameHeight": 220,
+        "defaultFrameWidth": 110,
+        "defaultFrameHeight": 110,
         "defaultFontSize": 35,
         "defaults": {
           "corner_orientation": "bottom-left",

@@ -94,6 +94,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const scale = globalScale
   const trackThickness = data.track_thickness
   const borderThickness = data.track_border_thickness
+  const trackCornerRadius = Math.min(trackThickness * 0.5, data.track_corner_radius)
   const values = seriesForWidget(activity, widget)
   const value = getInterpolatedActivityValue(activity, data.value, previewSecond)
   const layout =
@@ -105,6 +106,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
           height,
           cornerOrientation: data.corner_orientation,
           trackThickness,
+          trackCornerRadius,
           borderThickness,
         })
       : getArcGaugeLayout({
@@ -120,7 +122,6 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   if (!innerModel) return null
 
   const opacity = data.opacity * globalOpacity
-  const trackCornerRadius = Math.min(layout.trackThickness * 0.5, data.track_corner_radius)
   const fillIsFlat = Boolean(data.track_fill_flat)
   const fillEndCornerRadius = fillIsFlat ? 0 : trackCornerRadius
   const outerTrackThickness = layout.outerStrokeWidth
@@ -186,9 +187,10 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const unitMeasurement = innerModel.unitText
     ? measureArcPreviewText(innerModel.unitText, Math.max(innerModel.fontSize * 0.28, 12), innerModel.fontFamily)
     : null
+  const innerAnchor = layout.innerAnchor ?? { x: layout.centerX, y: layout.centerY }
   const innerLayout = getArcInnerWidgetLayout({
-    centerX: layout.centerX,
-    centerY: layout.centerY,
+    centerX: innerAnchor.x,
+    centerY: innerAnchor.y,
     offsetX: data.inner_widget_offset_x,
     offsetY: data.inner_widget_offset_y,
     fontSize: innerModel.fontSize,
