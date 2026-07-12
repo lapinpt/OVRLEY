@@ -93,7 +93,7 @@ impl PreparedValue {
             Self::Gradient(_) => DisplayType::Text,
             Self::HeadingTape(_) => DisplayType::Tape,
             Self::LinearGauge(_) => DisplayType::Linear,
-            Self::ArcGauge(_) => DisplayType::Arc,
+            Self::ArcGauge(value) => value.display_type,
         }
     }
 
@@ -302,7 +302,8 @@ pub struct ArcGaugeCache {
     pub height: u32,
     pub rotation: f32,
     pub display_type: DisplayType,
-    pub arc_angle: f32,
+    pub start_angle: f32,
+    pub sweep_angle: f32,
     pub radius: f32,
     pub track_thickness: f32,
     pub track_corner_radius: f32,

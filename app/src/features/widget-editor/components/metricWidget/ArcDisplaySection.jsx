@@ -10,20 +10,26 @@ import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
-import { ColorField, SliderField, ToggleField } from '../widgetFormControls'
+import { ColorField, SelectField, SliderField, ToggleField } from '../widgetFormControls'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
+const CORNER_ORIENTATION_OPTIONS = [
+  { value: 'bottom-left', label: 'Bottom Left' },
+  { value: 'bottom-right', label: 'Bottom Right' },
+]
 
 /**
- * Arc-gauge-specific controls. The gauge owns track geometry in its display
- * variant; the value/unit typography remains shared top-level metric data.
- * Icons are deliberately absent from this editor because arc gauges do not
+ * Arc-shaped gauge controls. Each display type owns its own variant data while
+ * sharing track and inner-widget styling. The value/unit typography remains
+ * shared top-level metric data. Icons are deliberately absent because gauges do not
  * render them.
  */
 export default function ArcDisplaySection({ widget, updateWidgetData }) {
-  const arcData = useMemo(() => widget.data.display_variants?.arc ?? {}, [widget.data.display_variants?.arc])
-  const updateArc = useDisplayVariantUpdater(widget, 'arc', arcData, updateWidgetData)
+  const displayType = widget.data.display_type
+  const isCornerGauge = displayType === 'corner'
+  const arcData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
+  const updateArc = useDisplayVariantUpdater(widget, displayType, arcData, updateWidgetData)
   const availableFonts = useAvailableFonts()
   const definition = getStandardMetricDefinition(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)
@@ -40,17 +46,26 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={SlidersHorizontal} title="Arc Track" />
+        <SectionHeading icon={SlidersHorizontal} title={isCornerGauge ? 'Corner Track' : 'Arc Track'} />
         <div className="grid grid-cols-1 gap-4 pt-2">
-          <SliderField
-            label="Arc Angle"
-            value={arcData.arc_angle}
-            min={ARC_MIN_ANGLE}
-            max={ARC_MAX_ANGLE}
-            step={5}
-            valueDisplay={`${arcData.arc_angle}°`}
-            onSliderChange={(arc_angle) => updateArc({ arc_angle })}
-          />
+          {isCornerGauge ? (
+            <SelectField
+              label="Corner Orientation"
+              value={arcData.corner_orientation}
+              onValueChange={(corner_orientation) => updateArc({ corner_orientation })}
+              options={CORNER_ORIENTATION_OPTIONS}
+            />
+          ) : (
+            <SliderField
+              label="Arc Angle"
+              value={arcData.arc_angle}
+              min={ARC_MIN_ANGLE}
+              max={ARC_MAX_ANGLE}
+              step={5}
+              valueDisplay={`${arcData.arc_angle}°`}
+              onSliderChange={(arc_angle) => updateArc({ arc_angle })}
+            />
+          )}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField

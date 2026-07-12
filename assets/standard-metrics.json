@@ -46,7 +46,10 @@
       },
       "heading_tape": {
         "label": "Heading Tape",
-        "icon": { "source": "shared", "assetFile": "display-type-heading-tape.svg" },
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-heading-tape.svg"
+        },
         "layoutMode": "boxed",
         "defaultFrameWidth": 600,
         "defaultFrameHeight": 100,
@@ -109,8 +112,12 @@
         "defaultFrameHeight": 60
       },
       "arc": {
-        "label": "Arc",
-        "icon": { "source": "shared", "assetFile": "display-type-arc.svg" },
+        "label": "Arc Gauge",
+        "icon": {
+          "source": "lucide",
+          "name": "Gauge",
+          "assetFile": "display-type-arc.svg"
+        },
         "layoutMode": "boxed",
         "defaultFrameWidth": 220,
         "defaultFrameHeight": 220,
@@ -135,15 +142,38 @@
         }
       },
       "corner": {
-        "label": "Corner",
-        "icon": { "source": "shared", "assetFile": "display-type-corner.svg" },
+        "label": "Corner Gauge",
+        "icon": {
+          "source": "custom",
+          "name": "CornerGauge",
+          "assetFile": "display-type-corner.svg"
+        },
         "layoutMode": "boxed",
-        "defaultFrameWidth": 200,
-        "defaultFrameHeight": 60
+        "defaultFrameWidth": 220,
+        "defaultFrameHeight": 220,
+        "defaultFontSize": 60,
+        "defaults": {
+          "corner_orientation": "bottom-left",
+          "inner_widget_offset_x": 0,
+          "inner_widget_offset_y": 0,
+          "track_thickness": 24,
+          "track_corner_radius": 12,
+          "track_border_thickness": 0,
+          "track_border_color": "#ffffff",
+          "track_empty_color": "#222222",
+          "track_empty_opacity": 0.5,
+          "track_filled_color": "#dce2e8",
+          "track_filled_opacity": 1,
+          "track_fill_flat": false,
+          "show_min_max_labels": false,
+          "min_max_label_font": "Arial.ttf",
+          "min_max_label_font_size": 12,
+          "min_max_label_color": "#ffffff"
+        }
       }
     },
     "variantFrameKeys": ["width", "height", "rotation"],
-    "defaults": ["text", "linear", "arc"],
+    "defaults": ["text", "linear", "arc", "corner"],
     "overrides": {
       "heading": ["text", "heading_tape"],
       "core_temperature": ["text"],

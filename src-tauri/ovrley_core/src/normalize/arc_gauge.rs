@@ -13,6 +13,14 @@ use crate::types::{DisplayType, MetricKind};
 
 pub const MIN_ARC_ANGLE_DEGREES: f32 = 30.0;
 pub const MAX_ARC_ANGLE_DEGREES: f32 = 360.0;
+pub const CORNER_GAUGE_ANGLE_DEGREES: f32 = 90.0;
+
+/// The supported bottom-corner placements for a fixed 90° gauge.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValidatedCornerGaugeOrientation {
+    BottomLeft,
+    BottomRight,
+}
 
 /// Fully validated arc gauge configuration.
 #[derive(Clone, Debug)]
@@ -25,6 +33,7 @@ pub struct ValidatedArcGaugeWidget {
     pub rotation: f32,
     pub display_type: DisplayType,
     pub arc_angle: f32,
+    pub corner_orientation: Option<ValidatedCornerGaugeOrientation>,
     pub inner_widget_offset_x: f32,
     pub inner_widget_offset_y: f32,
     pub track_thickness: f32,
@@ -57,6 +66,68 @@ pub fn validate_arc_gauge(value: ValueConfig, index: usize) -> CoreResult<Valida
         )));
     }
 
+    let arc_angle = require_f32(value.arc_angle, &p("arc_angle"))?;
+    if !(MIN_ARC_ANGLE_DEGREES..=MAX_ARC_ANGLE_DEGREES).contains(&arc_angle) {
+        return Err(CoreError::Config(format!(
+            "{}: must be {}..={}, got {arc_angle}",
+            p("arc_angle"),
+            MIN_ARC_ANGLE_DEGREES as u32,
+            MAX_ARC_ANGLE_DEGREES as u32,
+        )));
+    }
+
+    validate_arc_shaped_gauge(value, index, DisplayType::Arc, arc_angle, None)
+}
+
+/// Validates a raw value config as a fixed 90° bottom-corner gauge.
+pub fn validate_corner_gauge(
+    value: ValueConfig,
+    index: usize,
+) -> CoreResult<ValidatedArcGaugeWidget> {
+    let p = |field: &str| format!("values[{index}].{field}");
+
+    if value.display_type != DisplayType::Corner {
+        return Err(CoreError::Config(format!(
+            "{}: expected corner display_type, got '{}'",
+            p("display_type"),
+            value.display_type.as_str()
+        )));
+    }
+
+    let corner_orientation = match require_string(
+        value.corner_orientation.clone(),
+        &p("corner_orientation"),
+    )?
+    .as_str()
+    {
+        "bottom-left" => ValidatedCornerGaugeOrientation::BottomLeft,
+        "bottom-right" => ValidatedCornerGaugeOrientation::BottomRight,
+        orientation => {
+            return Err(CoreError::Config(format!(
+                "{}: must be 'bottom-left' or 'bottom-right', got '{orientation}'",
+                p("corner_orientation")
+            )));
+        }
+    };
+
+    validate_arc_shaped_gauge(
+        value,
+        index,
+        DisplayType::Corner,
+        CORNER_GAUGE_ANGLE_DEGREES,
+        Some(corner_orientation),
+    )
+}
+
+fn validate_arc_shaped_gauge(
+    value: ValueConfig,
+    index: usize,
+    display_type: DisplayType,
+    arc_angle: f32,
+    corner_orientation: Option<ValidatedCornerGaugeOrientation>,
+) -> CoreResult<ValidatedArcGaugeWidget> {
+    let p = |field: &str| format!("values[{index}].{field}");
+
     let width = value
         .width
         .ok_or_else(|| CoreError::Config(format!("{}: required", p("width"))))?;
@@ -68,16 +139,6 @@ pub fn validate_arc_gauge(value: ValueConfig, index: usize) -> CoreResult<Valida
     }
     if height == 0 {
         return Err(CoreError::Config(format!("{}: must be > 0", p("height"))));
-    }
-
-    let arc_angle = require_f32(value.arc_angle, &p("arc_angle"))?;
-    if !(MIN_ARC_ANGLE_DEGREES..=MAX_ARC_ANGLE_DEGREES).contains(&arc_angle) {
-        return Err(CoreError::Config(format!(
-            "{}: must be {}..={}, got {arc_angle}",
-            p("arc_angle"),
-            MIN_ARC_ANGLE_DEGREES as u32,
-            MAX_ARC_ANGLE_DEGREES as u32,
-        )));
     }
 
     let track_thickness = require_f32(value.track_thickness, &p("track_thickness"))?;
@@ -161,8 +222,9 @@ pub fn validate_arc_gauge(value: ValueConfig, index: usize) -> CoreResult<Valida
         width,
         height,
         rotation,
-        display_type: DisplayType::Arc,
+        display_type,
         arc_angle,
+        corner_orientation,
         inner_widget_offset_x,
         inner_widget_offset_y,
         track_thickness,

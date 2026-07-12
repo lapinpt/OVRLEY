@@ -25,6 +25,7 @@ const DISPLAY_SECTION = {
   heading_tape: HeadingTapeDisplaySection,
   linear: LinearDisplaySection,
   arc: ArcDisplaySection,
+  corner: ArcDisplaySection,
 }
 
 /**

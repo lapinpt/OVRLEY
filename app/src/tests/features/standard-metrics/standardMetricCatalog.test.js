@@ -178,9 +178,11 @@ describe('display type definitions', () => {
 
   test('boxed display types include default frame dimensions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameWidth).toBe(200)
-    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(30)
-    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(120)
-    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(120)
+    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(24)
+    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(220)
+    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(220)
+    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(220)
+    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(220)
   })
 
   test('intrinsic display types have no frame dimensions', () => {
@@ -216,8 +218,9 @@ describe('display type definitions', () => {
 
   test('getDefaultFrameDimensions returns dimensions for boxed types and null for intrinsic', () => {
     expect(getDefaultFrameDimensions('text')).toBeNull()
-    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 30 })
-    expect(getDefaultFrameDimensions('arc')).toEqual({ width: 120, height: 120 })
+    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 24 })
+    expect(getDefaultFrameDimensions('arc')).toEqual({ width: 220, height: 220 })
+    expect(getDefaultFrameDimensions('corner')).toEqual({ width: 220, height: 220 })
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
 

@@ -16,9 +16,7 @@ use super::range::{fill_percentage, metric_range, metric_values};
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
-use crate::normalize::{
-    ValidatedArcGaugeWidget, ValidatedSceneConfig, MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES,
-};
+use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
 use crate::render::format::format_validated_metric_parts;
 use crate::render::surface::create_surface;
 use crate::render::text::{
@@ -35,7 +33,8 @@ use skia_safe::{image_filters, paint::Style, BlendMode, Canvas, Paint, Point};
 use std::path::PathBuf;
 
 pub use self::path::{
-    arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles, ArcGaugeGeometry,
+    arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles, corner_gauge_geometry,
+    corner_start_end_angles, ArcGaugeGeometry,
 };
 
 const ARC_LABEL_GAP_PX: f32 = 8.0;
@@ -54,13 +53,22 @@ pub fn prepare_arc_gauge_cache(
         let scaled_height = ((gauge.height as f32) * scale).round().max(1.0) as u32;
         let track_thickness = gauge.track_thickness * scale;
         let track_border_thickness = gauge.track_border_thickness * scale;
-        let geometry = arc_gauge_geometry(
-            scaled_width as f32,
-            scaled_height as f32,
-            gauge.arc_angle,
-            track_thickness,
-            track_border_thickness,
-        );
+        let geometry = match gauge.corner_orientation {
+            Some(orientation) => corner_gauge_geometry(
+                scaled_width as f32,
+                scaled_height as f32,
+                orientation,
+                track_thickness,
+                track_border_thickness,
+            ),
+            None => arc_gauge_geometry(
+                scaled_width as f32,
+                scaled_height as f32,
+                gauge.arc_angle,
+                track_thickness,
+                track_border_thickness,
+            ),
+        };
         let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
         let text_style = validated_value_style(&gauge.inner_value, scene, scale);
         let unit_parts = format_validated_metric_parts(&gauge.inner_value, dense_activity, 0)
@@ -132,8 +140,9 @@ pub fn prepare_arc_gauge_cache(
             width: scaled_width,
             height: scaled_height,
             rotation: gauge.rotation,
-            display_type: DisplayType::Arc,
-            arc_angle: gauge.arc_angle,
+            display_type: gauge.display_type,
+            start_angle: geometry.start_angle,
+            sweep_angle: geometry.sweep_angle,
             radius: geometry.radius,
             track_thickness,
             track_corner_radius: gauge.track_corner_radius * scale,
@@ -162,7 +171,7 @@ pub fn draw_arc_gauge_widget(
     frame_index: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    if cache.display_type != DisplayType::Arc {
+    if !matches!(cache.display_type, DisplayType::Arc | DisplayType::Corner) {
         return None;
     }
 
@@ -181,10 +190,8 @@ pub fn draw_arc_gauge_widget(
             center_x: cache.x + cache.width as f32 * 0.5,
             center_y: cache.y + cache.height as f32 * 0.5,
             radius: cache.radius,
-            start_angle: arc_start_end_angles(cache.arc_angle).0,
-            sweep_angle: cache
-                .arc_angle
-                .clamp(MIN_ARC_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES),
+            start_angle: cache.start_angle,
+            sweep_angle: cache.sweep_angle,
         };
         if state.fill01 > 0.0 && geometry.radius > 0.0 {
             let fill_end_corner_radius = if cache.track_fill_flat {
@@ -435,7 +442,7 @@ fn clear_track_paint() -> Paint {
 }
 
 fn arc_label_angles(geometry: ArcGaugeGeometry) -> (f32, f32) {
-    if geometry.sweep_angle >= MAX_ARC_ANGLE_DEGREES - f32::EPSILON {
+    if geometry.sweep_angle.abs() >= crate::normalize::MAX_ARC_ANGLE_DEGREES - f32::EPSILON {
         // A full circle has coincident start/end points. Keep labels readable
         // by anchoring the range at the visual left and right edges instead.
         (180.0, 0.0)

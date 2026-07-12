@@ -1,5 +1,5 @@
 /**
- * Arc gauge SVG preview.
+ * Arc-shaped gauge SVG preview.
  *
  * Mirrors the Skia arc-gauge renderer: the empty stroked track, border,
  * min/max labels, and unit form the static presentation; the filled arc and
@@ -15,6 +15,7 @@ import {
   getArcInnerWidgetLayout,
   getArcLabelGap,
   getArcPoint,
+  getCornerGaugeLayout,
 } from '../utils/arcGaugeGeometry'
 import { buildArcGaugeInnerWidgetModel } from '../utils/metricWidgetPreviewUtils'
 import { getTextShadowParts } from '../utils/shadowUtils'
@@ -84,8 +85,10 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   useFontMetricsVersion(valueFontFamily, valueFontSize)
   useFontMetricsVersion(labelFontFamily, labelFontSize)
 
-  if (data.display_type !== 'arc') return null
+  if (data.display_type !== 'arc' && data.display_type !== 'corner') return null
 
+  const displayType = data.display_type
+  const testIdPrefix = `${displayType}-gauge`
   const width = data.width
   const height = data.height
   const scale = globalScale
@@ -93,15 +96,26 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const borderThickness = data.track_border_thickness
   const values = seriesForWidget(activity, widget)
   const value = getInterpolatedActivityValue(activity, data.value, previewSecond)
-  const layout = getArcGaugeLayout({
-    value,
-    values,
-    width,
-    height,
-    arcAngle: data.arc_angle,
-    trackThickness,
-    borderThickness,
-  })
+  const layout =
+    displayType === 'corner'
+      ? getCornerGaugeLayout({
+          value,
+          values,
+          width,
+          height,
+          cornerOrientation: data.corner_orientation,
+          trackThickness,
+          borderThickness,
+        })
+      : getArcGaugeLayout({
+          value,
+          values,
+          width,
+          height,
+          arcAngle: data.arc_angle,
+          trackThickness,
+          borderThickness,
+        })
   const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond })
   if (!innerModel) return null
 
@@ -184,12 +198,12 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
     showUnit: Boolean(innerModel.unitText),
   })
   const shadow = borderThickness > 0 ? getTextShadowParts(sceneStyle) : undefined
-  const shadowFilterId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-shadow`)
-  const valueShadowFilterId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-value-shadow`)
-  const unitShadowFilterId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-unit-shadow`)
-  const labelShadowFilterId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-label-shadow`)
-  const borderMaskId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-border-mask`)
-  const fillClipId = sanitizeSvgId(`arc-gauge-${widget.id || generatedId}-fill-clip`)
+  const shadowFilterId = sanitizeSvgId(`${testIdPrefix}-${widget.id || generatedId}-shadow`)
+  const valueShadowFilterId = sanitizeSvgId(`${testIdPrefix}-${widget.id || generatedId}-value-shadow`)
+  const unitShadowFilterId = sanitizeSvgId(`${testIdPrefix}-${widget.id || generatedId}-unit-shadow`)
+  const labelShadowFilterId = sanitizeSvgId(`${testIdPrefix}-${widget.id || generatedId}-label-shadow`)
+  const borderMaskId = sanitizeSvgId(`${testIdPrefix}-${widget.id || generatedId}-border-mask`)
+  const fillClipId = sanitizeSvgId(`${testIdPrefix}-${widget.id || generatedId}-fill-clip`)
   const shadowColor = shadow ? normalizeSvgShadowColor(shadow.color, opacity) : null
   const outerStrokeWidth = outerTrackThickness
   const borderMask = borderThickness > 0 ? `url(#${borderMaskId})` : undefined
@@ -201,7 +215,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
       height={height * scale}
       viewBox={`0 0 ${width} ${height}`}
       className="block overflow-visible"
-      data-testid="arc-gauge-preview"
+      data-testid={`${testIdPrefix}-preview`}
     >
       {shadow ? <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadow} /> : null}
       {borderThickness > 0 || fillClipPath ? (
@@ -222,7 +236,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
           ) : null}
           {fillClipPath ? (
             <clipPath id={fillClipId}>
-              <path data-testid="arc-gauge-fill-clip" d={fillClipPath} fillRule="evenodd" clipRule="evenodd" />
+              <path data-testid={`${testIdPrefix}-fill-clip`} d={fillClipPath} fillRule="evenodd" clipRule="evenodd" />
             </clipPath>
           ) : null}
         </defs>
@@ -237,16 +251,27 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
         </g>
       ) : null}
       {borderThickness > 0 ? (
-        <ArcTrackPath d={outerTrackPath} fill={data.track_border_color} fillOpacity={opacity} mask={borderMask} dataTestId="arc-gauge-border" />
+        <ArcTrackPath
+          d={outerTrackPath}
+          fill={data.track_border_color}
+          fillOpacity={opacity}
+          mask={borderMask}
+          dataTestId={`${testIdPrefix}-border`}
+        />
       ) : null}
-      <ArcTrackPath d={trackPath} fill={data.track_empty_color} fillOpacity={data.track_empty_opacity * opacity} dataTestId="arc-gauge-empty-track" />
+      <ArcTrackPath
+        d={trackPath}
+        fill={data.track_empty_color}
+        fillOpacity={data.track_empty_opacity * opacity}
+        dataTestId={`${testIdPrefix}-empty-track`}
+      />
       {fillClipPath ? (
         <g clipPath={`url(#${fillClipId})`}>
           <ArcTrackPath
             d={fillSourceTrackPath}
             fill={data.track_filled_color}
             fillOpacity={data.track_filled_opacity * opacity}
-            dataTestId="arc-gauge-filled-track"
+            dataTestId={`${testIdPrefix}-filled-track`}
           />
         </g>
       ) : null}

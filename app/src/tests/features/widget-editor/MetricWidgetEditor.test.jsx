@@ -276,3 +276,53 @@ describe('MetricWidgetEditor arc gauge controls', () => {
     )
   })
 })
+
+describe('MetricWidgetEditor corner gauge controls', () => {
+  test('keeps corner settings in the corner variant and exposes bottom-corner orientation', () => {
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'corner',
+          font: 'Arial.ttf',
+          font_size: 40,
+          color: '#ffffff',
+          show_units: true,
+          unit_color: '#ffffff',
+          display_unit: 'kmh',
+          display_variants: {
+            corner: {
+              width: 160,
+              height: 160,
+              rotation: 0,
+              corner_orientation: 'bottom-left',
+              inner_widget_offset_x: 0,
+              inner_widget_offset_y: 0,
+              track_thickness: 12,
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_fill_flat: false,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Corner Track')).toBeInTheDocument()
+    expect(screen.getByText('Corner Orientation')).toBeInTheDocument()
+    expect(screen.queryByText('Arc Angle')).not.toBeInTheDocument()
+
+    expect(screen.getByText('Bottom Left')).toBeInTheDocument()
+  })
+})

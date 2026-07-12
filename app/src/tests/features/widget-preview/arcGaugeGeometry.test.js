@@ -6,6 +6,8 @@ import {
   getArcGaugeLayout,
   getArcInnerWidgetLayout,
   getArcRadius,
+  getCornerGaugeAngles,
+  getCornerGaugeLayout,
 } from '@/features/widget-preview/utils/arcGaugeGeometry'
 
 describe('arcGaugeGeometry', () => {
@@ -38,6 +40,41 @@ describe('arcGaugeGeometry', () => {
     expect(layout.endPoint.y).toBeCloseTo(80)
     expect(layout.fillEndPoint.x).toBeCloseTo(80)
     expect(layout.fillEndPoint.y).toBeCloseTo(8)
+  })
+
+  test('places each track opposite its gauge corner and reverses bottom-left fill', () => {
+    expect(getCornerGaugeAngles('bottom-left')).toEqual({ startAngle: 0, endAngle: -90, sweepAngle: -90 })
+    expect(getCornerGaugeAngles('bottom-right')).toEqual({ startAngle: 180, endAngle: 270, sweepAngle: 90 })
+
+    const bottomLeft = getCornerGaugeLayout({
+      value: null,
+      values: [],
+      width: 160,
+      height: 160,
+      cornerOrientation: 'bottom-left',
+      trackThickness: 12,
+      borderThickness: 2,
+    })
+    const bottomRight = getCornerGaugeLayout({
+      value: null,
+      values: [],
+      width: 160,
+      height: 160,
+      cornerOrientation: 'bottom-right',
+      trackThickness: 12,
+      borderThickness: 2,
+    })
+
+    expect(bottomLeft.startPoint.x).toBeCloseTo(152)
+    expect(bottomLeft.startPoint.y).toBeCloseTo(80)
+    expect(bottomLeft.endPoint.x).toBeCloseTo(80)
+    expect(bottomLeft.endPoint.y).toBeCloseTo(8)
+    expect(bottomRight.startPoint.x).toBeCloseTo(8)
+    expect(bottomRight.startPoint.y).toBeCloseTo(80)
+    expect(bottomRight.endPoint.x).toBeCloseTo(80)
+    expect(bottomRight.endPoint.y).toBeCloseTo(8)
+    expect(bottomLeft.fillEndPoint.x).toBeLessThan(bottomLeft.startPoint.x)
+    expect(bottomRight.fillEndPoint.x).toBeGreaterThan(bottomRight.startPoint.x)
   })
 
   test('stacks the unit below a horizontally centered value with unconstrained offsets', () => {

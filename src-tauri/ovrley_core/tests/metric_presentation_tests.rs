@@ -80,6 +80,7 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         rotation: None,
         orientation: None,
         arc_angle: None,
+        corner_orientation: None,
         inner_widget_offset_x: None,
         inner_widget_offset_y: None,
         track_thickness: None,

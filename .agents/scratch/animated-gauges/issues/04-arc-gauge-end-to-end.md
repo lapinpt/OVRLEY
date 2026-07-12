@@ -38,21 +38,20 @@ NON-NEGOTIABLE: design-principles.md contains the blueprint for implementing ani
 
 ## Acceptance criteria
 
-- [ ] `arc_angle`, `inner_widget_offset_x`, `inner_widget_offset_y` fields added to `ValueConfig` with `#[serde(default)]`
-- [ ] Arc gauge static layer (empty arc + border + min/max labels + unit label) baked into cached `SkiaImage`
+- [x] `arc_angle`, `inner_widget_offset_x`, `inner_widget_offset_y` fields added to `ValueConfig` with `#[serde(default)]`
+- [x] Arc gauge static layer (empty arc + border + min/max labels + unit label) baked into cached `SkiaImage`
 - [ ] Arc gauge dynamic fill rendered per-frame with correct sweep direction (left-to-right)
-- [ ] Arc angle range enforced: 30°–360°
-- [ ] Arc radius correctly derived from widget bounding box minus padding
-- [ ] Rounded arc ends rendered via stroke-cap strategy in both Skia and SVG preview
-- [ ] Inner widget value text rendered per-frame inside arc
-- [ ] Inner widget unit label rendered in static layer (vertical stacking layout)
-- [ ] Inner widget positioned by x/y offset from arc center
-- [ ] There is no icon for this widget.
-- [ ] No auto-sizing or overlap clamping for inner widget
-- [ ] Frontend SVG preview renders arc gauge identically to Skia backend
-- [ ] Frontend editor controls for arc angle, inner widget offsets
-- [ ] Rust unit tests for arc angle geometry (start/end angles for various angles)
-- [ ] Frontend tests for arc geometry calculations and inner widget layout
+- [x] Arc angle range enforced: 30°–360°
+- [x] Arc radius correctly derived from widget bounding box minus padding
+- [x] Inner widget value text rendered per-frame inside arc
+- [x] Inner widget unit label rendered in static layer (vertical stacking layout)
+- [x] Inner widget positioned by x/y offset from arc center
+- [x] There is no icon for this widget.
+- [x] No auto-sizing or overlap clamping for inner widget
+- [x] Frontend SVG preview renders arc gauge identically to Skia backend
+- [x] Frontend editor controls for arc angle, inner widget offsets
+- [x] Rust unit tests for arc angle geometry (start/end angles for various angles)
+- [x] Frontend tests for arc geometry calculations and inner widget layout
 
 ## Blocked by
 

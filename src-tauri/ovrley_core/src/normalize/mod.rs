@@ -31,7 +31,9 @@ pub use raw::{
 };
 
 pub use arc_gauge::{
-    validate_arc_gauge, ValidatedArcGaugeWidget, MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES,
+    validate_arc_gauge, validate_corner_gauge, ValidatedArcGaugeWidget,
+    ValidatedCornerGaugeOrientation, CORNER_GAUGE_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES,
+    MIN_ARC_ANGLE_DEGREES,
 };
 pub use backdrop::{validate_backdrop, ValidatedBackdrop};
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
@@ -131,6 +133,10 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
             if value.display_type == DisplayType::Arc {
                 let value = value.with_promoted_display_variant("arc")?;
                 return validate_arc_gauge(value, idx).map(PreparedValue::ArcGauge);
+            }
+            if value.display_type == DisplayType::Corner {
+                let value = value.with_promoted_display_variant("corner")?;
+                return validate_corner_gauge(value, idx).map(PreparedValue::ArcGauge);
             }
             validate_value_widget(value, idx).map(PreparedValue::StandardText)
         })

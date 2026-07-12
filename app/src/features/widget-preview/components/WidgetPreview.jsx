@@ -46,6 +46,7 @@ const BOXED_PREVIEW_COMPONENTS = {
   heading_tape: OverlayHeadingWidget,
   linear: OverlayLinearGaugeWidget,
   arc: OverlayArcGaugeWidget,
+  corner: OverlayArcGaugeWidget,
 }
 
 /**

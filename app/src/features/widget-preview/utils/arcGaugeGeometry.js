@@ -41,6 +41,20 @@ export function getArcAngles(arcAngle) {
 }
 
 /**
+ * Returns the fixed 90° track opposite a bottom-corner gauge. Bottom-left
+ * deliberately fills from right to top; bottom-right fills left to top.
+ */
+export function getCornerGaugeAngles(cornerOrientation) {
+  switch (cornerOrientation) {
+    case 'bottom-right':
+      return { startAngle: 180, endAngle: 270, sweepAngle: 90 }
+    case 'bottom-left':
+    default:
+      return { startAngle: 0, endAngle: -90, sweepAngle: -90 }
+  }
+}
+
+/**
  * Returns a point on a screen-space circular arc.
  */
 export function getArcPoint(centerX, centerY, radius, angle) {
@@ -83,6 +97,34 @@ export function getArcFillPercentage(value, min, max) {
  * Produces the complete arc-track layout for SVG preview rendering.
  */
 export function getArcGaugeLayout({ value, values, width, height, arcAngle, trackThickness, borderThickness = 0 }) {
+  return getArcShapedGaugeLayout({
+    value,
+    values,
+    width,
+    height,
+    trackThickness,
+    borderThickness,
+    angles: getArcAngles(arcAngle),
+  })
+}
+
+/**
+ * Produces the fixed bottom-corner layout using the same radius, ranges, and
+ * labels as the configurable arc gauge.
+ */
+export function getCornerGaugeLayout({ value, values, width, height, cornerOrientation, trackThickness, borderThickness = 0 }) {
+  return getArcShapedGaugeLayout({
+    value,
+    values,
+    width,
+    height,
+    trackThickness,
+    borderThickness,
+    angles: getCornerGaugeAngles(cornerOrientation),
+  })
+}
+
+function getArcShapedGaugeLayout({ value, values, width, height, trackThickness, borderThickness, angles }) {
   const range = getArcGaugeRange(values)
   const hasValue = typeof value === 'number' && Number.isFinite(value)
   const fill = hasValue ? getArcFillPercentage(value, range.min, range.max) : 0.5
@@ -90,9 +132,8 @@ export function getArcGaugeLayout({ value, values, width, height, arcAngle, trac
   const centerY = finiteNumber(height) * 0.5
   const thickness = Math.max(0, finiteNumber(trackThickness))
   const border = Math.max(0, finiteNumber(borderThickness))
-  const angles = getArcAngles(arcAngle)
   const radius = getArcRadius({ width, height, trackThickness: thickness, borderThickness: border })
-  const fullCircle = angles.sweepAngle >= ARC_MAX_ANGLE_DEGREES
+  const fullCircle = Math.abs(angles.sweepAngle) >= ARC_MAX_ANGLE_DEGREES
   const labelAngles = fullCircle ? { min: 180, max: 0 } : { min: angles.startAngle, max: angles.endAngle }
 
   return {
@@ -114,17 +155,18 @@ export function getArcGaugeLayout({ value, values, width, height, arcAngle, trac
 }
 
 /**
- * Returns an SVG path for a partial clockwise arc. Full circles should use an
+ * Returns an SVG path for a partial arc. Full circles should use an
  * SVG `<circle>` instead because one arc command cannot represent them safely.
  */
 export function getArcSvgPath({ centerX, centerY, radius, startAngle, sweepAngle }) {
-  const safeSweep = Math.max(0, finiteNumber(sweepAngle))
-  if (safeSweep <= 0 || finiteNumber(radius) <= 0) return ''
+  const safeSweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(-ARC_MAX_ANGLE_DEGREES, finiteNumber(sweepAngle)))
+  if (safeSweep === 0 || finiteNumber(radius) <= 0) return ''
 
   const start = getArcPoint(centerX, centerY, radius, startAngle)
   const end = getArcPoint(centerX, centerY, radius, finiteNumber(startAngle) + safeSweep)
-  const largeArcFlag = safeSweep > 180 ? 1 : 0
-  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`
+  const largeArcFlag = Math.abs(safeSweep) > 180 ? 1 : 0
+  const sweepFlag = safeSweep > 0 ? 1 : 0
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y}`
 }
 
 const ARC_PATH_EPSILON = 0.001
@@ -259,23 +301,25 @@ export function getArcFilledTrackPath({
   startCornerRadius = cornerRadius,
   endCornerRadius = cornerRadius,
 }) {
-  const sweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(0, finiteNumber(sweepAngle)))
+  const sweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(-ARC_MAX_ANGLE_DEGREES, finiteNumber(sweepAngle)))
+  const sweepMagnitude = Math.abs(sweep)
+  const direction = Math.sign(sweep)
   const halfThickness = Math.max(0, finiteNumber(trackThickness)) * 0.5
   const outerRadius = finiteNumber(radius) + halfThickness
   const innerRadius = finiteNumber(radius) - halfThickness
-  // Zero is the only empty-fill value. A positive sweep can be shorter than
+  // Zero is the only empty-fill value. A non-zero sweep can be shorter than
   // the endpoint cap geometry, but it still represents a real value and the
   // cap supplies a visible, non-empty fill.
-  if (sweep <= 0 || halfThickness <= ARC_PATH_EPSILON || innerRadius <= ARC_PATH_EPSILON) return ''
+  if (sweepMagnitude <= 0 || halfThickness <= ARC_PATH_EPSILON || innerRadius <= ARC_PATH_EPSILON) return ''
 
   const start = finiteNumber(startAngle)
   const outerStart = arcPathPoint(centerX, centerY, outerRadius, start)
   const commands = [pathMove(outerStart)]
 
-  if (sweep >= ARC_MAX_ANGLE_DEGREES - ARC_PATH_EPSILON) {
-    appendCircularArc(commands, centerX, centerY, outerRadius, start, ARC_MAX_ANGLE_DEGREES)
+  if (sweepMagnitude >= ARC_MAX_ANGLE_DEGREES - ARC_PATH_EPSILON) {
+    appendCircularArc(commands, centerX, centerY, outerRadius, start, direction * ARC_MAX_ANGLE_DEGREES)
     commands.push('Z', pathMove(arcPathPoint(centerX, centerY, innerRadius, start)))
-    appendCircularArc(commands, centerX, centerY, innerRadius, start, -ARC_MAX_ANGLE_DEGREES)
+    appendCircularArc(commands, centerX, centerY, innerRadius, start, -direction * ARC_MAX_ANGLE_DEGREES)
     commands.push('Z')
     return commands.join(' ')
   }
@@ -286,10 +330,25 @@ export function getArcFilledTrackPath({
   const startFilletRadius = Math.min(halfThickness, Math.max(0, finiteNumber(startCornerRadius)))
   const endFilletRadius = Math.min(halfThickness, Math.max(0, finiteNumber(endCornerRadius)))
   appendCircularArc(commands, centerX, centerY, outerRadius, start, sweep)
-  appendOuterToInnerFillet(commands, endCenter, arcPathTangent(end), arcPathNormal(end), halfThickness, endFilletRadius)
+  const endTangent = arcPathTangent(end)
+  appendOuterToInnerFillet(
+    commands,
+    endCenter,
+    { x: endTangent.x * direction, y: endTangent.y * direction },
+    arcPathNormal(end),
+    halfThickness,
+    endFilletRadius,
+  )
   appendCircularArc(commands, centerX, centerY, innerRadius, end, -sweep)
   const startTangent = arcPathTangent(start)
-  appendInnerToOuterFillet(commands, startCenter, { x: -startTangent.x, y: -startTangent.y }, arcPathNormal(start), halfThickness, startFilletRadius)
+  appendInnerToOuterFillet(
+    commands,
+    startCenter,
+    { x: -startTangent.x * direction, y: -startTangent.y * direction },
+    arcPathNormal(start),
+    halfThickness,
+    startFilletRadius,
+  )
   commands.push('Z')
   return commands.join(' ')
 }
@@ -307,26 +366,28 @@ function arcCapAngle(radius, cornerRadius) {
  */
 export function getArcFilledTrackRevealSpec({ radius, startAngle, sweepAngle, startCornerRadius = 0, endCornerRadius = startCornerRadius, fill }) {
   const safeRadius = Math.max(0, finiteNumber(radius))
-  const safeSweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(0, finiteNumber(sweepAngle)))
+  const safeSweep = Math.min(ARC_MAX_ANGLE_DEGREES, Math.max(-ARC_MAX_ANGLE_DEGREES, finiteNumber(sweepAngle)))
+  const sweepMagnitude = Math.abs(safeSweep)
+  const direction = Math.sign(safeSweep)
   const fraction = Math.min(1, Math.max(0, finiteNumber(fill)))
-  if (safeRadius <= ARC_PATH_EPSILON || safeSweep <= 0 || fraction <= 0) return null
+  if (safeRadius <= ARC_PATH_EPSILON || sweepMagnitude <= 0 || fraction <= 0) return null
 
-  const fullCircle = safeSweep >= ARC_MAX_ANGLE_DEGREES - ARC_PATH_EPSILON
+  const fullCircle = sweepMagnitude >= ARC_MAX_ANGLE_DEGREES - ARC_PATH_EPSILON
   const startRadius = fullCircle ? 0 : Math.max(0, finiteNumber(startCornerRadius))
   const endRadius = fullCircle ? 0 : Math.max(0, finiteNumber(endCornerRadius))
   const startCapAngle = arcCapAngle(safeRadius, startRadius)
   const endCapAngle = arcCapAngle(safeRadius, endRadius)
-  const revealedSweep = (safeSweep + startCapAngle + endCapAngle) * fraction
+  const revealedSweep = (sweepMagnitude + startCapAngle + endCapAngle) * fraction
   const availableEndCapLength = safeRadius * ((revealedSweep * Math.PI) / 180)
   const revealedEndRadius = Math.min(endRadius, availableEndCapLength)
   const revealedEndCapAngle = arcCapAngle(safeRadius, revealedEndRadius)
 
   return {
-    startAngle: finiteNumber(startAngle) - startCapAngle,
-    // Retain a nonzero body for a positive reveal whose rounded end consumes
+    startAngle: finiteNumber(startAngle) - direction * startCapAngle,
+    // Retain a nonzero body for a revealed track whose rounded end consumes
     // all available length. Its size is below visual precision but keeps the
     // clip path valid in both SVG and Skia.
-    sweepAngle: Math.max(ARC_PATH_EPSILON, revealedSweep - revealedEndCapAngle),
+    sweepAngle: direction * Math.max(ARC_PATH_EPSILON, revealedSweep - revealedEndCapAngle),
     startCornerRadius: 0,
     endCornerRadius: revealedEndRadius,
   }

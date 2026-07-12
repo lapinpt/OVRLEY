@@ -136,6 +136,37 @@ describe('OverlayArcGaugeWidget', () => {
     expect(svg.querySelector('g[color]')).toBeNull()
   })
 
+  test('renders the corner display type with its own preview identity and bottom-right sweep', () => {
+    render(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ display_type: 'corner', corner_orientation: 'bottom-right' })}
+        activity={activity}
+        previewSecond={0.5}
+        globalScale={1}
+      />,
+    )
+
+    const svg = screen.getByTestId('corner-gauge-preview')
+    expect(svg).toBeInTheDocument()
+    expect(screen.getByTestId('corner-gauge-filled-track').getAttribute('d')).toContain('C')
+    expect(screen.getByText('180')).toBeInTheDocument()
+    expect(screen.getByText('KM/H')).toBeInTheDocument()
+  })
+
+  test('renders the reversed bottom-left corner fill from the right track endpoint', () => {
+    render(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ display_type: 'corner', corner_orientation: 'bottom-left' })}
+        activity={activity}
+        previewSecond={0.5}
+        globalScale={1}
+      />,
+    )
+
+    expect(screen.getByTestId('corner-gauge-filled-track')).toHaveAttribute('fill', '#40e0d0')
+    expect(screen.getByTestId('corner-gauge-fill-clip').getAttribute('d')).toContain('C')
+  })
+
   test('does not render a track shadow without a border', () => {
     render(
       <OverlayArcGaugeWidget

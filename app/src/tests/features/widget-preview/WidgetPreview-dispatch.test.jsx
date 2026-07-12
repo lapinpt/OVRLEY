@@ -142,4 +142,18 @@ describe('WidgetPreview dispatch by display_type', () => {
     )
     expect(getByTestId('arc-gauge-renderer')).toBeTruthy()
   })
+
+  test('corner display_type uses the shared arc-shaped gauge renderer', () => {
+    const { getByTestId } = render(
+      <WidgetPreview
+        widget={{
+          type: 'speed',
+          category: 'values',
+          data: { display_type: 'corner', x: 0, y: 0, display_variants: { corner: { width: 160, height: 160 } } },
+        }}
+        activity={ACTIVITY}
+      />,
+    )
+    expect(getByTestId('arc-gauge-renderer')).toHaveAttribute('data-display-type', 'corner')
+  })
 })

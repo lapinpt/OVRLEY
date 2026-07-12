@@ -303,7 +303,7 @@ describe('initDisplayVariant', () => {
 
     expect(result.display_variants.linear).toBeDefined()
     expect(result.display_variants.linear.width).toBe(200)
-    expect(result.display_variants.linear.height).toBe(30)
+    expect(result.display_variants.linear.height).toBe(24)
     expect(result.display_variants.linear.rotation).toBe(0)
     expect(result.display_variants.linear.orientation).toBe('horizontal')
     expect(result.display_variants.linear.track_fill_flat).toBe(true)

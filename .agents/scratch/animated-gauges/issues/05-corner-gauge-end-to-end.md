@@ -8,7 +8,7 @@ Status: ready-for-agent
 
 Implement the corner gauge display type end-to-end: Skia backend rendering with static/dynamic layer split, React frontend SVG preview, and widget editor controls. This slice reuses all arc rendering and inner widget layout infrastructure from the arc gauge slice.
 
-NON-NEGOTIABLE: design-principles.md contains the blueprint for implementing animated gauges. The architectural principles and design decisions in that document are non-negotiable and must be followed, otherwise the code will be rejected. The rendering DETAILS may deviate and you must always study LinearGaugeRenderer.jsx and linear_gauge.rs for reference (e.g. borders, corner rounding etc) but the principles and architecture are non-negotiable.
+NON-NEGOTIABLE: design-principles.md contains the blueprint for implementing animated gauges. The architectural principles and design decisions in that document are non-negotiable and must be followed, otherwise the code will be rejected. The rendering DETAILS may deviate and you must always study ArcGaugeRenderer.jsx and ovrley_core/src/render/widgets/gauges/arc for reference. The corner gauge is essentially a 90° arc gauge with a fixed angle and two possible orientations (bottom-left or bottom-right). The inner widget layout is identical to the arc gauge, and the corner gauge reuses the same inner widget layout code.
 
 **Backend behavior:**
 

@@ -69,13 +69,13 @@ pub fn draw_metric_presentation(
             frame_index,
             frame_profiler,
         ),
-        DisplayType::Arc => draw_arc_presentation(
+        DisplayType::Arc | DisplayType::Corner => draw_arc_presentation(
             canvas,
             presentation_caches.get(&value_idx),
             frame_index,
             frame_profiler,
         ),
-        DisplayType::Bars | DisplayType::Corner => None,
+        DisplayType::Bars => None,
     }
 }
 

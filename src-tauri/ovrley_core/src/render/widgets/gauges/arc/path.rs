@@ -3,7 +3,9 @@
 //! This deliberately does not generalize linear gauge geometry: arcs require
 //! circular offset curves and endpoint fillets, while linear gauges use RRects.
 
-use crate::normalize::{MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES};
+use crate::normalize::{
+    ValidatedCornerGaugeOrientation, MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES,
+};
 use skia_safe::{Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType, Point};
 
 const PATH_EPSILON: f32 = 0.001;
@@ -58,13 +60,17 @@ impl ArcTrackSpec {
     /// partial track as a full-sized dot.
     fn reveal_clip(self, fill01: f32) -> Option<Self> {
         let fill = fill01.clamp(0.0, 1.0);
-        let sweep = self.sweep_angle.clamp(0.0, MAX_ARC_ANGLE_DEGREES);
+        let sweep = self
+            .sweep_angle
+            .clamp(-MAX_ARC_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES);
+        let sweep_magnitude = sweep.abs();
+        let direction = sweep.signum();
         let radius = self.geometry.radius.max(0.0);
-        if fill <= 0.0 || sweep <= 0.0 || radius <= PATH_EPSILON {
+        if fill <= 0.0 || sweep_magnitude <= 0.0 || radius <= PATH_EPSILON {
             return None;
         }
 
-        let full_circle = sweep >= MAX_ARC_ANGLE_DEGREES - PATH_EPSILON;
+        let full_circle = sweep_magnitude >= MAX_ARC_ANGLE_DEGREES - PATH_EPSILON;
         let half_thickness = self.thickness.max(0.0) * 0.5;
         let start_corner_radius = if full_circle {
             0.0
@@ -78,7 +84,7 @@ impl ArcTrackSpec {
         };
         let start_cap_angle = arc_cap_angle_degrees(radius, start_corner_radius);
         let end_cap_angle = arc_cap_angle_degrees(radius, end_corner_radius);
-        let revealed_sweep = (sweep + start_cap_angle + end_cap_angle) * fill;
+        let revealed_sweep = (sweep_magnitude + start_cap_angle + end_cap_angle) * fill;
         let revealed_end_corner_radius =
             end_corner_radius.min(radius * revealed_sweep.to_radians());
         let revealed_end_cap_angle = arc_cap_angle_degrees(radius, revealed_end_corner_radius);
@@ -86,11 +92,11 @@ impl ArcTrackSpec {
 
         Some(Self {
             geometry: ArcGaugeGeometry {
-                start_angle: self.geometry.start_angle - start_cap_angle,
-                sweep_angle: body_sweep,
+                start_angle: self.geometry.start_angle - direction * start_cap_angle,
+                sweep_angle: direction * body_sweep,
                 ..self.geometry
             },
-            sweep_angle: body_sweep,
+            sweep_angle: direction * body_sweep,
             thickness: self.thickness,
             start_corner_radius: 0.0,
             end_corner_radius: revealed_end_corner_radius,
@@ -109,14 +115,19 @@ impl ArcTrackSpec {
     }
 
     fn filled_path(self) -> Option<Path> {
-        let sweep = self.sweep_angle.clamp(0.0, MAX_ARC_ANGLE_DEGREES);
+        let sweep = self
+            .sweep_angle
+            .clamp(-MAX_ARC_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES);
+        let sweep_magnitude = sweep.abs();
+        let direction = sweep.signum();
         let half_thickness = self.thickness.max(0.0) * 0.5;
         let outer_radius = self.geometry.radius + half_thickness;
         let inner_radius = self.geometry.radius - half_thickness;
-        // A zero sweep is an empty fill, but every positive sweep represents a
+        // A zero sweep is an empty fill, but every non-zero sweep represents a
         // real value. In particular, a short rounded fill is a cap rather than
         // an empty track, so do not discard it based on a geometric epsilon.
-        if sweep <= 0.0 || half_thickness <= PATH_EPSILON || inner_radius <= PATH_EPSILON {
+        if sweep_magnitude <= 0.0 || half_thickness <= PATH_EPSILON || inner_radius <= PATH_EPSILON
+        {
             return None;
         }
 
@@ -129,14 +140,14 @@ impl ArcTrackSpec {
             start,
         ));
 
-        if sweep >= MAX_ARC_ANGLE_DEGREES - PATH_EPSILON {
+        if sweep_magnitude >= MAX_ARC_ANGLE_DEGREES - PATH_EPSILON {
             append_circular_arc(
                 &mut path,
                 self.geometry.center_x,
                 self.geometry.center_y,
                 outer_radius,
                 start,
-                MAX_ARC_ANGLE_DEGREES,
+                direction * MAX_ARC_ANGLE_DEGREES,
             );
             path.close();
             path.move_to(arc_point(
@@ -151,7 +162,7 @@ impl ArcTrackSpec {
                 self.geometry.center_y,
                 inner_radius,
                 start,
-                -MAX_ARC_ANGLE_DEGREES,
+                -direction * MAX_ARC_ANGLE_DEGREES,
             );
             path.close();
             return Some(path.detach());
@@ -176,7 +187,7 @@ impl ArcTrackSpec {
                 self.geometry.radius,
                 end,
             ),
-            path_tangent(end),
+            directed_path_tangent(end, direction),
             path_normal(end),
             half_thickness,
             end_fillet_radius,
@@ -189,7 +200,7 @@ impl ArcTrackSpec {
             end,
             -sweep,
         );
-        let start_tangent = path_tangent(start);
+        let start_tangent = directed_path_tangent(start, direction);
         append_inner_to_outer_fillet(
             &mut path,
             arc_point(
@@ -243,6 +254,18 @@ pub fn arc_start_end_angles(arc_angle: f32) -> (f32, f32) {
     (270.0 - angle * 0.5, 270.0 + angle * 0.5)
 }
 
+/// Returns the fixed 90° track angles opposite a supported bottom corner.
+///
+/// A bottom-left gauge uses the top-right track and fills from its right edge
+/// toward the top. A bottom-right gauge uses the top-left track and fills from
+/// left to top.
+pub fn corner_start_end_angles(orientation: ValidatedCornerGaugeOrientation) -> (f32, f32) {
+    match orientation {
+        ValidatedCornerGaugeOrientation::BottomLeft => (0.0, -90.0),
+        ValidatedCornerGaugeOrientation::BottomRight => (180.0, 270.0),
+    }
+}
+
 /// Calculates an arc radius that keeps the filled track and its border inside
 /// the widget's smaller dimension.
 pub fn arc_radius(width: f32, height: f32, track_thickness: f32, border_thickness: f32) -> f32 {
@@ -276,6 +299,26 @@ pub fn arc_gauge_geometry(
     border_thickness: f32,
 ) -> ArcGaugeGeometry {
     let (start_angle, end_angle) = arc_start_end_angles(arc_angle);
+    ArcGaugeGeometry {
+        center_x: width * 0.5,
+        center_y: height * 0.5,
+        radius: arc_radius(width, height, track_thickness, border_thickness),
+        start_angle,
+        sweep_angle: end_angle - start_angle,
+    }
+}
+
+/// Builds the fixed 90° geometry for a bottom-corner gauge. Like a normal arc
+/// gauge, the radius is constrained by the widget bounds so the shared inner
+/// value layout remains centred in the frame.
+pub fn corner_gauge_geometry(
+    width: f32,
+    height: f32,
+    orientation: ValidatedCornerGaugeOrientation,
+    track_thickness: f32,
+    border_thickness: f32,
+) -> ArcGaugeGeometry {
+    let (start_angle, end_angle) = corner_start_end_angles(orientation);
     ArcGaugeGeometry {
         center_x: width * 0.5,
         center_y: height * 0.5,
@@ -427,6 +470,11 @@ fn append_inner_to_outer_fillet(
 fn path_tangent(angle: f32) -> Point {
     let radians = angle.to_radians();
     Point::new(-radians.sin(), radians.cos())
+}
+
+fn directed_path_tangent(angle: f32, direction: f32) -> Point {
+    let tangent = path_tangent(angle);
+    Point::new(tangent.x * direction, tangent.y * direction)
 }
 
 fn path_normal(angle: f32) -> Point {
