@@ -137,17 +137,15 @@ export function getArcBarGeometry({ radius, sweepAngle, bar_count, bar_gap }) {
 }
 
 export function getArcBarSegments(config) {
-  const { radius, startAngle, sweepAngle, borderThickness, cornerRadius } = config
+  const { radius, startAngle, sweepAngle } = config
   const direction = Math.sign(sweepAngle)
   const geometry = getArcBarGeometry(config)
-  const capExtent = Math.min(cornerRadius + borderThickness, geometry.extent * 0.5)
   const segments = []
   for (let index = 0; index < geometry.count; index += 1) {
-    const bodyStart = index * (geometry.extent + geometry.gap) + capExtent
-    const bodyExtent = Math.max(0.001, geometry.extent - capExtent * 2)
+    const segmentStart = index * (geometry.extent + geometry.gap)
     segments.push({
-      startAngle: startAngle + (direction * ((bodyStart / radius) * 180)) / Math.PI,
-      sweepAngle: (direction * ((bodyExtent / radius) * 180)) / Math.PI,
+      startAngle: startAngle + (direction * ((segmentStart / radius) * 180)) / Math.PI,
+      sweepAngle: (direction * ((geometry.extent / radius) * 180)) / Math.PI,
     })
   }
   return { ...geometry, segments }

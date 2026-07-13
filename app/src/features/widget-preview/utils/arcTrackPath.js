@@ -5,6 +5,7 @@ import {
   getTranslatedTrackCapPath,
   getTranslatedTrackCapReveal,
   pathCubic,
+  pathLine,
   pathMove,
   TRACK_PATH_EPSILON,
 } from './trackPathGeometry'
@@ -49,6 +50,106 @@ function appendCircularArc(commands, centerX, centerY, radius, startAngle, sweep
     const endControl = { x: end.x - endTangent.x * controlDistance, y: end.y - endTangent.y * controlDistance }
     commands.push(pathCubic(startControl, endControl, end))
   }
+}
+
+/** Returns the largest fillet that fits within an annular sector. */
+function getRoundedSegmentCornerRadius(outerRadius, innerRadius, sweepMagnitude, requestedRadius) {
+  const halfSweepRadians = (Math.min(sweepMagnitude, 180) * Math.PI) / 360
+  const halfSweepSine = Math.sin(halfSweepRadians)
+  const outerAngularLimit = (outerRadius * halfSweepSine) / (1 + halfSweepSine)
+  const innerAngularLimit = halfSweepSine === 1 ? Number.POSITIVE_INFINITY : (innerRadius * halfSweepSine) / (1 - halfSweepSine)
+  return Math.min(requestedRadius, (outerRadius - innerRadius) * 0.5, outerAngularLimit, innerAngularLimit)
+}
+
+function getCircularArc(centerX, centerY, radius, startAngle, sweepAngle) {
+  return { centerX, centerY, radius, startAngle, sweepAngle }
+}
+
+function appendArc(commands, arc) {
+  appendCircularArc(commands, arc.centerX, arc.centerY, arc.radius, arc.startAngle, arc.sweepAngle)
+}
+
+function getRoundedSegmentPathGeometry({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, cornerRadius }) {
+  const sweepMagnitude = Math.abs(sweepAngle)
+  const direction = Math.sign(sweepAngle)
+  const halfThickness = trackThickness * 0.5
+  const outerRadius = radius + halfThickness
+  const innerRadius = radius - halfThickness
+  const filletRadius = getRoundedSegmentCornerRadius(outerRadius, innerRadius, sweepMagnitude, cornerRadius)
+  const endAngle = startAngle + sweepAngle
+  const outerFilletCenterRadius = outerRadius - filletRadius
+  const innerFilletCenterRadius = innerRadius + filletRadius
+  const outerInsetAngle = (Math.asin(filletRadius / outerFilletCenterRadius) * 180) / Math.PI
+  const innerInsetAngle = (Math.asin(filletRadius / innerFilletCenterRadius) * 180) / Math.PI
+  const outerSideRadius = Math.sqrt(outerFilletCenterRadius ** 2 - filletRadius ** 2)
+  const innerSideRadius = Math.sqrt(innerFilletCenterRadius ** 2 - filletRadius ** 2)
+  const outerStartAngle = startAngle + direction * outerInsetAngle
+  const outerEndAngle = endAngle - direction * outerInsetAngle
+  const innerEndAngle = endAngle - direction * innerInsetAngle
+  const innerStartAngle = startAngle + direction * innerInsetAngle
+  const endOuterFilletCenter = getArcPoint(centerX, centerY, outerFilletCenterRadius, outerEndAngle)
+  const endInnerFilletCenter = getArcPoint(centerX, centerY, innerFilletCenterRadius, innerEndAngle)
+  const startInnerFilletCenter = getArcPoint(centerX, centerY, innerFilletCenterRadius, innerStartAngle)
+  const startOuterFilletCenter = getArcPoint(centerX, centerY, outerFilletCenterRadius, outerStartAngle)
+
+  return {
+    outerArc: getCircularArc(centerX, centerY, outerRadius, outerStartAngle, direction * (sweepMagnitude - outerInsetAngle * 2)),
+    endOuterFillet: getCircularArc(endOuterFilletCenter.x, endOuterFilletCenter.y, filletRadius, outerEndAngle, direction * (90 + outerInsetAngle)),
+    endInnerSide: getArcPoint(centerX, centerY, innerSideRadius, endAngle),
+    endInnerFillet: getCircularArc(
+      endInnerFilletCenter.x,
+      endInnerFilletCenter.y,
+      filletRadius,
+      endAngle + direction * 90,
+      direction * (90 - innerInsetAngle),
+    ),
+    innerArc: getCircularArc(centerX, centerY, innerRadius, innerEndAngle, -direction * (sweepMagnitude - innerInsetAngle * 2)),
+    startInnerFillet: getCircularArc(
+      startInnerFilletCenter.x,
+      startInnerFilletCenter.y,
+      filletRadius,
+      innerStartAngle + direction * 180,
+      direction * (90 - innerInsetAngle),
+    ),
+    startOuterSide: getArcPoint(centerX, centerY, outerSideRadius, startAngle),
+    startOuterFillet: getCircularArc(
+      startOuterFilletCenter.x,
+      startOuterFilletCenter.y,
+      filletRadius,
+      startAngle - direction * 90,
+      direction * (90 + outerInsetAngle),
+    ),
+  }
+}
+
+/**
+ * Creates a rounded annular sector without changing its radial side boundaries.
+ * The fillets consume the four corners inward instead of extending linear caps
+ * beyond a shortened centerline arc.
+ * @param {object} geometry - Arc centerline, thickness, and corner geometry.
+ * @returns {string} Closed SVG path.
+ */
+export function getArcRoundedSegmentPath({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, cornerRadius = 0 }) {
+  const sweepMagnitude = Math.abs(sweepAngle)
+  if (sweepMagnitude === 0) return ''
+  if (cornerRadius <= TRACK_PATH_EPSILON || sweepMagnitude >= ARC_MAX_ANGLE_DEGREES - TRACK_PATH_EPSILON) {
+    return getArcFilledTrackPath({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, cornerRadius: 0 })
+  }
+
+  const geometry = getRoundedSegmentPathGeometry({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, cornerRadius })
+  const commands = [
+    pathMove(getArcPoint(geometry.outerArc.centerX, geometry.outerArc.centerY, geometry.outerArc.radius, geometry.outerArc.startAngle)),
+  ]
+  appendArc(commands, geometry.outerArc)
+  appendArc(commands, geometry.endOuterFillet)
+  commands.push(pathLine(geometry.endInnerSide))
+  appendArc(commands, geometry.endInnerFillet)
+  appendArc(commands, geometry.innerArc)
+  appendArc(commands, geometry.startInnerFillet)
+  commands.push(pathLine(geometry.startOuterSide))
+  appendArc(commands, geometry.startOuterFillet)
+  commands.push('Z')
+  return commands.join(' ')
 }
 
 /** Converts arc geometry into the shared translated-cap coordinate frame. */

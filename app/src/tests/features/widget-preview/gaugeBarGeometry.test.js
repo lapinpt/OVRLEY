@@ -90,4 +90,13 @@ describe('gaugeBarGeometry', () => {
     expect(bars.segments).toHaveLength(8)
     expect(bars.segments.every((segment) => Math.abs(segment.sweepAngle) < 360)).toBe(true)
   })
+
+  test('keeps segmented arc footprints independent of corner radius', () => {
+    const shared = { radius: 50, startAngle: 180, sweepAngle: 180, trackThickness: 12, borderThickness: 2, bar_count: 8, bar_gap: 4 }
+    const square = getArcBarSegments({ ...shared, cornerRadius: 0 })
+    const rounded = getArcBarSegments({ ...shared, cornerRadius: 6 })
+
+    expect(rounded.segments).toEqual(square.segments)
+    expect(rounded.segments[0].sweepAngle).toBeGreaterThan(0.001)
+  })
 })

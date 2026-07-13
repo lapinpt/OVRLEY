@@ -1,6 +1,6 @@
 /** Arc-shaped gauge SVG preview. */
 
-import { getArcFilledTrackPath } from '../utils/arcTrackPath'
+import { getArcFilledTrackPath, getArcRoundedSegmentPath } from '../utils/arcTrackPath'
 import { useArcGaugePreviewPresentation } from '../hooks/useArcGaugePreviewPresentation'
 import { PreviewSvgShadowBlurFilter, PreviewSvgText } from './previewSvgComponents'
 
@@ -16,7 +16,16 @@ function ArcTrackPath({ fill, fillOpacity, dataTestId, ...geometry }) {
 function ArcSegmentPaths({ geometries, dataTestId, ...paint }) {
   const paths = []
   for (let index = 0; index < geometries.length; index += 1) {
-    paths.push(<ArcTrackPath key={index} {...geometries[index]} {...paint} dataTestId={dataTestId} />)
+    paths.push(
+      <path
+        key={index}
+        data-testid={dataTestId}
+        d={getArcRoundedSegmentPath({ ...geometries[index], ...paint })}
+        fill={paint.fill}
+        fillOpacity={paint.fillOpacity}
+        fillRule="evenodd"
+      />,
+    )
   }
   return paths
 }
@@ -26,8 +35,18 @@ function ArcSegmentMaskPaths({ geometries, outerStrokeWidth, outerCornerRadius, 
   for (let index = 0; index < geometries.length; index += 1) {
     paths.push(
       <g key={index}>
-        <ArcTrackPath {...geometries[index]} trackThickness={outerStrokeWidth} cornerRadius={outerCornerRadius} fill="#ffffff" fillOpacity={1} />
-        <ArcTrackPath {...geometries[index]} cornerRadius={innerCornerRadius} fill="#000000" fillOpacity={1} />
+        <path
+          d={getArcRoundedSegmentPath({ ...geometries[index], trackThickness: outerStrokeWidth, cornerRadius: outerCornerRadius })}
+          fill="#ffffff"
+          fillOpacity={1}
+          fillRule="evenodd"
+        />
+        <path
+          d={getArcRoundedSegmentPath({ ...geometries[index], cornerRadius: innerCornerRadius })}
+          fill="#000000"
+          fillOpacity={1}
+          fillRule="evenodd"
+        />
       </g>,
     )
   }

@@ -23,7 +23,7 @@ export function pathMove(point) {
   return `M ${formatPathNumber(point.x)} ${formatPathNumber(point.y)}`
 }
 
-function pathLine(point) {
+export function pathLine(point) {
   return `L ${formatPathNumber(point.x)} ${formatPathNumber(point.y)}`
 }
 

@@ -43,6 +43,27 @@ pub(crate) struct ArcTrackSpec {
     pub end_corner_radius: f32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct CircularArc {
+    center_x: f32,
+    center_y: f32,
+    radius: f32,
+    start_angle: f32,
+    sweep_angle: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RoundedSegmentPathGeometry {
+    outer_arc: CircularArc,
+    end_outer_fillet: CircularArc,
+    end_inner_side: Point,
+    end_inner_fillet: CircularArc,
+    inner_arc: CircularArc,
+    start_inner_fillet: CircularArc,
+    start_outer_side: Point,
+    start_outer_fillet: CircularArc,
+}
+
 /// Reveal clip geometry produced by [`ArcTrackSpec::reveal_clip`]. Below the
 /// low-fill threshold the clip is a translated rounded rectangle whose
 /// intersection with the annular source track grows from its start edge
@@ -304,6 +325,20 @@ pub(crate) fn draw_arc_track(canvas: &Canvas, spec: ArcTrackSpec, paint: &Paint)
     }
 }
 
+/// Draws one segmented bar as a rounded annular sector. Its radial boundaries
+/// stay fixed while the four fillets consume the corners inward.
+pub(crate) fn draw_arc_segment(
+    canvas: &Canvas,
+    geometry: ArcGaugeGeometry,
+    thickness: f32,
+    corner_radius: f32,
+    paint: &Paint,
+) {
+    if let Some(path) = rounded_segment_path(geometry, thickness, corner_radius) {
+        canvas.draw_path(&path, paint);
+    }
+}
+
 /// Reveals a full source track from its visible start edge through `fill01`.
 /// The source preserves its fixed start geometry; the clip controls only how
 /// much of that source is visible.
@@ -360,6 +395,197 @@ pub fn arc_point(center_x: f32, center_y: f32, radius: f32, angle: f32) -> Point
         center_x + radius * radians.cos(),
         center_y + radius * radians.sin(),
     )
+}
+
+fn circular_arc(
+    center_x: f32,
+    center_y: f32,
+    radius: f32,
+    start_angle: f32,
+    sweep_angle: f32,
+) -> CircularArc {
+    CircularArc {
+        center_x,
+        center_y,
+        radius,
+        start_angle,
+        sweep_angle,
+    }
+}
+
+fn append_arc(path: &mut PathBuilder, arc: CircularArc) {
+    append_circular_arc(
+        path,
+        arc.center_x,
+        arc.center_y,
+        arc.radius,
+        arc.start_angle,
+        arc.sweep_angle,
+    );
+}
+
+fn rounded_segment_corner_radius(
+    outer_radius: f32,
+    inner_radius: f32,
+    sweep_magnitude: f32,
+    requested_radius: f32,
+) -> f32 {
+    let half_sweep_sine = (sweep_magnitude.min(180.0) * 0.5).to_radians().sin();
+    let outer_angular_limit = outer_radius * half_sweep_sine / (1.0 + half_sweep_sine);
+    let inner_angular_limit = if half_sweep_sine == 1.0 {
+        f32::INFINITY
+    } else {
+        inner_radius * half_sweep_sine / (1.0 - half_sweep_sine)
+    };
+    requested_radius
+        .min((outer_radius - inner_radius) * 0.5)
+        .min(outer_angular_limit)
+        .min(inner_angular_limit)
+}
+
+fn rounded_segment_path_geometry(
+    geometry: ArcGaugeGeometry,
+    track_thickness: f32,
+    corner_radius: f32,
+) -> RoundedSegmentPathGeometry {
+    let sweep_magnitude = geometry.sweep_angle.abs();
+    let direction = geometry.sweep_angle.signum();
+    let half_thickness = track_thickness * 0.5;
+    let outer_radius = geometry.radius + half_thickness;
+    let inner_radius = geometry.radius - half_thickness;
+    let fillet_radius =
+        rounded_segment_corner_radius(outer_radius, inner_radius, sweep_magnitude, corner_radius);
+    let end_angle = geometry.start_angle + geometry.sweep_angle;
+    let outer_fillet_center_radius = outer_radius - fillet_radius;
+    let inner_fillet_center_radius = inner_radius + fillet_radius;
+    let outer_inset_angle = (fillet_radius / outer_fillet_center_radius)
+        .asin()
+        .to_degrees();
+    let inner_inset_angle = (fillet_radius / inner_fillet_center_radius)
+        .asin()
+        .to_degrees();
+    let outer_side_radius = (outer_fillet_center_radius.powi(2) - fillet_radius.powi(2)).sqrt();
+    let inner_side_radius = (inner_fillet_center_radius.powi(2) - fillet_radius.powi(2)).sqrt();
+    let outer_start_angle = geometry.start_angle + direction * outer_inset_angle;
+    let outer_end_angle = end_angle - direction * outer_inset_angle;
+    let inner_end_angle = end_angle - direction * inner_inset_angle;
+    let inner_start_angle = geometry.start_angle + direction * inner_inset_angle;
+    let end_outer_fillet_center = arc_point(
+        geometry.center_x,
+        geometry.center_y,
+        outer_fillet_center_radius,
+        outer_end_angle,
+    );
+    let end_inner_fillet_center = arc_point(
+        geometry.center_x,
+        geometry.center_y,
+        inner_fillet_center_radius,
+        inner_end_angle,
+    );
+    let start_inner_fillet_center = arc_point(
+        geometry.center_x,
+        geometry.center_y,
+        inner_fillet_center_radius,
+        inner_start_angle,
+    );
+    let start_outer_fillet_center = arc_point(
+        geometry.center_x,
+        geometry.center_y,
+        outer_fillet_center_radius,
+        outer_start_angle,
+    );
+
+    RoundedSegmentPathGeometry {
+        outer_arc: circular_arc(
+            geometry.center_x,
+            geometry.center_y,
+            outer_radius,
+            outer_start_angle,
+            direction * (sweep_magnitude - outer_inset_angle * 2.0),
+        ),
+        end_outer_fillet: circular_arc(
+            end_outer_fillet_center.x,
+            end_outer_fillet_center.y,
+            fillet_radius,
+            outer_end_angle,
+            direction * (90.0 + outer_inset_angle),
+        ),
+        end_inner_side: arc_point(
+            geometry.center_x,
+            geometry.center_y,
+            inner_side_radius,
+            end_angle,
+        ),
+        end_inner_fillet: circular_arc(
+            end_inner_fillet_center.x,
+            end_inner_fillet_center.y,
+            fillet_radius,
+            end_angle + direction * 90.0,
+            direction * (90.0 - inner_inset_angle),
+        ),
+        inner_arc: circular_arc(
+            geometry.center_x,
+            geometry.center_y,
+            inner_radius,
+            inner_end_angle,
+            -direction * (sweep_magnitude - inner_inset_angle * 2.0),
+        ),
+        start_inner_fillet: circular_arc(
+            start_inner_fillet_center.x,
+            start_inner_fillet_center.y,
+            fillet_radius,
+            inner_start_angle + direction * 180.0,
+            direction * (90.0 - inner_inset_angle),
+        ),
+        start_outer_side: arc_point(
+            geometry.center_x,
+            geometry.center_y,
+            outer_side_radius,
+            geometry.start_angle,
+        ),
+        start_outer_fillet: circular_arc(
+            start_outer_fillet_center.x,
+            start_outer_fillet_center.y,
+            fillet_radius,
+            geometry.start_angle - direction * 90.0,
+            direction * (90.0 + outer_inset_angle),
+        ),
+    }
+}
+
+fn rounded_segment_path(
+    geometry: ArcGaugeGeometry,
+    track_thickness: f32,
+    corner_radius: f32,
+) -> Option<Path> {
+    let sweep_magnitude = geometry.sweep_angle.abs();
+    if sweep_magnitude == 0.0 {
+        return None;
+    }
+    if corner_radius <= TRACK_PATH_EPSILON
+        || sweep_magnitude >= MAX_ARC_ANGLE_DEGREES - TRACK_PATH_EPSILON
+    {
+        return ArcTrackSpec::full(geometry, track_thickness, 0.0).filled_path();
+    }
+
+    let contour = rounded_segment_path_geometry(geometry, track_thickness, corner_radius);
+    let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
+    path.move_to(arc_point(
+        contour.outer_arc.center_x,
+        contour.outer_arc.center_y,
+        contour.outer_arc.radius,
+        contour.outer_arc.start_angle,
+    ));
+    append_arc(&mut path, contour.outer_arc);
+    append_arc(&mut path, contour.end_outer_fillet);
+    path.line_to(contour.end_inner_side);
+    append_arc(&mut path, contour.end_inner_fillet);
+    append_arc(&mut path, contour.inner_arc);
+    append_arc(&mut path, contour.start_inner_fillet);
+    path.line_to(contour.start_outer_side);
+    append_arc(&mut path, contour.start_outer_fillet);
+    path.close();
+    Some(path.detach())
 }
 
 fn arc_cap_angle_degrees(radius: f32, corner_radius: f32) -> f32 {
@@ -492,6 +718,29 @@ fn path_normal(angle: f32) -> Point {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn segment_geometry() -> ArcGaugeGeometry {
+        ArcGaugeGeometry {
+            center_x: 80.0,
+            center_y: 80.0,
+            inner_widget_center_x: 80.0,
+            inner_widget_center_y: 80.0,
+            radius: 64.0,
+            start_angle: 180.0,
+            sweep_angle: 12.0,
+        }
+    }
+
+    #[test]
+    fn rounded_segment_retains_annular_outer_and_inner_arcs() {
+        let geometry = rounded_segment_path_geometry(segment_geometry(), 12.0, 6.0);
+
+        assert!(geometry.outer_arc.sweep_angle > 1.0);
+        assert!(geometry.inner_arc.sweep_angle < -1.0);
+        assert!((geometry.outer_arc.radius - 70.0).abs() < TRACK_PATH_EPSILON);
+        assert!((geometry.inner_arc.radius - 58.0).abs() < TRACK_PATH_EPSILON);
+        assert!(rounded_segment_path(segment_geometry(), 12.0, 6.0).is_some());
+    }
 
     #[test]
     fn reveal_clip_handles_zero_and_tiny_fills() {

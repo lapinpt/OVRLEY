@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { getArcFilledTrackPath, getArcFilledTrackRevealSpec } from '@/features/widget-preview/utils/arcTrackPath'
+import { getArcFilledTrackPath, getArcFilledTrackRevealSpec, getArcRoundedSegmentPath } from '@/features/widget-preview/utils/arcTrackPath'
 
 describe('arcTrackPath', () => {
   test('builds exact flat radial faces and continuous semicircular caps', () => {
@@ -54,6 +54,17 @@ describe('arcTrackPath', () => {
     expect(getArcFilledTrackPath({ ...shared, sweepAngle: 0 })).toBe('')
     expect(getArcFilledTrackPath({ ...shared, sweepAngle: 0.0001 })).toMatch(/^M /)
     expect(getArcFilledTrackPath({ ...shared, sweepAngle: 0.0001, endCornerRadius: 0 })).toMatch(/^M /)
+  })
+
+  test('rounds an annular segment inward while retaining curved outer and inner bodies', () => {
+    const shared = { centerX: 80, centerY: 80, radius: 64, startAngle: 180, sweepAngle: 12, trackThickness: 12 }
+    const square = getArcRoundedSegmentPath({ ...shared, cornerRadius: 0 })
+    const rounded = getArcRoundedSegmentPath({ ...shared, cornerRadius: 6 })
+
+    expect(rounded).not.toBe(square)
+    expect(rounded.match(/ C /g).length).toBeGreaterThanOrEqual(6)
+    expect(rounded).toMatch(/ L /)
+    expect(rounded).toMatch(/ Z$/)
   })
 
   test('reveals a full track from its left edge while keeping the moving end rounded', () => {
