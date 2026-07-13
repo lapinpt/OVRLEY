@@ -12,36 +12,36 @@
 import { describe, expect, test, vi } from 'vitest'
 import { render } from '@testing-library/react'
 
-vi.mock('@/features/widget-preview/components/TextRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/text/TextPreview', () => ({
   OverlayTextWidget: (props) => <div data-testid="text-renderer" data-widget-type={props.widget.type} />,
 }))
-vi.mock('@/features/widget-preview/components/MetricRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/metric/MetricPreview', () => ({
   OverlayMetricWidget: (props) => <div data-testid="metric-renderer" data-widget-type={props.widget.type} />,
 }))
-vi.mock('@/features/widget-preview/components/RouteRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/route/RoutePreview', () => ({
   OverlayRouteWidget: () => <div data-testid="route-renderer" />,
 }))
-vi.mock('@/features/widget-preview/components/ElevationRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/elevation/ElevationPreview', () => ({
   OverlayElevationWidget: () => <div data-testid="elevation-renderer" />,
 }))
-vi.mock('@/features/widget-preview/components/HeadingRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/heading/HeadingPreview', () => ({
   OverlayHeadingWidget: (props) => <div data-testid="heading-renderer" data-widget-type={props.widget.type} />,
 }))
-vi.mock('@/features/widget-preview/components/LinearGaugeRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/linear-gauge/LinearGaugePreview', () => ({
   OverlayLinearGaugeWidget: (props) => (
     <div data-testid="linear-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
   ),
 }))
-vi.mock('@/features/widget-preview/components/ArcGaugeRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/arc-gauge/ArcGaugePreview', () => ({
   OverlayArcGaugeWidget: (props) => (
     <div data-testid="arc-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
   ),
 }))
-vi.mock('@/features/widget-preview/components/BackdropRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/backdrop/BackdropPreview', () => ({
   default: (props) => <div data-testid="backdrop-renderer" data-widget-type={props.widget.type} />,
 }))
 
-import WidgetPreview from '@/features/widget-preview/components/WidgetPreview'
+import WidgetPreview from '@/features/widget-preview/WidgetPreview'
 
 const ACTIVITY = { sample_elapsed_seconds: [0], speed: [25] }
 

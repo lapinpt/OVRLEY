@@ -9,7 +9,7 @@ import {
   getArcTrackCornerRadiusMax,
   getSuggestedArcBarGeometry,
   getSuggestedLinearBarGeometry,
-} from '@/features/widget-preview/utils/gaugeBarGeometry'
+} from '@/features/widget-preview/shared/gaugeBarGeometry'
 
 describe('gaugeBarGeometry', () => {
   test('uses whole-segment bucket thresholds', () => {

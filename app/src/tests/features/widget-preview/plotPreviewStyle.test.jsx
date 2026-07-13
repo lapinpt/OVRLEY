@@ -1,14 +1,13 @@
-import { renderHook } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
-import { useRoutePreviewStyle } from '@/features/widget-preview/hooks/useRoutePreviewStyle'
-import { useElevationPreviewStyle } from '@/features/widget-preview/hooks/useElevationPreviewStyle'
+import { getRoutePreviewStyle } from '@/features/widget-preview/widgets/route/style'
+import { buildElevationPreviewStyle } from '@/features/widget-preview/widgets/elevation/style'
 
-vi.mock('@/features/widget-preview/hooks/useFontMetricsVersion', () => ({
+vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
   useFontMetricsVersion: () => 0,
 }))
 
-vi.mock('@/features/widget-preview/utils/textMeasurement', async () => {
-  const actual = await vi.importActual('@/features/widget-preview/utils/textMeasurement')
+vi.mock('@/features/widget-preview/shared/textMeasurement', async () => {
+  const actual = await vi.importActual('@/features/widget-preview/shared/textMeasurement')
   return {
     ...actual,
     getPreviewFontFamily: (fontFamily) => fontFamily || 'Arial',
@@ -16,7 +15,7 @@ vi.mock('@/features/widget-preview/utils/textMeasurement', async () => {
 })
 
 describe('plot preview style scaling', () => {
-  test('route preview keeps configured stroke widths even when global scale is applied externally', () => {
+  test('route preview derives opacity and marker presentation', () => {
     const data = {
       width: 400,
       height: 200,
@@ -32,13 +31,13 @@ describe('plot preview style scaling', () => {
       completed_line_opacity: 100,
     }
 
-    const { result } = renderHook(() => useRoutePreviewStyle(data, 2))
+    const result = { current: getRoutePreviewStyle(data, 2) }
 
-    expect(result.current.remainingLineWidth).toBe(6)
-    expect(result.current.completedLineWidth).toBe(4)
+    expect(result.current.remainingLineOpacity).toBe(0.35)
+    expect(result.current.completedLineOpacity).toBe(1)
   })
 
-  test('elevation preview keeps configured stroke widths even when global scale is applied externally', () => {
+  test('elevation preview derives opacity and scale presentation', () => {
     const data = {
       width: 400,
       height: 200,
@@ -60,10 +59,10 @@ describe('plot preview style scaling', () => {
       },
     }
 
-    const { result } = renderHook(() => useElevationPreviewStyle(data, 2))
+    const result = { current: buildElevationPreviewStyle(data, 2) }
 
-    expect(result.current.remainingLineWidth).toBe(6)
-    expect(result.current.completedLineWidth).toBe(4)
-    expect(result.current.safeGlobalScale).toBe(2)
+    expect(result.current.remainingLineOpacity).toBe(0.35)
+    expect(result.current.completedLineOpacity).toBe(1)
+    expect(result.current.globalScale).toBe(2)
   })
 })

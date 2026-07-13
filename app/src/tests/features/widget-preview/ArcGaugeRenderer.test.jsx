@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import { OverlayArcGaugeWidget } from '@/features/widget-preview/components/ArcGaugeRenderer'
+import { OverlayArcGaugeWidget } from '@/features/widget-preview/widgets/arc-gauge/ArcGaugePreview'
 
 function makeWidget(overrides = {}) {
   return {
@@ -118,7 +118,9 @@ describe('OverlayArcGaugeWidget', () => {
     rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 0 })} activity={activity} previewSecond={0.5} globalScale={1} />)
     const fullyFlatFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
 
-    expect(flatFillPath).not.toBe(roundedFillPath)
+    expect(roundedFillPath).toBe(roundedTrackPath)
+    expect(flatFillPath).toBe(flatTrackPath)
+    expect(flatFillPath).toBe(roundedFillPath)
     expect(flatTrackPath).toBe(roundedTrackPath)
     expect(flatFillClipPath).not.toBe(roundedFillClipPath)
     expect(flatFillClipPath).not.toBe(fullyFlatFillClipPath)

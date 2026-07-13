@@ -7,7 +7,7 @@
 use super::draw_arc_labels;
 use super::geometry::ArcGaugeGeometry;
 use super::inner_widget::draw_static_unit;
-use super::path::{draw_arc_track, draw_revealed_arc_track, ArcTrackSpec};
+use super::path::ArcTrackSpec;
 use super::segment::{draw_segment, segment_geometries};
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
@@ -15,7 +15,7 @@ use crate::render::text::{parse_color, ResolvedTextStyle};
 use crate::render::widgets::common::normalize_shadow_style_validated;
 use crate::render::widgets::types::ArcGaugeCache;
 use crate::types::TrackFillStyle;
-use skia_safe::{image_filters, paint::Style, BlendMode, Canvas, Paint};
+use skia_safe::{image_filters, paint::Style, BlendMode, Canvas, ClipOp, Paint};
 use std::path::PathBuf;
 
 /// Builds the padded, cached image containing every frame-invariant element.
@@ -57,7 +57,7 @@ pub(super) fn draw_static_layer(
     match crate::normalize::scale_bar_geometry(gauge.bar_geometry, scale) {
         Some(bar_geometry) => {
             for segment in segment_geometries(geometry, bar_geometry) {
-                draw_static_segment(
+                draw_static_track(
                     canvas,
                     gauge,
                     segment,
@@ -95,54 +95,6 @@ pub(super) fn draw_static_layer(
 }
 
 fn draw_static_track(
-    canvas: &Canvas,
-    gauge: &ValidatedArcGaugeWidget,
-    geometry: ArcGaugeGeometry,
-    track_thickness: f32,
-    border_thickness: f32,
-    scale: f32,
-    text_style: &ResolvedTextStyle,
-    shadow_filter: Option<&skia_safe::ImageFilter>,
-) {
-    let inner_track =
-        ArcTrackSpec::full(geometry, track_thickness, gauge.track_corner_radius * scale);
-    let border_track = inner_track.outset(border_thickness);
-
-    if let Some(shadow_filter) = shadow_filter {
-        draw_arc_track(
-            canvas,
-            border_track,
-            &track_paint(
-                parse_color(&gauge.track_border_color, text_style.opacity),
-                Some(shadow_filter.clone()),
-            ),
-        );
-    }
-    if border_thickness > 0.0 {
-        draw_arc_track(
-            canvas,
-            border_track,
-            &track_paint(
-                parse_color(&gauge.track_border_color, text_style.opacity),
-                None,
-            ),
-        );
-        draw_arc_track(canvas, inner_track, &clear_track_paint());
-    }
-    draw_arc_track(
-        canvas,
-        inner_track,
-        &track_paint(
-            parse_color(
-                &gauge.track_empty_color,
-                gauge.track_empty_opacity * text_style.opacity,
-            ),
-            None,
-        ),
-    );
-}
-
-fn draw_static_segment(
     canvas: &Canvas,
     gauge: &ValidatedArcGaugeWidget,
     geometry: ArcGaugeGeometry,
@@ -244,9 +196,26 @@ fn draw_continuous_fill(
     } else {
         cache.track_corner_radius
     };
-    let track = ArcTrackSpec::full(geometry, cache.track_thickness, cache.track_corner_radius)
-        .with_end_corner_radius(end_corner_radius);
-    draw_revealed_arc_track(canvas, track, fill01, &fill_paint(cache));
+    let reveal_spec =
+        ArcTrackSpec::full(geometry, cache.track_thickness, cache.track_corner_radius)
+            .with_end_corner_radius(end_corner_radius);
+    let Some(reveal) = reveal_spec.reveal_clip(fill01) else {
+        return;
+    };
+    let Some(reveal_path) = reveal.path(&reveal_spec) else {
+        return;
+    };
+
+    canvas.save();
+    canvas.clip_path(&reveal_path, ClipOp::Intersect, true);
+    draw_segment(
+        canvas,
+        geometry,
+        cache.track_thickness,
+        cache.track_corner_radius,
+        &fill_paint(cache),
+    );
+    canvas.restore();
 }
 
 fn fill_paint(cache: &ArcGaugeCache) -> Paint {

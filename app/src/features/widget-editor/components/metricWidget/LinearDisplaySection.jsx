@@ -6,7 +6,7 @@ import { SlidersHorizontal, Tags } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
-import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/utils/gaugeBarGeometry'
+import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
 
 const ORIENTATION_OPTIONS = [
   { value: 'horizontal', label: 'Horizontal' },

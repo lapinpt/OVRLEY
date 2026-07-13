@@ -7,8 +7,16 @@ function makeMetricWidget(type, data = {}) {
     category: 'values',
     type,
     data: {
+      display_type: 'text',
+      font: 'Arial.ttf',
+      font_size: 60,
+      decimals: 0,
+      balance_format: 'percent_label',
       show_units: true,
       show_icon: false,
+      icon_size: 28,
+      icon_offset_x: 0,
+      icon_offset_y: 0,
       ...data,
     },
   }

@@ -10,12 +10,11 @@ use super::super::track_path::{
 
 use super::geometry::{arc_point, ArcGaugeGeometry};
 use crate::normalize::MAX_ARC_ANGLE_DEGREES;
-use skia_safe::{Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType, Point};
+use skia_safe::{Path, PathBuilder, PathFillType, Point};
 
-/// One filled arc-track layer. Empty, filled, border, clear, and shadow layers
-/// all use this exact shape; their only difference is the Skia paint supplied
-/// to [`draw_arc_track`]. Angles follow Skia's clockwise screen-space
-/// convention.
+/// Geometry used to build the moving reveal clip for a continuous arc track.
+/// The immutable source track is the rounded annular sector from `segment`;
+/// angles here follow Skia's clockwise screen-space convention.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ArcTrackSpec {
     pub geometry: ArcGaugeGeometry,
@@ -51,7 +50,7 @@ impl RevealClip {
 }
 
 impl ArcTrackSpec {
-    /// Creates the complete source track used by static and dynamic layers.
+    /// Creates a reveal specification spanning the complete track.
     pub(crate) fn full(geometry: ArcGaugeGeometry, thickness: f32, corner_radius: f32) -> Self {
         Self {
             geometry,
@@ -71,7 +70,7 @@ impl ArcTrackSpec {
         }
     }
 
-    /// Builds the reveal clip for this complete source track. Below a
+    /// Builds the reveal clip for this complete track. Below a
     /// threshold fill the clip is a translated rounded rectangle (Option B):
     /// it slides backward along the sweep tangent from the start so its
     /// intersection with the annular source grows monotonically. At or above
@@ -132,18 +131,7 @@ impl ArcTrackSpec {
         }))
     }
 
-    /// Returns a concentric border shape around this track.
-    pub(crate) fn outset(self, border_thickness: f32) -> Self {
-        let border = border_thickness;
-        Self {
-            thickness: self.thickness + border * 2.0,
-            start_corner_radius: self.start_corner_radius + border,
-            end_corner_radius: self.end_corner_radius + border,
-            ..self
-        }
-    }
-
-    /// Builds the closed annular body with independently rounded end caps.
+    /// Builds a closed annular clip with independently rounded end caps.
     pub(super) fn filled_path(self) -> Option<Path> {
         let sweep = self
             .sweep_angle
@@ -280,35 +268,6 @@ impl ArcTrackSpec {
             cap,
         )
     }
-}
-
-/// Draws a track using the supplied paint. Use `BlendMode::Clear` on the
-/// paint to punch out a border interior; the geometry stays identical.
-pub(crate) fn draw_arc_track(canvas: &Canvas, spec: ArcTrackSpec, paint: &Paint) {
-    if let Some(path) = spec.filled_path() {
-        canvas.draw_path(&path, paint);
-    }
-}
-
-/// Reveals a full source track from its visible start edge through `fill01`.
-/// The source preserves its fixed start geometry; the clip controls only how
-/// much of that source is visible.
-pub(crate) fn draw_revealed_arc_track(
-    canvas: &Canvas,
-    source: ArcTrackSpec,
-    fill01: f32,
-    paint: &Paint,
-) {
-    let Some(clip) = source.reveal_clip(fill01) else {
-        return;
-    };
-    let Some(clip_path) = clip.path(&source) else {
-        return;
-    };
-    canvas.save();
-    canvas.clip_path(&clip_path, ClipOp::Intersect, true);
-    draw_arc_track(canvas, source, paint);
-    canvas.restore();
 }
 
 fn arc_cap_angle_degrees(radius: f32, corner_radius: f32) -> f32 {

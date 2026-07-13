@@ -8,7 +8,7 @@ vi.mock('@/api/backend', () => ({
   hasTauriRuntime: () => true,
 }))
 
-import { OverlayElevationWidget } from '@/features/widget-preview'
+import { OverlayElevationWidget } from '@/features/widget-preview/widgets/elevation/ElevationPreview'
 
 const GEOMETRY_RESPONSE = {
   points: [

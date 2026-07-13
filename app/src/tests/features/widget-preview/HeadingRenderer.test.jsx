@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { render } from '@testing-library/react'
 
-import { OverlayHeadingWidget } from '@/features/widget-preview'
+import { OverlayHeadingWidget } from '@/features/widget-preview/widgets/heading/HeadingPreview'
 
 function makeHeadingWidget(overrides = {}) {
   return {
@@ -13,6 +13,7 @@ function makeHeadingWidget(overrides = {}) {
       y: 200,
       width: 400,
       height: 80,
+      opacity: 1,
       pixels_per_degree: 5,
       major_tick_interval: 15,
       minor_ticks_per_major: 3,
@@ -30,6 +31,7 @@ function makeHeadingWidget(overrides = {}) {
       label_color: '#cccccc',
       cardinal_label_color: '#ff0000',
       label_font_size: 12,
+      label_font: 'Arial.ttf',
       label_offset: 4,
       show_indicator: true,
       indicator_style: 'chevron',

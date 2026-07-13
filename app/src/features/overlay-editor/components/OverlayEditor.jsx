@@ -40,7 +40,7 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
       {visibleWidgets.map((widget) => {
         const Icon = WIDGET_ICONS[widget.type] || Tag
         const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
-        const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+        const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
         const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null)
         const left = renderGeometry.badgeLeft * displayScale - 2
@@ -272,7 +272,7 @@ function OverlayEditor({
 
         const preview = overlayState.liveWidgetPreviews[widgetId] ?? null
         const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond: overlayState.previewSecond })
-        const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+        const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
 
         return buildRenderedGeometrySignature(widget, visualBounds, overlayState.globalScale, preview)

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import OverlayBackdropWidget from '@/features/widget-preview/components/BackdropRenderer'
+import OverlayBackdropWidget from '@/features/widget-preview/widgets/backdrop/BackdropPreview'
 import { resolveActiveBackdropData } from '@/lib/widget/widget-resolver'
 
 function makeBackdropWidget(data = {}) {

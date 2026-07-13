@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { getArcFilledTrackPath, getArcFilledTrackRevealSpec, getArcRoundedSegmentPath } from '@/features/widget-preview/utils/arcTrackPath'
+import { getArcFilledTrackPath, getArcFilledTrackRevealSpec, getArcRoundedSegmentPath } from '@/features/widget-preview/widgets/arc-gauge/trackPath'
 
 describe('arcTrackPath', () => {
   test('builds exact flat radial faces and continuous semicircular caps', () => {

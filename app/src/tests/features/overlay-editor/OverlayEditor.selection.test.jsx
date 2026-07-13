@@ -43,11 +43,11 @@ vi.mock('@/features/widget-preview', () => ({
   }),
 }))
 
-vi.mock('@/features/widget-preview/hooks/useFontMetricsVersion', () => ({
+vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
   useFontMetricsVersion: () => 0,
 }))
 
-vi.mock('@/features/widget-preview/utils/textMeasurement', () => ({
+vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
   getPreviewFontFamily: (fontFamily) => fontFamily || 'Arial',
 }))
 

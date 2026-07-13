@@ -291,7 +291,7 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('90')
-    expect(model?.showIcon).toBe(true)
+    expect(model?.metricLayout.icon).not.toBeNull()
   })
 
   test('boxed display types skip the metric preview model so their own presentation path is used', () => {

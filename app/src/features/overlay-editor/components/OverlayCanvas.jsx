@@ -8,8 +8,8 @@ import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
-import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
-import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
+import { useFontMetricsVersion } from '@/features/widget-preview/shared/useFontMetrics'
+import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 import { syncVideoCurrentTime } from '@/features/video-preview/utils/videoPreviewPlayback'
@@ -151,7 +151,7 @@ const OverlayCanvasWidget = memo(
       previewSecond,
     })
     const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
-    const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+    const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
     const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
     const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview)
 

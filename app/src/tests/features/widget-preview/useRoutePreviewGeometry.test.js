@@ -65,7 +65,7 @@ vi.mock('@/lib/geometryUtils', () => ({
 }))
 
 // Mock svgPreviewUtils — completed points filtering
-vi.mock('@/features/widget-preview/utils/svgPreviewUtils', () => ({
+vi.mock('@/features/widget-preview/shared/svgPreviewUtils', () => ({
   buildRouteFramePreview: vi.fn((points, progressValues, progress01) => {
     if (!points.length) return { markerPoint: null, completedPoints: [] }
     const lastPoint = points[points.length - 1]
@@ -75,7 +75,7 @@ vi.mock('@/features/widget-preview/utils/svgPreviewUtils', () => ({
   sanitizeSvgId: vi.fn((id) => id),
 }))
 
-import { useRoutePreviewGeometry } from '@/features/widget-preview/hooks/useRoutePreviewGeometry'
+import { useRoutePreviewGeometry } from '@/features/widget-preview/widgets/route/useRoutePreviewGeometry'
 
 function makeActivity() {
   return {
@@ -106,7 +106,7 @@ function makeData() {
 }
 
 function makeStyle() {
-  return { width: 240, height: 240, safeGlobalScale: 1, remainingLineWidth: 2, completedLineWidth: 2, routeMarkerInsetRadius: 6 }
+  return { globalScale: 1, routeMarkerInsetRadius: 6 }
 }
 
 const GEOMETRY_RESPONSE = {

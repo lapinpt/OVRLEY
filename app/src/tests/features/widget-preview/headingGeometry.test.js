@@ -10,7 +10,7 @@ import {
   headingLabelBaseline,
   headingTapeLayout,
   headingTickPosition,
-} from '@/features/widget-preview/utils/headingGeometry'
+} from '@/features/widget-preview/widgets/heading/geometry'
 
 describe('headingOffset', () => {
   test('centers heading 0 under the widget indicator', () => {
@@ -117,9 +117,9 @@ describe('visibleTicks', () => {
     expect(tick0.x).toBeCloseTo(50, 1) // (0*5 - 350*5) % 1800 = -1750 % 1800 = 50
   })
 
-  test('returns empty for invalid dimensions', () => {
-    expect(visibleTicks(0, 0, 200, 15, 3, true, true)).toEqual([])
-    expect(visibleTicks(0, 5, 0, 15, 3, true, true)).toEqual([])
+  test('rejects invalid dimensions', () => {
+    expect(() => visibleTicks(0, 0, 200, 15, 3, true, true)).toThrow('Heading tape dimensions must be positive')
+    expect(() => visibleTicks(0, 5, 0, 15, 3, true, true)).toThrow('Heading tape dimensions must be positive')
   })
 })
 

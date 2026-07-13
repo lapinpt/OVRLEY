@@ -25,11 +25,11 @@ import { formatExportRangeTime } from '../utils/exportRange'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'
 
-function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
-  return widgets.map((widget) => {
+function materializeWidgets(rawWidgets, globalDefaults, liveWidgetDrafts) {
+  return rawWidgets.map((widget) => {
     const draft = liveWidgetDrafts[widget.id]
-    if (!draft) return widget
-    return { ...widget, data: { ...widget.data, ...draft } }
+    const draftedWidget = draft ? { ...widget, data: { ...widget.data, ...draft } } : widget
+    return { ...draftedWidget, data: getEffectiveWidgetData(draftedWidget, globalDefaults) }
   })
 }
 
@@ -62,10 +62,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   } = useWidgetDraftState()
 
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
-  const widgets = useMemo(
-    () => rawWidgets.map((widget) => ({ ...widget, data: getEffectiveWidgetData(widget, globalDefaults) })),
-    [globalDefaults, rawWidgets],
-  )
+  const widgets = useMemo(() => materializeWidgets(rawWidgets, globalDefaults, {}), [globalDefaults, rawWidgets])
   const sceneSize = useMemo(() => getSceneSize(config), [config])
   const globalOpacity = globalDefaults?.opacity ?? 1
   const globalScale = globalDefaults?.scale ?? 1
@@ -100,7 +97,10 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     resetWidgetDrafts()
   }, [config, resetWidgetDrafts])
 
-  const renderedWidgets = useMemo(() => mergeDraftsIntoWidgets(widgets, liveWidgetDrafts), [liveWidgetDrafts, widgets])
+  const renderedWidgets = useMemo(
+    () => materializeWidgets(rawWidgets, globalDefaults, liveWidgetDrafts),
+    [globalDefaults, liveWidgetDrafts, rawWidgets],
+  )
   const renderedWidgetMap = useMemo(() => Object.fromEntries(renderedWidgets.map((w) => [w.id, w])), [renderedWidgets])
   const orderedWidgetIds = useMemo(() => renderedWidgets.map((w) => w.id), [renderedWidgets])
 

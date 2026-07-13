@@ -13,8 +13,8 @@ import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
-import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/utils/arcGaugeLayout'
-import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/utils/gaugeBarGeometry'
+import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/widgets/arc-gauge/geometry'
+import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360

@@ -5,7 +5,7 @@ import {
   getArcRadius,
   getCornerGaugeAngles,
   getCornerGaugeLayout,
-} from '@/features/widget-preview/utils/arcGaugeLayout'
+} from '@/features/widget-preview/widgets/arc-gauge/geometry'
 
 describe('arcGaugeLayout', () => {
   test('uses vertically symmetric start and end angles for the supported range', () => {

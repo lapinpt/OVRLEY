@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import { OverlayLinearGaugeWidget } from '@/features/widget-preview/components/LinearGaugeRenderer'
+import { OverlayLinearGaugeWidget } from '@/features/widget-preview/widgets/linear-gauge/LinearGaugePreview'
 
 function makeWidget(overrides = {}) {
   return {
