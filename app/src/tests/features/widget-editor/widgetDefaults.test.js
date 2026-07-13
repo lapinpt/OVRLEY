@@ -3,7 +3,7 @@
  *
  * The `display_type` field on every newly created value widget must default to
  * `"text"` so existing rendering behavior is preserved out of the box. Future
- * slices introduce gauge display types (linear, bars, arc, corner, tape) but
+ * slices introduce gauge display types (linear, arc, corner, tape) but
  * the default remains `"text"` for backward compatibility.
  */
 

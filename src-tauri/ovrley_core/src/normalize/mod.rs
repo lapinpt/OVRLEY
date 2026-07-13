@@ -6,6 +6,7 @@
 
 mod arc_gauge;
 mod backdrop;
+mod bar_geometry;
 mod elevation;
 mod gradient;
 mod heading;
@@ -36,6 +37,11 @@ pub use arc_gauge::{
     MIN_ARC_ANGLE_DEGREES,
 };
 pub use backdrop::{validate_backdrop, ValidatedBackdrop};
+pub use bar_geometry::ResolvedBarGeometry;
+pub(crate) use bar_geometry::{
+    arc_track_radius, corner_track_cap_padding, corner_track_radius, resolve_bar_style_geometry,
+    scale_bar_geometry,
+};
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};

@@ -24,6 +24,7 @@ function makeWidget(overrides = {}) {
       track_filled_color: '#40e0d0',
       track_filled_opacity: 1,
       track_fill_flat: false,
+      track_fill_style: 'fill',
       show_min_max_labels: true,
       min_max_label_font: 'Arial.ttf',
       min_max_label_font_size: 12,
@@ -188,5 +189,36 @@ describe('OverlayArcGaugeWidget', () => {
     const svg = screen.getByTestId('arc-gauge-preview')
     expect(svg.querySelector('g[filter]')).toBeNull()
     expect(svg.querySelector('filter')).toBeNull()
+  })
+
+  test('renders discrete arc segments without a continuous empty arc', () => {
+    render(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ track_fill_style: 'bars', bar_count: 6, bar_gap: 4 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
+    )
+
+    expect(screen.getAllByTestId('arc-gauge-bar-empty')).toHaveLength(6)
+    expect(screen.getAllByTestId('arc-gauge-bar-filled')).toHaveLength(3)
+    expect(screen.queryByTestId('arc-gauge-empty-track')).toBeNull()
+  })
+
+  test('applies segmented arc behavior to corner gauges', () => {
+    render(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ display_type: 'corner', corner_orientation: 'bottom-right', track_fill_style: 'bars', bar_count: 4, bar_gap: 3 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
+    )
+
+    expect(screen.getAllByTestId('corner-gauge-bar-empty')).toHaveLength(4)
+    expect(screen.getAllByTestId('corner-gauge-bar-filled')).toHaveLength(2)
   })
 })

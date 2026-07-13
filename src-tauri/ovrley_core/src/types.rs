@@ -90,7 +90,7 @@ pub enum MetricKind {
 ///
 /// Controls how a metric value widget is rendered. The default is `Text` which
 /// matches the original icon + value + unit layout. Future slices introduce
-/// rendering paths for the gauge variants (linear, bars, arc, corner, and
+/// rendering paths for the gauge variants (linear, arc, corner, and
 /// heading tape) and use this field to dispatch.
 ///
 /// ## Backward compatibility
@@ -105,8 +105,6 @@ pub enum DisplayType {
     Text,
     #[serde(rename = "linear")]
     Linear,
-    #[serde(rename = "bars")]
-    Bars,
     #[serde(rename = "arc")]
     Arc,
     #[serde(rename = "corner")]
@@ -121,7 +119,6 @@ impl DisplayType {
         match self {
             DisplayType::Text => "text",
             DisplayType::Linear => "linear",
-            DisplayType::Bars => "bars",
             DisplayType::Arc => "arc",
             DisplayType::Corner => "corner",
             DisplayType::Tape => "heading_tape",
@@ -162,13 +159,44 @@ impl<'de> Deserialize<'de> for DisplayType {
             serde_json::Value::String(value) => match value.as_str() {
                 "text" => Ok(DisplayType::Text),
                 "linear" => Ok(DisplayType::Linear),
-                "bars" => Ok(DisplayType::Bars),
                 "arc" => Ok(DisplayType::Arc),
                 "corner" => Ok(DisplayType::Corner),
                 "heading_tape" => Ok(DisplayType::Tape),
                 _ => Ok(DisplayType::default()),
             },
             _ => Ok(DisplayType::default()),
+        }
+    }
+}
+
+/// Geometry/paint mode used by gauge tracks.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+pub enum TrackFillStyle {
+    #[serde(rename = "fill")]
+    #[default]
+    Fill,
+    #[serde(rename = "bars")]
+    Bars,
+}
+
+impl TrackFillStyle {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fill => "fill",
+            Self::Bars => "bars",
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TrackFillStyle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        match raw.as_str() {
+            Some("bars") => Ok(Self::Bars),
+            _ => Ok(Self::Fill),
         }
     }
 }

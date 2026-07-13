@@ -6,11 +6,11 @@
 //! place.
 
 use crate::normalize::{
-    ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGradientWidget, ValidatedHeading,
-    ValidatedLabel, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
+    ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGradientWidget,
+    ValidatedHeading, ValidatedLabel, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
     ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
 };
-use crate::types::{DisplayType, MetricKind};
+use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -275,6 +275,8 @@ pub struct LinearGaugeCache {
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
     pub track_fill_flat: bool,
+    pub track_fill_style: TrackFillStyle,
+    pub bar_geometry: Option<ResolvedBarGeometry>,
     pub min_value: f64,
     pub max_value: f64,
     pub frame_states: Vec<LinearGaugeFrameState>,
@@ -311,9 +313,12 @@ pub struct ArcGaugeCache {
     pub radius: f32,
     pub track_thickness: f32,
     pub track_corner_radius: f32,
+    pub track_border_thickness: f32,
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
     pub track_fill_flat: bool,
+    pub track_fill_style: TrackFillStyle,
+    pub bar_geometry: Option<ResolvedBarGeometry>,
     pub text_style: crate::render::text::ResolvedTextStyle,
     pub has_unit: bool,
     pub unit_font_size: f32,

@@ -27,21 +27,20 @@ linear gauge and both arc-shaped variants (`arc` and `corner`) gain a
   empty-track colour and an on segment uses the existing fill colour. The gaps
   are transparent: there is no track or gap-colour layer behind the segments.
 
-When `track_fill_style === "bars"`, two new settings become active and are
+When `track_fill_style === "bars"`, two required settings become active and are
 exposed in the editor:
 
-- `bar_count` — optional explicit number of discrete segments (integer ≥ 1).
-  When absent, derive a suitable count from the current track geometry.
-- `bar_gap` — optional explicit pixel gap between adjacent segments (≥ 0).
-  When absent, derive a suitable gap from the current track thickness. Explicit
-  and derived gaps are both clamped so each segment keeps a minimum width.
+- `bar_count` — number of discrete segments (integer ≥ 1).
+- `bar_gap` — pixel gap between adjacent segments (≥ 0).
 
-Do not seed fixed `bar_count` / `bar_gap` values when a widget is created or
-when the user switches to bars. Absence means **auto**, not "missing config".
-Auto values are resolved again whenever width, height, track thickness,
-arc angle, or corner geometry changes. This is especially important for arc
-and corner gauges: a count that looked balanced at one radius or sweep can look
-absurd after resizing.
+Widgets are not created with fixed bar defaults because their eventual gauge
+geometry is unknown. Instead, the frontend runs a supplementary seeding
+function exactly when the user changes Fill Style from `"fill"` to `"bars"`.
+It derives a reasonable count and gap from the gauge's geometry at that moment
+and persists both values with the style change. This function is not an Auto
+mode: it is not exposed as a control, invoked by renderers or validators, or
+rerun after resize and other geometry edits. Once seeded, count and gap are
+ordinary independent user-owned values.
 
 Because `track_fill_style`, `bar_count`, and `bar_gap` live on the shared
 `ValueConfig` and are consumed by each gauge's renderer, the bars concept is
@@ -87,9 +86,8 @@ top-level `display_type: "bars"` was never supported by a registered renderer
 and continues to follow the existing forgiving `DisplayType` fallback rather
 than being migrated implicitly to a particular gauge shape.
 
-`ValueConfig` gains three optional `#[serde(default)]` fields. Unlike ordinary
-required downstream fields, `bar_count: None` and `bar_gap: None` deliberately
-survive as auto-mode inputs until gauge geometry is known:
+`ValueConfig` gains three optional `#[serde(default)]` raw fields so existing
+fill-style configs remain compatible:
 
 ```rust
 // src-tauri/ovrley_core/src/normalize/raw/mod.rs
@@ -101,39 +99,37 @@ pub bar_count: Option<u32>,
 pub bar_gap: Option<f32>,
 ```
 
-Validated/render-cache gauge data stores the resolved concrete count and gap
-plus enough information for the editor/debug layer to distinguish auto from an
-explicit override. Never write a derived value back into persisted widget
-config merely because it was resolved for rendering.
+Gauge validation resolves a missing style to `Fill`. In bars mode it requires
+both `bar_count` and `bar_gap`, validates them against the current geometry,
+and stores their concrete values in the render cache. There is no persisted or
+validated Auto/Custom distinction.
 
-### Automatic bar geometry
+### Initial bar geometry seeding
 
-Resolve automatic values from logical (pre-output-scale) track geometry in one
-shared Rust helper and one frontend helper implementing the same documented
-contract:
+The frontend-only seeding helper derives initial values from logical
+(pre-output-scale) track geometry when Fill Style is toggled to Bars:
 
 - `S` is the available span along the track: the linear track extent or the
   arc centerline length `abs(sweep_radians) * radius`.
 - `T` is the outer cross-track thickness, including the configured border.
 - `MIN_BAR_PX = 2.0`.
-- If `bar_gap` is absent, use
-  `auto_gap = clamp(0.20 * T, 2.0, 6.0)` logical pixels.
-- If `bar_count` is absent, use target bar extent
+- Seed `bar_gap = clamp(0.20 * T, 2.0, 6.0)` logical pixels.
+- Use target bar extent
   `target_bar = clamp(T, 8.0, 24.0)` and resolve
   `N = round((S + gap) / (target_bar + gap))`.
-- Clamp an automatic `N` to `1..=floor(S / MIN_BAR_PX)`. When at least three
-  bars fit, use a minimum automatic count of three so short arc/corner gauges
+- Clamp seeded `N` to `1..=floor(S / MIN_BAR_PX)`. When at least three
+  bars fit, use a minimum seeded count of three so short arc/corner gauges
   still read as segmented rather than as a split continuous track.
-- After resolving `N`, clamp the gap with the sizing rules below. `N == 1`
+- After resolving `N`, clamp the seeded gap with the sizing rules below. `N == 1`
   always resolves to gap `0`.
 
-These constants are shared visual-design constants, not manifest defaults.
-They intentionally make density follow the live geometry. Explicit
-`bar_count` and/or `bar_gap` override only their corresponding automatic
-input; for example, an explicit gap with auto count participates in the count
-formula. Both implementations consume the constants and formulas documented
-here; cross-renderer parity validation is handled separately by the product
-owner as described below.
+These are editor seeding constants, not manifest defaults or runtime-derived
+state. The helper writes both results only as part of the style-toggle update.
+Changing `bar_count` never changes `bar_gap`, its configured value, or the gap
+control's maximum. Resizing also does not rewrite either field. Backend and
+renderer geometry consume only the explicit persisted values. Cross-renderer
+parity validation is handled separately by the product owner as described
+below.
 
 `track_fill_flat` (the existing per-gauge toggle) is **ignored** in bars mode.
 Ignoring it is the only sensible behaviour: in bars mode each segment is
@@ -201,11 +197,9 @@ axes):
   configured border is then inset within each segment independently.
 - `MIN_BAR_PX = 2.0`. A bars configuration is geometrically valid only when
   `S >= N * MIN_BAR_PX`; existing minimum gauge dimensions must guarantee
-  `S >= MIN_BAR_PX`. The editor constrains an explicit `bar_count` to
-  `floor(S / MIN_BAR_PX)`, and backend validation rejects an explicit count
-  that cannot fit. Automatic count resolution already obeys this bound. Do
-  not silently render fewer explicitly requested bars, because that would also
-  change the fill thresholds.
+  `S >= MIN_BAR_PX`. Backend validation rejects an explicit count that cannot
+  fit. Do not silently render fewer explicitly requested bars, because that
+  would also change the fill thresholds.
 - For `N == 1`, `gap = 0` and `bar_extent = S`.
 - For `N > 1`, `max_gap = (S - N * MIN_BAR_PX) / (N - 1)` and
   `gap = bar_gap.clamp(0, max_gap)`.
@@ -277,22 +271,20 @@ control (a `SelectField` with `"fill"` / `"bars"` options) placed near the
 existing `track_fill_flat` toggle in the gauge-track section. Because
 `ArcDisplaySection` also edits `corner`, the controls must read and write the
 active `display_variants.arc` or `display_variants.corner` object rather than
-hard-code the arc key. When the style is `"bars"`, two controls become visible
-(and are hidden otherwise):
+hard-code the arc key. When the style is `"bars"`, two plain controls become
+visible (and are hidden otherwise):
 
-- `bar_count` — an Auto/Custom control. Auto leaves the field absent and shows
-  the currently derived count as read-only context. Custom exposes an integer
-  `SliderField`, min 1, max ~64 (further bounded by the active track span so a
-  segment remains at least 2px). Switching back to Auto deletes the override.
-- `bar_gap` — an Auto/Custom control. Auto leaves the field absent and shows
-  the currently derived gap. Custom exposes a `SliderField`, min 0, max bounded
-  by the layout, step 1, `${value}px` display. Switching back to Auto deletes
-  the override.
+- `bar_count` — integer `SliderField`, min 1, max 64.
+- `bar_gap` — `SliderField`, min 0, fixed max 24, step 1, `${value}px`
+  display.
 
-Changing gauge dimensions or track geometry updates displayed auto values
-without mutating widget config. Explicit custom values remain user-owned; if a
-dimension edit would make an explicit count invalid, constrain that dimension
-edit or surface validation instead of silently replacing the user's count.
+The Fill Style transition to `"bars"` is a single update containing the style
+plus a seeded count and gap calculated from the current active gauge geometry.
+The seeding helper is called only by that transition. There are no Auto
+controls, no resize-time recomputation, and no count-dependent gap maximum.
+After the transition, changing either slider updates only its own field. If a
+later dimension edit makes the count invalid, surface validation rather than
+silently replacing the user's values.
 
 The `track_fill_flat` toggle is **hidden/disabled** when
 `track_fill_style === "bars"` (it has no meaning for discrete bars — see
@@ -305,9 +297,10 @@ through the existing `useDisplayVariantUpdater` so bars config lives in
 ### Manifest
 
 `assets/standard-metrics.json` — do **not** add `bar_count` or `bar_gap` to
-the `linear`, `arc`, or `corner` defaults; their absence enables responsive
-automatic geometry. Add `"track_fill_style": "fill"` as a default to all
-three. The `"bars"` definition in `displayTypes.definitions` is
+the `linear`, `arc`, or `corner` defaults. They are irrelevant in the default
+fill style and are seeded when Bars is selected. Add
+`"track_fill_style": "fill"` as a default to all three. The `"bars"`
+definition in `displayTypes.definitions` is
 **removed** (it was never wired through); nothing references it because no
 `BarsGauge` renderer was ever registered. Removing it keeps the
 display-type dropdown free of a dead entry.
@@ -321,10 +314,10 @@ acceptance contract:
    but do **not** execute any test, formatter, linter, type-check, or other
    verification command yet.
 2. Apply the repository's `/debloat` skill to every production and test file
-   touched by this issue. Establish the canonical Auto/Custom config contract,
-   remove consumer-side repair and duplicate geometry vocabulary, keep
-   automatic resolution at its owning geometry boundary, move reusable logic
-   out of renderer/editor components, and prune unused helpers and branches.
+   touched by this issue. Establish the explicit bars config contract, remove
+   consumer-side repair and duplicate operations of every kind, keep initial
+   seeding owned by the fill-style transition, move reusable logic out of
+   renderer/editor components, and prune unused helpers and branches.
 3. Inspect/search the complete touched-file diff as required by `/debloat` and
    finish all cleanup edits.
 4. Only after the debloat pass is complete, run focused tests followed by the
@@ -359,14 +352,14 @@ the two implementations.
 - [ ] `bar_fill_count(fill01, bar_count)` added to
       `render/widgets/gauges/range.rs`; `fill_percentage` and `metric_range`
       are reused unchanged.
-- [ ] Shared automatic-geometry helper resolves absent count/gap from live
-      logical track span and thickness using the documented constants in each
-      runtime, and resolved values are not persisted. Implementation does not
-      add or run a cross-runtime parity harness.
+- [ ] The frontend-only seeding helper derives reasonable count/gap values from
+      logical track span and thickness and is invoked only when Fill Style is
+      changed to Bars. Implementation does not add or run a cross-runtime
+      parity harness.
 - [ ] `ValidatedLinearGaugeWidget` and `ValidatedArcGaugeWidget` gain
       `track_fill_style` and resolved concrete bar geometry. Validators resolve
-      a missing style to `Fill`; in bars mode, absent count/gap select auto and
-      present values are explicit overrides. Validate explicit
+      a missing style to `Fill`; in bars mode, count and gap are required.
+      Validate
       `bar_count >= 1`, `bar_gap >= 0`, and that the requested count fits the
       available span at `>= 2px` per segment; geometry then clamps the gap. The
       arc validation path covers both `Arc` and `Corner` display types.
@@ -391,14 +384,14 @@ the two implementations.
 - [ ] Rust unit tests for `bar_fill_count` (fill01 = 0, immediately below and
       exactly at bucket thresholds, fill01 = 1, fill01 > 1, N = 1, and
       degenerate range) and the bar-sizing / angular-gap clamping formulas,
-      including `N == 1`, a requested count that cannot fit, automatic values
-      across several linear/arc/corner sizes, and recomputation after resize.
+      including `N == 1`, a requested count that cannot fit, and configured
+      values across linear/arc/corner gauges.
 
 ### Frontend
 
 - [ ] `widget-preview/utils/gaugeBarGeometry.js` with `getBarFillCount` and
-      `getBarGeometry` pure helpers mirroring the Rust bucket, automatic
-      default, sizing, and gap formulas.
+      `getBarGeometry` pure helpers for bucket, sizing, and gap formulas, plus
+      frontend-only initial-value helpers used by the style transition.
 - [ ] `LinearGaugeRenderer.jsx` renders discrete bars when
       `data.track_fill_style === 'bars'`: per-segment empty and border shapes
       replace the continuous static-track shape, filled interiors overlay the
@@ -409,16 +402,17 @@ the two implementations.
       arc is rendered behind the transparent gaps. Reuse the existing arc-path
       helpers per bar with per-bar sweep and caps.
 - [ ] `LinearDisplaySection.jsx` and `ArcDisplaySection.jsx` expose the
-      Fill Style dropdown plus Auto/Custom count and gap controls (hidden
-      unless style is `bars`), writing only explicit overrides through
-      `useDisplayVariantUpdater`; the arc section writes to the active
-      arc/corner variant.
+      Fill Style dropdown plus plain count and gap controls (hidden unless
+      style is `bars`), seed both values when switching to Bars, and write
+      changes through `useDisplayVariantUpdater`; the arc section writes to
+      the active arc/corner variant.
 - [ ] `assets/standard-metrics.json`: `track_fill_style` added to `linear`,
-      `arc`, and `corner` defaults; `bar_count` and `bar_gap` remain absent so
-      they resolve automatically; `"bars"` display-type definition removed.
+      `arc`, and `corner` defaults; `bar_count` and `bar_gap` remain absent
+      until Bars is selected; `"bars"` display-type definition removed.
 - [ ] Frontend tests for `gaugeBarGeometry` (bucket count, sizing clamping,
-      automatic density, resize recomputation, angular gap) and renderer tests
-      asserting bars-mode SVG output for linear, arc, and corner gauges.
+      initial seeding, angular gap) and renderer tests asserting bars-mode SVG
+      output for linear, arc, and corner gauges. Editor tests prove seeding runs
+      on the style transition only and the two controls remain independent.
 
 ### Cleanup and verification gate
 
@@ -427,9 +421,9 @@ the two implementations.
 - [ ] `/debloat` is applied to every file touched by this issue before tests
       run; its contract, ownership, one-language, pruning, and changed-path
       search checks are completed.
-- [ ] No derived Auto count/gap is persisted, no renderer or editor repairs
-      malformed required data, and Rust/JS geometry does not develop duplicate
-      naming schemes or parallel formulas during implementation.
+- [ ] No Auto count/gap mode exists, no renderer or editor repairs malformed
+      required data, and touched code contains no duplicate operations, naming
+      schemes, or parallel formulas introduced by the implementation.
 - [ ] Only after the debloat gate passes, focused tests, formatting, linting,
       type checks, broader relevant suites, and `git diff --check` are run.
 - [ ] Any verification-driven fix is debloated before the affected checks are

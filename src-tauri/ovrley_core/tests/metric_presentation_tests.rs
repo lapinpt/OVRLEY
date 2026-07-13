@@ -7,7 +7,7 @@
 //! - `Tape` without a cache returns `None`
 //! - `Tape` with a Text-mode cache returns `None` (presentation switched away)
 //! - `Tape` with a non-Heading metric returns `None`
-//! - Future boxed display types (`Linear`, `Bars`, `Arc`, `Corner`) return `None`
+//! - Boxed display types without a matching cache return `None`
 //!
 //! ## Type
 //! Integration test. Uses the public `ovrley_core::render::widgets::metric_presentation`
@@ -92,6 +92,9 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         track_filled_color: None,
         track_filled_opacity: None,
         track_fill_flat: None,
+        track_fill_style: None,
+        bar_count: None,
+        bar_gap: None,
         show_min_max_labels: None,
         min_max_label_font: None,
         min_max_label_font_size: None,
@@ -334,12 +337,7 @@ fn future_boxed_display_types_return_none() {
     let mut profiler = RenderProfiler::default();
     let caches = empty_caches();
 
-    for display_type in [
-        DisplayType::Linear,
-        DisplayType::Bars,
-        DisplayType::Arc,
-        DisplayType::Corner,
-    ] {
+    for display_type in [DisplayType::Linear, DisplayType::Arc, DisplayType::Corner] {
         let value = default_value_config(display_type);
         let result = draw_metric_presentation(
             surface.canvas(),

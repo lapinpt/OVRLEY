@@ -8,8 +8,11 @@ use super::helpers::{require_bool, require_f32, require_string};
 use super::raw::ValueConfig;
 use super::value::validate_arc_inner_value_widget;
 use super::ValidatedValueWidget;
+use super::{
+    arc_track_radius, corner_track_radius, resolve_bar_style_geometry, ResolvedBarGeometry,
+};
 use crate::error::{CoreError, CoreResult};
-use crate::types::{DisplayType, MetricKind};
+use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 
 pub const MIN_ARC_ANGLE_DEGREES: f32 = 30.0;
 pub const MAX_ARC_ANGLE_DEGREES: f32 = 360.0;
@@ -45,6 +48,8 @@ pub struct ValidatedArcGaugeWidget {
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
     pub track_fill_flat: bool,
+    pub track_fill_style: TrackFillStyle,
+    pub bar_geometry: Option<ResolvedBarGeometry>,
     pub show_min_max_labels: bool,
     pub min_max_label_font: String,
     pub min_max_label_font_size: f32,
@@ -207,6 +212,24 @@ fn validate_arc_shaped_gauge(
     let track_filled_color =
         require_string(value.track_filled_color.clone(), &p("track_filled_color"))?;
     let track_fill_flat = require_bool(value.track_fill_flat, &p("track_fill_flat"))?;
+    let track_fill_style = value.track_fill_style.unwrap_or_default();
+    let frame_size = width.min(height) as f32;
+    let radius = match corner_orientation {
+        Some(_) => corner_track_radius(
+            frame_size,
+            track_thickness,
+            track_corner_radius,
+            track_border_thickness,
+        ),
+        None => arc_track_radius(frame_size, track_thickness, track_border_thickness),
+    };
+    let bar_geometry = resolve_bar_style_geometry(
+        track_fill_style,
+        arc_angle.to_radians().abs() * radius,
+        value.bar_count,
+        value.bar_gap,
+        &p("track_fill_style"),
+    )?;
     let show_min_max_labels = require_bool(value.show_min_max_labels, &p("show_min_max_labels"))?;
     let min_max_label_font =
         require_string(value.min_max_label_font.clone(), &p("min_max_label_font"))?;
@@ -236,6 +259,8 @@ fn validate_arc_shaped_gauge(
         track_filled_color,
         track_filled_opacity,
         track_fill_flat,
+        track_fill_style,
+        bar_geometry,
         show_min_max_labels,
         min_max_label_font,
         min_max_label_font_size,

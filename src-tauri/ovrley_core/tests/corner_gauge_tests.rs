@@ -10,7 +10,7 @@ use ovrley_core::render::widgets::gauges::arc::{
 };
 use ovrley_core::render::widgets::types::PresentationCache;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
-use ovrley_core::types::DisplayType;
+use ovrley_core::types::{DisplayType, TrackFillStyle};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -137,6 +137,22 @@ fn corner_gauge_prepares_a_shared_arc_cache_and_renders_a_frame() {
     );
     assert_eq!(report.metric_presentations[0].widget.frame.progress01, 1.0);
     let _ = std::fs::remove_file(out_path);
+}
+
+#[test]
+fn corner_bars_keep_the_configured_segment_count() {
+    let mut value = full_corner_gauge_config("bottom-left");
+    value["track_fill_style"] = serde_json::json!("bars");
+    value["bar_count"] = serde_json::json!(6);
+    value["bar_gap"] = serde_json::json!(3);
+    let config = validate_single_corner(value).unwrap();
+
+    let gauge = match &config.values[0] {
+        ovrley_core::render::widgets::types::PreparedValue::ArcGauge(gauge) => gauge,
+        _ => panic!("corner should validate as an arc gauge"),
+    };
+    assert_eq!(gauge.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(gauge.bar_geometry.unwrap().count, 6);
 }
 
 fn validate_single_corner(

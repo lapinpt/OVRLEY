@@ -42,4 +42,4 @@ pub mod standard_widgets;
 pub mod types;
 
 pub use error::{CoreError, CoreResult};
-pub use types::{BackdropType, DisplayType, MetricKind};
+pub use types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};

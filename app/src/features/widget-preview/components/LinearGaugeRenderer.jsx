@@ -9,6 +9,7 @@
  */
 
 import { formatLinearGaugeLabel, getLinearGaugeLayout } from '../utils/linearGaugeGeometry'
+import { getBarFillCount, getLinearBarRects } from '../utils/gaugeBarGeometry'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { normalizeSvgShadowColor } from '../utils/svgPreviewUtils'
 import { getPreviewFontFamily, measurePreviewText } from '../utils/textMeasurement'
@@ -45,6 +46,107 @@ function getLinearGaugeLabelGap(labelFontSize) {
 
 function getRectCornerRadii(radius, width, height) {
   return { rx: Math.min(radius, width * 0.5), ry: Math.min(radius, height * 0.5) }
+}
+
+function getLinearSegmentModel(rect, borderThickness, cornerRadius) {
+  const outerRadii = getRectCornerRadii(cornerRadius, rect.width, rect.height)
+  const inner = {
+    x: rect.x + borderThickness,
+    y: rect.y + borderThickness,
+    width: Math.max(0, rect.width - borderThickness * 2),
+    height: Math.max(0, rect.height - borderThickness * 2),
+  }
+  return {
+    outer: { ...rect, ...outerRadii },
+    inner: { ...inner, ...getRectCornerRadii(Math.max(0, cornerRadius - borderThickness), inner.width, inner.height) },
+  }
+}
+
+function SegmentRects({ segments, layer, ...props }) {
+  const rects = []
+  for (let index = 0; index < segments.length; index += 1) {
+    rects.push(<rect key={index} {...segments[index][layer]} {...props} />)
+  }
+  return rects
+}
+
+function SegmentMaskRects({ segments }) {
+  const rects = []
+  for (let index = 0; index < segments.length; index += 1) {
+    rects.push(
+      <g key={index}>
+        <rect {...segments[index].outer} fill="white" />
+        <rect {...segments[index].inner} fill="black" />
+      </g>,
+    )
+  }
+  return rects
+}
+
+function buildLinearSegmentModels(rects, borderThickness, cornerRadius) {
+  const segments = []
+  for (const rect of rects) segments.push(getLinearSegmentModel(rect, borderThickness, cornerRadius))
+  return segments
+}
+
+function LinearGaugeTrack({ data, layout, opacity, maskId, shadowEnabled, shadowFilterId, continuousFill }) {
+  const segmented = data.track_fill_style === 'bars'
+  const bars = segmented
+    ? getLinearBarRects({
+        width: data.width,
+        height: data.height,
+        orientation: data.orientation,
+        bar_count: data.bar_count,
+        bar_gap: data.bar_gap,
+      })
+    : { count: 1, rects: [{ x: 0, y: 0, width: data.width, height: data.height }] }
+  const segments = buildLinearSegmentModels(bars.rects, data.track_border_thickness, data.track_corner_radius)
+  const filledCount = segmented ? getBarFillCount(layout.fill, bars.count) : 0
+  const shadowColor = shadowEnabled ? normalizeSvgShadowColor(shadowEnabled.color, opacity) : null
+
+  return (
+    <>
+      {data.track_border_thickness > 0 ? (
+        <defs>
+          <mask id={maskId}>
+            <SegmentMaskRects segments={segments} />
+          </mask>
+        </defs>
+      ) : null}
+      {shadowColor ? (
+        <g
+          transform={`translate(${shadowEnabled.distance} ${shadowEnabled.distance})`}
+          filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
+          mask={data.track_border_thickness > 0 ? `url(#${maskId})` : undefined}
+        >
+          <SegmentRects segments={segments} layer="outer" fill={shadowColor.color} opacity={shadowColor.opacity} />
+        </g>
+      ) : null}
+      {data.track_border_thickness > 0 ? (
+        <SegmentRects segments={segments} layer="outer" fill={data.track_border_color} mask={`url(#${maskId})`} opacity={opacity} />
+      ) : null}
+      <SegmentRects
+        segments={segments}
+        layer={data.track_border_thickness > 0 ? 'inner' : 'outer'}
+        fill={data.track_empty_color}
+        fillOpacity={data.track_empty_opacity}
+        opacity={opacity}
+        data-testid={segmented ? 'linear-gauge-bar-empty' : 'linear-gauge-empty-track'}
+      />
+      {segmented ? (
+        <SegmentRects
+          segments={segments.slice(0, filledCount)}
+          layer="inner"
+          fill={data.track_filled_color}
+          fillOpacity={data.track_filled_opacity}
+          opacity={opacity}
+          data-testid="linear-gauge-bar-filled"
+        />
+      ) : (
+        continuousFill
+      )}
+    </>
+  )
 }
 
 function getLinearGaugeLabelLayout({ data, width, height, labelFontFamily, labelFontSize, minLabel, maxLabel }) {
@@ -111,6 +213,7 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
   const values = seriesForWidget(activity, widget)
   const value = getInterpolatedActivityValue(activity, data.value || widget.type, previewSecond)
   const borderThickness = data.track_border_thickness ?? 0
+  const segmented = data.track_fill_style === 'bars'
   const layout = getLinearGaugeLayout({
     value,
     values,
@@ -130,8 +233,6 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
   const shadowEnabled = borderThickness > 0 && shadow
   const shadowFilterId = shadowEnabled?.strength > 0 ? `linear-gauge-${widget.id || maskId}-shadow` : null
   const fillIsFlat = Boolean(data.track_fill_flat)
-  const shadowMaskId = `${maskId}-shadow-mask`
-  const trackCornerRadii = getRectCornerRadii(cornerRadius, width, height)
   const innerTrackRect = {
     x: borderThickness,
     y: borderThickness,
@@ -140,23 +241,6 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
   }
   const innerTrackCornerRadii = getRectCornerRadii(fillCornerRadius, innerTrackRect.width, innerTrackRect.height)
   const fillCornerRadii = getRectCornerRadii(fillCornerRadius, layout.fillRect.width, layout.fillRect.height)
-  const shadowColor = shadowEnabled ? normalizeSvgShadowColor(shadowEnabled.color, opacity) : null
-  const outerShadow =
-    shadowColor != null ? (
-      <g transform={`translate(${shadowEnabled.distance} ${shadowEnabled.distance})`} filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}>
-        <rect
-          x={0}
-          y={0}
-          width={width}
-          height={height}
-          rx={trackCornerRadii.rx}
-          ry={trackCornerRadii.ry}
-          fill={shadowColor.color}
-          opacity={shadowColor.opacity}
-          mask={borderThickness > 0 ? `url(#${shadowMaskId})` : undefined}
-        />
-      </g>
-    ) : null
   const useRoundedFill = fillCornerRadius > 0
   const filledTrack =
     useRoundedFill && fillIsFlat ? (
@@ -208,95 +292,32 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
       data-testid="linear-gauge-preview"
     >
       {shadowFilterId ? <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadowEnabled} /> : null}
-      {borderThickness > 0 || useRoundedFill ? (
+      {!segmented && useRoundedFill ? (
         <defs>
-          {borderThickness > 0 ? (
-            <>
-              <mask id={maskId}>
-                <rect x={0} y={0} width={width} height={height} rx={trackCornerRadii.rx} ry={trackCornerRadii.ry} fill="white" />
-                <rect
-                  x={innerTrackRect.x}
-                  y={innerTrackRect.y}
-                  width={innerTrackRect.width}
-                  height={innerTrackRect.height}
-                  rx={innerTrackCornerRadii.rx}
-                  ry={innerTrackCornerRadii.ry}
-                  fill="black"
-                />
-              </mask>
-              <mask id={shadowMaskId}>
-                <rect x={0} y={0} width={width} height={height} rx={trackCornerRadii.rx} ry={trackCornerRadii.ry} fill="white" />
-                <rect
-                  x={innerTrackRect.x}
-                  y={innerTrackRect.y}
-                  width={innerTrackRect.width}
-                  height={innerTrackRect.height}
-                  rx={innerTrackCornerRadii.rx}
-                  ry={innerTrackCornerRadii.ry}
-                  fill="black"
-                />
-              </mask>
-            </>
-          ) : null}
-          {useRoundedFill ? (
-            <>
-              <clipPath id={flatFillClipId}>
-                <rect x={layout.fillRect.x} y={layout.fillRect.y} width={layout.fillRect.width} height={layout.fillRect.height} />
-              </clipPath>
-              <clipPath id={innerTrackClipId}>
-                <rect
-                  x={innerTrackRect.x}
-                  y={innerTrackRect.y}
-                  width={innerTrackRect.width}
-                  height={innerTrackRect.height}
-                  rx={innerTrackCornerRadii.rx}
-                  ry={innerTrackCornerRadii.ry}
-                />
-              </clipPath>
-            </>
-          ) : null}
+          <clipPath id={flatFillClipId}>
+            <rect x={layout.fillRect.x} y={layout.fillRect.y} width={layout.fillRect.width} height={layout.fillRect.height} />
+          </clipPath>
+          <clipPath id={innerTrackClipId}>
+            <rect
+              x={innerTrackRect.x}
+              y={innerTrackRect.y}
+              width={innerTrackRect.width}
+              height={innerTrackRect.height}
+              rx={innerTrackCornerRadii.rx}
+              ry={innerTrackCornerRadii.ry}
+            />
+          </clipPath>
         </defs>
       ) : null}
-      {outerShadow}
-      {borderThickness > 0 ? (
-        <rect
-          x={0}
-          y={0}
-          width={width}
-          height={height}
-          rx={trackCornerRadii.rx}
-          ry={trackCornerRadii.ry}
-          fill={data.track_border_color}
-          mask={`url(#${maskId})`}
-          opacity={opacity}
-        />
-      ) : (
-        <rect
-          x={0}
-          y={0}
-          width={width}
-          height={height}
-          rx={trackCornerRadii.rx}
-          ry={trackCornerRadii.ry}
-          fill={data.track_empty_color}
-          fillOpacity={data.track_empty_opacity}
-          opacity={opacity}
-        />
-      )}
-      {borderThickness > 0 ? (
-        <rect
-          x={innerTrackRect.x}
-          y={innerTrackRect.y}
-          width={innerTrackRect.width}
-          height={innerTrackRect.height}
-          rx={innerTrackCornerRadii.rx}
-          ry={innerTrackCornerRadii.ry}
-          fill={data.track_empty_color}
-          fillOpacity={data.track_empty_opacity}
-          opacity={opacity}
-        />
-      ) : null}
-      {filledTrack}
+      <LinearGaugeTrack
+        data={data}
+        layout={layout}
+        opacity={opacity}
+        maskId={maskId}
+        shadowEnabled={shadowEnabled}
+        shadowFilterId={shadowFilterId}
+        continuousFill={filledTrack}
+      />
       {showLabels ? (
         <>
           <PreviewSvgText

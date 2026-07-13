@@ -202,6 +202,49 @@ describe('MetricWidgetEditor linear gauge controls', () => {
       }),
     )
   })
+
+  test('shows explicit bar count and gap controls without auto controls', () => {
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'linear',
+          display_variants: {
+            linear: {
+              width: 200,
+              height: 40,
+              rotation: 0,
+              orientation: 'horizontal',
+              track_fill_style: 'bars',
+              bar_count: 12,
+              bar_gap: 4,
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_fill_flat: false,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_position: 'bottom',
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Bar Count')).toBeInTheDocument()
+    expect(screen.getByText('Bar Gap')).toBeInTheDocument()
+    expect(screen.queryByText('Auto Count')).not.toBeInTheDocument()
+    expect(screen.queryByText('Auto Gap')).not.toBeInTheDocument()
+    expect(updateWidgetData).not.toHaveBeenCalled()
+  })
 })
 
 describe('MetricWidgetEditor arc gauge controls', () => {

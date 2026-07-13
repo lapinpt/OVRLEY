@@ -4,6 +4,7 @@
 //! circular offset curves and endpoint fillets, while linear gauges use RRects.
 
 use crate::normalize::{
+    arc_track_radius, corner_track_cap_padding, corner_track_radius,
     ValidatedCornerGaugeOrientation, MAX_ARC_ANGLE_DEGREES, MIN_ARC_ANGLE_DEGREES,
 };
 use skia_safe::{Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType, Point};
@@ -48,10 +49,7 @@ pub(crate) struct ArcTrackSpec {
 #[derive(Clone, Copy, Debug)]
 enum RevealClip {
     Track(ArcTrackSpec),
-    TranslatedCap {
-        cap_radius: f32,
-        cap_offset: f32,
-    },
+    TranslatedCap { cap_radius: f32, cap_offset: f32 },
 }
 
 impl RevealClip {
@@ -367,8 +365,11 @@ pub fn corner_start_end_angles(orientation: ValidatedCornerGaugeOrientation) -> 
 /// Calculates an arc radius that keeps the filled track and its border inside
 /// the widget's smaller dimension.
 pub fn arc_radius(width: f32, height: f32, track_thickness: f32, border_thickness: f32) -> f32 {
-    let outer_half_thickness = track_thickness.max(0.0) * 0.5 + border_thickness.max(0.0);
-    (width.min(height) * 0.5 - outer_half_thickness).max(0.0)
+    arc_track_radius(
+        width.min(height),
+        track_thickness.max(0.0),
+        border_thickness.max(0.0),
+    )
 }
 
 /// Returns a point on the arc for a Skia screen-space angle.
@@ -425,8 +426,12 @@ pub fn corner_gauge_geometry(
     let frame_size = width.min(height).max(0.0);
     let track_thickness = track_thickness.max(0.0);
     let border_thickness = border_thickness.max(0.0);
-    let cap_padding =
-        (track_corner_radius.clamp(0.0, track_thickness * 0.5) + border_thickness).min(frame_size);
+    let cap_padding = corner_track_cap_padding(
+        frame_size,
+        track_thickness,
+        track_corner_radius,
+        border_thickness,
+    );
     let inner_inset = frame_size * CORNER_GAUGE_INNER_INSET / CORNER_GAUGE_DEFAULT_FRAME_SIZE;
     let is_bottom_right = orientation == ValidatedCornerGaugeOrientation::BottomRight;
     let center_x = if is_bottom_right {
@@ -444,7 +449,12 @@ pub fn corner_gauge_geometry(
             inner_inset
         },
         inner_widget_center_y: height - inner_inset,
-        radius: (frame_size - cap_padding - track_thickness * 0.5 - border_thickness).max(0.0),
+        radius: corner_track_radius(
+            frame_size,
+            track_thickness,
+            track_corner_radius,
+            border_thickness,
+        ),
         start_angle,
         sweep_angle: end_angle - start_angle,
     }

@@ -10,7 +10,7 @@
 //! - `type` (MetricKind) selects the telemetry data source.
 //! - `display_type` (DisplayType) selects the visual presentation.
 //! - Intrinsic text rendering stays in the value module.
-//! - Boxed metric presentations (heading_tape, and future linear/bars/arc/corner)
+//! - Boxed metric presentations (heading_tape, linear, arc, and corner)
 //!   are dispatched here.
 //!
 //! Route and elevation remain separate true graphical widgets outside this
@@ -35,7 +35,7 @@ use std::collections::BTreeMap;
 ///
 /// Returns `Some(WidgetRenderReport)` if the presentation was drawn, or `None`
 /// if the display type has no boxed rendering implementation yet (future display
-/// types like linear, bars, arc, corner).
+/// types like linear, arc, and corner).
 #[allow(clippy::too_many_arguments)]
 pub fn draw_metric_presentation(
     canvas: &Canvas,
@@ -75,7 +75,6 @@ pub fn draw_metric_presentation(
             frame_index,
             frame_profiler,
         ),
-        DisplayType::Bars => None,
     }
 }
 

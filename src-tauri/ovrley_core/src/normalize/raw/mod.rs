@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use crate::error::{CoreError, CoreResult};
-use crate::types::{BackdropType, DisplayType, MetricKind};
+use crate::types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 2;
@@ -290,6 +290,12 @@ pub struct ValueConfig {
     pub track_filled_opacity: Option<f32>,
     #[serde(default)]
     pub track_fill_flat: Option<bool>,
+    #[serde(default)]
+    pub track_fill_style: Option<TrackFillStyle>,
+    #[serde(default)]
+    pub bar_count: Option<u32>,
+    #[serde(default)]
+    pub bar_gap: Option<f32>,
     #[serde(default)]
     pub show_min_max_labels: Option<bool>,
     #[serde(default)]

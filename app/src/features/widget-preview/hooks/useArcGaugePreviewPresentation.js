@@ -3,6 +3,7 @@ import { getInterpolatedActivityValue } from '@/features/overlay-editor'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from '../utils/arcGaugeLayout'
 import { getArcInnerWidgetLayout } from '../utils/arcGaugeInnerLayout'
 import { getArcFilledTrackRevealSpec, getArcPoint } from '../utils/arcTrackPath'
+import { getArcBarSegments, getBarFillCount } from '../utils/gaugeBarGeometry'
 import { buildArcGaugeInnerWidgetModel } from '../utils/metricWidgetPreviewUtils'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { getPreviewFontFamily, measurePreviewText } from '../utils/textMeasurement'
@@ -64,13 +65,25 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
     }
     const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond })
     const opacity = data.opacity * globalOpacity
+    const segmented = data.track_fill_style === 'bars'
     const fillEndCornerRadius = data.track_fill_flat ? 0 : data.track_corner_radius
-    const fillReveal = getArcFilledTrackRevealSpec({
-      ...trackGeometry,
-      startCornerRadius: data.track_corner_radius,
-      endCornerRadius: fillEndCornerRadius,
-      fill: layout.fill,
-    })
+    const fillReveal = segmented
+      ? null
+      : getArcFilledTrackRevealSpec({
+          ...trackGeometry,
+          startCornerRadius: data.track_corner_radius,
+          endCornerRadius: fillEndCornerRadius,
+          fill: layout.fill,
+        })
+    const barLayout = segmented
+      ? getArcBarSegments({
+          ...trackGeometry,
+          borderThickness: data.track_border_thickness,
+          cornerRadius: data.track_corner_radius,
+          bar_count: data.bar_count,
+          bar_gap: data.bar_gap,
+        })
+      : null
     const minLabel = `${layout.min}`
     const maxLabel = `${layout.max}`
 
@@ -83,6 +96,8 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
       fillEndCornerRadius,
       outerCornerRadius: data.track_corner_radius + data.track_border_thickness,
       fillReveal,
+      barLayout,
+      filledBarCount: barLayout ? getBarFillCount(layout.fill, barLayout.count) : 0,
       minLabel,
       maxLabel,
       labels: data.show_min_max_labels ? getLabelLayout(layout, minLabel, maxLabel, labelFontFamily, data.min_max_label_font_size) : null,

@@ -12,6 +12,12 @@ pub fn fill_percentage(value: f64, min: f64, max: f64) -> f32 {
     ((value - min) / (max - min)).clamp(0.0, 1.0) as f32
 }
 
+/// Returns the number of whole segments enabled by a clamped fill fraction.
+pub fn bar_fill_count(fill01: f32, count: u32) -> usize {
+    let fill = fill01.clamp(0.0, 1.0);
+    (fill * count as f32).floor() as usize
+}
+
 pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
     let mut min_value = f64::INFINITY;
     let mut max_value = f64::NEG_INFINITY;
@@ -56,5 +62,22 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
         MetricKind::CoreTemperature => &series.core_temperature,
         MetricKind::Heading => &series.heading,
         MetricKind::LeftRightBalance | MetricKind::Gradient | MetricKind::Time => &[],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bar_fill_count;
+
+    #[test]
+    fn whole_bar_bucket_boundaries_are_discrete() {
+        assert_eq!(bar_fill_count(0.0, 5), 0);
+        assert_eq!(bar_fill_count(0.1999, 5), 0);
+        assert_eq!(bar_fill_count(0.2, 5), 1);
+        assert_eq!(bar_fill_count(0.9999, 5), 4);
+        assert_eq!(bar_fill_count(1.0, 5), 5);
+        assert_eq!(bar_fill_count(1.5, 5), 5);
+        assert_eq!(bar_fill_count(0.5, 1), 0);
+        assert_eq!(bar_fill_count(1.0, 1), 1);
     }
 }

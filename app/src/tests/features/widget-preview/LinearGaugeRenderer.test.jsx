@@ -21,6 +21,7 @@ function makeWidget(overrides = {}) {
       track_filled_color: '#40e0d0',
       track_filled_opacity: 1,
       track_fill_flat: false,
+      track_fill_style: 'fill',
       show_min_max_labels: false,
       min_max_label_font: 'Arial.ttf',
       min_max_label_font_size: 12,
@@ -109,7 +110,7 @@ describe('OverlayLinearGaugeWidget', () => {
     expect(shadowGroup).toBeTruthy()
     expect(shadowRect).toBeTruthy()
     expect(borderRect).toBeTruthy()
-    expect(shadowRect).toHaveAttribute('mask')
+    expect(shadowGroup).toHaveAttribute('mask')
     expect(borderRect).not.toHaveAttribute('filter')
     expect(shadowGroup.compareDocumentPosition(borderRect) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
@@ -128,5 +129,20 @@ describe('OverlayLinearGaugeWidget', () => {
     const svg = screen.getByTestId('linear-gauge-preview')
     expect(svg.querySelector('g[filter]')).toBeNull()
     expect(svg.querySelector('filter')).toBeNull()
+  })
+
+  test('replaces the continuous track with discrete empty and filled bars', () => {
+    render(
+      <OverlayLinearGaugeWidget
+        widget={makeWidget({ track_fill_style: 'bars', bar_count: 5, bar_gap: 4 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalScale={1}
+      />,
+    )
+
+    expect(screen.getAllByTestId('linear-gauge-bar-empty')).toHaveLength(5)
+    expect(screen.getAllByTestId('linear-gauge-bar-filled')).toHaveLength(2)
+    expect(screen.getByTestId('linear-gauge-preview').querySelector('rect[width="200"]')).toBeNull()
   })
 })

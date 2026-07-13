@@ -6,7 +6,9 @@
 //! dynamic filled portion is drawn per-frame on top.
 
 use super::labels::format_gauge_label;
-use super::range::{fill_percentage as shared_fill_percentage, metric_range, metric_values};
+use super::range::{
+    bar_fill_count, fill_percentage as shared_fill_percentage, metric_range, metric_values,
+};
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
@@ -21,7 +23,7 @@ use crate::render::widgets::types::{
     LinearGaugeCache, LinearGaugeFrameState, WidgetFrameReport, WidgetGeometryReport,
     WidgetRenderReport,
 };
-use crate::types::DisplayType;
+use crate::types::{DisplayType, TrackFillStyle};
 use skia_safe::{
     image_filters, BlendMode, Canvas, Paint, PathBuilder, PathFillType, Point, RRect, Rect,
 };
@@ -190,6 +192,8 @@ pub fn prepare_linear_gauge_cache(
             track_filled_color: gauge.track_filled_color.clone(),
             track_filled_opacity: gauge.track_filled_opacity,
             track_fill_flat: gauge.track_fill_flat,
+            track_fill_style: gauge.track_fill_style,
+            bar_geometry: crate::normalize::scale_bar_geometry(gauge.bar_geometry, scale),
             min_value,
             max_value,
             frame_states,
@@ -220,53 +224,10 @@ pub fn draw_linear_gauge_widget(
             .frame_states
             .get(frame_index)
             .or_else(|| cache.frame_states.last())?;
-        let (x, y, width, height) = bordered_bar_fill_rect(
-            cache.x,
-            cache.y,
-            cache.width as f32,
-            cache.height as f32,
-            state.fill01,
-            cache.orientation.into(),
-            cache.track_border_thickness,
-        );
-        if width > 0.0 && height > 0.0 {
-            let mut fill_paint = Paint::default();
-            fill_paint.set_anti_alias(true);
-            fill_paint.set_color(parse_color(
-                &cache.track_filled_color,
-                cache.track_filled_opacity,
-            ));
-            let fill_rect = Rect::from_xywh(x, y, width, height);
-            let radius = (cache.track_corner_radius - cache.track_border_thickness).max(0.0);
-            if radius > 0.0 {
-                let inset = cache.track_border_thickness.max(0.0);
-                let inner_rect = Rect::from_xywh(
-                    cache.x + inset,
-                    cache.y + inset,
-                    (cache.width as f32 - inset * 2.0).max(0.0),
-                    (cache.height as f32 - inset * 2.0).max(0.0),
-                );
-                let inner_rrect = RRect::new_rect_xy(inner_rect, radius, radius);
-
-                canvas.save();
-                if cache.track_fill_flat {
-                    canvas.clip_rect(fill_rect, skia_safe::ClipOp::Intersect, true);
-                    canvas.draw_rrect(inner_rrect, &fill_paint);
-                } else {
-                    canvas.clip_rrect(inner_rrect, skia_safe::ClipOp::Intersect, true);
-                    canvas.draw_rrect(
-                        RRect::new_rect_xy(
-                            fill_rect,
-                            radius.min(width * 0.5).max(0.0),
-                            radius.min(height * 0.5).max(0.0),
-                        ),
-                        &fill_paint,
-                    );
-                }
-                canvas.restore();
-            } else {
-                canvas.draw_rrect(RRect::new_rect_xy(fill_rect, radius, radius), &fill_paint);
-            }
+        if cache.track_fill_style == TrackFillStyle::Bars {
+            draw_segmented_linear_fill(canvas, cache, state.fill01);
+        } else {
+            draw_continuous_linear_fill(canvas, cache, state.fill01);
         }
 
         Some(WidgetRenderReport {
@@ -327,68 +288,28 @@ fn draw_static_linear_layer(
         None
     };
 
-    if let Some(ref filter) = shadow_filter {
-        let outer_rrect = RRect::new_rect_xy(Rect::from_xywh(0.0, 0.0, w, h), radius, radius);
-        let mut shadow_paint = Paint::default();
-        shadow_paint.set_anti_alias(true);
-        shadow_paint.set_color(skia_safe::Color::BLACK);
-        shadow_paint.set_image_filter(filter.clone());
-        if border > 0.0 {
-            let inner_rect = Rect::from_xywh(
-                border,
-                border,
-                (w - border * 2.0).max(0.0),
-                (h - border * 2.0).max(0.0),
+    if let Some(bar_geometry) = gauge.bar_geometry {
+        for index in 0..bar_geometry.count {
+            let rect = linear_segment_rect(
+                index,
+                bar_geometry.extent * scale,
+                bar_geometry.gap * scale,
+                w,
+                h,
+                gauge.orientation,
             );
-            let inner_radius = (radius - border).max(0.0);
-            let inner_rrect = RRect::new_rect_xy(inner_rect, inner_radius, inner_radius);
-            let mut ring_path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
-            ring_path.add_rrect(outer_rrect, None, None);
-            ring_path.add_rrect(inner_rrect, None, None);
-            let ring_path = ring_path.detach();
-            canvas.draw_path(&ring_path, &shadow_paint);
-        } else {
-            canvas.draw_rrect(outer_rrect, &shadow_paint);
+            draw_static_linear_track(canvas, gauge, rect, radius, border, shadow_filter.as_ref());
         }
-    }
-
-    if border > 0.0 {
-        let outer_rect = Rect::from_xywh(0.0, 0.0, w, h);
-        let outer_rrect = RRect::new_rect_xy(outer_rect, radius, radius);
-        let mut border_paint = Paint::default();
-        border_paint.set_anti_alias(true);
-        border_paint.set_color(parse_color(&gauge.track_border_color, 1.0));
-        canvas.draw_rrect(outer_rrect, &border_paint);
-
-        let inner_rect = Rect::from_xywh(
+    } else {
+        draw_static_linear_track(
+            canvas,
+            gauge,
+            Rect::from_xywh(0.0, 0.0, w, h),
+            radius,
             border,
-            border,
-            (w - border * 2.0).max(0.0),
-            (h - border * 2.0).max(0.0),
+            shadow_filter.as_ref(),
         );
-        let inner_radius = (radius - border).max(0.0);
-        let inner_rrect = RRect::new_rect_xy(inner_rect, inner_radius, inner_radius);
-        let mut clear_paint = Paint::default();
-        clear_paint.set_anti_alias(true);
-        clear_paint.set_blend_mode(BlendMode::Clear);
-        canvas.draw_rrect(inner_rrect, &clear_paint);
     }
-
-    let inner_rect = Rect::from_xywh(
-        border,
-        border,
-        (w - border * 2.0).max(0.0),
-        (h - border * 2.0).max(0.0),
-    );
-    let inner_radius = (radius - border).max(0.0);
-    let inner_rrect = RRect::new_rect_xy(inner_rect, inner_radius, inner_radius);
-    let mut empty_paint = Paint::default();
-    empty_paint.set_anti_alias(true);
-    empty_paint.set_color(parse_color(
-        &gauge.track_empty_color,
-        gauge.track_empty_opacity,
-    ));
-    canvas.draw_rrect(inner_rrect, &empty_paint);
 
     if gauge.show_min_max_labels {
         let font_size = gauge.min_max_label_font_size * scale;
@@ -403,6 +324,169 @@ fn draw_static_linear_layer(
     }
 
     Ok(())
+}
+
+fn linear_segment_rect(
+    index: u32,
+    extent: f32,
+    gap: f32,
+    width: f32,
+    height: f32,
+    orientation: ValidatedLinearGaugeOrientation,
+) -> Rect {
+    match orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => {
+            Rect::from_xywh(index as f32 * (extent + gap), 0.0, extent, height)
+        }
+        ValidatedLinearGaugeOrientation::Vertical => Rect::from_xywh(
+            0.0,
+            height - extent - index as f32 * (extent + gap),
+            width,
+            extent,
+        ),
+    }
+}
+
+fn draw_static_linear_track(
+    canvas: &Canvas,
+    gauge: &ValidatedLinearGaugeWidget,
+    rect: Rect,
+    configured_radius: f32,
+    border: f32,
+    shadow_filter: Option<&skia_safe::ImageFilter>,
+) {
+    let radius = configured_radius
+        .min(rect.width() * 0.5)
+        .min(rect.height() * 0.5);
+    let outer_rrect = RRect::new_rect_xy(rect, radius, radius);
+    let inner_rect = Rect::from_xywh(
+        rect.left + border,
+        rect.top + border,
+        (rect.width() - border * 2.0).max(0.0),
+        (rect.height() - border * 2.0).max(0.0),
+    );
+    let inner_radius = (radius - border).max(0.0);
+    let inner_rrect = RRect::new_rect_xy(inner_rect, inner_radius, inner_radius);
+
+    if let Some(filter) = shadow_filter {
+        let mut shadow_paint = Paint::default();
+        shadow_paint.set_anti_alias(true);
+        shadow_paint.set_color(skia_safe::Color::BLACK);
+        shadow_paint.set_image_filter(filter.clone());
+        if border > 0.0 {
+            let mut ring_path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
+            ring_path.add_rrect(outer_rrect, None, None);
+            ring_path.add_rrect(inner_rrect, None, None);
+            canvas.draw_path(&ring_path.detach(), &shadow_paint);
+        } else {
+            canvas.draw_rrect(outer_rrect, &shadow_paint);
+        }
+    }
+
+    if border > 0.0 {
+        let mut border_paint = Paint::default();
+        border_paint.set_anti_alias(true);
+        border_paint.set_color(parse_color(&gauge.track_border_color, 1.0));
+        canvas.draw_rrect(outer_rrect, &border_paint);
+
+        let mut clear_paint = Paint::default();
+        clear_paint.set_anti_alias(true);
+        clear_paint.set_blend_mode(BlendMode::Clear);
+        canvas.draw_rrect(inner_rrect, &clear_paint);
+    }
+
+    let mut empty_paint = Paint::default();
+    empty_paint.set_anti_alias(true);
+    empty_paint.set_color(parse_color(
+        &gauge.track_empty_color,
+        gauge.track_empty_opacity,
+    ));
+    canvas.draw_rrect(inner_rrect, &empty_paint);
+}
+
+fn draw_segmented_linear_fill(canvas: &Canvas, cache: &LinearGaugeCache, fill01: f32) {
+    let bar_geometry = cache
+        .bar_geometry
+        .expect("bars fill style must carry resolved bar geometry");
+    let filled_count = bar_fill_count(fill01, bar_geometry.count);
+    let paint = linear_fill_paint(cache);
+
+    for index in 0..filled_count as u32 {
+        let outer = linear_segment_rect(
+            index,
+            bar_geometry.extent,
+            bar_geometry.gap,
+            cache.width as f32,
+            cache.height as f32,
+            cache.orientation,
+        );
+        let border = cache.track_border_thickness;
+        let inner = Rect::from_xywh(
+            cache.x + outer.left + border,
+            cache.y + outer.top + border,
+            (outer.width() - border * 2.0).max(0.0),
+            (outer.height() - border * 2.0).max(0.0),
+        );
+        let radius = (cache.track_corner_radius - border)
+            .max(0.0)
+            .min(inner.width() * 0.5)
+            .min(inner.height() * 0.5);
+        canvas.draw_rrect(RRect::new_rect_xy(inner, radius, radius), &paint);
+    }
+}
+
+fn draw_continuous_linear_fill(canvas: &Canvas, cache: &LinearGaugeCache, fill01: f32) {
+    let (x, y, width, height) = bordered_bar_fill_rect(
+        cache.x,
+        cache.y,
+        cache.width as f32,
+        cache.height as f32,
+        fill01,
+        cache.orientation.into(),
+        cache.track_border_thickness,
+    );
+    if width <= 0.0 || height <= 0.0 {
+        return;
+    }
+
+    let fill_paint = linear_fill_paint(cache);
+    let fill_rect = Rect::from_xywh(x, y, width, height);
+    let radius = (cache.track_corner_radius - cache.track_border_thickness).max(0.0);
+    if radius == 0.0 {
+        canvas.draw_rrect(RRect::new_rect_xy(fill_rect, radius, radius), &fill_paint);
+        return;
+    }
+
+    let inset = cache.track_border_thickness.max(0.0);
+    let inner_rect = Rect::from_xywh(
+        cache.x + inset,
+        cache.y + inset,
+        (cache.width as f32 - inset * 2.0).max(0.0),
+        (cache.height as f32 - inset * 2.0).max(0.0),
+    );
+    let inner_rrect = RRect::new_rect_xy(inner_rect, radius, radius);
+    canvas.save();
+    if cache.track_fill_flat {
+        canvas.clip_rect(fill_rect, skia_safe::ClipOp::Intersect, true);
+        canvas.draw_rrect(inner_rrect, &fill_paint);
+    } else {
+        canvas.clip_rrect(inner_rrect, skia_safe::ClipOp::Intersect, true);
+        canvas.draw_rrect(
+            RRect::new_rect_xy(fill_rect, radius.min(width * 0.5), radius.min(height * 0.5)),
+            &fill_paint,
+        );
+    }
+    canvas.restore();
+}
+
+fn linear_fill_paint(cache: &LinearGaugeCache) -> Paint {
+    let mut paint = Paint::default();
+    paint.set_anti_alias(true);
+    paint.set_color(parse_color(
+        &cache.track_filled_color,
+        cache.track_filled_opacity,
+    ));
+    paint
 }
 
 fn linear_gauge_label_padding(

@@ -89,6 +89,7 @@
         "defaults": {
           "width": 80,
           "orientation": "horizontal",
+          "track_fill_style": "fill",
           "track_corner_radius": 12,
           "track_border_thickness": 0,
           "track_border_color": "#ffffff",
@@ -104,13 +105,6 @@
           "min_max_label_color": "#ffffff"
         }
       },
-      "bars": {
-        "label": "Bars",
-        "icon": { "source": "shared", "assetFile": "display-type-bars.svg" },
-        "layoutMode": "boxed",
-        "defaultFrameWidth": 200,
-        "defaultFrameHeight": 60
-      },
       "arc": {
         "label": "Arc Gauge",
         "icon": {
@@ -124,6 +118,7 @@
         "defaultFontSize": 60,
         "defaults": {
           "arc_angle": 225,
+          "track_fill_style": "fill",
           "inner_widget_offset_x": 0,
           "inner_widget_offset_y": 0,
           "track_thickness": 24,
@@ -154,6 +149,7 @@
         "defaultFontSize": 35,
         "defaults": {
           "corner_orientation": "bottom-left",
+          "track_fill_style": "fill",
           "inner_widget_offset_x": 0,
           "inner_widget_offset_y": 0,
           "track_thickness": 24,

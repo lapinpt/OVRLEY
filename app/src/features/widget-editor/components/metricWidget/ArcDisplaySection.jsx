@@ -12,6 +12,9 @@ import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SliderField, ToggleField } from '../widgetFormControls'
+import BarFillStyleControls from './BarFillStyleControls'
+import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/utils/arcGaugeLayout'
+import { getSuggestedArcBarGeometry } from '@/features/widget-preview/utils/gaugeBarGeometry'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
@@ -19,6 +22,11 @@ const CORNER_ORIENTATION_OPTIONS = [
   { value: 'bottom-left', label: 'Bottom Left' },
   { value: 'bottom-right', label: 'Bottom Right' },
 ]
+
+function suggestArcBarGeometry(data) {
+  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
+  return getSuggestedArcBarGeometry({ ...layout, borderThickness: data.track_border_thickness })
+}
 
 /**
  * Arc-shaped gauge controls. Each display type owns its own variant data while
@@ -110,6 +118,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             onSliderChange={(track_corner_radius) => updateArc({ track_corner_radius })}
           />
         </div>
+        <BarFillStyleControls data={arcData} suggestBarGeometry={suggestArcBarGeometry} updateVariant={updateArc} />
         <div className="grid grid-cols-2 gap-4">
           <ColorField label="Border Color" value={arcData.track_border_color} onChange={(track_border_color) => updateArc({ track_border_color })} />
           <SliderField
@@ -145,10 +154,6 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             valueDisplay={`${Math.round((arcData.track_filled_opacity ?? 0) * 100)}%`}
             onSliderChange={(track_filled_opacity) => updateArc({ track_filled_opacity })}
           />
-          <div className="flex items-center justify-between gap-2 px-1 self-end pb-2 pt-2">
-            <span className="text-[9px] text-muted-foreground uppercase font-bold">Flat</span>
-            <ToggleField checked={arcData.track_fill_flat} onCheckedChange={(track_fill_flat) => updateArc({ track_fill_flat })} />
-          </div>
         </div>
       </div>
 

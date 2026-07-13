@@ -10,7 +10,7 @@ use ovrley_core::render::widgets::gauges::arc::{
 };
 use ovrley_core::render::widgets::types::PresentationCache;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
-use ovrley_core::types::{DisplayType, MetricKind};
+use ovrley_core::types::{DisplayType, MetricKind, TrackFillStyle};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -120,6 +120,26 @@ fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
     );
     assert_eq!(cache.track_thickness, 12.0);
     assert!(cache.track_fill_flat);
+}
+
+#[test]
+fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
+    let mut raw_config = full_arc_gauge_config(20, 30);
+    raw_config["track_fill_style"] = serde_json::json!("bars");
+    raw_config["bar_count"] = serde_json::json!(8);
+    raw_config["bar_gap"] = serde_json::json!(4);
+    let config = validate_single_arc(raw_config).unwrap();
+    let paths = test_paths();
+    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
+    let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
+    let mut profiler = RenderProfiler::default();
+    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+
+    let Some(PresentationCache::ArcGauge(cache)) = assets.presentation_caches.get(&0) else {
+        panic!("arc bars should use the arc gauge cache");
+    };
+    assert_eq!(cache.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(cache.bar_geometry.unwrap().count, 8);
 }
 
 #[test]

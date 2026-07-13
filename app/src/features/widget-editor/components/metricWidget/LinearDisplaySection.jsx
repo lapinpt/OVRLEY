@@ -5,6 +5,8 @@ import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import BarFillStyleControls from './BarFillStyleControls'
+import { getSuggestedLinearBarGeometry } from '@/features/widget-preview/utils/gaugeBarGeometry'
 
 const ORIENTATION_OPTIONS = [
   { value: 'horizontal', label: 'Horizontal' },
@@ -124,6 +126,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             onSliderChange={(value) => updateLinear({ track_corner_radius: Math.min(Math.max(0, value), cornerRadiusMax) })}
           />
         </div>
+        <BarFillStyleControls data={linearData} suggestBarGeometry={getSuggestedLinearBarGeometry} updateVariant={updateLinear} />
         <div className="grid grid-cols-2 gap-4">
           <ColorField label="Border Color" value={linearData.track_border_color} onChange={(value) => updateLinear({ track_border_color: value })} />
           <SliderField
@@ -160,10 +163,6 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             valueDisplay={`${Math.round(linearData.track_filled_opacity * 100)}%`}
             onSliderChange={(value) => updateLinear({ track_filled_opacity: value })}
           />
-          <div className="flex items-center justify-between gap-2 px-1 self-end pb-2 pt-2">
-            <span className="text-[9px] text-muted-foreground uppercase font-bold">Flat</span>
-            <ToggleField checked={linearData.track_fill_flat} onCheckedChange={(checked) => updateLinear({ track_fill_flat: checked })} />
-          </div>
         </div>
       </div>
 

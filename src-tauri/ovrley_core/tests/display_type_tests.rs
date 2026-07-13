@@ -8,7 +8,7 @@ mod common;
 
 use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
-use ovrley_core::types::DisplayType;
+use ovrley_core::types::{DisplayType, TrackFillStyle};
 use serde_json::json;
 
 #[test]
@@ -16,7 +16,6 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
     let cases = [
         (r#""text""#, DisplayType::Text),
         (r#""linear""#, DisplayType::Linear),
-        (r#""bars""#, DisplayType::Bars),
         (r#""arc""#, DisplayType::Arc),
         (r#""corner""#, DisplayType::Corner),
         (r#""heading_tape""#, DisplayType::Tape),
@@ -32,11 +31,25 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
 }
 
 #[test]
+fn legacy_bars_display_type_falls_back_to_text() {
+    let parsed: DisplayType = serde_json::from_str(r#""bars""#).unwrap();
+    assert_eq!(parsed, DisplayType::Text);
+}
+
+#[test]
+fn track_fill_style_is_forgiving() {
+    let bars: TrackFillStyle = serde_json::from_str(r#""bars""#).unwrap();
+    let unknown: TrackFillStyle = serde_json::from_str(r#""unknown""#).unwrap();
+    assert_eq!(bars, TrackFillStyle::Bars);
+    assert_eq!(bars.as_str(), "bars");
+    assert_eq!(unknown, TrackFillStyle::Fill);
+}
+
+#[test]
 fn display_type_round_trips_each_variant() {
     let cases = [
         (DisplayType::Text, r#""text""#),
         (DisplayType::Linear, r#""linear""#),
-        (DisplayType::Bars, r#""bars""#),
         (DisplayType::Arc, r#""arc""#),
         (DisplayType::Corner, r#""corner""#),
         (DisplayType::Tape, r#""heading_tape""#),
@@ -169,10 +182,6 @@ fn display_type_is_intrinsic_only_for_text() {
     );
     assert_eq!(
         display_type_layout_mode(DisplayType::Linear),
-        DisplayTypeLayoutMode::Boxed
-    );
-    assert_eq!(
-        display_type_layout_mode(DisplayType::Bars),
         DisplayTypeLayoutMode::Boxed
     );
     assert_eq!(

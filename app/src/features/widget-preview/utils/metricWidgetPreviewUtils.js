@@ -5,7 +5,7 @@
  * for a metric widget (speed, heartrate, cadence, power, time, temperature) at
  * the given preview time.
  *
- * Boxed display types (heading_tape, linear, bars, arc, corner) are skipped —
+ * Boxed display types (heading_tape, linear, arc, corner) are skipped —
  * they use their own presentation-specific preview path driven by display_type.
  *
  * @param {object} params
