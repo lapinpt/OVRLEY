@@ -1,19 +1,19 @@
 //! Widget-specific test module root.
 //!
-//! Declares sub-modules for RDP simplification behavior tests applied
-//! to elevation and route data. These tests exercise internal widget
-//! types (`ElevationSample`, `RouteSample`) not available to crate-level
-//! integration tests. The parent `mod.rs` wires this module via
+//! Declares sub-modules for internal geometry and reduction behavior that is
+//! not part of the crate's public API. The parent `mod.rs` wires this module via
 //! `#[cfg(test)] mod tests;` because the tested functions are `pub(crate)`
 //! or private and require module-local access.
 //!
-//! ## Sub-modules
-//!
-//! - `rdp_elevation_tests.rs` — elevation-sample RDP simplification
-//! - `rdp_route_tests.rs` — route-sample RDP simplification
+//! Gauge modules here cover normalized fill, continuous reveal transitions,
+//! and segmented wedge geometry. Elevation and route modules cover frame
+//! state, projection, reduction, and RDP behavior.
 
+mod arc_gauge_path_tests;
+mod arc_gauge_segment_tests;
 mod elevation_frame_state_tests;
 mod elevation_geometry_tests;
 mod elevation_reduction_tests;
+mod gauge_metric_tests;
 mod rdp_elevation_tests;
 mod rdp_route_tests;

@@ -268,7 +268,6 @@ pub struct LinearGaugeCache {
     pub width: u32,
     pub height: u32,
     pub rotation: f32,
-    pub display_type: DisplayType,
     pub orientation: ValidatedLinearGaugeOrientation,
     pub track_corner_radius: f32,
     pub track_border_thickness: f32,
@@ -277,16 +276,12 @@ pub struct LinearGaugeCache {
     pub track_fill_flat: bool,
     pub track_fill_style: TrackFillStyle,
     pub bar_geometry: Option<ResolvedBarGeometry>,
-    pub min_value: f64,
-    pub max_value: f64,
     pub frame_states: Vec<LinearGaugeFrameState>,
 }
 
-/// Precomputed linear gauge state for one frame: the interpolated metric value
-/// and its fill fraction (0-1) for rendering the filled portion of the bar.
+/// Precomputed linear gauge fill fraction for one frame.
 #[derive(Clone, Copy, Debug)]
 pub struct LinearGaugeFrameState {
-    pub value: f64,
     pub fill01: f32,
 }
 
@@ -303,7 +298,6 @@ pub struct ArcGaugeCache {
     pub width: u32,
     pub height: u32,
     pub rotation: f32,
-    pub display_type: DisplayType,
     pub center_x: f32,
     pub center_y: f32,
     pub inner_widget_center_x: f32,
@@ -326,8 +320,6 @@ pub struct ArcGaugeCache {
     pub inner_widget_offset_x: f32,
     pub inner_widget_offset_y: f32,
     pub font_dirs: Vec<PathBuf>,
-    pub min_value: f64,
-    pub max_value: f64,
     pub frame_states: Vec<ArcGaugeFrameState>,
 }
 

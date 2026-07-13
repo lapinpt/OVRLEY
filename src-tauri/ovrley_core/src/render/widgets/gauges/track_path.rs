@@ -1,4 +1,8 @@
 //! Shared path geometry for rounded gauge tracks.
+//!
+//! Arc and linear tracks express their start edge as the same local frame:
+//! origin, forward tangent, and cross-track normal. That lets both renderers
+//! share identical rounded fillets and the translated cap used for tiny fills.
 
 use skia_safe::{Path, PathBuilder, PathFillType, Point};
 
@@ -7,6 +11,7 @@ pub(crate) const TRACK_PATH_EPSILON: f32 = 0.001;
 const QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_76;
 
 #[derive(Clone, Copy, Debug)]
+/// Local coordinate frame at a track endpoint.
 pub(crate) struct TrackPathFrame {
     pub origin: Point,
     pub tangent: Point,
@@ -23,11 +28,13 @@ impl TrackPathFrame {
 }
 
 #[derive(Clone, Copy, Debug)]
+/// Minimum rounded cap shifted backward along a track's tangent.
 pub(crate) struct TranslatedTrackCap {
     pub corner_radius: f32,
     pub cap_offset: f32,
 }
 
+/// Appends one rounded radial edge in the supplied endpoint frame.
 pub(crate) fn append_track_fillet(
     path: &mut PathBuilder,
     frame: TrackPathFrame,

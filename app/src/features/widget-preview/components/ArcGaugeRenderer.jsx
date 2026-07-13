@@ -24,29 +24,23 @@ function ArcSegmentPaths({ geometries, dataTestId, ...paint }) {
         fill={paint.fill}
         fillOpacity={paint.fillOpacity}
         fillRule="evenodd"
+        stroke={paint.stroke}
+        strokeOpacity={paint.strokeOpacity}
+        strokeWidth={paint.strokeWidth}
       />,
     )
   }
   return paths
 }
 
-function ArcSegmentMaskPaths({ geometries, outerStrokeWidth, outerCornerRadius, innerCornerRadius }) {
+function ArcSegmentMaskPaths({ geometries, borderThickness, cornerRadius }) {
   const paths = []
   for (let index = 0; index < geometries.length; index += 1) {
+    const path = getArcRoundedSegmentPath({ ...geometries[index], cornerRadius })
     paths.push(
       <g key={index}>
-        <path
-          d={getArcRoundedSegmentPath({ ...geometries[index], trackThickness: outerStrokeWidth, cornerRadius: outerCornerRadius })}
-          fill="#ffffff"
-          fillOpacity={1}
-          fillRule="evenodd"
-        />
-        <path
-          d={getArcRoundedSegmentPath({ ...geometries[index], cornerRadius: innerCornerRadius })}
-          fill="#000000"
-          fillOpacity={1}
-          fillRule="evenodd"
-        />
+        <path d={path} fill="#ffffff" fillOpacity={1} fillRule="evenodd" stroke="#ffffff" strokeWidth={borderThickness * 2} />
+        <path d={path} fill="#000000" fillOpacity={1} fillRule="evenodd" />
       </g>,
     )
   }
@@ -59,20 +53,7 @@ function buildArcSegmentGeometry(trackGeometry, segments) {
   return geometries
 }
 
-function ArcGaugeTrack({
-  data,
-  trackGeometry,
-  layout,
-  barLayout,
-  filledBarCount,
-  fillReveal,
-  fillEndCornerRadius,
-  opacity,
-  shadow,
-  outerCornerRadius,
-  maskPadding,
-  widgetId,
-}) {
+function ArcGaugeTrack({ data, trackGeometry, barLayout, filledBarCount, fillReveal, fillEndCornerRadius, opacity, shadow, maskPadding, widgetId }) {
   const segmented = barLayout != null
   const geometries = segmented ? buildArcSegmentGeometry(trackGeometry, barLayout.segments) : [trackGeometry]
   const maskId = `${data.display_type}-gauge-${widgetId}-border-mask`
@@ -92,12 +73,7 @@ function ArcGaugeTrack({
               height={data.height + maskPadding * 2}
               style={{ maskType: 'luminance' }}
             >
-              <ArcSegmentMaskPaths
-                geometries={geometries}
-                outerStrokeWidth={layout.outerStrokeWidth}
-                outerCornerRadius={outerCornerRadius}
-                innerCornerRadius={data.track_corner_radius}
-              />
+              <ArcSegmentMaskPaths geometries={geometries} borderThickness={data.track_border_thickness} cornerRadius={data.track_corner_radius} />
             </mask>
           ) : null}
           {fillReveal ? (
@@ -120,10 +96,12 @@ function ArcGaugeTrack({
         >
           <ArcSegmentPaths
             geometries={geometries}
-            trackThickness={layout.outerStrokeWidth}
-            cornerRadius={outerCornerRadius}
+            cornerRadius={data.track_corner_radius}
             fill={shadow.color}
             fillOpacity={opacity}
+            stroke={shadow.color}
+            strokeOpacity={opacity}
+            strokeWidth={data.track_border_thickness * 2}
           />
         </g>
       ) : null}
@@ -131,10 +109,12 @@ function ArcGaugeTrack({
         <g mask={`url(#${maskId})`}>
           <ArcSegmentPaths
             geometries={geometries}
-            trackThickness={layout.outerStrokeWidth}
-            cornerRadius={outerCornerRadius}
+            cornerRadius={data.track_corner_radius}
             fill={data.track_border_color}
             fillOpacity={opacity}
+            stroke={data.track_border_color}
+            strokeOpacity={opacity}
+            strokeWidth={data.track_border_thickness * 2}
             dataTestId={`${data.display_type}-gauge-${segmented ? 'bar-border' : 'border'}`}
           />
         </g>
@@ -179,13 +159,11 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
   const data = widget.data
   const presentation = useArcGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle })
   const {
-    layout,
     trackGeometry,
     innerModel,
     innerLayout,
     opacity,
     fillEndCornerRadius,
-    outerCornerRadius,
     fillReveal,
     barLayout,
     filledBarCount,
@@ -209,14 +187,12 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
       <ArcGaugeTrack
         data={data}
         trackGeometry={trackGeometry}
-        layout={layout}
         barLayout={barLayout}
         filledBarCount={filledBarCount}
         fillReveal={fillReveal}
         fillEndCornerRadius={fillEndCornerRadius}
         opacity={opacity}
         shadow={shadow}
-        outerCornerRadius={outerCornerRadius}
         maskPadding={maskPadding}
         widgetId={widget.id}
       />

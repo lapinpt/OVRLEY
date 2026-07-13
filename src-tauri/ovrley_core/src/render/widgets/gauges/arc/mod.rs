@@ -3,16 +3,23 @@
 //! An arc gauge uses a cached static layer for its empty filled track, border,
 //! labels, and unit. Each frame only draws a partial filled arc and the
 //! formatted numeric value in the centre of that arc.
+//!
+//! Module ownership:
+//! - `geometry` — frame layout, radii, angles, and polar projection.
+//! - `path` — continuous annular tracks and progressive reveal clipping.
+//! - `segment` — rounded annular wedges for bar-style tracks.
+//! - `layer` — cached static layers and per-frame track painting.
+//! - `inner_widget` — centered value/unit stack measurement and drawing.
 
+mod geometry;
 mod inner_widget;
+mod layer;
 mod path;
+mod segment;
 
-use self::inner_widget::{
-    draw_static_unit, inner_widget_layout, unit_font_size, DEFAULT_GAP_PX, LINE_HEIGHT,
-};
-use self::path::{draw_arc_segment, draw_arc_track, draw_revealed_arc_track, ArcTrackSpec};
-use super::labels::format_gauge_label;
-use super::range::{bar_fill_count, fill_percentage, metric_range, metric_values};
+use self::inner_widget::{inner_widget_layout, unit_font_size, DEFAULT_GAP_PX, LINE_HEIGHT};
+use self::layer::{draw_fill, draw_static_layer};
+use super::metric::{fill_percentage, format_gauge_label, metric_range, metric_values};
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
@@ -28,13 +35,18 @@ use crate::render::widgets::types::{
     ArcGaugeCache, ArcGaugeFrameState, WidgetFrameReport, WidgetGeometryReport, WidgetRenderReport,
 };
 use crate::render::widgets::value::metric_vertical_metrics_text;
-use crate::types::{DisplayType, TrackFillStyle};
-use skia_safe::{image_filters, paint::Style, BlendMode, Canvas, Paint, Point};
+use skia_safe::{Canvas, Point};
 use std::path::PathBuf;
 
-pub use self::path::{
+pub use self::geometry::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles, corner_gauge_geometry,
     corner_start_end_angles, ArcGaugeGeometry,
+};
+#[cfg(test)]
+pub(crate) use self::path::{ArcTrackSpec, RevealClip};
+#[cfg(test)]
+pub(crate) use self::segment::{
+    rounded_segment_geometry, rounded_segment_path, segment_geometries,
 };
 
 const ARC_LABEL_GAP_PX: f32 = 8.0;
@@ -119,7 +131,7 @@ pub fn prepare_arc_gauge_cache(
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::TRANSPARENT);
         canvas.translate((padding as f32, padding as f32));
-        draw_static_arc_layer(
+        draw_static_layer(
             canvas,
             gauge,
             scene,
@@ -141,7 +153,6 @@ pub fn prepare_arc_gauge_cache(
             width: scaled_width,
             height: scaled_height,
             rotation: gauge.rotation,
-            display_type: gauge.display_type,
             center_x: geometry.center_x,
             center_y: geometry.center_y,
             inner_widget_center_x: geometry.inner_widget_center_x,
@@ -164,8 +175,6 @@ pub fn prepare_arc_gauge_cache(
             inner_widget_offset_x: gauge.inner_widget_offset_x * scale,
             inner_widget_offset_y: gauge.inner_widget_offset_y * scale,
             font_dirs: font_dirs.to_vec(),
-            min_value,
-            max_value,
             frame_states,
         })
     })
@@ -179,10 +188,6 @@ pub fn draw_arc_gauge_widget(
     frame_index: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    if !matches!(cache.display_type, DisplayType::Arc | DisplayType::Corner) {
-        return None;
-    }
-
     frame_profiler.measure("gauge.arc.draw", || {
         canvas.draw_image(
             &cache.static_image,
@@ -204,11 +209,7 @@ pub fn draw_arc_gauge_widget(
             sweep_angle: cache.sweep_angle,
         };
         if state.fill01 > 0.0 && geometry.radius > 0.0 {
-            if cache.track_fill_style == TrackFillStyle::Bars {
-                draw_segmented_arc_fill(canvas, cache, geometry, state.fill01);
-            } else {
-                draw_continuous_arc_fill(canvas, cache, geometry, state.fill01);
-            }
+            draw_fill(canvas, cache, geometry, state.fill01);
         }
 
         let inner_layout = inner_widget_layout(
@@ -269,260 +270,7 @@ pub fn draw_arc_gauge_widget(
     })
 }
 
-fn draw_static_arc_layer(
-    canvas: &Canvas,
-    gauge: &ValidatedArcGaugeWidget,
-    scene: &ValidatedSceneConfig,
-    geometry: ArcGaugeGeometry,
-    scale: f32,
-    font_dirs: &[PathBuf],
-    min_value: f64,
-    max_value: f64,
-    unit_text: Option<&str>,
-    text_style: &ResolvedTextStyle,
-) -> CoreResult<()> {
-    let track_thickness = gauge.track_thickness * scale;
-    let border_thickness = gauge.track_border_thickness * scale;
-    let shadow = if border_thickness > 0.0 {
-        normalize_shadow_style_validated(
-            &scene.shadow_color,
-            scene.shadow_strength,
-            scene.shadow_distance,
-            scale,
-        )
-    } else {
-        None
-    };
-
-    let shadow_filter = shadow.and_then(|shadow| {
-        image_filters::drop_shadow_only(
-            (shadow.offset_x, shadow.offset_y),
-            (shadow.strength, shadow.strength),
-            parse_color(&shadow.color, text_style.opacity),
-            None,
-            None,
-            None,
-        )
-    });
-
-    if let Some(bar_geometry) = crate::normalize::scale_bar_geometry(gauge.bar_geometry, scale) {
-        for segment in arc_segment_geometries(geometry, bar_geometry) {
-            draw_static_arc_segment(
-                canvas,
-                gauge,
-                segment,
-                track_thickness,
-                border_thickness,
-                scale,
-                text_style,
-                shadow_filter.as_ref(),
-            );
-        }
-    } else {
-        draw_static_arc_track(
-            canvas,
-            gauge,
-            geometry,
-            track_thickness,
-            border_thickness,
-            scale,
-            text_style,
-            shadow_filter.as_ref(),
-        );
-    }
-
-    if gauge.show_min_max_labels {
-        draw_arc_labels(
-            canvas, gauge, geometry, scale, font_dirs, min_value, max_value, text_style,
-        )?;
-    }
-
-    if let Some(unit_text) = unit_text {
-        draw_static_unit(
-            canvas, gauge, geometry, scale, font_dirs, unit_text, text_style,
-        )?;
-    }
-
-    Ok(())
-}
-
-fn arc_segment_geometries(
-    track: ArcGaugeGeometry,
-    bars: crate::normalize::ResolvedBarGeometry,
-) -> Vec<ArcGaugeGeometry> {
-    let direction = track.sweep_angle.signum();
-    let mut segments = Vec::with_capacity(bars.count as usize);
-    for index in 0..bars.count {
-        let segment_start = index as f32 * (bars.extent + bars.gap);
-        segments.push(ArcGaugeGeometry {
-            start_angle: track.start_angle
-                + direction * (segment_start / track.radius).to_degrees(),
-            sweep_angle: direction * (bars.extent / track.radius).to_degrees(),
-            ..track
-        });
-    }
-    segments
-}
-
-fn draw_static_arc_track(
-    canvas: &Canvas,
-    gauge: &ValidatedArcGaugeWidget,
-    geometry: ArcGaugeGeometry,
-    track_thickness: f32,
-    border_thickness: f32,
-    scale: f32,
-    text_style: &ResolvedTextStyle,
-    shadow_filter: Option<&skia_safe::ImageFilter>,
-) {
-    let inner_track =
-        ArcTrackSpec::full(geometry, track_thickness, gauge.track_corner_radius * scale);
-    let border_track = inner_track.outset(border_thickness);
-
-    if let Some(shadow_filter) = shadow_filter {
-        let paint = track_paint(
-            parse_color(&gauge.track_border_color, text_style.opacity),
-            Some(shadow_filter.clone()),
-        );
-        draw_arc_track(canvas, border_track, &paint);
-    }
-
-    if border_thickness > 0.0 {
-        let paint = track_paint(
-            parse_color(&gauge.track_border_color, text_style.opacity),
-            None,
-        );
-        draw_arc_track(canvas, border_track, &paint);
-        draw_arc_track(canvas, inner_track, &clear_track_paint());
-    }
-
-    let empty_paint = track_paint(
-        parse_color(
-            &gauge.track_empty_color,
-            gauge.track_empty_opacity * text_style.opacity,
-        ),
-        None,
-    );
-    draw_arc_track(canvas, inner_track, &empty_paint);
-}
-
-fn draw_static_arc_segment(
-    canvas: &Canvas,
-    gauge: &ValidatedArcGaugeWidget,
-    geometry: ArcGaugeGeometry,
-    track_thickness: f32,
-    border_thickness: f32,
-    scale: f32,
-    text_style: &ResolvedTextStyle,
-    shadow_filter: Option<&skia_safe::ImageFilter>,
-) {
-    let inner_corner_radius = gauge.track_corner_radius * scale;
-    let outer_track_thickness = track_thickness + border_thickness * 2.0;
-    let outer_corner_radius = inner_corner_radius + border_thickness;
-
-    if let Some(shadow_filter) = shadow_filter {
-        let paint = track_paint(
-            parse_color(&gauge.track_border_color, text_style.opacity),
-            Some(shadow_filter.clone()),
-        );
-        draw_arc_segment(
-            canvas,
-            geometry,
-            outer_track_thickness,
-            outer_corner_radius,
-            &paint,
-        );
-    }
-
-    if border_thickness > 0.0 {
-        let paint = track_paint(
-            parse_color(&gauge.track_border_color, text_style.opacity),
-            None,
-        );
-        draw_arc_segment(
-            canvas,
-            geometry,
-            outer_track_thickness,
-            outer_corner_radius,
-            &paint,
-        );
-        draw_arc_segment(
-            canvas,
-            geometry,
-            track_thickness,
-            inner_corner_radius,
-            &clear_track_paint(),
-        );
-    }
-
-    let empty_paint = track_paint(
-        parse_color(
-            &gauge.track_empty_color,
-            gauge.track_empty_opacity * text_style.opacity,
-        ),
-        None,
-    );
-    draw_arc_segment(
-        canvas,
-        geometry,
-        track_thickness,
-        inner_corner_radius,
-        &empty_paint,
-    );
-}
-
-fn draw_segmented_arc_fill(
-    canvas: &Canvas,
-    cache: &ArcGaugeCache,
-    geometry: ArcGaugeGeometry,
-    fill01: f32,
-) {
-    let bars = cache
-        .bar_geometry
-        .expect("bars fill style must carry resolved bar geometry");
-    let filled_count = bar_fill_count(fill01, bars.count);
-    let paint = arc_fill_paint(cache);
-    for segment in arc_segment_geometries(geometry, bars)
-        .into_iter()
-        .take(filled_count)
-    {
-        draw_arc_segment(
-            canvas,
-            segment,
-            cache.track_thickness,
-            cache.track_corner_radius,
-            &paint,
-        );
-    }
-}
-
-fn draw_continuous_arc_fill(
-    canvas: &Canvas,
-    cache: &ArcGaugeCache,
-    geometry: ArcGaugeGeometry,
-    fill01: f32,
-) {
-    let fill_end_corner_radius = if cache.track_fill_flat {
-        0.0
-    } else {
-        cache.track_corner_radius
-    };
-    let track = ArcTrackSpec::full(geometry, cache.track_thickness, cache.track_corner_radius)
-        .with_end_corner_radius(fill_end_corner_radius);
-    let paint = arc_fill_paint(cache);
-    draw_revealed_arc_track(canvas, track, fill01, &paint);
-}
-
-fn arc_fill_paint(cache: &ArcGaugeCache) -> Paint {
-    track_paint(
-        parse_color(
-            &cache.track_filled_color,
-            cache.track_filled_opacity * cache.text_style.opacity,
-        ),
-        None,
-    )
-}
-
-fn draw_arc_labels(
+pub(super) fn draw_arc_labels(
     canvas: &Canvas,
     gauge: &ValidatedArcGaugeWidget,
     geometry: ArcGaugeGeometry,
@@ -592,25 +340,6 @@ fn arc_static_layer_padding(
     track_padding.max(labels_padding).max(unit_padding)
 }
 
-fn track_paint(color: skia_safe::Color, image_filter: Option<skia_safe::ImageFilter>) -> Paint {
-    let mut paint = Paint::default();
-    paint.set_anti_alias(true);
-    paint.set_style(Style::Fill);
-    paint.set_color(color);
-    if let Some(image_filter) = image_filter {
-        paint.set_image_filter(image_filter);
-    }
-    paint
-}
-
-fn clear_track_paint() -> Paint {
-    let mut clear_paint = Paint::default();
-    clear_paint.set_anti_alias(true);
-    clear_paint.set_style(Style::Fill);
-    clear_paint.set_blend_mode(BlendMode::Clear);
-    clear_paint
-}
-
 fn arc_label_angles(geometry: ArcGaugeGeometry) -> (f32, f32) {
     if geometry.sweep_angle.abs() >= crate::normalize::MAX_ARC_ANGLE_DEGREES - f32::EPSILON {
         // A full circle has coincident start/end points. Keep labels readable
@@ -641,36 +370,4 @@ fn arc_label_anchor(
 
 fn arc_label_gap(font_size: f32, scale: f32) -> f32 {
     (font_size * 0.35).max(ARC_LABEL_GAP_PX * scale)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::normalize::ResolvedBarGeometry;
-
-    #[test]
-    fn segmented_arc_uses_the_full_resolved_bar_extent() {
-        let track = ArcGaugeGeometry {
-            center_x: 80.0,
-            center_y: 80.0,
-            inner_widget_center_x: 80.0,
-            inner_widget_center_y: 80.0,
-            radius: 50.0,
-            start_angle: 180.0,
-            sweep_angle: 180.0,
-        };
-        let bars = ResolvedBarGeometry {
-            count: 4,
-            gap: 3.0,
-            extent: 10.0,
-        };
-        let segments = arc_segment_geometries(track, bars);
-
-        assert_eq!(segments.len(), 4);
-        assert!((segments[0].start_angle - track.start_angle).abs() < f32::EPSILON);
-        assert!(
-            (segments[0].sweep_angle - (bars.extent / track.radius).to_degrees()).abs()
-                < f32::EPSILON
-        );
-    }
 }

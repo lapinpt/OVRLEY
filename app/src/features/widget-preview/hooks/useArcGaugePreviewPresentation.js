@@ -88,13 +88,11 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
     const maxLabel = `${layout.max}`
 
     return {
-      layout,
       trackGeometry,
       innerModel,
       innerLayout: getArcInnerWidgetLayout(data, layout, innerModel),
       opacity,
       fillEndCornerRadius,
-      outerCornerRadius: data.track_corner_radius + data.track_border_thickness,
       fillReveal,
       barLayout,
       filledBarCount: barLayout ? getBarFillCount(layout.fill, barLayout.count) : 0,

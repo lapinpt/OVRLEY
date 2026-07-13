@@ -123,7 +123,6 @@ fn corner_gauge_prepares_a_shared_arc_cache_and_renders_a_frame() {
     let Some(PresentationCache::ArcGauge(cache)) = assets.presentation_caches.get(&0) else {
         panic!("corner gauge should use the shared arc cache");
     };
-    assert_eq!(cache.display_type, DisplayType::Corner);
     assert_eq!(cache.start_angle, 180.0);
     assert_eq!(cache.sweep_angle, 90.0);
     assert_eq!(cache.frame_states[1].fill01, 0.5);

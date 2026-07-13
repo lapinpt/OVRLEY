@@ -54,13 +54,9 @@ pub(crate) use value::{
     has_static_metric_icon_validated,
 };
 
-// Module-local tests for widget-specific RDP behavior that exercise internal
-// types (`ElevationSample`, `RouteSample`) not available from crate-level
-// integration tests. These tests are in a `tests/` subdirectory, not inline,
-// and are gated by `#[cfg(test)]` so they are excluded from production builds.
-// The tested functions (`simplify_elevation_samples_segment`,
-// `simplify_route_samples`) are `pub(crate)` — exposing them as full `pub`
-// would leak widget internals into the public API.
+// White-box widget tests exercise internal geometry and reduction contracts
+// that are not available from crate-level integration tests. They live in the
+// dedicated `tests/` subdirectory and are excluded from production builds.
 #[cfg(test)]
 mod tests;
 

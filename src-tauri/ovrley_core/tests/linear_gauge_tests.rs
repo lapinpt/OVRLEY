@@ -4,11 +4,9 @@ use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::raw::ValueConfig;
-use ovrley_core::normalize::validate_render_config;
+use ovrley_core::normalize::{validate_render_config, ValidatedLinearGaugeOrientation};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::gauges::linear::{
-    bar_fill_rect, bordered_bar_fill_rect, LinearGaugeOrientation,
-};
+use ovrley_core::render::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
 use ovrley_core::render::widgets::types::PresentationCache;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
 use ovrley_core::types::{DisplayType, MetricKind, TrackFillStyle};
@@ -72,7 +70,7 @@ fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Horizontal,
+        ValidatedLinearGaugeOrientation::Horizontal,
     );
     assert_eq!(horizontal, (10.0, 20.0, 50.0, 40.0));
 
@@ -82,7 +80,7 @@ fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Vertical,
+        ValidatedLinearGaugeOrientation::Vertical,
     );
     assert_eq!(vertical, (10.0, 50.0, 200.0, 10.0));
 }
@@ -95,7 +93,7 @@ fn linear_fill_rect_stays_inside_track_border() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Horizontal,
+        ValidatedLinearGaugeOrientation::Horizontal,
         2.0,
     );
     assert_eq!(horizontal, (12.0, 22.0, 49.0, 36.0));
@@ -106,7 +104,7 @@ fn linear_fill_rect_stays_inside_track_border() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Vertical,
+        ValidatedLinearGaugeOrientation::Vertical,
         2.0,
     );
     assert_eq!(vertical, (12.0, 49.0, 196.0, 9.0));
@@ -133,9 +131,6 @@ fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     let Some(PresentationCache::LinearGauge(cache)) = assets.presentation_caches.get(&0) else {
         panic!("linear gauge should prepare a gauge cache at value index 0");
     };
-    assert_eq!(cache.display_type, DisplayType::Linear);
-    assert_eq!(cache.min_value, 10.0);
-    assert_eq!(cache.max_value, 50.0);
     assert_eq!(cache.frame_states[1].fill01, 0.5);
 }
 

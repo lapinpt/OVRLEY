@@ -109,9 +109,6 @@ fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
     let Some(PresentationCache::ArcGauge(cache)) = assets.presentation_caches.get(&0) else {
         panic!("arc gauge should prepare a gauge cache at value index 0");
     };
-    assert_eq!(cache.display_type, DisplayType::Arc);
-    assert_eq!(cache.min_value, 10.0);
-    assert_eq!(cache.max_value, 50.0);
     assert_eq!(cache.frame_states[1].fill01, 0.5);
     assert_eq!(cache.frame_states[1].value_text, "108");
     assert!(

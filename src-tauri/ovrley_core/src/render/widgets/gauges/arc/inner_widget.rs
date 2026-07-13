@@ -1,6 +1,10 @@
 //! Value/unit stack layout shared by arc-shaped gauges.
+//!
+//! Value and optional unit text are measured as one centered vertical stack.
+//! The unit is frame-invariant and belongs to the cached static layer; only the
+//! formatted metric value is painted during per-frame composition.
 
-use super::path::ArcGaugeGeometry;
+use super::geometry::ArcGaugeGeometry;
 use crate::error::CoreResult;
 use crate::normalize::ValidatedArcGaugeWidget;
 use crate::render::text::{draw_text, origin_x_for_centered_text, resolve_font, ResolvedTextStyle};
@@ -13,16 +17,19 @@ const MIN_UNIT_FONT_SIZE: f32 = 12.0;
 pub(crate) const DEFAULT_GAP_PX: f32 = 4.0;
 
 #[derive(Clone, Copy, Debug)]
+/// Baselines and total bounds for the centered value/unit stack.
 pub(crate) struct ArcInnerWidgetLayout {
     pub(crate) center_x: f32,
     pub(crate) value_top: f32,
     pub(crate) unit_top: Option<f32>,
 }
 
+/// Resolves the unit font size relative to the validated value style.
 pub(crate) fn unit_font_size(text_style: &ResolvedTextStyle, scale: f32) -> f32 {
     (text_style.font_size * UNIT_RATIO).max(MIN_UNIT_FONT_SIZE * scale)
 }
 
+/// Measures and centers the value and optional unit around the inner anchor.
 pub(crate) fn inner_widget_layout(
     geometry: ArcGaugeGeometry,
     offset_x: f32,
@@ -48,6 +55,7 @@ pub(crate) fn inner_widget_layout(
     }
 }
 
+/// Draws the optional unit into the frame-invariant static layer.
 pub(crate) fn draw_static_unit(
     canvas: &Canvas,
     gauge: &ValidatedArcGaugeWidget,

@@ -1,23 +1,33 @@
-//! Shared metric-range and fill-fraction helpers for gauge renderers.
+//! Shared telemetry, fill, and boundary-label helpers for gauges.
+//!
+//! This module owns the common mapping from a validated metric to its dense
+//! series, derives the activity range once during cache preparation, and keeps
+//! fill quantization and boundary-label formatting identical across arc and
+//! linear renderers.
 
 use crate::activity::schema::DenseSeriesReport;
 use crate::types::MetricKind;
 
-/// Computes the fill fraction for a value within a min-max range.
-/// Returns a value clamped between 0.0 and 1.0, or 0.0 if the range is invalid.
-pub fn fill_percentage(value: f64, min: f64, max: f64) -> f32 {
+/// Maps a metric value into the inclusive normalized gauge range.
+///
+/// Values outside the range are clamped. A degenerate range has no measurable
+/// progress and therefore resolves to zero fill.
+pub(crate) fn fill_percentage(value: f64, min: f64, max: f64) -> f32 {
     if max <= min {
         return 0.0;
     }
     ((value - min) / (max - min)).clamp(0.0, 1.0) as f32
 }
 
-/// Returns the number of whole segments enabled by a clamped fill fraction.
-pub fn bar_fill_count(fill01: f32, count: u32) -> usize {
-    let fill = fill01.clamp(0.0, 1.0);
-    (fill * count as f32).floor() as usize
+/// Returns the number of completely filled bars at the supplied progress.
+pub(crate) fn bar_fill_count(fill01: f32, count: u32) -> usize {
+    (fill01.clamp(0.0, 1.0) * count as f32).floor() as usize
 }
 
+/// Derives the finite minimum and maximum for a metric's dense series.
+///
+/// An absent or constant series uses the documented neutral gauge range so
+/// cache preparation still has a usable scale.
 pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
     let mut min_value = f64::INFINITY;
     let mut max_value = f64::NEG_INFINITY;
@@ -32,6 +42,10 @@ pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f
     }
 }
 
+/// Selects the canonical dense telemetry series for a metric.
+///
+/// Derived metrics without their own dense series return an empty slice; their
+/// presentation range consequently follows [`metric_range`]'s neutral range.
 pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &[Option<f64>] {
     match metric {
         MetricKind::Speed => &series.speed,
@@ -65,27 +79,11 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{bar_fill_count, fill_percentage};
-
-    #[test]
-    fn fill_percentage_clamps_and_handles_degenerate_ranges() {
-        assert_eq!(fill_percentage(50.0, 0.0, 100.0), 0.5);
-        assert_eq!(fill_percentage(-20.0, 0.0, 100.0), 0.0);
-        assert_eq!(fill_percentage(120.0, 0.0, 100.0), 1.0);
-        assert_eq!(fill_percentage(42.0, 10.0, 10.0), 0.0);
-    }
-
-    #[test]
-    fn whole_bar_bucket_boundaries_are_discrete() {
-        assert_eq!(bar_fill_count(0.0, 5), 0);
-        assert_eq!(bar_fill_count(0.1999, 5), 0);
-        assert_eq!(bar_fill_count(0.2, 5), 1);
-        assert_eq!(bar_fill_count(0.9999, 5), 4);
-        assert_eq!(bar_fill_count(1.0, 5), 5);
-        assert_eq!(bar_fill_count(1.5, 5), 5);
-        assert_eq!(bar_fill_count(0.5, 1), 0);
-        assert_eq!(bar_fill_count(1.0, 1), 1);
+/// Formats a min/max label with no decimal for integers and one otherwise.
+pub(crate) fn format_gauge_label(value: f64) -> String {
+    if value.fract().abs() < f64::EPSILON {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.1}")
     }
 }
