@@ -7,8 +7,7 @@ use ovrley_core::normalize::raw::ValueConfig;
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::widgets::gauges::linear::{
-    bar_fill_rect, bordered_bar_fill_rect, fill_percentage, format_linear_gauge_label,
-    LinearGaugeOrientation,
+    bar_fill_rect, bordered_bar_fill_rect, LinearGaugeOrientation,
 };
 use ovrley_core::render::widgets::types::PresentationCache;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
@@ -66,14 +65,6 @@ fn value_config_deserializes_linear_gauge_fields() {
 }
 
 #[test]
-fn fill_percentage_clamps_and_handles_degenerate_ranges() {
-    assert_eq!(fill_percentage(50.0, 0.0, 100.0), 0.5);
-    assert_eq!(fill_percentage(-20.0, 0.0, 100.0), 0.0);
-    assert_eq!(fill_percentage(120.0, 0.0, 100.0), 1.0);
-    assert_eq!(fill_percentage(42.0, 10.0, 10.0), 0.0);
-}
-
-#[test]
 fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
     let horizontal = bar_fill_rect(
         10.0,
@@ -119,12 +110,6 @@ fn linear_fill_rect_stays_inside_track_border() {
         2.0,
     );
     assert_eq!(vertical, (12.0, 49.0, 196.0, 9.0));
-}
-
-#[test]
-fn gauge_labels_format_integer_and_decimal_ranges() {
-    assert_eq!(format_linear_gauge_label(10.0), "10");
-    assert_eq!(format_linear_gauge_label(10.24), "10.2");
 }
 
 #[test]

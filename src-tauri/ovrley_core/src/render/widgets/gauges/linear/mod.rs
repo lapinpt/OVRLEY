@@ -6,9 +6,7 @@
 //! dynamic filled portion is drawn per-frame on top.
 
 use super::labels::format_gauge_label;
-use super::range::{
-    bar_fill_count, fill_percentage as shared_fill_percentage, metric_range, metric_values,
-};
+use super::range::{bar_fill_count, fill_percentage, metric_range, metric_values};
 use super::track_path::{translated_track_cap_path, translated_track_cap_reveal, TrackPathFrame};
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
@@ -57,11 +55,6 @@ impl From<ValidatedLinearGaugeOrientation> for LinearGaugeOrientation {
             ValidatedLinearGaugeOrientation::Vertical => Self::Vertical,
         }
     }
-}
-
-/// Backwards-compatible public entry point for the shared gauge range helper.
-pub fn fill_percentage(value: f64, min: f64, max: f64) -> f32 {
-    shared_fill_percentage(value, min, max)
 }
 
 /// Computes the filled-bar rect without border insetting.
@@ -580,8 +573,8 @@ fn linear_gauge_label_layout(
     let w = width as f32;
     let h = height as f32;
     let gap = linear_gauge_label_gap(gauge.min_max_label_font_size * scale);
-    let min_label = format_linear_gauge_label(min_value);
-    let max_label = format_linear_gauge_label(max_value);
+    let min_label = format_gauge_label(min_value);
+    let max_label = format_gauge_label(max_value);
     let (_, metrics) = font.metrics();
     let (_, min_bounds) = font.measure_str(&min_label, None);
     let (_, max_bounds) = font.measure_str(&max_label, None);
@@ -638,9 +631,4 @@ fn linear_gauge_label_layout(
         }
         _ => unreachable!("linear gauge label position should match validated orientation"),
     }
-}
-
-/// Backwards-compatible public entry point for shared gauge label formatting.
-pub fn format_linear_gauge_label(value: f64) -> String {
-    format_gauge_label(value)
 }

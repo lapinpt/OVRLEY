@@ -3,19 +3,6 @@
  * Pure functions, no DOM manipulation.
  */
 
-import { isInteractiveElement } from '@/lib/utils'
-
-/**
- * Checks whether the target element is inside an editable input, textarea,
- * select, or contenteditable element.
- *
- * @param {EventTarget} target - DOM event target to inspect.
- * @returns {boolean} True if target is inside an editable element.
- */
-export function isEditableElement(target) {
-  return isInteractiveElement(target)
-}
-
 /**
  * Checks whether a mouse/pointer event has a multi-selection modifier
  * key held (meta, ctrl, or shift).

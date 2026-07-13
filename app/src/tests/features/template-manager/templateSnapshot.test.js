@@ -6,9 +6,9 @@ import {
   createTemplateState,
   normalizeTemplateConfig,
   normalizeTemplateFilePayload,
-  templateStatesEqual,
 } from '@/features/template-manager/utils/templateSnapshot'
 import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
+import { deepEqual } from '@/store/store-utils'
 
 describe('template snapshot standard metric schema', () => {
   test('creates standard metric defaults with display_unit as the canonical unit field', () => {
@@ -174,17 +174,17 @@ describe('template snapshot standard metric schema', () => {
     expect(normalized.config.values[1].id).toMatch(/^widget-\d+$/)
   })
 
-  test('templateStatesEqual returns true for structurally equal template states', () => {
+  test('deepEqual returns true for structurally equal template states', () => {
     const state = {
       config: { scene: { width: 1920, height: 1080, fps: 30 }, labels: [], values: [{ value: 'speed', x: 10 }], plots: [] },
       settings: { globalDefaults: { color_values: '#ffffff' } },
     }
     const copy = JSON.parse(JSON.stringify(state))
 
-    expect(templateStatesEqual(state, copy)).toBe(true)
+    expect(deepEqual(state, copy)).toBe(true)
   })
 
-  test('templateStatesEqual returns false when config differs', () => {
+  test('deepEqual returns false when config differs', () => {
     const left = {
       config: { scene: { width: 1920, height: 1080 }, labels: [], values: [], plots: [] },
       settings: { globalDefaults: {} },
@@ -194,10 +194,10 @@ describe('template snapshot standard metric schema', () => {
       settings: { globalDefaults: {} },
     }
 
-    expect(templateStatesEqual(left, right)).toBe(false)
+    expect(deepEqual(left, right)).toBe(false)
   })
 
-  test('templateStatesEqual returns false when settings differ', () => {
+  test('deepEqual returns false when settings differ', () => {
     const left = {
       config: { scene: {}, labels: [], values: [], plots: [] },
       settings: { globalDefaults: { color_values: '#ffffff' } },
@@ -207,7 +207,7 @@ describe('template snapshot standard metric schema', () => {
       settings: { globalDefaults: { color_values: '#000000' } },
     }
 
-    expect(templateStatesEqual(left, right)).toBe(false)
+    expect(deepEqual(left, right)).toBe(false)
   })
 
   test('rejects older template versions explicitly', () => {

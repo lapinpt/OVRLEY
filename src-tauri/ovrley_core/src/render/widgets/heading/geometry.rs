@@ -145,15 +145,6 @@ pub fn heading_label_bottom(
         + font_size * LABEL_DESCENT_PCT
 }
 
-pub fn heading_tape_body_height(
-    body_height: f32,
-    major_tick_length_pct: f32,
-    label_offset: f32,
-    font_size: f32,
-) -> f32 {
-    heading_label_bottom(body_height, major_tick_length_pct, label_offset, font_size)
-}
-
 /// A single visible tick on the tape.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TapeTick {

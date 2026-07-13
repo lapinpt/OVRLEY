@@ -65,15 +65,3 @@ pub fn interpolate_numeric_series_value(
     let points = collect_valid_numeric_points(x_values, y_values);
     interpolate_points(&points, target_x)
 }
-
-/// Linearly interpolates an optional numeric series at `target_x`.
-///
-/// Alias for [`interpolate_numeric_series_value`] — provided for
-/// callers that use the "optional" naming convention.
-pub fn interpolate_optional_numeric_series(
-    x_values: &[f64],
-    y_values: &[Option<f64>],
-    target_x: f64,
-) -> Option<f64> {
-    interpolate_numeric_series_value(x_values, y_values, target_x)
-}

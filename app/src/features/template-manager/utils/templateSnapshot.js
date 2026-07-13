@@ -6,7 +6,6 @@
  * stringification, download, and structural state comparison.
  */
 
-import { deepEqual } from '@/store/store-utils'
 import { createDurableTemplateState } from '@/lib/template/template-state'
 import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
 
@@ -87,17 +86,6 @@ export function normalizeTemplateFilePayload(rawTemplate) {
     ...normalizedState,
     name: rawTemplate.name || null,
   }
-}
-
-/**
- * Compares template state objects for structural equality.
- *
- * @param {*} left - Left-hand template state.
- * @param {*} right - Right-hand template state.
- * @returns {boolean} Whether the two template states are structurally equivalent.
- */
-export function templateStatesEqual(left, right) {
-  return deepEqual(left, right)
 }
 
 /**

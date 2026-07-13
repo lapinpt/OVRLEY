@@ -42,7 +42,7 @@ src-tauri/ovrley_core/   Standalone Rust crate — Skia rendering, ffmpeg encodi
 
 `pnpm tauri build` is wrapped by `scripts/tauri.mjs` — it runs Tauri with `--no-bundle`, then creates a standalone `.zip` portable archive containing the binary + `vendor/ffmpeg/` + `fonts/` + `templates/`.
 
-- NEVER run build without the user's permission.
+ABSOLUTELY NEVER run build without the user's permission!
 
 ## Code style (frontend)
 

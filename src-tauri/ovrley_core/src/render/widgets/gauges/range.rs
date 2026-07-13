@@ -67,7 +67,15 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
 
 #[cfg(test)]
 mod tests {
-    use super::bar_fill_count;
+    use super::{bar_fill_count, fill_percentage};
+
+    #[test]
+    fn fill_percentage_clamps_and_handles_degenerate_ranges() {
+        assert_eq!(fill_percentage(50.0, 0.0, 100.0), 0.5);
+        assert_eq!(fill_percentage(-20.0, 0.0, 100.0), 0.0);
+        assert_eq!(fill_percentage(120.0, 0.0, 100.0), 1.0);
+        assert_eq!(fill_percentage(42.0, 10.0, 10.0), 0.0);
+    }
 
     #[test]
     fn whole_bar_bucket_boundaries_are_discrete() {

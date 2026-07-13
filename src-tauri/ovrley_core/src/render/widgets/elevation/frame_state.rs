@@ -229,7 +229,7 @@ fn interpolate_elevation_for_elapsed_frames(
     frame_elapsed_seconds
         .iter()
         .map(|frame_elapsed| {
-            crate::interpolation::interpolate_optional_numeric_series(
+            crate::interpolation::interpolate_numeric_series_value(
                 elapsed_seconds,
                 elevations,
                 scene_start + *frame_elapsed,

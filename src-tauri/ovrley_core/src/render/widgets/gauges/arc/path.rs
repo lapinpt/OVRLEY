@@ -4,9 +4,8 @@
 //! translated low-fill cap is shared with linear gauges.
 
 use super::super::track_path::{
-    append_inner_to_outer_track_fillet, append_outer_to_inner_track_fillet,
-    translated_track_cap_path, translated_track_cap_reveal, TrackPathFrame, TranslatedTrackCap,
-    TRACK_PATH_EPSILON,
+    append_track_fillet, translated_track_cap_path, translated_track_cap_reveal, TrackPathFrame,
+    TranslatedTrackCap, TRACK_PATH_EPSILON,
 };
 
 use crate::normalize::{
@@ -226,7 +225,7 @@ impl ArcTrackSpec {
             start,
             sweep,
         );
-        append_outer_to_inner_track_fillet(
+        append_track_fillet(
             &mut path,
             TrackPathFrame {
                 origin: arc_point(
@@ -240,6 +239,7 @@ impl ArcTrackSpec {
             },
             half_thickness,
             end_fillet_radius,
+            1.0,
         );
         append_circular_arc(
             &mut path,
@@ -250,7 +250,7 @@ impl ArcTrackSpec {
             -sweep,
         );
         let start_tangent = directed_path_tangent(start, direction);
-        append_inner_to_outer_track_fillet(
+        append_track_fillet(
             &mut path,
             TrackPathFrame {
                 origin: arc_point(
@@ -264,6 +264,7 @@ impl ArcTrackSpec {
             },
             half_thickness,
             start_fillet_radius,
+            -1.0,
         );
         path.close();
         Some(path.detach())

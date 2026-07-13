@@ -9,3 +9,14 @@ pub fn format_gauge_label(value: f64) -> String {
         format!("{value:.1}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::format_gauge_label;
+
+    #[test]
+    fn formats_integer_and_decimal_ranges() {
+        assert_eq!(format_gauge_label(10.0), "10");
+        assert_eq!(format_gauge_label(10.24), "10.2");
+    }
+}

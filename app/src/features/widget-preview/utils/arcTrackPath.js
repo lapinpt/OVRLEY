@@ -1,8 +1,7 @@
 /** Low-level SVG path geometry for filled arc tracks and rounded caps. */
 
 import {
-  appendInnerToOuterTrackFillet,
-  appendOuterToInnerTrackFillet,
+  appendTrackFillet,
   getTranslatedTrackCapPath,
   getTranslatedTrackCapReveal,
   pathCubic,
@@ -128,7 +127,7 @@ export function getArcFilledTrackPath({
     tangent: { x: endTangent.x * direction, y: endTangent.y * direction },
     normal: arcPathNormal(end),
   }
-  appendOuterToInnerTrackFillet(commands, endFrame, halfThickness, endFilletRadius)
+  appendTrackFillet(commands, endFrame, halfThickness, endFilletRadius, 1)
   appendCircularArc(commands, centerX, centerY, innerRadius, end, -sweepAngle)
   const startTangent = arcPathTangent(startAngle)
   const startFrame = {
@@ -136,7 +135,7 @@ export function getArcFilledTrackPath({
     tangent: { x: -startTangent.x * direction, y: -startTangent.y * direction },
     normal: arcPathNormal(startAngle),
   }
-  appendInnerToOuterTrackFillet(commands, startFrame, halfThickness, startFilletRadius)
+  appendTrackFillet(commands, startFrame, halfThickness, startFilletRadius, -1)
   commands.push('Z')
   return commands.join(' ')
 }

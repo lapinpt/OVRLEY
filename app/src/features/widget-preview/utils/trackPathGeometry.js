@@ -31,7 +31,7 @@ export function pathCubic(control1, control2, end) {
   return `C ${formatPathNumber(control1.x)} ${formatPathNumber(control1.y)} ${formatPathNumber(control2.x)} ${formatPathNumber(control2.y)} ${formatPathNumber(end.x)} ${formatPathNumber(end.y)}`
 }
 
-function appendTrackFillet(commands, frame, halfThickness, cornerRadius, startNormalDirection) {
+export function appendTrackFillet(commands, frame, halfThickness, cornerRadius, startNormalDirection) {
   if (cornerRadius <= TRACK_PATH_EPSILON) {
     const [oppositeEdge] = localPathPoints(frame, [[0, -startNormalDirection * halfThickness]])
     commands.push(pathLine(oppositeEdge))
@@ -56,16 +56,6 @@ function appendTrackFillet(commands, frame, halfThickness, cornerRadius, startNo
   )
 }
 
-/** Appends the advancing cap from the positive-normal edge to the negative-normal edge. */
-export function appendOuterToInnerTrackFillet(commands, frame, halfThickness, cornerRadius) {
-  appendTrackFillet(commands, frame, halfThickness, cornerRadius, 1)
-}
-
-/** Appends the trailing cap from the negative-normal edge to the positive-normal edge. */
-export function appendInnerToOuterTrackFillet(commands, frame, halfThickness, cornerRadius) {
-  appendTrackFillet(commands, frame, halfThickness, cornerRadius, -1)
-}
-
 /** Returns the translated phase while the revealed length is shorter than the minimum cap. */
 export function getTranslatedTrackCapReveal({ revealedLength, cornerRadius }) {
   const capLength = cornerRadius * 2
@@ -86,12 +76,13 @@ export function getTranslatedTrackCapPath({ frame, trackThickness, cornerRadius,
   const halfThickness = trackThickness * 0.5
   const [outerEdge] = localPathPoints(translatedFrame, [[0, halfThickness]])
   const commands = [pathMove(outerEdge)]
-  appendOuterToInnerTrackFillet(commands, translatedFrame, halfThickness, cornerRadius)
-  appendInnerToOuterTrackFillet(
+  appendTrackFillet(commands, translatedFrame, halfThickness, cornerRadius, 1)
+  appendTrackFillet(
     commands,
     { ...translatedFrame, tangent: { x: -translatedFrame.tangent.x, y: -translatedFrame.tangent.y } },
     halfThickness,
     cornerRadius,
+    -1,
   )
   commands.push('Z')
   return commands.join(' ')

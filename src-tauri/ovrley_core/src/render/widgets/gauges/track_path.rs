@@ -28,7 +28,7 @@ pub(crate) struct TranslatedTrackCap {
     pub cap_offset: f32,
 }
 
-fn append_track_fillet(
+pub(crate) fn append_track_fillet(
     path: &mut PathBuilder,
     frame: TrackPathFrame,
     half_thickness: f32,
@@ -59,24 +59,6 @@ fn append_track_fillet(
         frame.point(kappa, -start_normal_direction * half_thickness),
         frame.point(0.0, -start_normal_direction * half_thickness),
     );
-}
-
-pub(crate) fn append_outer_to_inner_track_fillet(
-    path: &mut PathBuilder,
-    frame: TrackPathFrame,
-    half_thickness: f32,
-    corner_radius: f32,
-) {
-    append_track_fillet(path, frame, half_thickness, corner_radius, 1.0);
-}
-
-pub(crate) fn append_inner_to_outer_track_fillet(
-    path: &mut PathBuilder,
-    frame: TrackPathFrame,
-    half_thickness: f32,
-    corner_radius: f32,
-) {
-    append_track_fillet(path, frame, half_thickness, corner_radius, -1.0);
 }
 
 /// Returns the translated phase while the revealed length is shorter than the minimum cap.
@@ -115,13 +97,14 @@ pub(crate) fn translated_track_cap_path(
     let outer_edge = translated_frame.point(0.0, half_thickness);
     let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
     path.move_to(outer_edge);
-    append_outer_to_inner_track_fillet(
+    append_track_fillet(
         &mut path,
         translated_frame,
         half_thickness,
         cap.corner_radius,
+        1.0,
     );
-    append_inner_to_outer_track_fillet(
+    append_track_fillet(
         &mut path,
         TrackPathFrame {
             tangent: Point::new(-translated_frame.tangent.x, -translated_frame.tangent.y),
@@ -129,6 +112,7 @@ pub(crate) fn translated_track_cap_path(
         },
         half_thickness,
         cap.corner_radius,
+        -1.0,
     );
     path.close();
     path.detach()
