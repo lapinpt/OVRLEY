@@ -8,7 +8,13 @@
  * @module LinearGaugeRenderer
  */
 
-import { formatLinearGaugeLabel, getLinearGaugeLayout } from '../utils/linearGaugeGeometry'
+import {
+  formatLinearGaugeLabel,
+  getLinearGaugeLayout,
+  getLinearRectCornerRadii,
+  getLinearSegmentModels,
+  getLinearTranslatedFillPath,
+} from '../utils/linearGaugeGeometry'
 import { getBarFillCount, getLinearBarRects } from '../utils/gaugeBarGeometry'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { normalizeSvgShadowColor } from '../utils/svgPreviewUtils'
@@ -20,46 +26,16 @@ import { useId } from 'react'
 
 const LINEAR_GAUGE_LABEL_GAP_PX = 8
 
-/**
- * Extracts the activity series for the metric this widget displays.
- *
- * @param {object} activity - Activity data with per-metric series arrays.
- * @param {object} widget - Widget config (resolved data).
- * @returns {number[]} The metric series, or empty array.
- */
-function seriesForWidget(activity, widget) {
-  const key = widget?.data?.value || widget?.type
-  return Array.isArray(activity?.[key]) ? activity[key] : []
-}
-
 function originXForCenteredText(measurement, centerX) {
-  return centerX - ((measurement.boundsLeft ?? 0) + (measurement.boundsRight ?? measurement.width ?? 0)) * 0.5
+  return centerX - (measurement.boundsLeft + measurement.boundsRight) * 0.5
 }
 
 function baselineYForCenteredText(measurement, centerY) {
-  return centerY + ((measurement.ascent ?? 0) - (measurement.descent ?? 0)) * 0.5
+  return centerY + (measurement.ascent - measurement.descent) * 0.5
 }
 
 function getLinearGaugeLabelGap(labelFontSize) {
   return Math.max(labelFontSize * 0.35, LINEAR_GAUGE_LABEL_GAP_PX)
-}
-
-function getRectCornerRadii(radius, width, height) {
-  return { rx: Math.min(radius, width * 0.5), ry: Math.min(radius, height * 0.5) }
-}
-
-function getLinearSegmentModel(rect, borderThickness, cornerRadius) {
-  const outerRadii = getRectCornerRadii(cornerRadius, rect.width, rect.height)
-  const inner = {
-    x: rect.x + borderThickness,
-    y: rect.y + borderThickness,
-    width: Math.max(0, rect.width - borderThickness * 2),
-    height: Math.max(0, rect.height - borderThickness * 2),
-  }
-  return {
-    outer: { ...rect, ...outerRadii },
-    inner: { ...inner, ...getRectCornerRadii(Math.max(0, cornerRadius - borderThickness), inner.width, inner.height) },
-  }
 }
 
 function SegmentRects({ segments, layer, ...props }) {
@@ -83,12 +59,6 @@ function SegmentMaskRects({ segments }) {
   return rects
 }
 
-function buildLinearSegmentModels(rects, borderThickness, cornerRadius) {
-  const segments = []
-  for (const rect of rects) segments.push(getLinearSegmentModel(rect, borderThickness, cornerRadius))
-  return segments
-}
-
 function LinearGaugeTrack({ data, layout, opacity, maskId, shadowEnabled, shadowFilterId, continuousFill }) {
   const segmented = data.track_fill_style === 'bars'
   const bars = segmented
@@ -100,7 +70,7 @@ function LinearGaugeTrack({ data, layout, opacity, maskId, shadowEnabled, shadow
         bar_gap: data.bar_gap,
       })
     : { count: 1, rects: [{ x: 0, y: 0, width: data.width, height: data.height }] }
-  const segments = buildLinearSegmentModels(bars.rects, data.track_border_thickness, data.track_corner_radius)
+  const segments = getLinearSegmentModels(bars.rects, data.track_border_thickness, data.track_corner_radius)
   const filledCount = segmented ? getBarFillCount(layout.fill, bars.count) : 0
   const shadowColor = shadowEnabled ? normalizeSvgShadowColor(shadowEnabled.color, opacity) : null
 
@@ -154,18 +124,18 @@ function getLinearGaugeLabelLayout({ data, width, height, labelFontFamily, label
   const minMeasure = measurePreviewText(minLabel, labelFontSize, labelFontFamily)
   const maxMeasure = measurePreviewText(maxLabel, labelFontSize, labelFontFamily)
   const fontMetrics = measurePreviewText(NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT, labelFontSize, labelFontFamily)
-  const fontAscent = fontMetrics.fontAscent ?? fontMetrics.ascent ?? 0
-  const fontDescent = fontMetrics.fontDescent ?? fontMetrics.descent ?? 0
+  const fontAscent = fontMetrics.fontAscent
+  const fontDescent = fontMetrics.fontDescent
 
   if (data.orientation === 'vertical') {
     if (data.min_max_label_position === 'right') {
       return {
         min: {
-          x: width + gap - (minMeasure.boundsLeft ?? 0),
+          x: width + gap - minMeasure.boundsLeft,
           y: baselineYForCenteredText(minMeasure, height),
         },
         max: {
-          x: width + gap - (maxMeasure.boundsLeft ?? 0),
+          x: width + gap - maxMeasure.boundsLeft,
           y: baselineYForCenteredText(maxMeasure, 0),
         },
       }
@@ -173,11 +143,11 @@ function getLinearGaugeLabelLayout({ data, width, height, labelFontFamily, label
 
     return {
       min: {
-        x: -gap - (minMeasure.boundsRight ?? minMeasure.width ?? 0),
+        x: -gap - minMeasure.boundsRight,
         y: baselineYForCenteredText(minMeasure, height),
       },
       max: {
-        x: -gap - (maxMeasure.boundsRight ?? maxMeasure.width ?? 0),
+        x: -gap - maxMeasure.boundsRight,
         y: baselineYForCenteredText(maxMeasure, 0),
       },
     }
@@ -202,17 +172,16 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
   const maskId = useId()
   const flatFillClipId = `${maskId}-flat-fill`
   const innerTrackClipId = `${maskId}-inner-track`
-  const labelFontSize = data.min_max_label_font_size ?? 12
+  const labelFontSize = data.min_max_label_font_size
   const labelFontFamily = getPreviewFontFamily(data.min_max_label_font)
   useFontMetricsVersion(labelFontFamily, labelFontSize)
   if (data.display_type !== 'linear') return null
 
   const width = data.width
   const height = data.height
-  const scale = globalScale || 1
-  const values = seriesForWidget(activity, widget)
-  const value = getInterpolatedActivityValue(activity, data.value || widget.type, previewSecond)
-  const borderThickness = data.track_border_thickness ?? 0
+  const values = activity?.[data.value] ?? []
+  const value = getInterpolatedActivityValue(activity, data.value, previewSecond)
+  const borderThickness = data.track_border_thickness
   const segmented = data.track_fill_style === 'bars'
   const layout = getLinearGaugeLayout({
     value,
@@ -222,26 +191,29 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
     orientation: data.orientation,
     borderThickness,
   })
-  const opacity = (data.opacity ?? 1) * globalOpacity
-  const cornerRadius = data.track_corner_radius ?? 0
+  const opacity = data.opacity * globalOpacity
+  const cornerRadius = data.track_corner_radius
   const fillCornerRadius = Math.max(0, cornerRadius - borderThickness)
-  const showLabels = Boolean(data.show_min_max_labels)
+  const showLabels = data.show_min_max_labels
   const minLabel = formatLinearGaugeLabel(layout.min)
   const maxLabel = formatLinearGaugeLabel(layout.max)
   const labelLayout = showLabels ? getLinearGaugeLabelLayout({ data, width, height, labelFontFamily, labelFontSize, minLabel, maxLabel }) : null
   const shadow = getTextShadowParts(sceneStyle)
   const shadowEnabled = borderThickness > 0 && shadow
-  const shadowFilterId = shadowEnabled?.strength > 0 ? `linear-gauge-${widget.id || maskId}-shadow` : null
-  const fillIsFlat = Boolean(data.track_fill_flat)
-  const innerTrackRect = {
-    x: borderThickness,
-    y: borderThickness,
-    width: Math.max(0, width - borderThickness * 2),
-    height: Math.max(0, height - borderThickness * 2),
-  }
-  const innerTrackCornerRadii = getRectCornerRadii(fillCornerRadius, innerTrackRect.width, innerTrackRect.height)
-  const fillCornerRadii = getRectCornerRadii(fillCornerRadius, layout.fillRect.width, layout.fillRect.height)
+  const shadowFilterId = shadowEnabled && shadowEnabled.strength > 0 ? `linear-gauge-${widget.id}-shadow` : null
+  const fillIsFlat = data.track_fill_flat
+  const innerTrackRect = layout.innerTrackRect
+  const innerTrackCornerRadii = getLinearRectCornerRadii(fillCornerRadius, innerTrackRect)
   const useRoundedFill = fillCornerRadius > 0
+  const translatedFillPath =
+    useRoundedFill && !fillIsFlat
+      ? getLinearTranslatedFillPath({
+          trackRect: innerTrackRect,
+          fillRect: layout.fillRect,
+          orientation: data.orientation,
+          cornerRadius: fillCornerRadius,
+        })
+      : ''
   const filledTrack =
     useRoundedFill && fillIsFlat ? (
       <rect
@@ -256,14 +228,22 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
         fillOpacity={data.track_filled_opacity}
         opacity={opacity}
       />
+    ) : translatedFillPath ? (
+      <path
+        d={translatedFillPath}
+        clipPath={`url(#${innerTrackClipId})`}
+        fill={data.track_filled_color}
+        fillOpacity={data.track_filled_opacity}
+        opacity={opacity}
+      />
     ) : useRoundedFill ? (
       <rect
         x={layout.fillRect.x}
         y={layout.fillRect.y}
         width={layout.fillRect.width}
         height={layout.fillRect.height}
-        rx={fillCornerRadii.rx}
-        ry={fillCornerRadii.ry}
+        rx={fillCornerRadius}
+        ry={fillCornerRadius}
         clipPath={`url(#${innerTrackClipId})`}
         fill={data.track_filled_color}
         fillOpacity={data.track_filled_opacity}
@@ -275,8 +255,6 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
         y={layout.fillRect.y}
         width={layout.fillRect.width}
         height={layout.fillRect.height}
-        rx={fillCornerRadii.rx}
-        ry={fillCornerRadii.ry}
         fill={data.track_filled_color}
         fillOpacity={data.track_filled_opacity}
         opacity={opacity}
@@ -285,8 +263,8 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
 
   return (
     <svg
-      width={width * scale}
-      height={height * scale}
+      width={width * globalScale}
+      height={height * globalScale}
       viewBox={`0 0 ${width} ${height}`}
       className="block overflow-visible"
       data-testid="linear-gauge-preview"

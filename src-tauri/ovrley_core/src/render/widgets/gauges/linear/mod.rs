@@ -9,6 +9,7 @@ use super::labels::format_gauge_label;
 use super::range::{
     bar_fill_count, fill_percentage as shared_fill_percentage, metric_range, metric_values,
 };
+use super::track_path::{translated_track_cap_path, translated_track_cap_reveal, TrackPathFrame};
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
@@ -471,12 +472,48 @@ fn draw_continuous_linear_fill(canvas: &Canvas, cache: &LinearGaugeCache, fill01
         canvas.draw_rrect(inner_rrect, &fill_paint);
     } else {
         canvas.clip_rrect(inner_rrect, skia_safe::ClipOp::Intersect, true);
-        canvas.draw_rrect(
-            RRect::new_rect_xy(fill_rect, radius.min(width * 0.5), radius.min(height * 0.5)),
-            &fill_paint,
-        );
+        let revealed_length = match cache.orientation {
+            ValidatedLinearGaugeOrientation::Horizontal => width,
+            ValidatedLinearGaugeOrientation::Vertical => height,
+        };
+        if let Some(cap) = translated_track_cap_reveal(revealed_length, radius) {
+            let (frame, track_thickness) =
+                linear_track_cap_frame(inner_rect, radius, cache.orientation);
+            let cap_path = translated_track_cap_path(frame, track_thickness, cap);
+            canvas.draw_path(&cap_path, &fill_paint);
+        } else {
+            canvas.draw_rrect(RRect::new_rect_xy(fill_rect, radius, radius), &fill_paint);
+        }
     }
     canvas.restore();
+}
+
+fn linear_track_cap_frame(
+    track: Rect,
+    corner_radius: f32,
+    orientation: ValidatedLinearGaugeOrientation,
+) -> (TrackPathFrame, f32) {
+    match orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => (
+            TrackPathFrame {
+                origin: Point::new(track.left + corner_radius, track.top + track.height() * 0.5),
+                tangent: Point::new(1.0, 0.0),
+                normal: Point::new(0.0, 1.0),
+            },
+            track.height(),
+        ),
+        ValidatedLinearGaugeOrientation::Vertical => (
+            TrackPathFrame {
+                origin: Point::new(
+                    track.left + track.width() * 0.5,
+                    track.bottom - corner_radius,
+                ),
+                tangent: Point::new(0.0, -1.0),
+                normal: Point::new(1.0, 0.0),
+            },
+            track.width(),
+        ),
+    }
 }
 
 fn linear_fill_paint(cache: &LinearGaugeCache) -> Paint {

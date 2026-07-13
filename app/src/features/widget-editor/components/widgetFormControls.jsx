@@ -79,16 +79,17 @@ export function FieldBlock({ label, children, className, disabled = false }) {
  * @param {*} props.onValueChange - Callback invoked to value change.
  * @param {*} props.options - Configuration options for the helper.
  * @param {*} props.disabled - Value for disabled.
+ * @param {object} props.contentProps - Positioning options passed to the select menu.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SelectField({ label, value, onValueChange, options, disabled = false }) {
+export function SelectField({ label, value, onValueChange, options, disabled = false, contentProps }) {
   return (
     <FieldBlock label={label} disabled={disabled}>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className={cn(CONTROL_CLASS, disabled && 'opacity-50 pointer-events-none')}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent {...contentProps}>
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}

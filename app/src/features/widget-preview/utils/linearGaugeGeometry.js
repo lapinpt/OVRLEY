@@ -1,13 +1,6 @@
-/**
- * Gauge geometry utilities — pure functions for computing fill percentages,
- * rect layouts, value ranges, and label formatting for linear gauge widgets.
- *
- * These functions are used by both the SVG renderer (GaugeRenderer.jsx) and
- * the editor overlay (resize handles). They are intentionally stateless and
- * framework-agnostic to stay testable in isolation.
- *
- * @module linearGaugeGeometry
- */
+/** Pure presentation geometry and label formatting for linear gauge previews. */
+
+import { getTranslatedTrackCapPath, getTranslatedTrackCapReveal } from './trackPathGeometry'
 
 /**
  * Computes the fill percentage of a value within a range.
@@ -21,6 +14,15 @@
 export function getFillPercentage(value, min, max) {
   if (typeof value !== 'number' || !Number.isFinite(value) || max <= min) return 0
   return Math.min(1, Math.max(0, (value - min) / (max - min)))
+}
+
+function getLinearInsetRect({ x = 0, y = 0, width, height, borderThickness = 0 }) {
+  return {
+    x: x + borderThickness,
+    y: y + borderThickness,
+    width: Math.max(0, width - borderThickness * 2),
+    height: Math.max(0, height - borderThickness * 2),
+  }
 }
 
 /**
@@ -38,17 +40,31 @@ export function getFillPercentage(value, min, max) {
  * @returns {{ x: number, y: number, width: number, height: number }} Fill rect.
  */
 export function getLinearFillRect({ x = 0, y = 0, width, height, fill, orientation = 'horizontal', borderThickness = 0 }) {
-  const fill01 = Math.min(1, Math.max(0, fill || 0))
-  const inset = Math.max(0, borderThickness || 0)
-  const innerX = x + inset
-  const innerY = y + inset
-  const innerWidth = Math.max(0, width - inset * 2)
-  const innerHeight = Math.max(0, height - inset * 2)
+  const fill01 = Math.min(1, Math.max(0, fill))
+  const inner = getLinearInsetRect({ x, y, width, height, borderThickness })
   if (orientation === 'vertical') {
-    const filledHeight = innerHeight * fill01
-    return { x: innerX, y: innerY + innerHeight - filledHeight, width: innerWidth, height: filledHeight }
+    const filledHeight = inner.height * fill01
+    return { x: inner.x, y: inner.y + inner.height - filledHeight, width: inner.width, height: filledHeight }
   }
-  return { x: innerX, y: innerY, width: innerWidth * fill01, height: innerHeight }
+  return { ...inner, width: inner.width * fill01 }
+}
+
+export function getLinearRectCornerRadii(radius, rect) {
+  return { rx: Math.min(radius, rect.width * 0.5), ry: Math.min(radius, rect.height * 0.5) }
+}
+
+function getLinearSegmentModel(rect, borderThickness, cornerRadius) {
+  const inner = getLinearInsetRect({ ...rect, borderThickness })
+  return {
+    outer: { ...rect, ...getLinearRectCornerRadii(cornerRadius, rect) },
+    inner: { ...inner, ...getLinearRectCornerRadii(Math.max(0, cornerRadius - borderThickness), inner) },
+  }
+}
+
+export function getLinearSegmentModels(rects, borderThickness, cornerRadius) {
+  const segments = []
+  for (const rect of rects) segments.push(getLinearSegmentModel(rect, borderThickness, cornerRadius))
+  return segments
 }
 
 /**
@@ -59,7 +75,10 @@ export function getLinearFillRect({ x = 0, y = 0, width, height, fill, orientati
  * @returns {{ min: number, max: number }} The value range.
  */
 export function getLinearGaugeRange(values) {
-  const finiteValues = (values || []).filter((value) => typeof value === 'number' && Number.isFinite(value))
+  const finiteValues = []
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) finiteValues.push(value)
+  }
   if (finiteValues.length === 0) return { min: 0, max: 100 }
   const min = Math.min(...finiteValues)
   const max = Math.max(...finiteValues)
@@ -77,18 +96,59 @@ export function getLinearGaugeRange(values) {
  * @param {number} params.height - Track height.
  * @param {string} [params.orientation='horizontal'] - Gauge orientation.
  * @param {number} [params.borderThickness=0] - Border inset.
- * @returns {{ min: number, max: number, fill: number, trackRect: object, fillRect: object }}
+ * @returns {{ min: number, max: number, fill: number, innerTrackRect: object, fillRect: object }}
  */
 export function getLinearGaugeLayout({ value, values, width, height, orientation = 'horizontal', borderThickness = 0 }) {
   const range = getLinearGaugeRange(values)
   const hasValue = typeof value === 'number' && Number.isFinite(value)
   const fill = hasValue ? getFillPercentage(value, range.min, range.max) : 0.5
+  const innerTrackRect = getLinearInsetRect({ width, height, borderThickness })
   return {
     ...range,
     fill,
-    trackRect: { x: 0, y: 0, width, height },
-    fillRect: getLinearFillRect({ x: 0, y: 0, width, height, fill, orientation, borderThickness }),
+    innerTrackRect,
+    fillRect: getLinearFillRect({ ...innerTrackRect, fill, orientation }),
   }
+}
+
+function getLinearTrackCapGeometry(trackRect, orientation, cornerRadius) {
+  if (orientation === 'vertical') {
+    return {
+      frame: {
+        origin: {
+          x: trackRect.x + trackRect.width * 0.5,
+          y: trackRect.y + trackRect.height - cornerRadius,
+        },
+        tangent: { x: 0, y: -1 },
+        normal: { x: 1, y: 0 },
+      },
+      trackThickness: trackRect.width,
+    }
+  }
+
+  return {
+    frame: {
+      origin: {
+        x: trackRect.x + cornerRadius,
+        y: trackRect.y + trackRect.height * 0.5,
+      },
+      tangent: { x: 1, y: 0 },
+      normal: { x: 0, y: 1 },
+    },
+    trackThickness: trackRect.height,
+  }
+}
+
+/**
+ * Builds the fixed rounded cap used before a normal linear fill rectangle is
+ * wide or tall enough to contain its configured corner radius.
+ */
+export function getLinearTranslatedFillPath({ trackRect, fillRect, orientation, cornerRadius }) {
+  const revealedLength = orientation === 'vertical' ? fillRect.height : fillRect.width
+  const translatedCap = getTranslatedTrackCapReveal({ revealedLength, cornerRadius })
+  if (!translatedCap) return ''
+
+  return getTranslatedTrackCapPath({ ...getLinearTrackCapGeometry(trackRect, orientation, cornerRadius), ...translatedCap })
 }
 
 /**

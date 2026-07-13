@@ -40,6 +40,15 @@ pub struct ResolvedBarGeometry {
     pub extent: f32,
 }
 
+pub(crate) fn track_corner_radius_max(
+    cross_extent: f32,
+    track_span: f32,
+    bar_geometry: Option<&ResolvedBarGeometry>,
+) -> f32 {
+    let along_extent = bar_geometry.map_or(track_span, |geometry| geometry.extent);
+    (cross_extent.min(along_extent) * 0.5).floor()
+}
+
 pub(crate) fn scale_bar_geometry(
     geometry: Option<ResolvedBarGeometry>,
     scale: f32,
@@ -140,5 +149,12 @@ mod tests {
     fn impossible_explicit_count_is_rejected() {
         let error = resolve_bar_geometry(10.0, 6, 2.0, "gauge").unwrap_err();
         assert!(error.to_string().contains("do not fit"));
+    }
+
+    #[test]
+    fn segmented_corner_radius_uses_the_smallest_bar_dimension() {
+        let geometry = resolve_bar_geometry(100.0, 10, 4.0, "gauge").unwrap();
+        assert_eq!(geometry.extent, 6.4);
+        assert_eq!(track_corner_radius_max(20.0, 100.0, Some(&geometry)), 3.0);
     }
 }

@@ -292,12 +292,12 @@ describe('MetricWidgetEditor arc gauge controls', () => {
 
     expect(screen.getByText('Arc Track')).toBeInTheDocument()
     expect(screen.getByText('Arc Angle')).toBeInTheDocument()
-    expect(screen.getByText('Inner Label')).toBeInTheDocument()
-    expect(screen.getByText('Inner Unit')).toBeInTheDocument()
-    expect(screen.getByText('Flat')).toBeInTheDocument()
+    expect(screen.getByText('Label')).toBeInTheDocument()
+    expect(screen.getAllByText('Unit').length).toBeGreaterThan(0)
+    expect(screen.getByText('Flat Track')).toBeInTheDocument()
     expect(screen.queryByText('Icon')).not.toBeInTheDocument()
 
-    await user.click(screen.getByText('Flat').parentElement.querySelector('[role="switch"]'))
+    await user.click(screen.getByText('Flat Track').parentElement.querySelector('[role="switch"]'))
     expect(updateWidgetData).toHaveBeenCalledWith(
       'value-0',
       expect.objectContaining({

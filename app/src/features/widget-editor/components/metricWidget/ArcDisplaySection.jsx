@@ -12,9 +12,9 @@ import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SliderField, ToggleField } from '../widgetFormControls'
-import BarFillStyleControls from './BarFillStyleControls'
+import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/utils/arcGaugeLayout'
-import { getSuggestedArcBarGeometry } from '@/features/widget-preview/utils/gaugeBarGeometry'
+import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/utils/gaugeBarGeometry'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
@@ -26,6 +26,16 @@ const CORNER_ORIENTATION_OPTIONS = [
 function suggestArcBarGeometry(data) {
   const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
   return getSuggestedArcBarGeometry({ ...layout, borderThickness: data.track_border_thickness })
+}
+
+function getArcGapMax(data) {
+  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
+  return getArcBarGapMax({ ...layout, bar_count: data.bar_count })
+}
+
+function getArcCornerRadiusMax(data) {
+  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
+  return getArcTrackCornerRadiusMax({ ...data, ...layout })
 }
 
 /**
@@ -44,8 +54,9 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
   const unitOptions = getStandardMetricUnitOptions(widget.type)
   const unitsMode = getStandardMetricUnitsMode(widget.type)
   const supportsUnitSelection = unitOptions.length > 1
-  const cornerRadiusMax = Math.max(0, (arcData.track_thickness ?? 0) * 0.5)
+  const cornerRadiusMax = getArcCornerRadiusMax(arcData)
   const size = widget.data.width ?? arcData.width
+  const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData) : 0
 
   const updateBoundedNumber = (key, rawValue, min, max) => {
     const value = Number(rawValue)
@@ -62,7 +73,18 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
     <>
       <div className="space-y-4">
         <SectionHeading icon={SlidersHorizontal} title={isCornerGauge ? 'Corner Track' : 'Arc Track'} />
-        <div className="grid grid-cols-1 gap-4 pt-2">
+        <div className="grid grid-cols-1 gap-4">
+          <SliderField
+            label="Size"
+            value={size}
+            min={30}
+            max={600}
+            step={1}
+            valueDisplay={`${Math.round(size)}px`}
+            onSliderChange={handleSizeChange}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4 pt-2">
           {isCornerGauge ? (
             <SelectField
               label="Corner Orientation"
@@ -81,19 +103,6 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
               onSliderChange={(arc_angle) => updateArc({ arc_angle })}
             />
           )}
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          <SliderField
-            label="Size"
-            value={size}
-            min={30}
-            max={600}
-            step={1}
-            valueDisplay={`${Math.round(size)}px`}
-            onSliderChange={handleSizeChange}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
           <SliderField
             label="Thickness"
             value={arcData.track_thickness}
@@ -104,10 +113,13 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             onSliderChange={(track_thickness) =>
               updateArc({
                 track_thickness,
-                track_corner_radius: Math.min(arcData.track_corner_radius ?? 0, track_thickness * 0.5),
+                track_corner_radius: Math.min(arcData.track_corner_radius, getArcCornerRadiusMax({ ...arcData, track_thickness })),
               })
             }
           />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <BarFillStyleField data={arcData} suggestBarGeometry={suggestArcBarGeometry} updateVariant={updateArc} />
           <SliderField
             label="Corner Radius"
             value={arcData.track_corner_radius}
@@ -117,8 +129,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             valueDisplay={`${arcData.track_corner_radius}px`}
             onSliderChange={(track_corner_radius) => updateArc({ track_corner_radius })}
           />
+          <BarFillStyleDetails data={arcData} barGapMax={barGapMax} getCornerRadiusMax={getArcCornerRadiusMax} updateVariant={updateArc} />
         </div>
-        <BarFillStyleControls data={arcData} suggestBarGeometry={suggestArcBarGeometry} updateVariant={updateArc} />
         <div className="grid grid-cols-2 gap-4">
           <ColorField label="Border Color" value={arcData.track_border_color} onChange={(track_border_color) => updateArc({ track_border_color })} />
           <SliderField
@@ -157,7 +169,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
         </div>
       </div>
 
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Inner Label" fontSizeLabel="Font Size" />
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Label" fontSizeLabel="Font Size" />
       <div className="grid grid-cols-2 gap-4">
         <SliderField
           label="Horizontal Offset"
@@ -181,7 +193,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
 
       {unitsMode !== 'hidden' ? (
         <UnitsControlRow
-          title="Inner Unit"
+          title="Unit"
           checked={widget.data.show_units ?? definition?.showUnitsByDefault ?? false}
           onCheckedChange={(show_units) => updateWidgetData(widget.id, { show_units })}
           colorValue={widget.data.unit_color}

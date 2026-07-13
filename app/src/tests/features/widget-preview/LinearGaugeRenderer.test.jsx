@@ -10,6 +10,7 @@ function makeWidget(overrides = {}) {
     data: {
       value: 'speed',
       display_type: 'linear',
+      opacity: 1,
       width: 200,
       height: 40,
       orientation: 'horizontal',
@@ -26,6 +27,7 @@ function makeWidget(overrides = {}) {
       min_max_label_font: 'Arial.ttf',
       min_max_label_font_size: 12,
       min_max_label_color: '#ffffff',
+      min_max_label_position: 'bottom',
       ...overrides,
     },
   }

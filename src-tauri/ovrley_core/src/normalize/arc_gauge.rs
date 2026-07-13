@@ -9,7 +9,8 @@ use super::raw::ValueConfig;
 use super::value::validate_arc_inner_value_widget;
 use super::ValidatedValueWidget;
 use super::{
-    arc_track_radius, corner_track_radius, resolve_bar_style_geometry, ResolvedBarGeometry,
+    arc_track_radius, corner_track_radius, resolve_bar_style_geometry, track_corner_radius_max,
+    ResolvedBarGeometry,
 };
 use crate::error::{CoreError, CoreResult};
 use crate::types::{DisplayType, MetricKind, TrackFillStyle};
@@ -163,7 +164,7 @@ fn validate_arc_shaped_gauge(
     }
     // Arc tracks use a filled outline with endpoint fillets. Keep the shared
     // radius contract bounded by the track half-width, matching linear gauges.
-    let track_corner_radius = raw_corner_radius.min(track_thickness * 0.5);
+    let initial_corner_radius = raw_corner_radius.min(track_thickness * 0.5);
 
     let track_border_thickness =
         require_f32(value.track_border_thickness, &p("track_border_thickness"))?;
@@ -214,22 +215,46 @@ fn validate_arc_shaped_gauge(
     let track_fill_flat = require_bool(value.track_fill_flat, &p("track_fill_flat"))?;
     let track_fill_style = value.track_fill_style.unwrap_or_default();
     let frame_size = width.min(height) as f32;
-    let radius = match corner_orientation {
+    let initial_radius = match corner_orientation {
         Some(_) => corner_track_radius(
             frame_size,
             track_thickness,
-            track_corner_radius,
+            initial_corner_radius,
             track_border_thickness,
         ),
         None => arc_track_radius(frame_size, track_thickness, track_border_thickness),
     };
-    let bar_geometry = resolve_bar_style_geometry(
+    let initial_bar_span = arc_angle.to_radians().abs() * initial_radius;
+    let initial_bar_geometry = resolve_bar_style_geometry(
         track_fill_style,
-        arc_angle.to_radians().abs() * radius,
+        initial_bar_span,
         value.bar_count,
         value.bar_gap,
         &p("track_fill_style"),
     )?;
+    let track_corner_radius = raw_corner_radius.min(track_corner_radius_max(
+        track_thickness,
+        track_thickness,
+        initial_bar_geometry.as_ref(),
+    ));
+    let bar_geometry =
+        if corner_orientation.is_some() && track_corner_radius < initial_corner_radius {
+            let radius = corner_track_radius(
+                frame_size,
+                track_thickness,
+                track_corner_radius,
+                track_border_thickness,
+            );
+            resolve_bar_style_geometry(
+                track_fill_style,
+                arc_angle.to_radians().abs() * radius,
+                value.bar_count,
+                value.bar_gap,
+                &p("track_fill_style"),
+            )?
+        } else {
+            initial_bar_geometry
+        };
     let show_min_max_labels = require_bool(value.show_min_max_labels, &p("show_min_max_labels"))?;
     let min_max_label_font =
         require_string(value.min_max_label_font.clone(), &p("min_max_label_font"))?;

@@ -1,7 +1,13 @@
 //! Filled-path geometry shared by arc-shaped gauges.
 //!
-//! This deliberately does not generalize linear gauge geometry: arcs require
-//! circular offset curves and endpoint fillets, while linear gauges use RRects.
+//! Arc bodies require circular offset curves and endpoint fillets. Their
+//! translated low-fill cap is shared with linear gauges.
+
+use super::super::track_path::{
+    append_inner_to_outer_track_fillet, append_outer_to_inner_track_fillet,
+    translated_track_cap_path, translated_track_cap_reveal, TrackPathFrame, TranslatedTrackCap,
+    TRACK_PATH_EPSILON,
+};
 
 use crate::normalize::{
     arc_track_radius, corner_track_cap_padding, corner_track_radius,
@@ -9,8 +15,6 @@ use crate::normalize::{
 };
 use skia_safe::{Canvas, ClipOp, Paint, Path, PathBuilder, PathFillType, Point};
 
-const PATH_EPSILON: f32 = 0.001;
-const QUARTER_CIRCLE_KAPPA: f32 = 0.552_284_76;
 const CORNER_GAUGE_DEFAULT_FRAME_SIZE: f32 = 110.0;
 const CORNER_GAUGE_INNER_INSET: f32 = 22.0;
 
@@ -41,15 +45,15 @@ pub(crate) struct ArcTrackSpec {
 }
 
 /// Reveal clip geometry produced by [`ArcTrackSpec::reveal_clip`]. Below the
-/// low-fill threshold the clip is a translated filled disk whose intersection
-/// with the annular source track forms a crescent (Option B); above the
-/// threshold it is a normal partial-track shape. Keeping the leading edge a
-/// true circular arc of the full cap radius at every fill level makes the
+/// low-fill threshold the clip is a translated rounded rectangle whose
+/// intersection with the annular source track grows from its start edge
+/// (Option B); above the threshold it is a normal partial-track shape. Keeping
+/// the leading corners at the full cap radius at every fill level makes the
 /// handoff between the two variants seamless.
 #[derive(Clone, Copy, Debug)]
 enum RevealClip {
     Track(ArcTrackSpec),
-    TranslatedCap { cap_radius: f32, cap_offset: f32 },
+    TranslatedCap(TranslatedTrackCap),
 }
 
 impl RevealClip {
@@ -58,10 +62,7 @@ impl RevealClip {
     fn path(self, source: &ArcTrackSpec) -> Option<Path> {
         match self {
             RevealClip::Track(spec) => spec.filled_path(),
-            RevealClip::TranslatedCap {
-                cap_radius,
-                cap_offset,
-            } => source.translated_cap_path(cap_radius, cap_offset),
+            RevealClip::TranslatedCap(cap) => Some(source.translated_cap_path(cap)),
         }
     }
 }
@@ -87,11 +88,11 @@ impl ArcTrackSpec {
     }
 
     /// Builds the reveal clip for this complete source track. Below a
-    /// threshold fill the clip is a translated filled disk (Option B): it
-    /// slides backward along the sweep tangent from the start so its
-    /// intersection with the annular source produces a crescent that grows
-    /// monotonically. At or above the threshold the clip is a normal partial
-    /// track shape with an anchored start and a progressively revealed end cap.
+    /// threshold fill the clip is a translated rounded rectangle (Option B):
+    /// it slides backward along the sweep tangent from the start so its
+    /// intersection with the annular source grows monotonically. At or above
+    /// the threshold the clip is a normal partial-track shape with an anchored
+    /// start and a progressively revealed end cap.
     fn reveal_clip(self, fill01: f32) -> Option<RevealClip> {
         let fill = fill01.clamp(0.0, 1.0);
         let sweep = self
@@ -100,11 +101,11 @@ impl ArcTrackSpec {
         let sweep_magnitude = sweep.abs();
         let direction = sweep.signum();
         let radius = self.geometry.radius.max(0.0);
-        if fill <= 0.0 || sweep_magnitude <= 0.0 || radius <= PATH_EPSILON {
+        if fill <= 0.0 || sweep_magnitude <= 0.0 || radius <= TRACK_PATH_EPSILON {
             return None;
         }
 
-        let full_circle = sweep_magnitude >= MAX_ARC_ANGLE_DEGREES - PATH_EPSILON;
+        let full_circle = sweep_magnitude >= MAX_ARC_ANGLE_DEGREES - TRACK_PATH_EPSILON;
         let half_thickness = self.thickness.max(0.0) * 0.5;
         let start_corner_radius = if full_circle {
             0.0
@@ -120,21 +121,17 @@ impl ArcTrackSpec {
         let end_cap_angle = arc_cap_angle_degrees(radius, end_corner_radius);
         let total_span = sweep_magnitude + start_cap_angle + end_cap_angle;
         let revealed_sweep = total_span * fill;
-        let revealed_end_corner_radius =
-            end_corner_radius.min(radius * revealed_sweep.to_radians());
+        let available_end_cap_length = radius * revealed_sweep.to_radians();
+        let revealed_end_corner_radius = end_corner_radius.min(available_end_cap_length);
         let revealed_end_cap_angle = arc_cap_angle_degrees(radius, revealed_end_corner_radius);
-        let body_sweep = (revealed_sweep - revealed_end_cap_angle).max(PATH_EPSILON);
+        let body_sweep = (revealed_sweep - revealed_end_cap_angle).max(TRACK_PATH_EPSILON);
 
-        let effective_cap_radius = end_corner_radius.min(half_thickness);
-        if effective_cap_radius > PATH_EPSILON && !full_circle && total_span > PATH_EPSILON {
-            let cap_diameter_angular = (2.0 * effective_cap_radius / radius).to_degrees();
-            let threshold_fill = cap_diameter_angular / total_span;
-            if fill < threshold_fill {
-                let phase = fill / threshold_fill;
-                return Some(RevealClip::TranslatedCap {
-                    cap_radius: effective_cap_radius,
-                    cap_offset: -2.0 * effective_cap_radius * (1.0 - phase),
-                });
+        if end_corner_radius > TRACK_PATH_EPSILON && !full_circle && total_span > TRACK_PATH_EPSILON
+        {
+            if let Some(cap) =
+                translated_track_cap_reveal(available_end_cap_length, end_corner_radius)
+            {
+                return Some(RevealClip::TranslatedCap(cap));
             }
         }
 
@@ -174,7 +171,9 @@ impl ArcTrackSpec {
         // A zero sweep is an empty fill, but every non-zero sweep represents a
         // real value. In particular, a short rounded fill is a cap rather than
         // an empty track, so do not discard it based on a geometric epsilon.
-        if sweep_magnitude <= 0.0 || half_thickness <= PATH_EPSILON || inner_radius <= PATH_EPSILON
+        if sweep_magnitude <= 0.0
+            || half_thickness <= TRACK_PATH_EPSILON
+            || inner_radius <= TRACK_PATH_EPSILON
         {
             return None;
         }
@@ -188,7 +187,7 @@ impl ArcTrackSpec {
             start,
         ));
 
-        if sweep_magnitude >= MAX_ARC_ANGLE_DEGREES - PATH_EPSILON {
+        if sweep_magnitude >= MAX_ARC_ANGLE_DEGREES - TRACK_PATH_EPSILON {
             append_circular_arc(
                 &mut path,
                 self.geometry.center_x,
@@ -227,16 +226,18 @@ impl ArcTrackSpec {
             start,
             sweep,
         );
-        append_outer_to_inner_fillet(
+        append_outer_to_inner_track_fillet(
             &mut path,
-            arc_point(
-                self.geometry.center_x,
-                self.geometry.center_y,
-                self.geometry.radius,
-                end,
-            ),
-            directed_path_tangent(end, direction),
-            path_normal(end),
+            TrackPathFrame {
+                origin: arc_point(
+                    self.geometry.center_x,
+                    self.geometry.center_y,
+                    self.geometry.radius,
+                    end,
+                ),
+                tangent: directed_path_tangent(end, direction),
+                normal: path_normal(end),
+            },
             half_thickness,
             end_fillet_radius,
         );
@@ -249,16 +250,18 @@ impl ArcTrackSpec {
             -sweep,
         );
         let start_tangent = directed_path_tangent(start, direction);
-        append_inner_to_outer_fillet(
+        append_inner_to_outer_track_fillet(
             &mut path,
-            arc_point(
-                self.geometry.center_x,
-                self.geometry.center_y,
-                self.geometry.radius,
-                start,
-            ),
-            Point::new(-start_tangent.x, -start_tangent.y),
-            path_normal(start),
+            TrackPathFrame {
+                origin: arc_point(
+                    self.geometry.center_x,
+                    self.geometry.center_y,
+                    self.geometry.radius,
+                    start,
+                ),
+                tangent: Point::new(-start_tangent.x, -start_tangent.y),
+                normal: path_normal(start),
+            },
             half_thickness,
             start_fillet_radius,
         );
@@ -266,27 +269,12 @@ impl ArcTrackSpec {
         Some(path.detach())
     }
 
-    /// Builds a closed filled disk centered on the track centerline at
-    /// `cap_offset` along the sweep tangent from the start. Used as the
-    /// low-fill clip; its intersection with the annular source track produces a
-    /// crescent that grows monotonically with fill. `cap_offset = 0` places the
-    /// disk's center on the start radial, so the front half reads as the
-    /// fully-formed end cap; negative `cap_offset` slides the disk behind the
-    /// start, shrinking the visible crescent.
-    fn translated_cap_path(self, cap_radius: f32, cap_offset: f32) -> Option<Path> {
+    /// Converts arc geometry into the shared translated-cap coordinate frame.
+    fn translated_cap_path(self, cap: TranslatedTrackCap) -> Path {
         let sweep = self
             .sweep_angle
             .clamp(-MAX_ARC_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES);
         let direction = sweep.signum();
-        let half_thickness = self.thickness.max(0.0) * 0.5;
-        if direction == 0.0 || cap_radius <= PATH_EPSILON || half_thickness <= PATH_EPSILON {
-            return None;
-        }
-        let r = cap_radius.min(half_thickness);
-        if r <= PATH_EPSILON {
-            return None;
-        }
-
         let start_center = arc_point(
             self.geometry.center_x,
             self.geometry.center_y,
@@ -295,23 +283,15 @@ impl ArcTrackSpec {
         );
         let start_tangent = path_tangent(self.geometry.start_angle);
         let sweep_forward = Point::new(start_tangent.x * direction, start_tangent.y * direction);
-        let cap_center = Point::new(
-            start_center.x + sweep_forward.x * cap_offset,
-            start_center.y + sweep_forward.y * cap_offset,
-        );
-
-        let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
-        path.move_to(arc_point(cap_center.x, cap_center.y, r, 0.0));
-        append_circular_arc(
-            &mut path,
-            cap_center.x,
-            cap_center.y,
-            r,
-            0.0,
-            MAX_ARC_ANGLE_DEGREES,
-        );
-        path.close();
-        Some(path.detach())
+        translated_track_cap_path(
+            TrackPathFrame {
+                origin: start_center,
+                tangent: sweep_forward,
+                normal: path_normal(self.geometry.start_angle),
+            },
+            self.thickness,
+            cap,
+        )
     }
 }
 
@@ -382,7 +362,7 @@ pub fn arc_point(center_x: f32, center_y: f32, radius: f32, angle: f32) -> Point
 }
 
 fn arc_cap_angle_degrees(radius: f32, corner_radius: f32) -> f32 {
-    if radius <= PATH_EPSILON || corner_radius <= 0.0 {
+    if radius <= TRACK_PATH_EPSILON || corner_radius <= 0.0 {
         0.0
     } else {
         corner_radius.atan2(radius).to_degrees()
@@ -493,112 +473,6 @@ fn append_circular_arc(
     }
 }
 
-fn append_outer_to_inner_fillet(
-    path: &mut PathBuilder,
-    origin: Point,
-    tangent: Point,
-    normal: Point,
-    half_thickness: f32,
-    corner_radius: f32,
-) {
-    if corner_radius <= PATH_EPSILON {
-        path.line_to(local_point(origin, tangent, normal, 0.0, -half_thickness));
-        return;
-    }
-
-    let kappa = corner_radius * QUARTER_CIRCLE_KAPPA;
-    let upper_end = local_point(
-        origin,
-        tangent,
-        normal,
-        corner_radius,
-        half_thickness - corner_radius,
-    );
-    let lower_start = local_point(
-        origin,
-        tangent,
-        normal,
-        corner_radius,
-        -half_thickness + corner_radius,
-    );
-    path.cubic_to(
-        local_point(origin, tangent, normal, kappa, half_thickness),
-        local_point(
-            origin,
-            tangent,
-            normal,
-            corner_radius,
-            half_thickness - corner_radius + kappa,
-        ),
-        upper_end,
-    );
-    path.line_to(lower_start);
-    path.cubic_to(
-        local_point(
-            origin,
-            tangent,
-            normal,
-            corner_radius,
-            -half_thickness + corner_radius - kappa,
-        ),
-        local_point(origin, tangent, normal, kappa, -half_thickness),
-        local_point(origin, tangent, normal, 0.0, -half_thickness),
-    );
-}
-
-fn append_inner_to_outer_fillet(
-    path: &mut PathBuilder,
-    origin: Point,
-    tangent: Point,
-    normal: Point,
-    half_thickness: f32,
-    corner_radius: f32,
-) {
-    if corner_radius <= PATH_EPSILON {
-        path.line_to(local_point(origin, tangent, normal, 0.0, half_thickness));
-        return;
-    }
-
-    let kappa = corner_radius * QUARTER_CIRCLE_KAPPA;
-    let lower_end = local_point(
-        origin,
-        tangent,
-        normal,
-        corner_radius,
-        -half_thickness + corner_radius,
-    );
-    let upper_start = local_point(
-        origin,
-        tangent,
-        normal,
-        corner_radius,
-        half_thickness - corner_radius,
-    );
-    path.cubic_to(
-        local_point(origin, tangent, normal, kappa, -half_thickness),
-        local_point(
-            origin,
-            tangent,
-            normal,
-            corner_radius,
-            -half_thickness + corner_radius - kappa,
-        ),
-        lower_end,
-    );
-    path.line_to(upper_start);
-    path.cubic_to(
-        local_point(
-            origin,
-            tangent,
-            normal,
-            corner_radius,
-            half_thickness - corner_radius + kappa,
-        ),
-        local_point(origin, tangent, normal, kappa, half_thickness),
-        local_point(origin, tangent, normal, 0.0, half_thickness),
-    );
-}
-
 fn path_tangent(angle: f32) -> Point {
     let radians = angle.to_radians();
     Point::new(-radians.sin(), radians.cos())
@@ -612,13 +486,6 @@ fn directed_path_tangent(angle: f32, direction: f32) -> Point {
 fn path_normal(angle: f32) -> Point {
     let radians = angle.to_radians();
     Point::new(radians.cos(), radians.sin())
-}
-
-fn local_point(origin: Point, tangent: Point, normal: Point, x: f32, y: f32) -> Point {
-    Point::new(
-        origin.x + tangent.x * x + normal.x * y,
-        origin.y + tangent.y * x + normal.y * y,
-    )
 }
 
 #[cfg(test)]
@@ -660,12 +527,9 @@ mod tests {
         let halfway = source.reveal_clip(0.5).unwrap();
 
         match low_fill {
-            RevealClip::TranslatedCap {
-                cap_radius,
-                cap_offset,
-            } => {
-                assert!((cap_radius - 6.0).abs() < PATH_EPSILON);
-                assert!(cap_offset < 0.0 && cap_offset > -12.0);
+            RevealClip::TranslatedCap(cap) => {
+                assert!((cap.corner_radius - 6.0).abs() < TRACK_PATH_EPSILON);
+                assert!(cap.cap_offset < 0.0 && cap.cap_offset > -12.0);
             }
             _ => panic!("expected TranslatedCap below threshold, got {:?}", low_fill),
         }
@@ -673,8 +537,8 @@ mod tests {
         match just_above_threshold {
             RevealClip::Track(spec) => {
                 let expected_start = 180.0 - arc_cap_angle_degrees(64.0, 6.0);
-                assert!((spec.geometry.start_angle - expected_start).abs() < PATH_EPSILON);
-                assert!((spec.end_corner_radius - 6.0).abs() < PATH_EPSILON);
+                assert!((spec.geometry.start_angle - expected_start).abs() < TRACK_PATH_EPSILON);
+                assert!((spec.end_corner_radius - 6.0).abs() < TRACK_PATH_EPSILON);
             }
             _ => panic!(
                 "expected Track above threshold, got {:?}",

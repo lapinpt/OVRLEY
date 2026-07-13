@@ -40,7 +40,7 @@ pub use backdrop::{validate_backdrop, ValidatedBackdrop};
 pub use bar_geometry::ResolvedBarGeometry;
 pub(crate) use bar_geometry::{
     arc_track_radius, corner_track_cap_padding, corner_track_radius, resolve_bar_style_geometry,
-    scale_bar_geometry,
+    scale_bar_geometry, track_corner_radius_max,
 };
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
