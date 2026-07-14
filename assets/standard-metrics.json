@@ -85,6 +85,7 @@
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
         "defaultFrameHeight": 24,
+        "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
           "width": 80,
           "orientation": "horizontal",
@@ -115,6 +116,7 @@
         "defaultFrameWidth": 220,
         "defaultFrameHeight": 220,
         "defaultFontSize": 60,
+        "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
           "arc_angle": 240,
           "track_fill_style": "fill",
@@ -146,6 +148,7 @@
         "defaultFrameWidth": 162,
         "defaultFrameHeight": 162,
         "defaultFontSize": 51,
+        "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
           "corner_orientation": "bottom-left",
           "track_fill_style": "fill",

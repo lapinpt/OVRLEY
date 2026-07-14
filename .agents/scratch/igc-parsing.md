@@ -3,13 +3,15 @@
 **.IGC flight-log parsing** is now supported and extracts gps location, altitude, speed, true heading, vertical speed, and temperature. It attempts to calculate the missing metrics when the IGC file does not provide them.
 
 - Added ability to mute the video in preview.
-- Pinned FFmpeg version to 8.1.2-3 instead of always using the latest. Anything after that causes NVIDIA+CUDA to export as green frames because of scale_cuda refactor which likely introduces a bug.
+- Pinned FFmpeg version to 8.1.2 master instead of always using the latest. This also fixes NVIDIA+CUDA export producing green frames due a scale_cuda refactor in later commits which introduced this bug.
 
-- Fixed a bug in some metric widgetswhere decimal places with value '0' were being trimmed and the values displayed as integers instead.
+- Fixed a bug in some metric widgets where decimal places with value '0' were being trimmed and the values displayed as integers instead.
 - Fixed a bug where minimize/maximize/close buttons of the window were unresponsive.
 - Fixed broken template selection introduced by making the window draggable by the title bar.
-- Fixed a bug where hardware-accelerated export would sometimes result in a malformed video file.
-- NVIDIA+CUDA export always produced a small green strip at the bottom of the video because of a weird spec (thanks NVIDIA for the prank!). Fixed by sheer creativity of metadata.
+- Fixed a bug where hardware-accelerated export would sometimes result in a malformed video file that could not be played.
+- NVIDIA+CUDA export always produced a small green strip at the bottom/side of the video because of a weird NVIDIA spec (thanks NVIDIA for the prank!). Fixed by sheer creativity of metadata.
+- Some hardware-accelerated exports would lose 0-5 frames at the end due to stitching of parallel export jobs and audio packet mismatch. This was fixed by a better algorithm.
+- Some portrait videos are shot in landscape and only contain metadata for video players to rotate them (who knew?). Being unaware of this, OVRLEY would previously export them incorrectly as a landscape, but now it correctly rotates them to portrait.
 
 ## Goal
 

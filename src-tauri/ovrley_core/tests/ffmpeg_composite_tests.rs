@@ -64,6 +64,7 @@ fn settings_for_codec(
         height: 2160,
         source_fps,
         overlay_pipe_fps,
+        include_audio: true,
         hwaccel_available: hwaccel,
     })
     .unwrap()
@@ -81,7 +82,32 @@ fn settings_for_dimensions(width: u32, height: u32) -> CompositeFfmpegSettings {
         height,
         source_fps: Fps::new(30000, 1001).unwrap(),
         overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
         hwaccel_available: &HwAccelInfo::default(),
+    })
+    .unwrap()
+}
+
+fn cuda_settings_for_dimensions(codec: &str, width: u32, height: u32) -> CompositeFfmpegSettings {
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_nvenc: true,
+        hevc_nvenc: true,
+        nvgpu: true,
+        nnvgpu: true,
+        ..AvailableCodecs::default()
+    });
+    build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: codec,
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width,
+        height,
+        source_fps: Fps::new(30000, 1001).unwrap(),
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
+        hwaccel_available: &hwaccel,
     })
     .unwrap()
 }
@@ -232,7 +258,7 @@ fn test_2_7a_video_trim_is_filter_side_even_without_input_seek() {
     assert!(built
         .filter_complex
         .contains("trim=start=0:end=10,setpts=PTS-STARTPTS,"));
-    assert!(built.output_args.iter().any(|arg| arg == "-shortest"));
+    assert!(!built.output_args.iter().any(|arg| arg == "-shortest"));
 }
 
 #[test]
@@ -255,6 +281,7 @@ fn validates_zero_direct_fps_values() {
         height: 2160,
         source_fps: Fps { num: 0, den: 1 },
         overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
         hwaccel_available: &HwAccelInfo::default(),
     })
     .unwrap_err();
@@ -337,6 +364,7 @@ fn test_8_4_nvenc_hevc_unavailable_fails_clearly() {
         height: 2160,
         source_fps: Fps::new(30000, 1001).unwrap(),
         overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
         hwaccel_available: &HwAccelInfo::default(),
     })
     .unwrap_err();
@@ -380,6 +408,7 @@ fn test_8_6_videotoolbox_hevc_unavailable_fails_clearly() {
         height: 2160,
         source_fps: Fps::new(30000, 1001).unwrap(),
         overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
         hwaccel_available: &HwAccelInfo::default(),
     })
     .unwrap_err();
@@ -448,6 +477,7 @@ fn test_8_7c_amf_hevc_unavailable_fails_clearly() {
         height: 2160,
         source_fps: Fps::new(30000, 1001).unwrap(),
         overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
         hwaccel_available: &HwAccelInfo::default(),
     })
     .unwrap_err();
@@ -534,6 +564,7 @@ fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
         height: 2160,
         source_fps: Fps::new(30000, 1001).unwrap(),
         overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
         hwaccel_available: &hwaccel,
     })
     .unwrap_err();
@@ -569,9 +600,41 @@ fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
     assert_argument_pair(&built.input_0_args, "-filter_hw_device", "cuda");
     assert_argument_pair(&built.input_0_args, "-hwaccel", "cuda");
     assert_argument_pair(&built.input_0_args, "-hwaccel_output_format", "cuda");
-    assert!(built.filter_complex.contains("scale_cuda=format=yuv420p"));
+    assert!(built
+        .filter_complex
+        .contains("scale_cuda=w=3840:h=2160:format=yuv420p"));
     assert!(built.filter_complex.contains("overlay_cuda"));
     assert_argument_pair(&built.output_args, "-c:v", "h264_nvenc");
+    assert_argument_pair(
+        &built.output_args,
+        "-bsf:v",
+        "h264_metadata=crop_right=0:crop_bottom=16",
+    );
+}
+
+#[test]
+fn test_9_2_1_cuda_h264_crops_32_pixel_frame_overhang_on_each_axis() {
+    let landscape = cuda_settings_for_dimensions("nnvgpu_h264", 1920, 1080);
+    let portrait = cuda_settings_for_dimensions("nnvgpu_h264", 1080, 1920);
+    let both_axes = cuda_settings_for_dimensions("nnvgpu_h264", 1918, 1078);
+    let aligned = cuda_settings_for_dimensions("nnvgpu_h264", 1920, 1920);
+
+    assert_argument_pair(
+        &landscape.output_args,
+        "-bsf:v",
+        "h264_metadata=crop_right=0:crop_bottom=8",
+    );
+    assert_argument_pair(
+        &portrait.output_args,
+        "-bsf:v",
+        "h264_metadata=crop_right=8:crop_bottom=0",
+    );
+    assert_argument_pair(
+        &both_axes.output_args,
+        "-bsf:v",
+        "h264_metadata=crop_right=2:crop_bottom=10",
+    );
+    assert!(!aligned.output_args.iter().any(|arg| arg == "-bsf:v"));
 }
 
 #[test]
@@ -596,9 +659,33 @@ fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
 
     assert_eq!(built.selected_profile_name, "nnvgpu_hevc");
     assert_eq!(built.fallback_profile_name.as_deref(), Some("nvgpu_hevc"));
-    assert!(built.filter_complex.contains("scale_cuda=format=yuv420p"));
+    assert!(built
+        .filter_complex
+        .contains("scale_cuda=w=3840:h=2160:format=yuv420p"));
     assert!(built.filter_complex.contains("overlay_cuda"));
     assert_argument_pair(&built.output_args, "-c:v", "hevc_nvenc");
+    assert_argument_pair(
+        &built.output_args,
+        "-bsf:v",
+        "hevc_metadata=width=3840:height=2160",
+    );
+}
+
+#[test]
+fn test_9_3_1_cuda_hevc_uses_display_oriented_output_dimensions() {
+    let landscape = cuda_settings_for_dimensions("nnvgpu_hevc", 1920, 1080);
+    let portrait = cuda_settings_for_dimensions("nnvgpu_hevc", 1080, 1920);
+
+    assert_argument_pair(
+        &landscape.output_args,
+        "-bsf:v",
+        "hevc_metadata=width=1920:height=1080",
+    );
+    assert_argument_pair(
+        &portrait.output_args,
+        "-bsf:v",
+        "hevc_metadata=width=1080:height=1920",
+    );
 }
 
 #[test]
@@ -619,6 +706,7 @@ fn test_9_5_qsv_full_profile_requires_qsv_filter_stack() {
         height: 2160,
         source_fps: Fps::new(30000, 1001).unwrap(),
         overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        include_audio: true,
         hwaccel_available: &hwaccel,
     })
     .unwrap_err();
@@ -700,6 +788,7 @@ fn test_9_6_qsv_full_profile_requires_detected_init_args() {
         height: 2160,
         source_fps: Fps::new(30, 1).unwrap(),
         overlay_pipe_fps: Fps::new(30, 1).unwrap(),
+        include_audio: true,
         hwaccel_available: &hwaccel,
     })
     .unwrap_err();

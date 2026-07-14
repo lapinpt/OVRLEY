@@ -3,8 +3,8 @@ import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 const BAR_COUNT_MAX = 64
 
 const FILL_STYLE_OPTIONS = [
-  { value: 'fill', label: 'Fill' },
-  { value: 'bars', label: 'Bars' },
+  { value: 'fill', label: 'Continuous Fill' },
+  { value: 'bars', label: 'Segmented Bars' },
 ]
 
 function buildFillStyleUpdate(data, track_fill_style, suggestBarGeometry) {

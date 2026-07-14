@@ -46,7 +46,7 @@ const CUDA_H264_FILTER: &str =
 [base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
 
 const CUDA_HEVC_FILTER: &str =
-    "[0:v]{base_video_filters}scale_cuda=w={width}:h={height}:format=yuv420p:use_filters=1[base];\
+    "[0:v]{base_video_filters}scale_cuda=w={width}:h={height}:format=yuv420p[base];\
 [1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
 [base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
 
@@ -132,8 +132,6 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
         output_args: &[
             "-c:v",
             "h264_nvenc",
-            "-bsf:v",
-            "h264_metadata=crop_bottom=16",
             "-rc:v",
             "cbr",
             "-bf:v",
@@ -161,8 +159,6 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
         output_args: &[
             "-c:v",
             "hevc_nvenc",
-            "-bsf:v",
-            "hevc_metadata=width=3840:height=2160",
             "-rc:v",
             "cbr",
             "-bf:v",

@@ -232,6 +232,7 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         0.2,
         0.0,
         1,
+        true,
     )
     .unwrap();
 
@@ -307,6 +308,7 @@ fn test_5_9_invalid_dense_frame_range_fails_clearly() {
         0.2,
         0.0,
         1,
+        true,
     )
     .unwrap();
 

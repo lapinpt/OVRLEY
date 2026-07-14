@@ -165,6 +165,7 @@ pub struct CompositeFfmpegBuildRequest<'a> {
     pub height: u32,
     pub source_fps: Fps,
     pub overlay_pipe_fps: Fps,
+    pub include_audio: bool,
     pub hwaccel_available: &'a HwAccelInfo,
 }
 
@@ -262,17 +263,19 @@ pub(crate) fn build_composite_ffmpeg_settings_with_source_rotation(
 
     // ── PHASE 5: BUILD INPUT 2 ARGS (trimmed audio source for stream copy) ──
     let mut input_2_args = Vec::new();
-    if request.video_trim_start > 0.0 {
-        input_2_args.push("-ss".to_string());
-        input_2_args.push(format_seconds_arg(request.video_trim_start));
+    if request.include_audio {
+        if request.video_trim_start > 0.0 {
+            input_2_args.push("-ss".to_string());
+            input_2_args.push(format_seconds_arg(request.video_trim_start));
+        }
+        input_2_args.extend([
+            source_autorotate_arg.to_string(),
+            "-t".to_string(),
+            format_seconds_arg(request.render_duration),
+            "-i".to_string(),
+            video_path,
+        ]);
     }
-    input_2_args.extend([
-        source_autorotate_arg.to_string(),
-        "-t".to_string(),
-        format_seconds_arg(request.render_duration),
-        "-i".to_string(),
-        video_path,
-    ]);
 
     // ── PHASE 6: BUILD FILTER COMPLEX (video trim + scale + overlay + format) ──
     let filter_complex = composite_filter_complex(
@@ -285,21 +288,22 @@ pub(crate) fn build_composite_ffmpeg_settings_with_source_rotation(
     )?;
 
     // ── PHASE 7: BUILD OUTPUT ARGS (map, codec, bitrate, audio copy, mux flags) ──
-    let mut output_args = vec![
-        "-map".to_string(),
-        "[out]".to_string(),
-        "-map".to_string(),
-        "2:a?".to_string(),
-        "-r".to_string(),
-        source_fps.ffmpeg_arg(),
-    ];
+    let mut output_args = vec!["-map".to_string(), "[out]".to_string()];
+    if request.include_audio {
+        output_args.extend(["-map".to_string(), "2:a?".to_string()]);
+    }
+    output_args.extend(["-r".to_string(), source_fps.ffmpeg_arg()]);
     output_args.extend(selected_profile.output_args.clone());
+    if let Some(metadata_filter) =
+        cuda_display_metadata_filter(selected_profile.name, request.width, request.height)
+    {
+        output_args.extend(["-bsf:v".to_string(), metadata_filter]);
+    }
+    output_args.extend(["-b:v".to_string(), request.bitrate.to_string()]);
+    if request.include_audio {
+        output_args.extend(["-c:a".to_string(), "copy".to_string()]);
+    }
     output_args.extend([
-        "-b:v".to_string(),
-        request.bitrate.to_string(),
-        "-c:a".to_string(),
-        "copy".to_string(),
-        "-shortest".to_string(),
         "-movflags".to_string(),
         "faststart".to_string(),
         "-metadata:s:v:0".to_string(),
@@ -317,6 +321,36 @@ pub(crate) fn build_composite_ffmpeg_settings_with_source_rotation(
         filter_complex,
         output_args,
     })
+}
+
+const CUDA_FRAME_ALIGNMENT: u32 = 32;
+
+/// Returns codec-specific metadata that hides CUDA's aligned frame overhang.
+///
+/// Composite dimensions are display-oriented before this point. Sources with
+/// 90/270-degree rotation metadata have already been transposed, so portrait
+/// crops apply to the aligned right edge rather than the source's coded bottom.
+fn cuda_display_metadata_filter(
+    profile_name: &str,
+    display_width: u32,
+    display_height: u32,
+) -> Option<String> {
+    match profile_name {
+        "nnvgpu_h264" => {
+            let crop_right = cuda_frame_overhang(display_width);
+            let crop_bottom = cuda_frame_overhang(display_height);
+            (crop_right != 0 || crop_bottom != 0)
+                .then(|| format!("h264_metadata=crop_right={crop_right}:crop_bottom={crop_bottom}"))
+        }
+        "nnvgpu_hevc" => Some(format!(
+            "hevc_metadata=width={display_width}:height={display_height}"
+        )),
+        _ => None,
+    }
+}
+
+fn cuda_frame_overhang(dimension: u32) -> u32 {
+    (CUDA_FRAME_ALIGNMENT - dimension % CUDA_FRAME_ALIGNMENT) % CUDA_FRAME_ALIGNMENT
 }
 
 /// Chooses FFmpeg's raw-overlay input queue size from frame dimensions.
@@ -584,6 +618,7 @@ fn composite_filter_complex(
     );
     if let Some(rotation_filter) = source_rotation_filter {
         base_video_filters.push_str(rotation_filter);
+        base_video_filters.push_str("sidedata=mode=delete:type=DISPLAYMATRIX,");
     }
     Ok(template
         .replace("{base_video_filters}", &base_video_filters)
@@ -714,4 +749,49 @@ fn format_seconds_arg(value: f64) -> String {
         .trim_end_matches('0')
         .trim_end_matches('.')
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_argument_pair(args: &[String], flag: &str, value: &str) {
+        assert!(
+            args.windows(2)
+                .any(|pair| pair[0] == flag && pair[1] == value),
+            "missing argument pair {flag} {value}: {args:?}"
+        );
+    }
+
+    #[test]
+    fn rotated_cuda_profiles_use_post_orientation_dimensions_for_metadata() {
+        let hwaccel = HwAccelInfo::trust_selected_profile();
+        for (codec_name, expected_metadata) in [
+            ("nnvgpu_h264", "h264_metadata=crop_right=8:crop_bottom=0"),
+            ("nnvgpu_hevc", "hevc_metadata=width=1080:height=1920"),
+        ] {
+            let settings = build_composite_ffmpeg_settings_with_source_rotation(
+                &CompositeFfmpegBuildRequest {
+                    codec_name,
+                    bitrate: "60M",
+                    video_path: Path::new("rotated-landscape.mp4"),
+                    video_trim_start: 0.0,
+                    render_duration: 1.0,
+                    width: 1080,
+                    height: 1920,
+                    source_fps: Fps::new(30, 1).unwrap(),
+                    overlay_pipe_fps: Fps::new(30, 1).unwrap(),
+                    include_audio: true,
+                    hwaccel_available: &hwaccel,
+                },
+                Some(90),
+            )
+            .unwrap();
+
+            assert!(settings
+                .filter_complex
+                .contains("transpose_cuda=2,sidedata=mode=delete:type=DISPLAYMATRIX,scale_cuda"));
+            assert_argument_pair(&settings.output_args, "-bsf:v", expected_metadata);
+        }
+    }
 }

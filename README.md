@@ -7,6 +7,7 @@
 <div align="center">
   <img src="docs/hero.avif" alt="OVRLEY Dashboard Interface" width="100%" />
   <img src="docs/hero2.avif" alt="OVRLEY Dashboard Interface" width="100%" />
+  <video src="docs/gauge-showcase.mp4" controls autoplay loop muted playsinline width="100%"></video>
 </div>
 
 <br />

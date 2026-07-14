@@ -106,6 +106,7 @@ pub fn derive_fixture_composite_plan(
         render_duration,
         trim_start,
         update_rate,
+        true,
     )
     .unwrap()
 }
@@ -247,6 +248,7 @@ pub fn render_fixture_composite_with_paths(
         render_duration,
         0.0,
         update_rate,
+        true,
     )
     .map_err(|error| error.to_string())?;
 
@@ -322,6 +324,7 @@ pub fn write_fixture_composite_debug_summary(path_name: &str) -> AppPaths {
         height: 1080,
         source_fps,
         overlay_pipe_fps,
+        include_audio: true,
         hwaccel_available: &HwAccelInfo::default(),
     })
     .unwrap();

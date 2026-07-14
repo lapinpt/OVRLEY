@@ -80,7 +80,10 @@ export const DISPLAY_VARIANT_KEYS = Object.freeze(
   Object.fromEntries(
     Object.entries(DISPLAY_TYPE_DEFINITIONS)
       .filter(([, definition]) => definition.layoutMode === 'boxed')
-      .map(([displayType, definition]) => [displayType, [...DISPLAY_VARIANT_FRAME_KEYS, ...Object.keys(definition.defaults || {})]]),
+      .map(([displayType, definition]) => [
+        displayType,
+        [...DISPLAY_VARIANT_FRAME_KEYS, ...Object.keys(definition.defaults || {}), ...(definition.conditionalKeys || [])],
+      ]),
   ),
 )
 

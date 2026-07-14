@@ -129,6 +129,82 @@ pub(crate) fn concat_video_segments(
     }
 }
 
+/// Concatenates video-only composite segments and muxes one continuous source
+/// audio stream into the final MP4 without re-encoding either stream.
+pub(crate) fn concat_composite_video_segments(
+    paths: &AppPaths,
+    ffmpeg_bin: &Path,
+    filenames: &[String],
+    source_video_path: &Path,
+    audio_trim_start: f64,
+    render_duration: f64,
+    output_path: &Path,
+) -> CoreResult<()> {
+    let list_path = paths
+        .temp_dir
+        .join(format!("concat_list_{}.txt", timestamp_nanos()?));
+    let mut list_content = String::new();
+    for filename in filenames {
+        list_content.push_str(&format!(
+            "file '{}'\n",
+            paths
+                .downloads_dir
+                .join(filename)
+                .display()
+                .to_string()
+                .replace('\\', "/")
+        ));
+    }
+    fs::write(&list_path, list_content).map_err(|source| CoreError::Io {
+        path: list_path.clone(),
+        source,
+    })?;
+
+    let mut command = Command::new(ffmpeg_bin);
+    configure_ffmpeg_command(&mut command, ffmpeg_bin);
+    command
+        .arg("-f")
+        .arg("concat")
+        .arg("-safe")
+        .arg("0")
+        .arg("-i")
+        .arg(&list_path);
+    if audio_trim_start > 0.0 {
+        command.arg("-ss").arg(format!("{audio_trim_start:.9}"));
+    }
+    let status = command
+        .arg("-t")
+        .arg(format!("{render_duration:.9}"))
+        .arg("-i")
+        .arg(source_video_path)
+        .arg("-map")
+        .arg("0:v:0")
+        .arg("-map")
+        .arg("1:a?")
+        .arg("-c")
+        .arg("copy")
+        .arg("-movflags")
+        .arg("faststart")
+        .arg("-y")
+        .arg(output_path)
+        .status()
+        .map_err(|error| {
+            CoreError::Encode(format!(
+                "Failed to stitch composite video and audio: {error}"
+            ))
+        })?;
+
+    let _ = fs::remove_file(&list_path);
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(CoreError::Encode(format!(
+            "FFmpeg composite stitch failed with status {status}"
+        )))
+    }
+}
+
 /// Writes preparation timing data for one render.
 pub(crate) fn write_prepare_summary(
     debug_dir: &Path,

@@ -225,6 +225,7 @@ pub fn render_composite_video_single(
     composite_render_duration: f64,
     composite_video_trim_start: f64,
     composite_widget_update_rate: u32,
+    include_audio: bool,
 ) -> CoreResult<String> {
     if controller.cancel_flag().load(Ordering::SeqCst) {
         return Err(CoreError::Cancelled);
@@ -243,6 +244,7 @@ pub fn render_composite_video_single(
         composite_render_duration,
         composite_video_trim_start,
         composite_widget_update_rate,
+        include_audio,
     )?;
 
     std::fs::create_dir_all(&paths.downloads_dir).map_err(|error| CoreError::Io {
@@ -566,6 +568,7 @@ pub fn derive_composite_pipeline_plan(
     composite_render_duration: f64,
     composite_video_trim_start: f64,
     composite_widget_update_rate: u32,
+    include_audio: bool,
 ) -> CoreResult<CompositePipelinePlan> {
     // ── PHASE 1: VALIDATE & DERIVE TIMING VALUES ──
     let source_fps = Fps::new(composite_video_fps_num, composite_video_fps_den)?;
@@ -622,6 +625,7 @@ pub fn derive_composite_pipeline_plan(
             height,
             source_fps,
             overlay_pipe_fps,
+            include_audio,
             hwaccel_available: &hwaccel_info,
         },
         source_orientation.rotation_degrees,
