@@ -2,10 +2,9 @@
 
 const MIN_BAR_PX = 2
 
-const MIN_SUGGESTED_GAP_PX = 2
-const MAX_SUGGESTED_GAP_PX = 6
-const MIN_TARGET_BAR_PX = 8
-const MAX_TARGET_BAR_PX = 24
+const SUGGESTED_BAR_GAP_PX = 4
+const SUGGESTED_LINEAR_BAR_COUNT = 20
+const SUGGESTED_ARC_BAR_COUNT_FULL = 60
 
 export function getBarFillCount(fill01, count) {
   return Math.floor(Math.min(1, Math.max(0, fill01)) * count)
@@ -47,12 +46,10 @@ function getCornerRadiusMax(crossExtent, alongExtent) {
   return Math.floor(Math.min(crossExtent, alongExtent) * 0.5)
 }
 
-function getSuggestedBarGeometry({ span, outerThickness, crossExtent }) {
-  const bar_gap = Math.round(Math.min(MAX_SUGGESTED_GAP_PX, Math.max(MIN_SUGGESTED_GAP_PX, outerThickness * 0.2)))
-  const targetExtent = Math.round(Math.min(MAX_TARGET_BAR_PX, Math.max(MIN_TARGET_BAR_PX, outerThickness)))
+function getSuggestedBarGeometry({ span, crossExtent, targetBars }) {
+  const bar_gap = SUGGESTED_BAR_GAP_PX
   const maxCount = Math.floor(span / MIN_BAR_PX)
-  const proposedCount = Math.round((span + bar_gap) / (targetExtent + bar_gap))
-  const bar_count = Math.min(maxCount, Math.max(maxCount >= 3 ? 3 : 1, proposedCount))
+  const bar_count = Math.min(maxCount, Math.max(maxCount >= 3 ? 3 : 1, targetBars))
   const maxGap = getBarGapMax({ span, bar_count })
   const gap = Math.min(bar_gap, maxGap)
   const geometry = getBarGeometry({ span, bar_count, bar_gap: gap })
@@ -76,8 +73,8 @@ export function getSuggestedLinearBarGeometry({ width, height, orientation }) {
   const horizontal = orientation === 'horizontal'
   return getSuggestedBarGeometry({
     span: horizontal ? width : height,
-    outerThickness: horizontal ? height : width,
     crossExtent: horizontal ? height : width,
+    targetBars: SUGGESTED_LINEAR_BAR_COUNT,
   })
 }
 
@@ -107,11 +104,13 @@ export function getLinearBarRects(config) {
   return { ...geometry, rects }
 }
 
-export function getSuggestedArcBarGeometry({ radius, sweepAngle, trackThickness, borderThickness }) {
+export function getSuggestedArcBarGeometry({ radius, sweepAngle, trackThickness, corner = false }) {
+  const degrees = Math.abs(sweepAngle)
+  const fullCount = corner ? SUGGESTED_ARC_BAR_COUNT_FULL * 1.5 : SUGGESTED_ARC_BAR_COUNT_FULL
   return getSuggestedBarGeometry({
     span: Math.abs((sweepAngle * Math.PI * radius) / 180),
-    outerThickness: trackThickness + borderThickness * 2,
     crossExtent: trackThickness,
+    targetBars: Math.round(degrees * (fullCount / 360)),
   })
 }
 

@@ -70,7 +70,6 @@
           "show_major_labels": true,
           "label_color": "#cccccc",
           "cardinal_label_color": "#ff0000",
-          "label_font": "Arial.ttf",
           "label_font_size": 12,
           "label_offset": 4,
           "indicator_style": "chevron",
@@ -97,9 +96,9 @@
           "track_empty_opacity": 0.5,
           "track_filled_color": "#dce2e8",
           "track_filled_opacity": 1,
-          "track_fill_flat": true,
+          "track_fill_flat": false,
           "show_min_max_labels": false,
-          "min_max_label_font": "Arial.ttf",
+          "min_max_label_font": null,
           "min_max_label_font_size": 12,
           "min_max_label_position": "bottom",
           "min_max_label_color": "#ffffff"
@@ -117,7 +116,7 @@
         "defaultFrameHeight": 220,
         "defaultFontSize": 60,
         "defaults": {
-          "arc_angle": 225,
+          "arc_angle": 240,
           "track_fill_style": "fill",
           "inner_widget_offset_x": 0,
           "inner_widget_offset_y": 0,
@@ -131,7 +130,7 @@
           "track_filled_opacity": 1,
           "track_fill_flat": false,
           "show_min_max_labels": false,
-          "min_max_label_font": "Arial.ttf",
+          "min_max_label_font": null,
           "min_max_label_font_size": 12,
           "min_max_label_color": "#ffffff"
         }
@@ -144,9 +143,9 @@
           "assetFile": "display-type-corner.svg"
         },
         "layoutMode": "boxed",
-        "defaultFrameWidth": 110,
-        "defaultFrameHeight": 110,
-        "defaultFontSize": 35,
+        "defaultFrameWidth": 162,
+        "defaultFrameHeight": 162,
+        "defaultFontSize": 51,
         "defaults": {
           "corner_orientation": "bottom-left",
           "track_fill_style": "fill",
@@ -162,7 +161,7 @@
           "track_filled_opacity": 1,
           "track_fill_flat": false,
           "show_min_max_labels": false,
-          "min_max_label_font": "Arial.ttf",
+          "min_max_label_font": null,
           "min_max_label_font_size": 12,
           "min_max_label_color": "#ffffff"
         }

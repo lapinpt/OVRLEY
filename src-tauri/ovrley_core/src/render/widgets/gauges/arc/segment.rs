@@ -54,7 +54,7 @@ pub(crate) fn segment_geometries(
 }
 
 /// Paints one rounded wedge when its geometry has a visible sweep.
-pub(super) fn draw_segment(
+pub(crate) fn draw_segment(
     canvas: &Canvas,
     geometry: ArcGaugeGeometry,
     thickness: f32,
@@ -63,6 +63,27 @@ pub(super) fn draw_segment(
 ) {
     if let Some(path) = rounded_segment_path(geometry, thickness, corner_radius) {
         canvas.draw_path(&path, paint);
+    }
+}
+
+/// Returns a geometry inset by `border_thickness` on all sides for
+/// inward-border drawing. Angular boundaries are shifted at the
+/// centerline radius, and radial thickness is handled separately.
+pub(crate) fn inner_segment_geometry(
+    geometry: ArcGaugeGeometry,
+    border_thickness: f32,
+) -> ArcGaugeGeometry {
+    let direction = geometry.sweep_angle.signum();
+    let max_angle_offset_deg = geometry.sweep_angle.abs() / 2.0;
+    let angle_offset_deg = if border_thickness > 0.0 && geometry.radius > 0.0 {
+        ((border_thickness / geometry.radius).to_degrees()).min(max_angle_offset_deg)
+    } else {
+        0.0
+    };
+    ArcGaugeGeometry {
+        start_angle: geometry.start_angle + direction * angle_offset_deg,
+        sweep_angle: geometry.sweep_angle - direction * angle_offset_deg * 2.0,
+        ..geometry
     }
 }
 

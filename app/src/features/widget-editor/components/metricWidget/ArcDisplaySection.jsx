@@ -24,8 +24,9 @@ const CORNER_ORIENTATION_OPTIONS = [
 ]
 
 function suggestArcBarGeometry(data) {
-  const layout = data.corner_orientation == null ? getArcGaugeLayout(data, null, []) : getCornerGaugeLayout(data, null, [])
-  return getSuggestedArcBarGeometry({ ...layout, borderThickness: data.track_border_thickness })
+  const isCorner = data.corner_orientation != null
+  const layout = isCorner ? getCornerGaugeLayout(data, null, []) : getArcGaugeLayout(data, null, [])
+  return getSuggestedArcBarGeometry({ ...layout, corner: isCorner, borderThickness: data.track_border_thickness })
 }
 
 function getArcGapMax(data) {
@@ -137,7 +138,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData }) {
             label="Border"
             value={arcData.track_border_thickness}
             min={0}
-            max={24}
+            max={6}
             step={1}
             valueDisplay={`${arcData.track_border_thickness}px`}
             onSliderChange={(track_border_thickness) => updateArc({ track_border_thickness })}

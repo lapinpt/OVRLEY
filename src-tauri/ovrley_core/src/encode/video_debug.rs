@@ -18,7 +18,10 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static LAST_TIMESTAMP_NANOS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Serialize)]
 /// Timing summary for one video render phase.
@@ -243,12 +246,37 @@ pub(crate) fn create_debug_dir(paths: &AppPaths, phase: &str) -> CoreResult<Path
     Ok(dir)
 }
 
-/// Returns the current Unix timestamp in nanoseconds.
+/// Returns a process-unique, monotonic Unix-nanosecond identifier.
+///
+/// The wall clock alone is not a uniqueness guarantee when parallel render
+/// workers create output files at nearly the same time. Preserve the timestamp
+/// shape for readable artifact names, but advance the value when the clock has
+/// not advanced far enough.
 pub(crate) fn timestamp_nanos() -> CoreResult<u128> {
-    SystemTime::now()
+    let clock_value = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .map_err(|error| CoreError::Encode(error.to_string()))
+        .map_err(|error| CoreError::Encode(error.to_string()))?
+        .as_nanos();
+    let clock_value = u64::try_from(clock_value)
+        .map_err(|_| CoreError::Encode("Timestamp exceeds supported identifier range".into()))?;
+
+    let mut previous = LAST_TIMESTAMP_NANOS.load(Ordering::Relaxed);
+    loop {
+        let next = clock_value.max(
+            previous
+                .checked_add(1)
+                .ok_or_else(|| CoreError::Encode("Timestamp identifier space exhausted".into()))?,
+        );
+        match LAST_TIMESTAMP_NANOS.compare_exchange_weak(
+            previous,
+            next,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return Ok(u128::from(next)),
+            Err(observed) => previous = observed,
+        }
+    }
 }
 
 /// Selects representative frame indexes for optional sample PNG export.

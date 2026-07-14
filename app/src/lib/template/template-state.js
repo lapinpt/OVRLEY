@@ -59,6 +59,8 @@ function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = nu
   const font = resolved.font || globals?.font_values
   if (!nextData.font && font) nextData.font = font
   if (!nextData.font_family) nextData.font_family = getFontFamilyName(font || nextData.font_family)
+  const labelFont = resolved.min_max_label_font || globals?.font_values
+  if (!nextData.min_max_label_font && labelFont) nextData.min_max_label_font = labelFont
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.icon_color === undefined) nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
   if (nextData.unit_color === undefined && resolved.value !== 'time') nextData.unit_color = globals?.color_units || '#ffffff'

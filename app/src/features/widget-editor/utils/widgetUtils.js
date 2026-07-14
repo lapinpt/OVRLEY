@@ -182,10 +182,14 @@ export function createMetricValueDefaults(type, globalDefaults, displayType) {
     const variantDefaults = getDisplayTypeConfigDefaults(resolvedDisplayType)
     const frameDefaults = getDefaultFrameDimensions(resolvedDisplayType)
     if (variantDefaults || frameDefaults) {
-      displayVariants[resolvedDisplayType] = {
+      const seed = {
         ...(variantDefaults || {}),
         ...(frameDefaults || {}),
       }
+      if (!seed.min_max_label_font && font) {
+        seed.min_max_label_font = font
+      }
+      displayVariants[resolvedDisplayType] = seed
     }
   }
 

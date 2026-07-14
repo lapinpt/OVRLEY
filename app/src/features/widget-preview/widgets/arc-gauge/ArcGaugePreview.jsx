@@ -33,14 +33,31 @@ function ArcSegmentPaths({ geometries, dataTestId, ...paint }) {
   return paths
 }
 
+function getArcSegmentInnerGeometry({ centerX, centerY, radius, startAngle, sweepAngle, trackThickness, borderThickness, cornerRadius }) {
+  const direction = Math.sign(sweepAngle)
+  const maxAngleOffsetDeg = Math.abs(sweepAngle) / 2
+  const angleOffsetDeg = borderThickness > 0 && radius > 0 ? Math.min(((borderThickness / radius) * 180) / Math.PI, maxAngleOffsetDeg) : 0
+  return {
+    centerX,
+    centerY,
+    radius,
+    startAngle: startAngle + direction * angleOffsetDeg,
+    sweepAngle: sweepAngle - direction * angleOffsetDeg * 2,
+    trackThickness: Math.max(0, trackThickness - borderThickness * 2),
+    cornerRadius: Math.max(0, cornerRadius - borderThickness),
+  }
+}
+
 function ArcSegmentMaskPaths({ geometries, borderThickness, cornerRadius }) {
   const paths = []
   for (let index = 0; index < geometries.length; index += 1) {
-    const path = getArcRoundedSegmentPath({ ...geometries[index], cornerRadius })
+    const outerPath = getArcRoundedSegmentPath({ ...geometries[index], cornerRadius })
+    const innerGeo = getArcSegmentInnerGeometry({ ...geometries[index], borderThickness, cornerRadius })
+    const innerPath = getArcRoundedSegmentPath(innerGeo)
     paths.push(
       <g key={index}>
-        <path d={path} fill="#ffffff" fillOpacity={1} fillRule="evenodd" stroke="#ffffff" strokeWidth={borderThickness * 2} />
-        <path d={path} fill="#000000" fillOpacity={1} fillRule="evenodd" />
+        <path d={outerPath} fill="#ffffff" fillOpacity={1} fillRule="evenodd" />
+        <path d={innerPath} fill="#000000" fillOpacity={1} fillRule="evenodd" />
       </g>,
     )
   }
@@ -99,23 +116,6 @@ function ArcGaugeTrack({ data, trackGeometry, barLayout, filledBarCount, fillRev
             cornerRadius={data.track_corner_radius}
             fill={shadow.color}
             fillOpacity={opacity}
-            stroke={shadow.color}
-            strokeOpacity={opacity}
-            strokeWidth={data.track_border_thickness * 2}
-          />
-        </g>
-      ) : null}
-      {data.track_border_thickness > 0 ? (
-        <g mask={`url(#${maskId})`}>
-          <ArcSegmentPaths
-            geometries={geometries}
-            cornerRadius={data.track_corner_radius}
-            fill={data.track_border_color}
-            fillOpacity={opacity}
-            stroke={data.track_border_color}
-            strokeOpacity={opacity}
-            strokeWidth={data.track_border_thickness * 2}
-            dataTestId={`${data.display_type}-gauge-${segmented ? 'bar-border' : 'border'}`}
           />
         </g>
       ) : null}
@@ -142,6 +142,17 @@ function ArcGaugeTrack({ data, trackGeometry, barLayout, filledBarCount, fillRev
             fill={data.track_filled_color}
             fillOpacity={data.track_filled_opacity * opacity}
             dataTestId={`${data.display_type}-gauge-filled-track`}
+          />
+        </g>
+      ) : null}
+      {data.track_border_thickness > 0 ? (
+        <g mask={`url(#${maskId})`}>
+          <ArcSegmentPaths
+            geometries={geometries}
+            cornerRadius={data.track_corner_radius}
+            fill={data.track_border_color}
+            fillOpacity={opacity}
+            dataTestId={`${data.display_type}-gauge-${segmented ? 'bar-border' : 'border'}`}
           />
         </g>
       ) : null}

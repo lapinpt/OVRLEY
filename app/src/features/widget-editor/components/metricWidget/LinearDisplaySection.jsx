@@ -135,7 +135,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             label="Border"
             value={linearData.track_border_thickness}
             min={0}
-            max={12}
+            max={6}
             step={1}
             valueDisplay={`${linearData.track_border_thickness}px`}
             onSliderChange={(value) => updateLinear({ track_border_thickness: value })}

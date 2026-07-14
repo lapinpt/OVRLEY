@@ -3,10 +3,13 @@
 **.IGC flight-log parsing** is now supported and extracts gps location, altitude, speed, true heading, vertical speed, and temperature. It attempts to calculate the missing metrics when the IGC file does not provide them.
 
 - Added ability to mute the video in preview.
+- Pinned FFmpeg version to 8.1.2-3 instead of always using the latest. Anything after that causes NVIDIA+CUDA to export as green frames because of scale_cuda refactor which likely introduces a bug.
 
 - Fixed a bug in some metric widgetswhere decimal places with value '0' were being trimmed and the values displayed as integers instead.
-- Fixed a bug where min/max values of linear/arc widgets was derived only from the exported part of the activity, not the entire activity.
 - Fixed a bug where minimize/maximize/close buttons of the window were unresponsive.
+- Fixed broken template selection introduced by making the window draggable by the title bar.
+- Fixed a bug where hardware-accelerated export would sometimes result in a malformed video file.
+- NVIDIA+CUDA export always produced a small green strip at the bottom of the video because of a weird spec (thanks NVIDIA for the prank!). Fixed by sheer creativity of metadata.
 
 ## Goal
 

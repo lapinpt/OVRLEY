@@ -8,7 +8,7 @@ use super::draw_arc_labels;
 use super::geometry::ArcGaugeGeometry;
 use super::inner_widget::draw_static_unit;
 use super::path::ArcTrackSpec;
-use super::segment::{draw_segment, segment_geometries};
+use super::segment::{draw_segment, inner_segment_geometry, segment_geometries};
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
 use crate::render::text::{parse_color, ResolvedTextStyle};
@@ -113,7 +113,7 @@ fn draw_static_track(
             geometry,
             track_thickness,
             inner_corner_radius,
-            &segment_border_paint(border_color, border_thickness, Some(shadow_filter.clone())),
+            &segment_border_paint(border_color, Some(shadow_filter.clone())),
         );
     }
     if border_thickness > 0.0 {
@@ -122,29 +122,40 @@ fn draw_static_track(
             geometry,
             track_thickness,
             inner_corner_radius,
-            &segment_border_paint(border_color, border_thickness, None),
+            &segment_border_paint(border_color, None),
         );
+        let inner_geo = inner_segment_geometry(geometry, border_thickness);
+        let inner_thickness = (track_thickness - border_thickness * 2.0).max(0.0);
+        let inner_cnr = (inner_corner_radius - border_thickness).max(0.0);
+        draw_segment(canvas, inner_geo, inner_thickness, inner_cnr, &clear_track_paint());
+        draw_segment(
+            canvas,
+            inner_geo,
+            inner_thickness,
+            inner_cnr,
+            &track_paint(
+                parse_color(
+                    &gauge.track_empty_color,
+                    gauge.track_empty_opacity * text_style.opacity,
+                ),
+                None,
+            ),
+        );
+    } else {
         draw_segment(
             canvas,
             geometry,
             track_thickness,
             inner_corner_radius,
-            &clear_track_paint(),
+            &track_paint(
+                parse_color(
+                    &gauge.track_empty_color,
+                    gauge.track_empty_opacity * text_style.opacity,
+                ),
+                None,
+            ),
         );
     }
-    draw_segment(
-        canvas,
-        geometry,
-        track_thickness,
-        inner_corner_radius,
-        &track_paint(
-            parse_color(
-                &gauge.track_empty_color,
-                gauge.track_empty_opacity * text_style.opacity,
-            ),
-            None,
-        ),
-    );
 }
 
 /// Dispatches the current fill to the continuous or segmented painting model.
@@ -171,17 +182,14 @@ fn draw_segmented_fill(
         .expect("bars fill style must carry resolved bar geometry");
     let filled_count = super::super::metric::bar_fill_count(fill01, bars.count);
     let paint = fill_paint(cache);
+    let inner_thickness = (cache.track_thickness - cache.track_border_thickness * 2.0).max(0.0);
+    let inner_corner = (cache.track_corner_radius - cache.track_border_thickness).max(0.0);
     for segment in segment_geometries(geometry, bars)
         .into_iter()
         .take(filled_count)
     {
-        draw_segment(
-            canvas,
-            segment,
-            cache.track_thickness,
-            cache.track_corner_radius,
-            &paint,
-        );
+        let inner_geo = inner_segment_geometry(segment, cache.track_border_thickness);
+        draw_segment(canvas, inner_geo, inner_thickness, inner_corner, &paint);
     }
 }
 
@@ -191,14 +199,14 @@ fn draw_continuous_fill(
     geometry: ArcGaugeGeometry,
     fill01: f32,
 ) {
-    let end_corner_radius = if cache.track_fill_flat {
-        0.0
-    } else {
-        cache.track_corner_radius
-    };
+    let bt = cache.track_border_thickness;
+    let inner_thickness = (cache.track_thickness - bt * 2.0).max(0.0);
+    let inner_geometry = inner_segment_geometry(geometry, bt);
+    let inner_corner = (cache.track_corner_radius - bt).max(0.0);
+    let end_corner = if cache.track_fill_flat { 0.0 } else { inner_corner };
     let reveal_spec =
-        ArcTrackSpec::full(geometry, cache.track_thickness, cache.track_corner_radius)
-            .with_end_corner_radius(end_corner_radius);
+        ArcTrackSpec::full(inner_geometry, inner_thickness, inner_corner)
+            .with_end_corner_radius(end_corner);
     let Some(reveal) = reveal_spec.reveal_clip(fill01) else {
         return;
     };
@@ -210,9 +218,9 @@ fn draw_continuous_fill(
     canvas.clip_path(&reveal_path, ClipOp::Intersect, true);
     draw_segment(
         canvas,
-        geometry,
-        cache.track_thickness,
-        cache.track_corner_radius,
+        inner_geometry,
+        inner_thickness,
+        inner_corner,
         &fill_paint(cache),
     );
     canvas.restore();
@@ -241,12 +249,10 @@ fn track_paint(color: skia_safe::Color, image_filter: Option<skia_safe::ImageFil
 
 fn segment_border_paint(
     color: skia_safe::Color,
-    border_thickness: f32,
     image_filter: Option<skia_safe::ImageFilter>,
 ) -> Paint {
     let mut paint = track_paint(color, image_filter);
-    paint.set_style(Style::StrokeAndFill);
-    paint.set_stroke_width(border_thickness * 2.0);
+    paint.set_style(Style::Fill);
     paint
 }
 

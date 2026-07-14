@@ -19,12 +19,12 @@ describe('gaugeBarGeometry', () => {
     expect(getBarFillCount(1, 5)).toBe(5)
   })
 
-  test('suggests geometry from the track size when bars are enabled', () => {
+  test('suggests a fixed bar count independent of track span', () => {
     const compact = getSuggestedLinearBarGeometry({ width: 100, height: 20, orientation: 'horizontal' })
     const wide = getSuggestedLinearBarGeometry({ width: 200, height: 20, orientation: 'horizontal' })
-    expect(wide.count).toBeGreaterThan(compact.count)
-    expect(compact.gap).toBe(4)
+    expect(wide.count).toBe(compact.count)
     expect(wide.gap).toBe(4)
+    expect(compact.gap).toBeLessThanOrEqual(4)
     expect(Object.values(compact).every(Number.isInteger)).toBe(true)
     expect(Object.values(wide).every(Number.isInteger)).toBe(true)
   })
