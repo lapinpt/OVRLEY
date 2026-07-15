@@ -23,9 +23,11 @@
 
 import { normalizeColorFields } from '@/lib/color-utils'
 import { ensureWidgetIdsInConfig } from '../widget/widget-config'
-import { initDisplayVariant } from '../widget/metric-widget-resolver'
+import { initDisplayVariant } from '../widget/widget-resolver'
 import {
   COURSE_PLOT_KEYS,
+  BACKDROP_SHARED_KEYS,
+  BACKDROP_VARIANT_KEYS,
   DEFAULT_GLOBAL_DEFAULTS,
   DISPLAY_VARIANT_KEYS,
   ELEVATION_PLOT_KEYS,
@@ -108,6 +110,41 @@ function normalizeScene(scene = {}) {
 function normalizeLabel(label = {}) {
   const pickedLabel = pickDefined(label, LABEL_KEYS)
   return normalizeColorFields(pickedLabel)
+}
+
+function normalizeBackdropVariants(variants) {
+  if (!variants || typeof variants !== 'object') return undefined
+  const normalized = {}
+  for (const [displayType, variantConfig] of Object.entries(variants)) {
+    if (!variantConfig || typeof variantConfig !== 'object') continue
+    const allowedKeys = BACKDROP_VARIANT_KEYS[displayType]
+    if (!allowedKeys) continue
+    normalized[displayType] = normalizeColorFields(pickDefined(variantConfig, allowedKeys))
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined
+}
+
+function normalizeBackdrop(backdrop = {}) {
+  const pickedBackdrop = normalizeColorFields(pickDefined(backdrop, BACKDROP_SHARED_KEYS))
+  const displayType = pickedBackdrop.display_type
+  const allowedVariantKeys = BACKDROP_VARIANT_KEYS[displayType]
+  const normalizedVariants = normalizeBackdropVariants(backdrop.display_variants) || {}
+
+  if (allowedVariantKeys) {
+    const promotedVariant = pickDefined(backdrop, allowedVariantKeys)
+    if (Object.keys(promotedVariant).length > 0) {
+      normalizedVariants[displayType] = normalizeColorFields({
+        ...(normalizedVariants[displayType] || {}),
+        ...promotedVariant,
+      })
+    }
+  }
+
+  if (Object.keys(normalizedVariants).length > 0) {
+    pickedBackdrop.display_variants = normalizedVariants
+  }
+
+  return pickedBackdrop
 }
 
 function normalizeDisplayVariants(variants) {
@@ -193,7 +230,10 @@ function normalizePlot(plot = {}, config, globalDefaults) {
  */
 export function normalizeTemplateConfig(config, globalDefaults) {
   const nextConfig = ensureWidgetIdsInConfig(cloneSerializable(config) || {})
-  const normalizedConfig = { scene: normalizeScene(nextConfig.scene), labels: [], values: [], plots: [] }
+  const normalizedConfig = { scene: normalizeScene(nextConfig.scene), backdrops: [], labels: [], values: [], plots: [] }
+  if (Array.isArray(nextConfig.backdrops)) {
+    for (const backdrop of nextConfig.backdrops) normalizedConfig.backdrops.push(normalizeBackdrop(backdrop))
+  }
   if (Array.isArray(nextConfig.labels)) {
     for (const label of nextConfig.labels) normalizedConfig.labels.push(normalizeLabel(label))
   }

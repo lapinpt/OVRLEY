@@ -10,7 +10,6 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGrid, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import EditorToolbar from '@/features/app-shell/components/EditorToolbar'
-import useStore from '@/store/useStore'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel } from '@/features/widget-preview'
@@ -24,7 +23,7 @@ import { useDragHandlers } from '../hooks/useDragHandlers'
 import { useResizeHandlers } from '../hooks/useResizeHandlers'
 import { useScaleHandlers } from '../hooks/useScaleHandlers'
 import { useRotateHandlers } from '../hooks/useRotateHandlers'
-import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
+import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { buildRenderedGeometrySignature, resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
 
 function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgetPreviews, widgets }) {
@@ -41,16 +40,16 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
       {visibleWidgets.map((widget) => {
         const Icon = WIDGET_ICONS[widget.type] || Tag
         const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
-        const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+        const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
         const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null)
-        const left = renderGeometry.badgeLeft * displayScale
-        const top = Math.max(renderGeometry.badgeTop * displayScale - 24, 0)
+        const left = renderGeometry.badgeLeft * displayScale - 2
+        const top = Math.max(renderGeometry.badgeTop * displayScale - 8, 0)
 
         return (
           <div
             key={widget.id}
-            className="absolute flex h-5 items-center gap-1 rounded-md border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
+            className="absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
             style={{ left, top }}
           >
             <Icon className="h-3 w-3" />
@@ -68,12 +67,12 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
       {showTemplateStatus ? (
         <Badge
           variant={status === 'Modified' ? 'secondary' : 'outline'}
-          className={`h-6 rounded-full text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft text-primary' : 'bg-card/85'}`}
+          className={`h-6 rounded-xs text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
         >
           {status}
         </Badge>
       ) : null}
-      <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
+      <div className="rounded-xs border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
         {width} &times; {height}
       </div>
     </div>
@@ -104,7 +103,7 @@ function CanvasToolbar({ editorControls, importedBackgroundImageFilename, import
 function EmptyOverlayState() {
   return (
     <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-sm rounded-xl border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+      <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
           <LayoutGrid className="h-6 w-6" />
         </div>
@@ -141,6 +140,7 @@ function OverlayEditor({
 
   // Derived state hook — widgets, scene, preview, drafts
   const overlayState = useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange })
+  const activity = overlayState.activity
 
   // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
   const selection = useWidgetSelection({
@@ -187,7 +187,6 @@ function OverlayEditor({
   })
 
   // Moveable interaction hooks
-  const activity = useStore.getState().parsedActivity
   const effectiveSelectedWidgetIds = selection.effectiveSelectedWidgetIds
 
   const dragHandlers = useDragHandlers({
@@ -273,7 +272,7 @@ function OverlayEditor({
 
         const preview = overlayState.liveWidgetPreviews[widgetId] ?? null
         const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond: overlayState.previewSecond })
-        const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+        const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
 
         return buildRenderedGeometrySignature(widget, visualBounds, overlayState.globalScale, preview)
@@ -296,11 +295,23 @@ function OverlayEditor({
   }, [overlayState.moveableRef, selectedRenderedGeometryVersion])
 
   // Capability flags
-  const canResizeSelected = !selection.isGroupSelection && isBoxedMetricWidget(selection.selectedWidget)
-  const showEdgeResizeHandles = canResizeSelected && selection.selectedWidget?.type === 'elevation'
-  const canScaleSelected = Boolean(!selection.isGroupSelection && selection.selectedWidget && !isBoxedMetricWidget(selection.selectedWidget))
-  const canRotateSelected = !selection.isGroupSelection && selection.selectedWidget?.type === 'course'
-  const maintainAspectRatio = !selection.isGroupSelection && (selection.selectedWidget?.type === 'course' || canScaleSelected)
+  const selectedWidget = selection.selectedWidget
+  const hasSingleSelection = Boolean(selectedWidget) && !selection.isGroupSelection
+  const isBackdropSelected = isBackdropWidget(selectedWidget)
+  const isFramedSelected = isFramedWidget(selectedWidget)
+  const selectedDisplayType = selectedWidget?.data?.display_type
+
+  const canResizeSelected = hasSingleSelection && isFramedSelected
+  const showEdgeResizeHandles = canResizeSelected && selectedWidget?.type === 'elevation'
+  const canScaleSelected = hasSingleSelection && !isFramedSelected
+  const canRotateSelected = hasSingleSelection && selectedWidget?.type === 'course'
+  const maintainAspectRatio =
+    hasSingleSelection &&
+    (selectedDisplayType === 'arc' ||
+      selectedDisplayType === 'corner' ||
+      (isBackdropSelected && selectedDisplayType === 'circle') ||
+      selectedWidget?.type === 'course' ||
+      !isFramedSelected)
 
   // Marquee cleanup
   useEffect(
@@ -356,7 +367,7 @@ function OverlayEditor({
       <div
         ref={setStageElement}
         data-testid="overlay-editor-stage"
-        className="relative flex h-full w-full items-center justify-center overflow-hidden p-8"
+        className="relative flex h-full w-full items-center justify-center overflow-hidden py-8"
         onMouseDown={handleSceneMouseDown}
       >
         <CanvasStatusBadges
@@ -375,7 +386,7 @@ function OverlayEditor({
           style={{ width: overlayState.sceneSize.width * displayScale, height: overlayState.sceneSize.height * displayScale }}
         >
           <div
-            className="absolute left-0 top-0"
+            className="absolute left-0 top-0 mt-4"
             style={{
               width: overlayState.sceneSize.width,
               height: overlayState.sceneSize.height,

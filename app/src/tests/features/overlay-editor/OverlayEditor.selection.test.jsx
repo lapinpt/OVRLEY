@@ -9,6 +9,7 @@ import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditor from '@/features/overlay-editor/components/OverlayEditor'
 import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
+import { createBackdropDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
@@ -42,18 +43,18 @@ vi.mock('@/features/widget-preview', () => ({
   }),
 }))
 
-vi.mock('@/features/widget-preview/hooks/useFontMetricsVersion', () => ({
+vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
   useFontMetricsVersion: () => 0,
 }))
 
-vi.mock('@/features/widget-preview/utils/textMeasurement', () => ({
+vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
   getPreviewFontFamily: (fontFamily) => fontFamily || 'Arial',
 }))
 
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: ({ moveableRef }) => {
+  default: ({ canResizeSelected, maintainAspectRatio, moveableRef }) => {
     moveableRef.current = { updateRect: moveableUpdateRectMock }
-    return null
+    return <div data-testid="moveable-props" data-can-resize={String(canResizeSelected)} data-maintain-ratio={String(maintainAspectRatio)} />
   },
 }))
 
@@ -380,6 +381,124 @@ describe('OverlayEditor selection flow', () => {
 
     expect(renderGeometry.badgeLeft).toBe(130)
     expect(renderGeometry.badgeTop).toBe(215)
+  })
+
+  test('uses heading tape frame height for render geometry', () => {
+    const renderGeometry = resolveWidgetRenderGeometry(
+      {
+        id: 'heading-1',
+        type: 'heading',
+        category: 'values',
+        data: {
+          x: 10,
+          y: 20,
+          display_type: 'heading_tape',
+          width: 400,
+          height: 80,
+          display_variants: {
+            heading_tape: {
+              width: 400,
+              height: 80,
+            },
+          },
+        },
+      },
+      null,
+      1,
+    )
+
+    expect(renderGeometry.width).toBe(400)
+    expect(renderGeometry.height).toBe(80)
+  })
+
+  test('enables resize handles for selected backdrop frames', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      backdrops: [{ ...createBackdropDefaults('rectangle'), id: 'widget-backdrop' }],
+      labels: [],
+      plots: [],
+      values: [],
+    }
+
+    useStore.getState().setConfig(config)
+
+    const { container, getByTestId } = render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const backdrop = container.querySelector('[data-widget-id="widget-backdrop"]')
+    expect(backdrop).toBeTruthy()
+
+    fireEvent.mouseDown(backdrop, { button: 0 })
+
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'false')
+  })
+
+  test('maintains a square frame for selected arc widgets', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      backdrops: [],
+      labels: [],
+      plots: [],
+      values: [
+        {
+          id: 'widget-arc',
+          value: 'speed',
+          x: 0,
+          y: 0,
+          display_type: 'arc',
+          display_variants: {
+            arc: {
+              width: 220,
+              height: 220,
+            },
+          },
+        },
+      ],
+    }
+
+    useStore.getState().setConfig(config)
+
+    const { container, getByTestId } = render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const arc = container.querySelector('[data-widget-id="widget-arc"]')
+    expect(arc).toBeTruthy()
+
+    fireEvent.mouseDown(arc, { button: 0 })
+
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'true')
   })
 
   test('renders the canvas toolbar centered above the preview area', () => {

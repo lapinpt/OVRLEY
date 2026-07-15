@@ -8,13 +8,14 @@
 use super::LabelCacheStatus;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
-use crate::normalize::ValidatedSceneConfig;
+use crate::normalize::{ValidatedBackdrop, ValidatedLabel, ValidatedSceneConfig};
 use crate::paths::AppPaths;
 use crate::render::surface::{create_surface, wrap_native_surface};
 use crate::render::text::{draw_text, validated_label_style, validated_value_style};
 use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::{
-    draw_static_metric_icon_for_value_validated, has_static_metric_icon_validated,
+    draw_backdrops_static_layer, draw_static_metric_icon_for_value_validated,
+    has_static_metric_icon_validated,
 };
 use skia_safe::Image;
 use std::collections::HashMap;
@@ -28,7 +29,8 @@ use std::time::Instant;
 /// different render configurations cannot reuse stale images across renders.
 pub(super) fn cached_labels_image(
     paths: &AppPaths,
-    labels: &[crate::normalize::ValidatedLabel],
+    backdrops: &[ValidatedBackdrop],
+    labels: &[ValidatedLabel],
     values: &[PreparedValue],
     scene: &ValidatedSceneConfig,
     prepare_profiler: &mut RenderProfiler,
@@ -36,13 +38,13 @@ pub(super) fn cached_labels_image(
     let width = scene.width;
     let height = scene.height;
     let scale = scene.scale;
-    if labels.is_empty() && !config_has_static_metric_icons(values) {
+    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_icons(values) {
         return Ok((None, LabelCacheStatus::None));
     }
 
     static CACHE: OnceLock<Mutex<HashMap<u64, Image>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let cache_key = labels_cache_key(labels, values, scene, width, height, scale);
+    let cache_key = labels_cache_key(backdrops, labels, values, scene, width, height, scale);
 
     if let Ok(cache) = cache.lock() {
         if let Some(image) = cache.get(&cache_key) {
@@ -57,7 +59,15 @@ pub(super) fn cached_labels_image(
         surface.canvas().clear(skia_safe::Color::TRANSPARENT);
     });
     prepare_profiler.measure("text.static.cache", || {
-        draw_static_text_and_icons(surface.canvas(), paths, labels, values, scene, scale)
+        draw_static_backdrops_text_and_icons(
+            surface.canvas(),
+            paths,
+            backdrops,
+            labels,
+            values,
+            scene,
+            scale,
+        )
     })?;
     let image = surface.image_snapshot();
     prepare_profiler.record_ms(
@@ -78,7 +88,8 @@ pub(super) fn cached_labels_image(
 /// values so the hot path does not have to redraw static content repeatedly.
 pub fn prepare_base_rgba(
     paths: &AppPaths,
-    labels: &[crate::normalize::ValidatedLabel],
+    backdrops: &[ValidatedBackdrop],
+    labels: &[ValidatedLabel],
     values: &[PreparedValue],
     scene: &ValidatedSceneConfig,
     prepare_profiler: &mut RenderProfiler,
@@ -88,7 +99,7 @@ pub fn prepare_base_rgba(
     let scale = scene.scale;
     let row_bytes = (width as usize) * 4;
     let mut pixels = vec![0u8; row_bytes * (height as usize)];
-    if labels.is_empty() && !config_has_static_metric_icons(values) {
+    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_icons(values) {
         return Ok(Some(pixels));
     }
 
@@ -96,7 +107,15 @@ pub fn prepare_base_rgba(
         wrap_native_surface(width, height, pixels.as_mut_slice())
     })?;
     prepare_profiler.measure("text.static.cache", || {
-        draw_static_text_and_icons(surface.canvas(), paths, labels, values, scene, scale)
+        draw_static_backdrops_text_and_icons(
+            surface.canvas(),
+            paths,
+            backdrops,
+            labels,
+            values,
+            scene,
+            scale,
+        )
     })?;
     drop(surface);
     Ok(Some(pixels))
@@ -114,14 +133,16 @@ pub(super) fn config_has_static_metric_icons(values: &[PreparedValue]) -> bool {
 ///
 /// This shared loop is the single source of truth for static overlay content so
 /// cached preview images and copied RGBA base buffers cannot drift apart.
-fn draw_static_text_and_icons(
+fn draw_static_backdrops_text_and_icons(
     canvas: &skia_safe::Canvas,
     paths: &AppPaths,
-    labels: &[crate::normalize::ValidatedLabel],
+    backdrops: &[ValidatedBackdrop],
+    labels: &[ValidatedLabel],
     values: &[PreparedValue],
     scene: &ValidatedSceneConfig,
     scale: f32,
 ) -> CoreResult<()> {
+    draw_backdrops_static_layer(canvas, backdrops, scale);
     for validated in labels {
         let style = validated_label_style(validated, scene, scale);
         draw_text(canvas, &validated.text, &style, &paths.font_dirs)?;
@@ -132,7 +153,8 @@ fn draw_static_text_and_icons(
 
 /// Computes the cache key for the shared static label/icon layer.
 fn labels_cache_key(
-    labels: &[crate::normalize::ValidatedLabel],
+    backdrops: &[ValidatedBackdrop],
+    labels: &[ValidatedLabel],
     values: &[PreparedValue],
     scene: &ValidatedSceneConfig,
     width: u32,
@@ -144,6 +166,7 @@ fn labels_cache_key(
     height.hash(&mut hasher);
     scale.to_bits().hash(&mut hasher);
     format!("{scene:?}").hash(&mut hasher);
+    format!("{backdrops:?}").hash(&mut hasher);
     format!("{labels:?}").hash(&mut hasher);
     format!("{values:?}").hash(&mut hasher);
     hasher.finish()
@@ -182,6 +205,7 @@ fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValue
         PreparedValue::TimeText(validated) => Some(&validated.base),
         PreparedValue::Gradient(_)
         | PreparedValue::HeadingTape(_)
-        | PreparedValue::LinearGauge(_) => None,
+        | PreparedValue::LinearGauge(_)
+        | PreparedValue::ArcGauge(_) => None,
     }
 }

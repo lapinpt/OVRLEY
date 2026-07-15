@@ -3,25 +3,36 @@
  */
 
 import { GROUPED_QUICKMENU_ITEMS } from '@/lib/widget/widget-icons'
+import { DisplayTypePopover } from './DisplayTypePopover'
 
 function WidgetButton({ item, onClick }) {
   const Icon = item.icon
-  return (
+  const hasMultipleTypes = item.displayTypes.length > 1
+
+  const button = (
     <button
-      onClick={() => onClick(item.type)}
-      className="group flex flex-col items-center justify-center gap-2 w-full aspect-square rounded-lg border border-border/70 bg-surface transition-all hover:border-accent-border hover:bg-surface-accent-soft cursor-pointer"
+      onClick={hasMultipleTypes ? undefined : () => onClick(item.type)}
+      className="group flex flex-col items-center justify-center gap-2 w-full aspect-square rounded-xs border border-border/70 bg-surface transition-all hover:border-accent-border hover:bg-surface-accent-soft/30 cursor-pointer"
     >
       <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
       <span className="text-[9px] leading-tight text-foreground text-center px-0.5 group-hover:text-primary">{item.label}</span>
     </button>
   )
+
+  if (!hasMultipleTypes) return button
+
+  return (
+    <DisplayTypePopover displayTypes={item.displayTypes} onSelect={(displayType) => onClick(item.type, displayType)}>
+      {button}
+    </DisplayTypePopover>
+  )
 }
 
 /**
- * Renders a scrollable 2-column grid of widget-type buttons, grouped by category.
+ * Renders a scrollable 3-column grid of widget-type buttons, grouped by category.
  *
  * @param {object} props
- * @param {(type: string) => void} props.onAddWidget — Called with the widget type when a button is clicked.
+ * @param {(type: string, displayType?: string) => void} props.onAddWidget — Called with the widget type (and optional display type) when a button is clicked.
  * @returns {JSX.Element} Rendered React element.
  */
 export function WidgetButtonGrid({ onAddWidget }) {

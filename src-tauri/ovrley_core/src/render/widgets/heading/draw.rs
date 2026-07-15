@@ -112,14 +112,9 @@ fn draw_indicator(canvas: &Canvas, cache: &HeadingWidgetCache) {
 
     match cache.indicator_style.as_str() {
         "chevron" => draw_chevron_indicator(canvas, cache, center_x, top_y, bottom_y, color),
-        "highlight_bar" => draw_highlight_bar_indicator(
-            canvas,
-            cache,
-            center_x,
-            cache.y + cache.tape_body_y,
-            cache.y + cache.tape_body_y + cache.tape_body_height,
-            color,
-        ),
+        "highlight_bar" => {
+            draw_highlight_bar_indicator(canvas, cache, center_x, top_y, bottom_y, color)
+        }
         _ => {}
     }
 }

@@ -7,7 +7,7 @@
 
 use super::helpers::{
     require_f32, require_hex_color, require_non_negative_f32, require_percentage,
-    require_positive_f32,
+    require_positive_f32, require_positive_u32,
 };
 use super::raw::{HeadingWidgetConfig, ValueConfig};
 use crate::error::{CoreError, CoreResult};
@@ -77,8 +77,8 @@ pub fn validate_heading(
 
     let x = hw.x;
     let y = hw.y;
-    let width = require_positive_u32(hw.width, &p("width"))?;
-    let height = require_positive_u32(hw.height, &p("height"))?;
+    let width = require_positive_u32(Some(hw.width), &p("width"))?;
+    let height = require_positive_u32(Some(hw.height), &p("height"))?;
     let pixels_per_degree = require_f32(hw.pixels_per_degree, &p("pixels_per_degree"))?;
     require_positive_f32(Some(pixels_per_degree), &p("pixels_per_degree"))?;
 
@@ -210,14 +210,6 @@ fn resolve_label_font(hw: &HeadingWidgetConfig, scene: &ValidatedSceneConfig) ->
     hw.label_font.clone().or_else(|| scene.font.clone())
 }
 
-fn require_positive_u32(v: u32, field: &str) -> CoreResult<u32> {
-    if v == 0 {
-        Err(CoreError::Config(format!("{field}: must be > 0")))
-    } else {
-        Ok(v)
-    }
-}
-
 fn require_tick_alignment(v: &str, field: &str) -> CoreResult<String> {
     match v {
         "below" | "centered" => Ok(v.to_string()),
@@ -296,6 +288,11 @@ mod tests {
             height: None,
             rotation: None,
             orientation: None,
+            arc_angle: None,
+            corner_orientation: None,
+            inner_widget_offset_x: None,
+            inner_widget_offset_y: None,
+            track_thickness: None,
             track_corner_radius: None,
             track_border_thickness: None,
             track_border_color: None,
@@ -304,6 +301,9 @@ mod tests {
             track_filled_color: None,
             track_filled_opacity: None,
             track_fill_flat: None,
+            track_fill_style: None,
+            bar_count: None,
+            bar_gap: None,
             show_min_max_labels: None,
             min_max_label_font: None,
             min_max_label_font_size: None,

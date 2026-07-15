@@ -50,6 +50,8 @@ jobs:
 
       - name: Build Tauri app
         run: pnpm tauri build --bundles app
+        env:
+          VITE_OVRLEY_VERSION: ${{ steps.release_tag.outputs.tag }}
 
       - name: Create portable archive
         run: node scripts/package-portable.mjs --version ${{ steps.release_tag.outputs.tag }}

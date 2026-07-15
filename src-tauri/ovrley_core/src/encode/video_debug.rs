@@ -18,7 +18,10 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static LAST_TIMESTAMP_NANOS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Serialize)]
 /// Timing summary for one video render phase.
@@ -122,6 +125,82 @@ pub(crate) fn concat_video_segments(
     } else {
         Err(CoreError::Encode(format!(
             "FFmpeg concat failed with status {status}"
+        )))
+    }
+}
+
+/// Concatenates video-only composite segments and muxes one continuous source
+/// audio stream into the final MP4 without re-encoding either stream.
+pub(crate) fn concat_composite_video_segments(
+    paths: &AppPaths,
+    ffmpeg_bin: &Path,
+    filenames: &[String],
+    source_video_path: &Path,
+    audio_trim_start: f64,
+    render_duration: f64,
+    output_path: &Path,
+) -> CoreResult<()> {
+    let list_path = paths
+        .temp_dir
+        .join(format!("concat_list_{}.txt", timestamp_nanos()?));
+    let mut list_content = String::new();
+    for filename in filenames {
+        list_content.push_str(&format!(
+            "file '{}'\n",
+            paths
+                .downloads_dir
+                .join(filename)
+                .display()
+                .to_string()
+                .replace('\\', "/")
+        ));
+    }
+    fs::write(&list_path, list_content).map_err(|source| CoreError::Io {
+        path: list_path.clone(),
+        source,
+    })?;
+
+    let mut command = Command::new(ffmpeg_bin);
+    configure_ffmpeg_command(&mut command, ffmpeg_bin);
+    command
+        .arg("-f")
+        .arg("concat")
+        .arg("-safe")
+        .arg("0")
+        .arg("-i")
+        .arg(&list_path);
+    if audio_trim_start > 0.0 {
+        command.arg("-ss").arg(format!("{audio_trim_start:.9}"));
+    }
+    let status = command
+        .arg("-t")
+        .arg(format!("{render_duration:.9}"))
+        .arg("-i")
+        .arg(source_video_path)
+        .arg("-map")
+        .arg("0:v:0")
+        .arg("-map")
+        .arg("1:a?")
+        .arg("-c")
+        .arg("copy")
+        .arg("-movflags")
+        .arg("faststart")
+        .arg("-y")
+        .arg(output_path)
+        .status()
+        .map_err(|error| {
+            CoreError::Encode(format!(
+                "Failed to stitch composite video and audio: {error}"
+            ))
+        })?;
+
+    let _ = fs::remove_file(&list_path);
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(CoreError::Encode(format!(
+            "FFmpeg composite stitch failed with status {status}"
         )))
     }
 }
@@ -243,12 +322,37 @@ pub(crate) fn create_debug_dir(paths: &AppPaths, phase: &str) -> CoreResult<Path
     Ok(dir)
 }
 
-/// Returns the current Unix timestamp in nanoseconds.
+/// Returns a process-unique, monotonic Unix-nanosecond identifier.
+///
+/// The wall clock alone is not a uniqueness guarantee when parallel render
+/// workers create output files at nearly the same time. Preserve the timestamp
+/// shape for readable artifact names, but advance the value when the clock has
+/// not advanced far enough.
 pub(crate) fn timestamp_nanos() -> CoreResult<u128> {
-    SystemTime::now()
+    let clock_value = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .map_err(|error| CoreError::Encode(error.to_string()))
+        .map_err(|error| CoreError::Encode(error.to_string()))?
+        .as_nanos();
+    let clock_value = u64::try_from(clock_value)
+        .map_err(|_| CoreError::Encode("Timestamp exceeds supported identifier range".into()))?;
+
+    let mut previous = LAST_TIMESTAMP_NANOS.load(Ordering::Relaxed);
+    loop {
+        let next = clock_value.max(
+            previous
+                .checked_add(1)
+                .ok_or_else(|| CoreError::Encode("Timestamp identifier space exhausted".into()))?,
+        );
+        match LAST_TIMESTAMP_NANOS.compare_exchange_weak(
+            previous,
+            next,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return Ok(u128::from(next)),
+            Err(observed) => previous = observed,
+        }
+    }
 }
 
 /// Selects representative frame indexes for optional sample PNG export.

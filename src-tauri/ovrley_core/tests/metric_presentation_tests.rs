@@ -7,7 +7,7 @@
 //! - `Tape` without a cache returns `None`
 //! - `Tape` with a Text-mode cache returns `None` (presentation switched away)
 //! - `Tape` with a non-Heading metric returns `None`
-//! - Future boxed display types (`Linear`, `Bars`, `Arc`, `Corner`) return `None`
+//! - Boxed display types without a matching cache return `None`
 //!
 //! ## Type
 //! Integration test. Uses the public `ovrley_core::render::widgets::metric_presentation`
@@ -79,6 +79,11 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         height: None,
         rotation: None,
         orientation: None,
+        arc_angle: None,
+        corner_orientation: None,
+        inner_widget_offset_x: None,
+        inner_widget_offset_y: None,
+        track_thickness: None,
         track_corner_radius: None,
         track_border_thickness: None,
         track_border_color: None,
@@ -87,6 +92,9 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         track_filled_color: None,
         track_filled_opacity: None,
         track_fill_flat: None,
+        track_fill_style: None,
+        bar_count: None,
+        bar_gap: None,
         show_min_max_labels: None,
         min_max_label_font: None,
         min_max_label_font_size: None,
@@ -104,12 +112,12 @@ fn default_heading_cache(display_type: DisplayType) -> HeadingWidgetCache {
             surface.image_snapshot()
         },
         tape_width: 1800.0,
-        tape_body_y: 14.0,
-        tape_body_height: 51.0,
+        tape_body_y: 15.0,
+        tape_body_height: 65.0,
         x: 100.0,
         y: 200.0,
         width: 400,
-        height: 65,
+        height: 80,
         pixels_per_degree: 5.0,
         show_indicator: true,
         indicator_style: "chevron".to_string(),
@@ -230,7 +238,7 @@ fn tape_display_type_with_heading_cache_draws_successfully() {
     );
     let report = result.unwrap();
     assert_eq!(report.geometry.widget_width, 400);
-    assert_eq!(report.geometry.widget_height, 65);
+    assert_eq!(report.geometry.widget_height, 80);
 }
 
 #[test]
@@ -329,12 +337,7 @@ fn future_boxed_display_types_return_none() {
     let mut profiler = RenderProfiler::default();
     let caches = empty_caches();
 
-    for display_type in [
-        DisplayType::Linear,
-        DisplayType::Bars,
-        DisplayType::Arc,
-        DisplayType::Corner,
-    ] {
+    for display_type in [DisplayType::Linear, DisplayType::Arc, DisplayType::Corner] {
         let value = default_value_config(display_type);
         let result = draw_metric_presentation(
             surface.canvas(),
@@ -441,6 +444,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
 
     let config = RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![
             serde_json::from_value(heading_tape_at_pos_0).unwrap(),
@@ -524,6 +528,7 @@ fn render_preserves_multiple_boxed_reports() {
     scene["height"] = serde_json::json!(200);
     let config = RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![heading_tape, speed_text],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -586,8 +591,8 @@ fn render_preserves_multiple_boxed_reports() {
         "Reported widget geometry should match configured heading-tape width"
     );
     assert_eq!(
-        presentation.widget.geometry.widget_height, 35,
-        "Reported widget geometry should include the configured heading-tape body and visible chevron slot"
+        presentation.widget.geometry.widget_height, 60,
+        "Reported widget geometry should match configured heading-tape frame height"
     );
 
     let _ = std::fs::remove_file(&out_path);
@@ -617,6 +622,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
     scene["height"] = serde_json::json!(200);
     let config = RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![heading_tape_left, heading_tape_right],
         plots: serde_json::Value::Object(serde_json::Map::new()),

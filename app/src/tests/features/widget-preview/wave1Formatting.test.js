@@ -7,8 +7,16 @@ function makeMetricWidget(type, data = {}) {
     category: 'values',
     type,
     data: {
+      display_type: 'text',
+      font: 'Arial.ttf',
+      font_size: 60,
+      decimals: 0,
+      balance_format: 'percent_label',
       show_units: true,
       show_icon: false,
+      icon_size: 28,
+      icon_offset_x: 0,
+      icon_offset_y: 0,
       ...data,
     },
   }
@@ -28,7 +36,7 @@ describe('Wave 2 metric formatting', () => {
       activity: makeActivity('vertical_oscillation', 85),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('85')
+    expect(model?.valueText).toBe('85.0')
     expect(model?.unitText).toBe('MM')
   })
 
@@ -38,7 +46,7 @@ describe('Wave 2 metric formatting', () => {
       activity: makeActivity('vertical_oscillation', 100),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('10')
+    expect(model?.valueText).toBe('10.0')
     expect(model?.unitText).toBe('CM')
   })
 
@@ -170,7 +178,7 @@ describe('Wave 1 metric formatting', () => {
       activity: makeActivity('vertical_speed', 1),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('11811')
+    expect(model?.valueText).toBe('11811.0')
     expect(model?.unitText).toBe('FT/H')
   })
 
@@ -426,7 +434,7 @@ describe('Phase 4 camera metric formatting', () => {
       activity: makeActivity('focal_length', 24),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('24')
+    expect(model?.valueText).toBe('24.00')
     expect(model?.unitText).toBe('MM')
   })
 

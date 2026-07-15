@@ -74,6 +74,22 @@ pub(crate) async fn backend_render(
     ))
 }
 
+/// Finalizes frontend-extracted raw samples into a parsed activity payload.
+///
+/// This wrapper intentionally does no activity work; it preserves the existing
+/// command convention by delegating to `ovrley_core` and serializing the result
+/// as a JSON string for JavaScript.
+#[tauri::command]
+pub(crate) async fn backend_finalize_activity(
+    app: AppHandle,
+    raw_activity_json: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_finalize_activity(
+        &runtime_paths::app_paths(&app)?,
+        &raw_activity_json,
+    ))
+}
+
 /// Renders one transparent preview PNG for the requested second.
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(
@@ -218,6 +234,22 @@ pub(crate) async fn backend_import_preview_video(
     };
 
     serialize_command_result(&response)
+}
+
+/// Extracts embedded telemetry from an imported video source.
+///
+/// This is intentionally separate from preview import so a failed telemetry
+/// parse does not prevent video playback; the frontend can call it
+/// opportunistically after the preview video is registered.
+#[tauri::command]
+pub(crate) async fn backend_extract_video_telemetry(
+    app: AppHandle,
+    file_path: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_extract_video_telemetry(
+        &runtime_paths::app_paths(&app)?,
+        &file_path,
+    ))
 }
 
 /// Clears the currently registered local HTTP preview video.

@@ -3,6 +3,7 @@
     "definitions": {
       "text": {
         "label": "Text",
+        "icon": { "source": "shared", "assetFile": "display-type-text.svg" },
         "layoutMode": "intrinsic",
         "defaults": {
           "x": 100,
@@ -45,6 +46,10 @@
       },
       "heading_tape": {
         "label": "Heading Tape",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-heading-tape.svg"
+        },
         "layoutMode": "boxed",
         "defaultFrameWidth": 600,
         "defaultFrameHeight": 100,
@@ -65,7 +70,6 @@
           "show_major_labels": true,
           "label_color": "#cccccc",
           "cardinal_label_color": "#ff0000",
-          "label_font": "Arial.ttf",
           "label_font_size": 12,
           "label_offset": 4,
           "indicator_style": "chevron",
@@ -76,49 +80,98 @@
         }
       },
       "linear": {
-        "label": "Linear",
+        "label": "Linear Bar",
+        "icon": { "source": "shared", "assetFile": "display-type-linear.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
-        "defaultFrameHeight": 30,
+        "defaultFrameHeight": 24,
+        "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
           "width": 80,
           "orientation": "horizontal",
-          "track_corner_radius": 8,
-          "track_border_thickness": 2,
+          "track_fill_style": "fill",
+          "track_corner_radius": 12,
+          "track_border_thickness": 0,
           "track_border_color": "#ffffff",
           "track_empty_color": "#222222",
-          "track_empty_opacity": 0.3,
-          "track_filled_color": "#40e0d0",
+          "track_empty_opacity": 0.5,
+          "track_filled_color": "#dce2e8",
           "track_filled_opacity": 1,
-          "track_fill_flat": true,
+          "track_fill_flat": false,
           "show_min_max_labels": false,
-          "min_max_label_font": "Arial.ttf",
+          "min_max_label_font": null,
           "min_max_label_font_size": 12,
           "min_max_label_position": "bottom",
           "min_max_label_color": "#ffffff"
         }
       },
-      "bars": {
-        "label": "Bars",
-        "layoutMode": "boxed",
-        "defaultFrameWidth": 200,
-        "defaultFrameHeight": 60
-      },
       "arc": {
-        "label": "Arc",
+        "label": "Arc Gauge",
+        "icon": {
+          "source": "lucide",
+          "name": "Gauge",
+          "assetFile": "display-type-arc.svg"
+        },
         "layoutMode": "boxed",
-        "defaultFrameWidth": 120,
-        "defaultFrameHeight": 120
+        "defaultFrameWidth": 220,
+        "defaultFrameHeight": 220,
+        "defaultFontSize": 60,
+        "conditionalKeys": ["bar_count", "bar_gap"],
+        "defaults": {
+          "arc_angle": 240,
+          "track_fill_style": "fill",
+          "inner_widget_offset_x": 0,
+          "inner_widget_offset_y": 0,
+          "track_thickness": 24,
+          "track_corner_radius": 15,
+          "track_border_thickness": 0,
+          "track_border_color": "#ffffff",
+          "track_empty_color": "#222222",
+          "track_empty_opacity": 0.5,
+          "track_filled_color": "#dce2e8",
+          "track_filled_opacity": 1,
+          "track_fill_flat": false,
+          "show_min_max_labels": false,
+          "min_max_label_font": null,
+          "min_max_label_font_size": 12,
+          "min_max_label_color": "#ffffff"
+        }
       },
       "corner": {
-        "label": "Corner",
+        "label": "Corner Gauge",
+        "icon": {
+          "source": "custom",
+          "name": "CornerGauge",
+          "assetFile": "display-type-corner.svg"
+        },
         "layoutMode": "boxed",
-        "defaultFrameWidth": 200,
-        "defaultFrameHeight": 60
+        "defaultFrameWidth": 162,
+        "defaultFrameHeight": 162,
+        "defaultFontSize": 51,
+        "conditionalKeys": ["bar_count", "bar_gap"],
+        "defaults": {
+          "corner_orientation": "bottom-left",
+          "track_fill_style": "fill",
+          "inner_widget_offset_x": 0,
+          "inner_widget_offset_y": 0,
+          "track_thickness": 24,
+          "track_corner_radius": 12,
+          "track_border_thickness": 0,
+          "track_border_color": "#ffffff",
+          "track_empty_color": "#222222",
+          "track_empty_opacity": 0.5,
+          "track_filled_color": "#dce2e8",
+          "track_filled_opacity": 1,
+          "track_fill_flat": false,
+          "show_min_max_labels": false,
+          "min_max_label_font": null,
+          "min_max_label_font_size": 12,
+          "min_max_label_color": "#ffffff"
+        }
       }
     },
     "variantFrameKeys": ["width", "height", "rotation"],
-    "defaults": ["text", "linear"],
+    "defaults": ["text", "linear", "arc", "corner"],
     "overrides": {
       "heading": ["text", "heading_tape"],
       "core_temperature": ["text"],

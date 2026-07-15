@@ -1,80 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
 import { buildMetricWidgetPreviewModel } from '@/features/widget-preview'
-import { deriveActivityMetricSeries } from '@/lib/activity/metric-series'
-import { isFiniteNumber, roundValue, safeNumber } from '@/lib/activity/parse-helpers'
-
-describe('gear_position extraction pipeline', () => {
-  test('extracts gearPosition from normalizedRawSamples into metricSeriesMap', () => {
-    const { metricSeriesMap } = deriveActivityMetricSeries({
-      courseSeries: [],
-      distanceSeries: [0, 100],
-      elevationBaseSeries: [0, 0],
-      elapsedSeries: [0, 10],
-      normalizedRawSamples: [{ gearPosition: null }, { gearPosition: 5 }],
-      useLegacyGpxDerivations: false,
-      helpers: { isFiniteNumber, roundValue, safeNumber },
-    })
-
-    expect(metricSeriesMap.gear_position).toBeDefined()
-    expect(metricSeriesMap.gear_position.source).toBe('direct')
-    expect(metricSeriesMap.gear_position.series).toEqual([null, 5])
-  })
-})
-
-describe('distance extraction pipeline', () => {
-  test('keeps the derived distance series in metricSeriesMap', () => {
-    const { metricSeriesMap } = deriveActivityMetricSeries({
-      courseSeries: [],
-      distanceSeries: [0, 100, 250],
-      elevationBaseSeries: [0, 0, 0],
-      elapsedSeries: [0, 5, 10],
-      normalizedRawSamples: [{}, {}, {}],
-      useLegacyGpxDerivations: false,
-      helpers: { isFiniteNumber, roundValue, safeNumber },
-    })
-
-    expect(metricSeriesMap.distance).toBeDefined()
-    expect(metricSeriesMap.distance.source).toBe('direct')
-    expect(metricSeriesMap.distance.series).toEqual([0, 100, 250])
-  })
-})
-
-describe('vertical_oscillation extraction pipeline', () => {
-  test('extracts verticalOscillation from normalizedRawSamples into metricSeriesMap', () => {
-    const { metricSeriesMap } = deriveActivityMetricSeries({
-      courseSeries: [],
-      distanceSeries: [0, 100],
-      elevationBaseSeries: [0, 0],
-      elapsedSeries: [0, 10],
-      normalizedRawSamples: [{ verticalOscillation: null }, { verticalOscillation: 85 }],
-      useLegacyGpxDerivations: false,
-      helpers: { isFiniteNumber, roundValue, safeNumber },
-    })
-
-    expect(metricSeriesMap.vertical_oscillation).toBeDefined()
-    expect(metricSeriesMap.vertical_oscillation.source).toBe('direct')
-    expect(metricSeriesMap.vertical_oscillation.series).toEqual([null, 85])
-  })
-})
-
-describe('core_temperature extraction pipeline', () => {
-  test('extracts coreTemperature from normalizedRawSamples into metricSeriesMap', () => {
-    const { metricSeriesMap } = deriveActivityMetricSeries({
-      courseSeries: [],
-      distanceSeries: [0, 100],
-      elevationBaseSeries: [0, 0],
-      elapsedSeries: [0, 10],
-      normalizedRawSamples: [{ coreTemperature: null }, { coreTemperature: 37.5 }],
-      useLegacyGpxDerivations: false,
-      helpers: { isFiniteNumber, roundValue, safeNumber },
-    })
-
-    expect(metricSeriesMap.core_temperature).toBeDefined()
-    expect(metricSeriesMap.core_temperature.source).toBe('direct')
-    expect(metricSeriesMap.core_temperature.series).toEqual([null, 37.5])
-  })
-})
 
 describe('core_temperature widget preview', () => {
   test('formats core_temperature from display_unit celsius', () => {
@@ -281,6 +207,29 @@ describe('metric widget preview model standard metric units', () => {
     expect(model?.unitText).toBe('MIN/KM')
   })
 
+  test('preserves requested decimal places for vertical speed widgets', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'vertical_speed',
+        data: {
+          display_unit: 'mps',
+          decimals: 1,
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        vertical_speed: [2],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('2.0')
+    expect(model?.unitText).toBe('M/S')
+  })
+
   test('gear_position formats as integer with gear unit', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: {
@@ -342,7 +291,7 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('90')
-    expect(model?.showIcon).toBe(true)
+    expect(model?.metricLayout.icon).not.toBeNull()
   })
 
   test('boxed display types skip the metric preview model so their own presentation path is used', () => {

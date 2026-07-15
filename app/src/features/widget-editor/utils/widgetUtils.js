@@ -4,8 +4,12 @@
  */
 
 import { createFontSelection } from '@/lib/fonts'
-import { getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
+import { initBackdropVariant } from '@/lib/widget/widget-resolver'
+import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults, getDisplayTypeDefaultFontSize } from '@/lib/widget/standard-metrics'
 import {
+  BACKDROP_DEFAULT_DISPLAY_TYPES,
+  BACKDROP_CIRCLE_DEFAULTS,
+  BACKDROP_RECTANGLE_DEFAULTS,
   TEXT_DEFAULTS,
   TEXT_FONT_SIZES,
   TEXT_LABEL_DEFAULTS,
@@ -14,6 +18,23 @@ import {
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
 } from '@/lib/widget/standard-widgets'
+
+const BACKDROP_SHARED_DEFAULT_KEYS = [
+  'x',
+  'y',
+  'opacity',
+  'fill_color',
+  'fill_opacity',
+  'border_thickness',
+  'border_color',
+  'border_opacity',
+  'display_type',
+]
+
+const BACKDROP_DEFAULTS_BY_TYPE = {
+  circle: BACKDROP_CIRCLE_DEFAULTS,
+  rectangle: BACKDROP_RECTANGLE_DEFAULTS,
+}
 
 /**
  * Parses integer.
@@ -56,7 +77,7 @@ export function getGlobalColor(globalDefaults, key, fallback = '#ffffff') {
  * @param {*} coursePoints - Value for course points.
  * @returns {object} Requested value or structure.
  */
-function getCourseWidgetDimensions(coursePoints) {
+export function getCourseWidgetDimensions(coursePoints) {
   const validPoints = (coursePoints || []).filter(([latitude, longitude]) => Number.isFinite(latitude) && Number.isFinite(longitude))
 
   if (validPoints.length < 2) {
@@ -100,20 +121,43 @@ export function createLabelDefaults(globalDefaults) {
 }
 
 /**
+ * Creates backdrop defaults.
+ *
+ * @param {string} [displayType] - Optional display type override (e.g. "circle", "rectangle").
+ * @returns {object} Backdrop data with shared fields at the top level and active geometry nested.
+ */
+export function createBackdropDefaults(displayType) {
+  const resolvedType = displayType || BACKDROP_DEFAULT_DISPLAY_TYPES[0]
+  const activeDefaults = BACKDROP_DEFAULTS_BY_TYPE[resolvedType]
+  const seed = Object.fromEntries(BACKDROP_SHARED_DEFAULT_KEYS.map((key) => [key, activeDefaults[key]]))
+
+  return initBackdropVariant(
+    {
+      ...seed,
+      display_type: resolvedType,
+    },
+    resolvedType,
+  )
+}
+
+/**
  * Creates metric value defaults.
  *
  * @param {*} type - Widget or value type identifier.
  * @param {*} globalDefaults - Value for global defaults.
+ * @param {string} [displayType] - Optional display type override (e.g. "text", "linear", "heading_tape").
  * @returns {object} Derived data structure for downstream use.
  */
-export function createMetricValueDefaults(type, globalDefaults) {
+export function createMetricValueDefaults(type, globalDefaults, displayType) {
   const font = globalDefaults?.font_values || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
+  const resolvedDisplayType = displayType || 'text'
   const sharedDefaults = {
     ...TEXT_DEFAULTS,
     value: type,
+    display_type: resolvedDisplayType,
     ...fontSelection,
-    font_size: TEXT_FONT_SIZES[type] || TEXT_FONT_SIZES.default,
+    font_size: getDisplayTypeDefaultFontSize(resolvedDisplayType) ?? TEXT_FONT_SIZES[type] ?? TEXT_FONT_SIZES.default,
     color: getGlobalColor(globalDefaults, 'color_values'),
     opacity: globalDefaults?.opacity ?? 1,
   }
@@ -124,27 +168,43 @@ export function createMetricValueDefaults(type, globalDefaults) {
       unit_color: getGlobalColor(globalDefaults, 'color_units'),
     }
   }
-  if (type === 'heading') {
+
+  // Build display_variants for boxed display types
+  const displayVariants = {}
+  if (type === 'heading' || resolvedDisplayType === 'heading_tape') {
     const frameDefaults = getDefaultFrameDimensions('heading_tape')
-    return {
-      ...sharedDefaults,
-      icon_color: getGlobalColor(globalDefaults, 'color_icons'),
-      unit_color: getGlobalColor(globalDefaults, 'color_units'),
-      ...TYPE_DEFAULTS[type],
-      display_variants: {
-        heading_tape: {
-          ...HEADING_TAPE_DEFAULTS,
-          ...(frameDefaults || {}),
-        },
-      },
+    displayVariants.heading_tape = {
+      ...HEADING_TAPE_DEFAULTS,
+      ...(frameDefaults || {}),
     }
   }
-  return {
+  if (resolvedDisplayType !== 'text' && !displayVariants[resolvedDisplayType]) {
+    const variantDefaults = getDisplayTypeConfigDefaults(resolvedDisplayType)
+    const frameDefaults = getDefaultFrameDimensions(resolvedDisplayType)
+    if (variantDefaults || frameDefaults) {
+      const seed = {
+        ...(variantDefaults || {}),
+        ...(frameDefaults || {}),
+      }
+      if (!seed.min_max_label_font && font) {
+        seed.min_max_label_font = font
+      }
+      displayVariants[resolvedDisplayType] = seed
+    }
+  }
+
+  const result = {
     ...sharedDefaults,
     icon_color: getGlobalColor(globalDefaults, 'color_icons'),
     unit_color: getGlobalColor(globalDefaults, 'color_units'),
     ...TYPE_DEFAULTS[type],
   }
+
+  if (Object.keys(displayVariants).length > 0) {
+    result.display_variants = displayVariants
+  }
+
+  return result
 }
 
 /**

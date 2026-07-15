@@ -12,28 +12,36 @@
 import { describe, expect, test, vi } from 'vitest'
 import { render } from '@testing-library/react'
 
-vi.mock('@/features/widget-preview/components/TextRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/text/TextPreview', () => ({
   OverlayTextWidget: (props) => <div data-testid="text-renderer" data-widget-type={props.widget.type} />,
 }))
-vi.mock('@/features/widget-preview/components/MetricRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/metric/MetricPreview', () => ({
   OverlayMetricWidget: (props) => <div data-testid="metric-renderer" data-widget-type={props.widget.type} />,
 }))
-vi.mock('@/features/widget-preview/components/RouteRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/route/RoutePreview', () => ({
   OverlayRouteWidget: () => <div data-testid="route-renderer" />,
 }))
-vi.mock('@/features/widget-preview/components/ElevationRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/elevation/ElevationPreview', () => ({
   OverlayElevationWidget: () => <div data-testid="elevation-renderer" />,
 }))
-vi.mock('@/features/widget-preview/components/HeadingRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/heading/HeadingPreview', () => ({
   OverlayHeadingWidget: (props) => <div data-testid="heading-renderer" data-widget-type={props.widget.type} />,
 }))
-vi.mock('@/features/widget-preview/components/LinearGaugeRenderer', () => ({
+vi.mock('@/features/widget-preview/widgets/linear-gauge/LinearGaugePreview', () => ({
   OverlayLinearGaugeWidget: (props) => (
     <div data-testid="linear-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
   ),
 }))
+vi.mock('@/features/widget-preview/widgets/arc-gauge/ArcGaugePreview', () => ({
+  OverlayArcGaugeWidget: (props) => (
+    <div data-testid="arc-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
+  ),
+}))
+vi.mock('@/features/widget-preview/widgets/backdrop/BackdropPreview', () => ({
+  default: (props) => <div data-testid="backdrop-renderer" data-widget-type={props.widget.type} />,
+}))
 
-import WidgetPreview from '@/features/widget-preview/components/WidgetPreview'
+import WidgetPreview from '@/features/widget-preview/WidgetPreview'
 
 const ACTIVITY = { sample_elapsed_seconds: [0], speed: [25] }
 
@@ -41,6 +49,25 @@ describe('WidgetPreview dispatch by display_type', () => {
   test('label widgets always use the text renderer', () => {
     const { getByTestId } = render(<WidgetPreview widget={{ type: 'label', category: 'labels', data: { text: 'Hi', x: 0, y: 0 } }} />)
     expect(getByTestId('text-renderer')).toBeTruthy()
+  })
+
+  test('backdrop widgets use the backdrop renderer', () => {
+    const { getByTestId } = render(
+      <WidgetPreview
+        widget={{
+          type: 'backdrop',
+          category: 'backdrops',
+          data: {
+            display_type: 'rectangle',
+            x: 0,
+            y: 0,
+            fill_color: '#ffffff',
+            display_variants: { rectangle: { width: 200, height: 120 } },
+          },
+        }}
+      />,
+    )
+    expect(getByTestId('backdrop-renderer')).toBeTruthy()
   })
 
   test('course widgets use the route renderer', () => {
@@ -104,5 +131,29 @@ describe('WidgetPreview dispatch by display_type', () => {
       />,
     )
     expect(getByTestId('linear-gauge-renderer')).toBeTruthy()
+  })
+
+  test('arc display_type uses the arc gauge renderer', () => {
+    const { getByTestId } = render(
+      <WidgetPreview
+        widget={{ type: 'speed', category: 'values', data: { display_type: 'arc', x: 0, y: 0, width: 160, height: 160 } }}
+        activity={ACTIVITY}
+      />,
+    )
+    expect(getByTestId('arc-gauge-renderer')).toBeTruthy()
+  })
+
+  test('corner display_type uses the shared arc-shaped gauge renderer', () => {
+    const { getByTestId } = render(
+      <WidgetPreview
+        widget={{
+          type: 'speed',
+          category: 'values',
+          data: { display_type: 'corner', x: 0, y: 0, display_variants: { corner: { width: 160, height: 160 } } },
+        }}
+        activity={ACTIVITY}
+      />,
+    )
+    expect(getByTestId('arc-gauge-renderer')).toHaveAttribute('data-display-type', 'corner')
   })
 })

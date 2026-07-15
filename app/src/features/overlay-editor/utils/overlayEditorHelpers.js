@@ -1,21 +1,7 @@
 /**
- * Editor overlay helpers — selection, intersection, scene origin, and
- * scaled data computation. Pure functions, no DOM manipulation.
+ * Editor overlay helpers — selection, intersection, and scene origin.
+ * Pure functions, no DOM manipulation.
  */
-
-import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from '../data/overlayEditorConstants'
-import { clamp, isInteractiveElement } from '@/lib/utils'
-
-/**
- * Checks whether the target element is inside an editable input, textarea,
- * select, or contenteditable element.
- *
- * @param {EventTarget} target - DOM event target to inspect.
- * @returns {boolean} True if target is inside an editable element.
- */
-export function isEditableElement(target) {
-  return isInteractiveElement(target)
-}
 
 /**
  * Checks whether a mouse/pointer event has a multi-selection modifier
@@ -118,47 +104,4 @@ export function getWidgetSceneOrigin(widget, draft = null, visualBounds = null, 
     x: x + boundsOffsetX,
     y: (data.y ?? 0) + gradientYOffset + boundsOffsetY,
   }
-}
-
-/**
- * Builds a widget data draft from a scaling interaction — computes new
- * font_size, icon_size, icon offsets, triangle_width, and value_offset
- * based on the uniform scale factor.
- *
- * Only includes fields relevant to the widget's category and type.
- *
- * @param {object} origin - Interaction start snapshot ({ fontSize, iconSize, iconOffsetX, iconOffsetY, triangleWidth, valueOffset }).
- * @param {number} scaleFactor - Uniform scale multiplier.
- * @param {object} widget - Widget definition (used to determine category).
- * @returns {object} Draft with scaled properties.
- */
-export function buildScaledWidgetDataDraft(origin, scaleFactor, widget, { round = true } = {}) {
-  const r = round ? Math.round : (v) => v
-  const nextFontSize = clamp(r((origin.fontSize || 60) * scaleFactor), 8, 400)
-  const nextIconSize = clamp(r((origin.iconSize || 28) * scaleFactor), 0, 400)
-  const nextIconOffsetX = r((origin.iconOffsetX || 0) * scaleFactor)
-  const nextIconOffsetY = r((origin.iconOffsetY || 0) * scaleFactor)
-  const nextTriangleWidth = clamp(r((origin.triangleWidth ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH) * scaleFactor), 0, 600)
-  const nextValueOffset = r((origin.valueOffset || 0) * scaleFactor)
-
-  const nextDraft = {
-    font_size: nextFontSize,
-  }
-
-  if (widget?.category === 'values' && widget.type !== 'gradient') {
-    Object.assign(nextDraft, {
-      icon_size: nextIconSize,
-      icon_offset_x: nextIconOffsetX,
-      icon_offset_y: nextIconOffsetY,
-    })
-  }
-
-  if (widget?.type === 'gradient') {
-    Object.assign(nextDraft, {
-      triangle_width: nextTriangleWidth,
-      value_offset: nextValueOffset,
-    })
-  }
-
-  return nextDraft
 }

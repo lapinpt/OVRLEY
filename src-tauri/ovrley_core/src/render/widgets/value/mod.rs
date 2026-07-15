@@ -67,7 +67,7 @@ pub(crate) struct MetricWidgetRequest<'a> {
 /// `false` for metric kinds without a formatter so callers can fall back to
 /// generic formatted text drawing.
 ///
-/// Boxed display types (heading_tape, linear, bars, arc, corner) are not drawn
+/// Boxed display types (heading_tape, linear, arc, corner) are not drawn
 /// here — the caller is responsible for invoking
 /// [`super::metric_presentation::draw_metric_presentation`] for non-intrinsic
 /// display types. This function returns `true` for those types to signal that
@@ -205,11 +205,10 @@ mod tests {
         };
         let mut surface = create_surface(400, 200).unwrap();
 
-        for dt_str in ["heading_tape", "linear", "bars", "arc", "corner"] {
+        for dt_str in ["heading_tape", "linear", "arc", "corner"] {
             let display_type = match dt_str {
                 "heading_tape" => DisplayType::Tape,
                 "linear" => DisplayType::Linear,
-                "bars" => DisplayType::Bars,
                 "arc" => DisplayType::Arc,
                 "corner" => DisplayType::Corner,
                 _ => unreachable!(),

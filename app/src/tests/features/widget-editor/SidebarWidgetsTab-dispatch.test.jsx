@@ -11,6 +11,7 @@ import { describe, expect, test, vi } from 'vitest'
 
 // Mock all editor components
 vi.mock('@/features/widget-editor/components/TextWidgetEditor', () => ({ default: () => <div data-testid="editor-text" /> }))
+vi.mock('@/features/widget-editor/components/BackdropWidgetEditor', () => ({ default: () => <div data-testid="editor-backdrop" /> }))
 vi.mock('@/features/widget-editor/components/metricWidget/MetricWidgetEditor', () => ({ default: () => <div data-testid="editor-metric" /> }))
 vi.mock('@/features/widget-editor/components/TimeWidgetEditor', () => ({ default: () => <div data-testid="editor-time" /> }))
 vi.mock('@/features/widget-editor/components/GradientWidgetEditor', () => ({ default: () => <div data-testid="editor-gradient" /> }))
@@ -50,6 +51,20 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     )
     const { getByTestId } = render(<SidebarWidgetsTab />)
     expect(getByTestId('editor-text')).toBeTruthy()
+  })
+
+  test('backdrop widget renders BackdropWidgetEditor', () => {
+    mockUseWidgetManager.mockReturnValue(
+      makeManagerState({
+        id: 'w1',
+        type: 'backdrop',
+        category: 'backdrops',
+        name: 'Backdrop',
+        data: { display_type: 'rectangle', x: 0, y: 0, opacity: 1, display_variants: { rectangle: { width: 200, height: 120 } } },
+      }),
+    )
+    const { getByTestId } = render(<SidebarWidgetsTab />)
+    expect(getByTestId('editor-backdrop')).toBeTruthy()
   })
 
   test('standard metric widget (speed) renders MetricWidgetEditor', () => {

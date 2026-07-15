@@ -11,7 +11,7 @@ import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, u
 import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
 import { clamp } from '@/lib/utils'
-import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
+import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
@@ -62,15 +62,22 @@ export function useWidgetManager() {
   }
 
   // Add widget — creates a new widget of the given type with defaults and appends to config
-  const addWidget = (type) => {
+  const addWidget = (type, displayType) => {
     const nextConfig = structuredClone(config)
+    let targetCategory = null
 
-    if (type === 'label') {
+    if (type === 'backdrop') {
+      if (!nextConfig.backdrops) nextConfig.backdrops = []
+      nextConfig.backdrops.push(createBackdropDefaults(displayType))
+      targetCategory = 'backdrops'
+    } else if (type === 'label') {
       if (!nextConfig.labels) nextConfig.labels = []
       nextConfig.labels.push(createLabelDefaults(globalDefaults))
+      targetCategory = 'labels'
     } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
       if (!nextConfig.values) nextConfig.values = []
-      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults))
+      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults, displayType))
+      targetCategory = 'values'
     } else if (['course', 'elevation'].includes(type)) {
       if (!nextConfig.plots) nextConfig.plots = []
       nextConfig.plots.push(
@@ -79,10 +86,11 @@ export function useWidgetManager() {
           sceneFontSize: globalDefaults?.font_size,
         }),
       )
+      targetCategory = 'plots'
     }
 
     const normalizedConfig = ensureWidgetIdsInConfig(nextConfig)
-    const newId = buildConfigWidgets(normalizedConfig).at(-1)?.id || null
+    const newId = targetCategory ? normalizedConfig[targetCategory]?.at(-1)?.id || null : null
 
     setConfig(normalizedConfig)
     if (newId) setSelectedWidgetId(newId)
@@ -100,6 +108,11 @@ export function useWidgetManager() {
 
     if (widget.type === 'label') {
       setConfig(replaceWidgetInConfig(config, id, createLabelDefaults(globalDefaults)))
+      return
+    }
+
+    if (widget.type === 'backdrop') {
+      setConfig(replaceWidgetInConfig(config, id, createBackdropDefaults()))
       return
     }
 

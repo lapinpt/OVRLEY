@@ -29,6 +29,9 @@ export default function VideoSyncSection({
   importedVideoDuration,
   importedVideoFps,
   importedVideoResolution,
+  importedVideoCodecName,
+  importedVideoBitRate,
+  importedVideoCameraModel,
   importedVideoCreationTime,
   videoSyncWarning,
   videoResolutionMismatch,
@@ -46,10 +49,9 @@ export default function VideoSyncSection({
         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Video</h4>
         <Separator className="flex-1" />
       </div>
-
       <div className="space-y-2 text-xs text-muted-foreground px-1 pt-2">
         <div className="flex justify-between">
-          <b>Data:</b>
+          <b>INFO:</b>
           <span className="text-xs font-normal text-foreground/70">
             {importedVideoDuration
               ? `${Math.floor(importedVideoDuration / 60)}:${Math.floor(importedVideoDuration % 60)
@@ -66,23 +68,33 @@ export default function VideoSyncSection({
             {importedVideoCreationTime ? new Date(importedVideoCreationTime).toLocaleString() : 'Unknown'}
           </span>
         </div>
-      </div>
+        <div className="flex justify-between">
+          <b>Codec:</b>
+          <span className="text-xs font-normal text-foreground/70">
+            {' '}
+            {importedVideoCodecName || 'Unknown'} |{' '}
+            {importedVideoBitRate ? `${(Number(importedVideoBitRate) / 1_000_000).toFixed(0)} Mbps` : 'Unknown'}
+          </span>
+        </div>
 
+        <div className="flex justify-between">
+          <b>Camera:</b>
+          <span className="text-xs font-normal text-foreground/70">{importedVideoCameraModel || 'Unknown'}</span>
+        </div>
+      </div>
       {videoSyncWarning && (
-        <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
+        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">{videoSyncWarning}</p>
         </div>
       )}
-
       {videoResolutionMismatch && (
-        <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
+        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
         </div>
       )}
-
-      {activitySummary?.startTime && (
+      {activitySummary?.syncTime && (
         <div className="space-y-1">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold pb-2!">Sync Offset</Label>
           <div className="grid grid-cols-2 gap-4">
@@ -127,6 +139,18 @@ export default function VideoSyncSection({
           </div>
         </div>
       )}
+
+      {/* Yeah this will take an entire rewrite to plug in , so not now...
+      {activitySummary && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-4 w-full h-9 gap-2 border-border/80 bg-surface-elevated px-3 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          Set Data Sources
+        </Button>
+      )} */}
     </div>
   )
 }

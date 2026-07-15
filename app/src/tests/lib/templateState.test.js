@@ -71,6 +71,52 @@ describe('normalizeGlobalDefaults', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('normalizeTemplateConfig', () => {
+  test('treats a missing backdrops section as an empty list', () => {
+    const result = normalizeTemplateConfig({ scene: {} })
+
+    expect(result.backdrops).toEqual([])
+  })
+
+  test('normalizes backdrops with shared fields and active rectangle geometry', () => {
+    const config = {
+      backdrops: [
+        {
+          id: 'bd-abc',
+          display_type: 'rectangle',
+          x: 10,
+          y: 20,
+          opacity: 0.75,
+          fill_color: '#FFFFFF',
+          fill_opacity: 0.5,
+          border_thickness: 0,
+          border_color: '#000000',
+          border_opacity: 1,
+          width: 240,
+          height: 160,
+          unknown_field: 'remove',
+        },
+      ],
+    }
+    const result = normalizeTemplateConfig(config)
+
+    expect(result.backdrops[0]).toMatchObject({
+      id: 'bd-abc',
+      display_type: 'rectangle',
+      x: 10,
+      y: 20,
+      fill_color: '#ffffff',
+      display_variants: {
+        rectangle: {
+          width: 240,
+          height: 160,
+        },
+      },
+    })
+    expect(result.backdrops[0]).not.toHaveProperty('unknown_field')
+    expect(result.backdrops[0]).not.toHaveProperty('width')
+    expect(result.backdrops[0]).not.toHaveProperty('height')
+  })
+
   test('strips derived and render-only keys from scene', () => {
     const config = {
       scene: {

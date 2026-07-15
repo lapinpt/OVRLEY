@@ -16,7 +16,6 @@ import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
-import { resolutionsMismatch } from '../utils/codecUtils'
 import { createRenderEffectiveConfig } from '../utils/renderConfig'
 import useRenderDialogState from './useRenderDialogState'
 
@@ -47,8 +46,7 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const hasParsedActivity = Boolean(activitySummary)
   const canRender = Boolean(config && hasParsedActivity)
-  const hasResolutionMismatch = resolutionsMismatch(config?.scene, importedVideoResolution)
-  const renderDisabled = !canRender || renderingVideo || backendStatus !== 'connected' || hasResolutionMismatch
+  const renderDisabled = !canRender || renderingVideo || backendStatus !== 'connected'
   const renderTooltipContent = useMemo(() => {
     if (!config) {
       return hasParsedActivity ? 'Load a template first' : 'Load a template and GPX/FIT activity first'
@@ -59,14 +57,12 @@ export default function useRenderWorkflow({ backendStatus }) {
     if (backendStatus !== 'connected') {
       return 'Backend offline'
     }
-    if (hasResolutionMismatch) {
-      return 'Overlay and imported video resolutions must match'
-    }
+
     if (renderingVideo) {
       return 'Rendering already in progress'
     }
     return null
-  }, [backendStatus, config, hasParsedActivity, hasResolutionMismatch, renderingVideo])
+  }, [backendStatus, config, hasParsedActivity, renderingVideo])
   const renderPreviewFrameDisabled = !canRender || renderingVideo || renderingPreviewFrame || backendStatus !== 'connected'
 
   const buildRenderSettingsDraft = useCallback(() => {
@@ -245,6 +241,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         importedVideoFpsDen: useStore.getState().importedVideoFpsDen,
         importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
         importedVideoPath: shouldComposite ? useStore.getState().importedVideoPath : null,
+        importedVideoResolution: useStore.getState().importedVideoResolution,
         parsedActivity: useStore.getState().parsedActivity,
         startSecond: useStore.getState().startSecond,
         endSecond: useStore.getState().endSecond,
@@ -254,7 +251,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         setRenderProgress,
       })
       if (result && result.cancelled) {
-        console.log('Render video cancelled (UI handled)')
+        // cancelled
       }
     } catch (error) {
       setRenderDialogPhase('closed')
@@ -299,6 +296,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         importedVideoFpsDen: useStore.getState().importedVideoFpsDen,
         importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
         importedVideoPath: useStore.getState().importedVideoPath,
+        importedVideoResolution: useStore.getState().importedVideoResolution,
         timelineEnd: useStore.getState().endSecond,
         timelineStart: useStore.getState().startSecond,
         updateRate,
@@ -306,10 +304,10 @@ export default function useRenderWorkflow({ backendStatus }) {
       })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
 
-      const dummyDurationSeconds = useStore.getState().dummyDurationSeconds
+      const fallbackDurationSeconds = useStore.getState().fallbackDurationSeconds
       const selectedSecond = useStore.getState().selectedSecond
       const resolvedPreviewSecond = resolvePreviewSecond({
-        dummyDurationSeconds,
+        fallbackDurationSeconds,
         selectedSecond,
         sourceActivity: parsedActivity,
       })

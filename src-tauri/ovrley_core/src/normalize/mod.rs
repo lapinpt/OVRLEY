@@ -4,6 +4,9 @@
 //! owns zero render-affecting defaults — missing fields are rejected. The
 //! frontend must materialise all defaults before sending the config.
 
+mod arc_gauge;
+mod backdrop;
+mod bar_geometry;
 mod elevation;
 mod gradient;
 mod heading;
@@ -23,10 +26,22 @@ use raw::RenderConfig;
 
 pub use raw::{
     find_plot_value, parse_config_json, parse_config_value, parse_template_json,
-    parse_template_value, CoursePlotConfig, ElevationPlotConfig, HeadingWidgetConfig, LabelConfig,
-    SceneConfig, ValueConfig, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
+    parse_template_value, BackdropConfig, CoursePlotConfig, ElevationPlotConfig,
+    HeadingWidgetConfig, LabelConfig, SceneConfig, ValueConfig, TEMPLATE_FILE_FORMAT,
+    TEMPLATE_FILE_VERSION,
 };
 
+pub use arc_gauge::{
+    validate_arc_gauge, validate_corner_gauge, ValidatedArcGaugeWidget,
+    ValidatedCornerGaugeOrientation, CORNER_GAUGE_ANGLE_DEGREES, MAX_ARC_ANGLE_DEGREES,
+    MIN_ARC_ANGLE_DEGREES,
+};
+pub use backdrop::{validate_backdrop, ValidatedBackdrop};
+pub use bar_geometry::ResolvedBarGeometry;
+pub(crate) use bar_geometry::{
+    arc_track_radius, corner_track_cap_padding, corner_track_radius, resolve_bar_style_geometry,
+    scale_bar_geometry, track_corner_radius_max,
+};
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
@@ -84,6 +99,7 @@ pub struct RenderDataRequirements {
 #[derive(Clone)]
 pub struct ValidatedRenderConfig {
     pub scene: ValidatedSceneConfig,
+    pub backdrops: Vec<ValidatedBackdrop>,
     pub labels: Vec<ValidatedLabel>,
     pub values: Vec<PreparedValue>,
     pub course_plot: Option<ValidatedRoutePlot>,
@@ -94,6 +110,13 @@ pub struct ValidatedRenderConfig {
 /// missing or invalid field as an error. Plots are pre-parsed and validated.
 pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderConfig> {
     let scene = validate_scene_config(raw.scene)?;
+
+    let backdrops = raw
+        .backdrops
+        .iter()
+        .enumerate()
+        .map(|(i, backdrop)| validate_backdrop(backdrop, i))
+        .collect::<CoreResult<Vec<_>>>()?;
 
     let values = raw
         .values
@@ -112,6 +135,14 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
             if value.display_type == DisplayType::Linear {
                 let value = value.with_promoted_display_variant("linear")?;
                 return validate_linear_gauge(value, idx).map(PreparedValue::LinearGauge);
+            }
+            if value.display_type == DisplayType::Arc {
+                let value = value.with_promoted_display_variant("arc")?;
+                return validate_arc_gauge(value, idx).map(PreparedValue::ArcGauge);
+            }
+            if value.display_type == DisplayType::Corner {
+                let value = value.with_promoted_display_variant("corner")?;
+                return validate_corner_gauge(value, idx).map(PreparedValue::ArcGauge);
             }
             validate_value_widget(value, idx).map(PreparedValue::StandardText)
         })
@@ -144,6 +175,7 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
 
     Ok(ValidatedRenderConfig {
         scene,
+        backdrops,
         labels,
         values,
         course_plot,

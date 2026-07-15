@@ -144,15 +144,29 @@ export function getStandardMetricUnitLabel(type, displayUnit) {
 
 /**
  * Look up display-specific non-geometry defaults for a given display type.
- * For boxed types (like heading_tape), returns the flat defaults object.
+ * For boxed types (like heading_tape), returns the flat defaults object
+ * (tick colors, font sizes, etc.) excluding frame dimensions.
  * For intrinsic types, returns null (consumers read TEXT_DEFAULTS directly).
  * @param {string} displayType - display_type key
  * @returns {object|null} defaults object, or `null` if none defined
  */
-export function getDisplayVariantNonGeometryDefaults(displayType) {
+export function getDisplayTypeConfigDefaults(displayType) {
   const definition = DISPLAY_TYPE_DEFINITIONS[displayType]
   if (!definition?.defaults || definition.layoutMode === 'intrinsic') return null
   return definition.defaults
+}
+
+/**
+ * Returns the initial shared value-font size for a display type, when it
+ * supplies one. Unlike display config defaults, this value is not persisted
+ * into the display variant and therefore remains editable as `font_size`.
+ *
+ * @param {string} displayType - display_type key
+ * @returns {number|null} configured default font size, or null
+ */
+export function getDisplayTypeDefaultFontSize(displayType) {
+  const fontSize = DISPLAY_TYPE_DEFINITIONS[displayType]?.defaultFontSize
+  return Number.isFinite(fontSize) ? fontSize : null
 }
 
 // ---------------------------------------------------------------------------

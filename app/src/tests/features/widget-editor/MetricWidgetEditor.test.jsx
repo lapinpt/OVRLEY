@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
 
+vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
+  default: () => ({ recommendedFonts: [], systemFonts: [] }),
+}))
+
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {}
@@ -197,5 +201,171 @@ describe('MetricWidgetEditor linear gauge controls', () => {
         }),
       }),
     )
+  })
+
+  test('shows explicit bar count and gap controls without auto controls', () => {
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'linear',
+          display_variants: {
+            linear: {
+              width: 200,
+              height: 40,
+              rotation: 0,
+              orientation: 'horizontal',
+              track_fill_style: 'bars',
+              bar_count: 12,
+              bar_gap: 4,
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_fill_flat: false,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_position: 'bottom',
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Bar Count')).toBeInTheDocument()
+    expect(screen.getByText('Bar Gap')).toBeInTheDocument()
+    expect(screen.queryByText('Auto Count')).not.toBeInTheDocument()
+    expect(screen.queryByText('Auto Gap')).not.toBeInTheDocument()
+    expect(updateWidgetData).not.toHaveBeenCalled()
+  })
+})
+
+describe('MetricWidgetEditor arc gauge controls', () => {
+  test('renders arc geometry, inner-widget, and shared track controls without an icon section', async () => {
+    const user = userEvent.setup()
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'arc',
+          font: 'Arial.ttf',
+          font_size: 40,
+          color: '#ffffff',
+          show_units: true,
+          unit_color: '#ffffff',
+          display_unit: 'kmh',
+          display_variants: {
+            arc: {
+              width: 160,
+              height: 160,
+              rotation: 0,
+              arc_angle: 180,
+              inner_widget_offset_x: 0,
+              inner_widget_offset_y: 0,
+              track_thickness: 12,
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_fill_flat: false,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Arc Track')).toBeInTheDocument()
+    expect(screen.getByText('Arc Angle')).toBeInTheDocument()
+    expect(screen.getByText('Label')).toBeInTheDocument()
+    expect(screen.getAllByText('Unit').length).toBeGreaterThan(0)
+    expect(screen.getByText('Flat Track')).toBeInTheDocument()
+    expect(screen.queryByText('Icon')).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Flat Track').parentElement.querySelector('[role="switch"]'))
+    expect(updateWidgetData).toHaveBeenCalledWith(
+      'value-0',
+      expect.objectContaining({
+        display_variants: expect.objectContaining({
+          arc: expect.objectContaining({ track_fill_flat: true }),
+        }),
+      }),
+    )
+
+    const switches = screen.getAllByRole('switch')
+    await user.click(switches[switches.length - 1])
+    expect(updateWidgetData).toHaveBeenCalledWith(
+      'value-0',
+      expect.objectContaining({
+        display_variants: expect.objectContaining({
+          arc: expect.objectContaining({ show_min_max_labels: true }),
+        }),
+      }),
+    )
+  })
+})
+
+describe('MetricWidgetEditor corner gauge controls', () => {
+  test('keeps corner settings in the corner variant and exposes bottom-corner orientation', () => {
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', {
+          display_type: 'corner',
+          font: 'Arial.ttf',
+          font_size: 40,
+          color: '#ffffff',
+          show_units: true,
+          unit_color: '#ffffff',
+          display_unit: 'kmh',
+          display_variants: {
+            corner: {
+              width: 160,
+              height: 160,
+              rotation: 0,
+              corner_orientation: 'bottom-left',
+              inner_widget_offset_x: 0,
+              inner_widget_offset_y: 0,
+              track_thickness: 12,
+              track_corner_radius: 6,
+              track_border_thickness: 2,
+              track_border_color: '#ffffff',
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_fill_flat: false,
+              show_min_max_labels: false,
+              min_max_label_font: 'Arial.ttf',
+              min_max_label_font_size: 12,
+              min_max_label_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Corner Track')).toBeInTheDocument()
+    expect(screen.getByText('Corner Orientation')).toBeInTheDocument()
+    expect(screen.queryByText('Arc Angle')).not.toBeInTheDocument()
+
+    expect(screen.getByText('Bottom Left')).toBeInTheDocument()
   })
 })

@@ -103,7 +103,7 @@ function useAppShellComposition() {
   }
 
   const activityControls = {
-    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT' : activityFilename || 'Load GPX/FIT/SRT',
+    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT/IGC' : activityFilename || 'Load GPX/FIT/SRT/IGC',
     onOpenActivityFile: handleGpxFileOpen,
   }
 
@@ -218,7 +218,10 @@ function AppShell() {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="relative flex min-w-0 flex-1 flex-col bg-surface-darken">
-            <LoadingOverlay show={isProcessing || importingVideo} label={importingVideo ? 'Importing media...' : 'Processing...'} />
+            <LoadingOverlay
+              show={isProcessing || importingVideo}
+              label={importingVideo ? 'Importing your video...' : 'Processing your activity...'}
+            />
             <WidgetDrawer />
             <div className="min-h-0 flex-1">
               <OverlayEditor

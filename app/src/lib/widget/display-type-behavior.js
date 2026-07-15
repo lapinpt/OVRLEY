@@ -22,6 +22,16 @@ export function isTextDisplayType(displayType) {
 }
 
 /**
+ * Returns whether a widget is a backdrop.
+ *
+ * @param {object|null|undefined} widget - Widget definition.
+ * @returns {boolean} True when the widget is a backdrop.
+ */
+export function isBackdropWidget(widget) {
+  return widget?.category === 'backdrops' || widget?.type === 'backdrop'
+}
+
+/**
  * Returns whether a widget uses a boxed (framed) display type that should
  * behave like a bounded visual frame rather than intrinsic text.
  *
@@ -39,4 +49,14 @@ export function isBoxedMetricWidget(widget) {
     return isBoxedDisplayType(widget?.data?.display_type)
   }
   return widget?.category === 'plots'
+}
+
+/**
+ * Returns whether a widget occupies a fixed scene frame instead of intrinsic text bounds.
+ *
+ * @param {object|null|undefined} widget - Widget definition.
+ * @returns {boolean} True when the widget renders as a fixed frame.
+ */
+export function isFramedWidget(widget) {
+  return isBackdropWidget(widget) || isBoxedMetricWidget(widget)
 }

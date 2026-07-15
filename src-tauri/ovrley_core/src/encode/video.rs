@@ -105,5 +105,6 @@ pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResul
         render_duration,
         trim_start,
         update_rate,
+        true,
     )
 }

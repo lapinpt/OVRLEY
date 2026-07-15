@@ -5,16 +5,18 @@
 //! widget-local geometry, builds static layers, and precomputes marker states so
 //! video rendering can draw each frame with predictable cost.
 
+/// Static backdrop widget implementation.
+pub(crate) mod backdrop;
 /// Shared geometry, style, and drawing helpers for all widgets.
 pub(crate) mod common;
 /// Elevation profile widget implementation.
 pub(crate) mod elevation;
+/// Gauge renderers and gauge-specific shared infrastructure.
+pub mod gauges;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
 /// Heading compass tape widget implementation.
 pub mod heading;
-/// Linear gauge metric widget implementation.
-pub mod linear_gauge;
 /// Marker and dot drawing helpers.
 mod marker;
 /// DisplayType-driven metric presentation dispatch.
@@ -38,8 +40,10 @@ use crate::paths::AppPaths;
 use crate::render::widgets::types::PreparedValue;
 use std::collections::BTreeMap;
 
+pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
-pub use linear_gauge::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
+pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
+pub use gauges::linear::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
 pub use types::{
@@ -50,13 +54,9 @@ pub(crate) use value::{
     has_static_metric_icon_validated,
 };
 
-// Module-local tests for widget-specific RDP behavior that exercise internal
-// types (`ElevationSample`, `RouteSample`) not available from crate-level
-// integration tests. These tests are in a `tests/` subdirectory, not inline,
-// and are gated by `#[cfg(test)]` so they are excluded from production builds.
-// The tested functions (`simplify_elevation_samples_segment`,
-// `simplify_route_samples`) are `pub(crate)` — exposing them as full `pub`
-// would leak widget internals into the public API.
+// White-box widget tests exercise internal geometry and reduction contracts
+// that are not available from crate-level integration tests. They live in the
+// dedicated `tests/` subdirectory and are excluded from production builds.
 #[cfg(test)]
 mod tests;
 
@@ -72,11 +72,13 @@ pub fn prepare_render_assets(
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<PreparedRenderAssets> {
     let scene = config.scene.clone();
+    let backdrops = config.backdrops.clone();
     let labels = config.labels.clone();
     let values = config.values.clone();
 
     let mut assets = PreparedRenderAssets {
         scene,
+        backdrops,
         labels,
         values,
         route_cache: None,
@@ -119,7 +121,7 @@ pub fn prepare_render_assets(
                     .insert(idx, types::PresentationCache::HeadingTape(cache));
             }
             PreparedValue::LinearGauge(validated) => {
-                let cache = linear_gauge::prepare_linear_gauge_cache(
+                let cache = gauges::linear::prepare_linear_gauge_cache(
                     validated,
                     dense_activity,
                     &assets.scene,
@@ -130,6 +132,19 @@ pub fn prepare_render_assets(
                 assets
                     .presentation_caches
                     .insert(idx, types::PresentationCache::LinearGauge(cache));
+            }
+            PreparedValue::ArcGauge(validated) => {
+                let cache = gauges::arc::prepare_arc_gauge_cache(
+                    validated,
+                    dense_activity,
+                    &assets.scene,
+                    assets.scene.scale,
+                    &paths.font_dirs,
+                    prepare_profiler,
+                )?;
+                assets
+                    .presentation_caches
+                    .insert(idx, types::PresentationCache::ArcGauge(cache));
             }
             _ => {}
         }

@@ -4,7 +4,7 @@
 
 import { useEffect } from 'react'
 import { deleteWidgetsInConfig, duplicateWidgetsInConfig } from '@/lib/widget/widget-config'
-import { isEditableElement } from '../utils/overlayEditorHelpers'
+import { isInteractiveElement } from '@/lib/utils'
 
 /**
  * Registers keyboard listeners for delete/copy/paste editor actions.
@@ -24,7 +24,7 @@ export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, s
     }
 
     const handleKeyDown = (event) => {
-      if (event.defaultPrevented || event.altKey || isEditableElement(event.target)) {
+      if (event.defaultPrevented || event.altKey || isInteractiveElement(event.target)) {
         return
       }
 

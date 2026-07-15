@@ -1,0 +1,153 @@
+/**
+ * Builds the shared preview model for intrinsic metric-style widgets.
+ *
+ * Computes the formatted value text, unit text, icon layout, and visual bounds
+ * for a metric widget (speed, heartrate, cadence, power, time, temperature) at
+ * the given preview time.
+ *
+ * Boxed display types (heading_tape, linear, arc, corner) are skipped —
+ * they use their own presentation-specific preview path driven by display_type.
+ *
+ * @param {object} params
+ * @param {object} params.widget - Widget configuration object.
+ * @param {object} params.activity - Activity data with series values.
+ * @param {number} params.previewSecond - Current preview time in seconds.
+ * @returns {object|null} Preview model with metricLayout, visualBounds, and text values, or null for non-value or boxed widgets.
+ */
+
+import { formatStandardMetricDisplay, formatTimeValue } from './format'
+import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily, measureArcPreviewText } from '../../shared/textMeasurement'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue, NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor'
+import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
+
+/**
+ * Returns the last finite numeric value in a metric series.
+ * @param {unknown[]} series - Activity metric samples.
+ * @returns {number|null} Last finite value, or null when none exists.
+ */
+function getLastFiniteValue(series) {
+  if (!series) return null
+
+  for (let index = series.length - 1; index >= 0; index -= 1) {
+    const candidate = series[index]
+    if (candidate !== null) return candidate
+  }
+
+  return null
+}
+
+/**
+ * Formats current distance, optionally paired with the activity's total distance.
+ * @param {object} activity - Activity data containing distance samples.
+ * @param {number} previewSecond - Current preview time.
+ * @param {object} widgetData - Normalized distance-widget data.
+ * @returns {{value: string, units: string}} Formatted distance display.
+ */
+export function formatDistancePreviewDisplay(activity, previewSecond, widgetData) {
+  const currentDistance = getInterpolatedActivityValue(activity, 'distance', previewSecond)
+  const current = formatStandardMetricDisplay('distance', currentDistance, widgetData)
+  if (!widgetData.show_full_distance) return current
+
+  const totalDistance = getLastFiniteValue(activity?.distance)
+  if (totalDistance === null) return current
+
+  const total = formatStandardMetricDisplay('distance', totalDistance, {
+    ...widgetData,
+    show_units: false,
+  })
+
+  return {
+    value: `${current.value}/${total.value}`,
+    units: current.units,
+  }
+}
+
+/**
+ * Builds the text content consumed by boxed gauges that retain the metric
+ * value in their frame. Unlike the intrinsic metric model, this deliberately
+ * has no icon layout: arc gauges stack value and unit vertically.
+ *
+ * @param {object} params
+ * @param {object} params.widget - Resolved metric widget.
+ * @param {object} params.activity - Activity data with metric series.
+ * @param {number} params.previewSecond - Current preview time.
+ * @returns {{ valueText: string, unitText: string, fontFamily: string, fontSize: number, valueMeasure: object, valueVerticalMeasure: object, unitMeasure: object|null }|null}
+ */
+export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond }) {
+  const formatted =
+    widget.type === 'distance'
+      ? formatDistancePreviewDisplay(activity, previewSecond, widget.data)
+      : formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), widget.data)
+  const fontFamily = getPreviewFontFamily(widget.data.font)
+  const valueText = `${widget.data.prefix}${formatted.value}${widget.data.suffix}`
+  const unitText = widget.data.show_units ? formatted.units : ''
+  const valueMeasure = measureArcPreviewText(valueText, widget.data.font_size, fontFamily)
+  const valueVerticalMeasure = measureArcPreviewText(
+    /^[0-9:.%+-]+$/.test(valueText) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : valueText,
+    widget.data.font_size,
+    fontFamily,
+  )
+  const unitMeasure = unitText ? measureArcPreviewText(unitText, Math.max(widget.data.font_size * 0.28, 12), fontFamily) : null
+
+  return {
+    valueText,
+    unitText,
+    fontFamily,
+    valueMeasure,
+    valueVerticalMeasure,
+    unitMeasure,
+  }
+}
+
+/**
+ * Builds the formatted layout model for an intrinsic metric widget preview.
+ * @param {object} params - Widget and current activity preview state.
+ * @returns {object|null} Metric presentation model, or null for unsupported presentations.
+ */
+export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
+  // Guard — skip non-value widgets and gradient type (handled separately).
+  if (widget.category !== 'values' || widget.type === 'gradient') return null
+  // Boxed display types use their own presentation-specific preview path.
+  if (isBoxedDisplayType(widget.data.display_type)) return null
+
+  // Resolve display_variants for non-text display types
+  const fontFamily = getPreviewFontFamily(widget.data.font)
+
+  // Value formatting — format the interpolated activity value based on widget type (speed, heartrate, cadence, power, time, temperature)
+  let valueText = '--'
+  let unitText = ''
+
+  if (isStandardMetricWidgetType(widget.type)) {
+    const formatted =
+      widget.type === 'distance'
+        ? formatDistancePreviewDisplay(activity, previewSecond, widget.data)
+        : formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), widget.data)
+    valueText = formatted.value
+    unitText = formatted.units
+  } else if (widget.type === 'time') {
+    valueText = formatTimeValue(widget.data.format, getInterpolatedTimeValue(activity, previewSecond))
+  } else {
+    throw new Error(`Cannot build intrinsic metric preview for widget type: ${widget.type}`)
+  }
+
+  // Layout computation — build icon, value, and units positions via text measurement, then compute visual bounds with icon offsets
+  const metricLayout = getMetricWidgetLayout({
+    fontSize: widget.data.font_size,
+    fontFamily,
+    valueText,
+    unitText,
+    showIcon: widget.data.show_icon,
+    showUnits: widget.data.show_units,
+    iconSize: widget.data.icon_size,
+  })
+
+  return {
+    metricLayout,
+    unitText,
+    valueText,
+    visualBounds: getMetricWidgetVisualBounds(metricLayout, {
+      iconOffsetX: widget.data.icon_offset_x,
+      iconOffsetY: widget.data.icon_offset_y,
+    }),
+  }
+}

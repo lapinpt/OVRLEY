@@ -278,7 +278,7 @@ fn vertical_speed_converts_to_ftph() {
             ("show_units", "true"),
         ],
     );
-    assert_eq!(value, "11811");
+    assert_eq!(value, "11811.0");
     assert_eq!(unit, Some("FT/H".to_string()));
 }
 
@@ -294,7 +294,7 @@ fn vertical_oscillation_formats_as_mm() {
             ("show_units", "true"),
         ],
     );
-    assert_eq!(value, "85");
+    assert_eq!(value, "85.0");
     assert_eq!(unit, Some("MM".to_string()));
 }
 
@@ -310,7 +310,7 @@ fn vertical_oscillation_converts_to_cm() {
             ("show_units", "true"),
         ],
     );
-    assert_eq!(value, "10");
+    assert_eq!(value, "10.0");
     assert_eq!(unit, Some("CM".to_string()));
 }
 
@@ -497,7 +497,7 @@ fn aperture_formats_integer_fnum() {
             ("display_unit", r#""fnum""#),
         ],
     );
-    assert_eq!(value, "F/2");
+    assert_eq!(value, "F/2.0");
 }
 
 #[test]

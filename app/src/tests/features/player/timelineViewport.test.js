@@ -1,0 +1,76 @@
+import { describe, expect, test } from 'vitest'
+import {
+  buildFitTargets,
+  clampToView,
+  computeTimelineTicks,
+  fitRangeToViewport,
+  fitToFull,
+  followPlayhead,
+  getMatchingFitTargetId,
+  panViewport,
+  rangesMatch,
+  zoomRange,
+} from '@/features/player/utils/timelineViewport'
+
+describe('timelineViewport utilities', () => {
+  test('clamps and fits viewports', () => {
+    expect(clampToView(150, 250, 200)).toEqual({ viewStart: 100, viewEnd: 200 })
+    expect(fitToFull(2.509)).toEqual({ viewStart: 0, viewEnd: 2.509 })
+  })
+
+  test('zooms around a pivot and clamps to the duration', () => {
+    const result = zoomRange({ direction: 1, pivot: 50, totalDuration: 200, viewEnd: 100, viewStart: 0 })
+
+    expect(result.viewEnd - result.viewStart).toBeCloseTo(100 / 1.6)
+    expect(result.viewStart).toBeLessThanOrEqual(50)
+    expect(result.viewEnd).toBeGreaterThanOrEqual(50)
+  })
+
+  test('fits target ranges with padding and a minimum span', () => {
+    const result = fitRangeToViewport({ rangeStart: 10, rangeEnd: 90, totalDuration: 100 })
+
+    expect(result.viewStart).toBeCloseTo(6.8)
+    expect(result.viewEnd).toBeCloseTo(93.2)
+    expect(fitRangeToViewport({ rangeStart: 50, rangeEnd: 50, totalDuration: 100 }).viewEnd).toBeGreaterThan(50)
+  })
+
+  test('pans and follows the playhead inside bounds', () => {
+    expect(panViewport({ deltaSeconds: 10, totalDuration: 200, viewEnd: 50, viewStart: 0 })).toEqual({ viewStart: 10, viewEnd: 60 })
+
+    const followed = followPlayhead({ playheadSecond: 100, totalDuration: 200, viewEnd: 50, viewStart: 0 })
+    expect(followed.viewStart).toBeCloseTo(100 - 0.85 * 50)
+    expect(followed.viewEnd).toBeCloseTo(100 - 0.85 * 50 + 50)
+  })
+
+  test('follows before the playhead exits the right edge', () => {
+    const viewport = followPlayhead({ playheadSecond: 45, totalDuration: 200, viewEnd: 50, viewStart: 0 })
+
+    expect(viewport.viewStart).toBeCloseTo(45 - 0.85 * 50)
+    expect(viewport.viewEnd - viewport.viewStart).toBeCloseTo(50)
+  })
+
+  test('builds and matches canonical fit targets', () => {
+    const targets = buildFitTargets({
+      activityDurationSeconds: 45,
+      fallbackDurationSeconds: 73,
+      hasActivityData: true,
+      hasVideo: true,
+      importedVideoDuration: 20,
+      totalDuration: 100,
+      videoSyncOffsetSeconds: 10,
+    })
+
+    expect(targets.map((target) => target.id)).toEqual(['all', 'video', 'activity'])
+    expect(getMatchingFitTargetId({ targets, viewport: targets[1].viewport })).toBe('video')
+    expect(rangesMatch({ viewStart: 0, viewEnd: 100 }, { viewStart: 0, viewEnd: 100.0005 })).toBe(true)
+  })
+
+  test('computes major and minor timeline ticks', () => {
+    const ticks = computeTimelineTicks({ viewStart: 0, viewEnd: 100, widthPx: 900 })
+    const majorStep = ticks.major[1].second - ticks.major[0].second
+
+    expect(majorStep * (900 / 100)).toBeGreaterThanOrEqual(90)
+    expect(ticks.major[0].label).toBeTruthy()
+    expect(ticks.minor[0].label).toBeUndefined()
+  })
+})

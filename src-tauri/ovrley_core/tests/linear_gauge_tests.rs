@@ -4,15 +4,12 @@ use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::raw::ValueConfig;
-use ovrley_core::normalize::validate_render_config;
+use ovrley_core::normalize::{validate_render_config, ValidatedLinearGaugeOrientation};
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::widgets::linear_gauge::{
-    bar_fill_rect, bordered_bar_fill_rect, fill_percentage, format_linear_gauge_label,
-    LinearGaugeOrientation,
-};
+use ovrley_core::render::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
 use ovrley_core::render::widgets::types::PresentationCache;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
-use ovrley_core::types::{DisplayType, MetricKind};
+use ovrley_core::types::{DisplayType, MetricKind, TrackFillStyle};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -34,6 +31,9 @@ fn value_config_deserializes_linear_gauge_fields() {
         "track_filled_color": "#778899",
         "track_filled_opacity": 0.8,
         "track_fill_flat": true,
+        "track_fill_style": "bars",
+        "bar_count": 12,
+        "bar_gap": 3,
         "show_min_max_labels": true,
         "min_max_label_font": "Teko.ttf",
         "min_max_label_font_size": 12,
@@ -53,18 +53,13 @@ fn value_config_deserializes_linear_gauge_fields() {
     assert_eq!(value.track_filled_color.as_deref(), Some("#778899"));
     assert_eq!(value.track_filled_opacity, Some(0.8));
     assert_eq!(value.track_fill_flat, Some(true));
+    assert_eq!(value.track_fill_style, Some(TrackFillStyle::Bars));
+    assert_eq!(value.bar_count, Some(12));
+    assert_eq!(value.bar_gap, Some(3.0));
     assert_eq!(value.show_min_max_labels, Some(true));
     assert_eq!(value.min_max_label_font.as_deref(), Some("Teko.ttf"));
     assert_eq!(value.min_max_label_font_size, Some(12.0));
     assert_eq!(value.min_max_label_color.as_deref(), Some("#aabbcc"));
-}
-
-#[test]
-fn fill_percentage_clamps_and_handles_degenerate_ranges() {
-    assert_eq!(fill_percentage(50.0, 0.0, 100.0), 0.5);
-    assert_eq!(fill_percentage(-20.0, 0.0, 100.0), 0.0);
-    assert_eq!(fill_percentage(120.0, 0.0, 100.0), 1.0);
-    assert_eq!(fill_percentage(42.0, 10.0, 10.0), 0.0);
 }
 
 #[test]
@@ -75,7 +70,7 @@ fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Horizontal,
+        ValidatedLinearGaugeOrientation::Horizontal,
     );
     assert_eq!(horizontal, (10.0, 20.0, 50.0, 40.0));
 
@@ -85,7 +80,7 @@ fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Vertical,
+        ValidatedLinearGaugeOrientation::Vertical,
     );
     assert_eq!(vertical, (10.0, 50.0, 200.0, 10.0));
 }
@@ -98,7 +93,7 @@ fn linear_fill_rect_stays_inside_track_border() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Horizontal,
+        ValidatedLinearGaugeOrientation::Horizontal,
         2.0,
     );
     assert_eq!(horizontal, (12.0, 22.0, 49.0, 36.0));
@@ -109,22 +104,17 @@ fn linear_fill_rect_stays_inside_track_border() {
         200.0,
         40.0,
         0.25,
-        LinearGaugeOrientation::Vertical,
+        ValidatedLinearGaugeOrientation::Vertical,
         2.0,
     );
     assert_eq!(vertical, (12.0, 49.0, 196.0, 9.0));
 }
 
 #[test]
-fn gauge_labels_format_integer_and_decimal_ranges() {
-    assert_eq!(format_linear_gauge_label(10.0), "10");
-    assert_eq!(format_linear_gauge_label(10.24), "10.2");
-}
-
-#[test]
 fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -141,10 +131,35 @@ fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     let Some(PresentationCache::LinearGauge(cache)) = assets.presentation_caches.get(&0) else {
         panic!("linear gauge should prepare a gauge cache at value index 0");
     };
-    assert_eq!(cache.display_type, DisplayType::Linear);
-    assert_eq!(cache.min_value, 10.0);
-    assert_eq!(cache.max_value, 50.0);
     assert_eq!(cache.frame_states[1].fill01, 0.5);
+}
+
+#[test]
+fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
+    let mut value = full_linear_gauge_config(20, 30);
+    value["track_fill_style"] = serde_json::json!("bars");
+    value["bar_count"] = serde_json::json!(8);
+    value["bar_gap"] = serde_json::json!(4);
+    let config = validate_render_config(RenderConfig {
+        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
+        labels: vec![],
+        values: vec![serde_json::from_value(value).unwrap()],
+        plots: serde_json::Value::Object(serde_json::Map::new()),
+        extra: BTreeMap::new(),
+    })
+    .unwrap();
+    let paths = test_paths();
+    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
+    let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
+    let mut profiler = RenderProfiler::default();
+    let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
+
+    let Some(PresentationCache::LinearGauge(cache)) = assets.presentation_caches.get(&0) else {
+        panic!("linear bars should use the linear gauge cache");
+    };
+    assert_eq!(cache.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(cache.bar_geometry.unwrap().count, 8);
 }
 
 #[test]
@@ -154,6 +169,7 @@ fn preview_render_reports_linear_gauge_without_text_fallback() {
     scene["height"] = serde_json::json!(120);
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
+        backdrops: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),

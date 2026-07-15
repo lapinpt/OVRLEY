@@ -4,9 +4,7 @@
  */
 
 import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
-import { headingTapeRenderedHeight } from '@/features/widget-preview/utils/headingGeometry'
+import { isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 import { resolveWidgetRenderGeometry } from './widgetRenderGeometry'
 
@@ -100,18 +98,15 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
   }
 
   const visualBounds = getWidgetVisualBoundsFromTarget(target)
+  const isFramed = isFramedWidget(widget)
   const origin = getWidgetSceneOrigin(widget, draft, visualBounds, {
-    boundsScale: isBoxedMetricWidget(widget) ? 1 : globalScale,
+    boundsScale: isFramed ? 1 : globalScale,
   })
   const nextWidth = draft.width ?? widget.data.width
   const nextHeight = draft.height ?? widget.data.height
   const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const isBoxed = isBoxedMetricWidget(widget)
-  const renderScale = isBoxed ? globalScale || 1 : 1
-  const resolvedData = isBoxed ? resolveActiveMetricWidgetData({ ...widget.data, ...draft }) : { ...widget.data, ...draft }
-  const renderedHeight =
-    resolvedData.display_type === 'heading_tape' ? headingTapeRenderedHeight(resolvedData) : (nextHeight ?? resolvedData.height ?? 0)
-  const nextScale = (draft.scale ?? 1) * (isBoxed ? 1 : globalScale)
+  const renderScale = isFramed ? globalScale || 1 : 1
+  const nextScale = (draft.scale ?? 1) * (isFramed ? 1 : globalScale)
 
   target.style.left = `${origin.x}px`
   target.style.top = `${origin.y}px`
@@ -120,8 +115,8 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
     target.style.width = `${nextWidth * renderScale}px`
   }
 
-  if (typeof renderedHeight === 'number') {
-    target.style.height = `${renderedHeight * renderScale}px`
+  if (typeof nextHeight === 'number') {
+    target.style.height = `${nextHeight * renderScale}px`
   }
 
   target.style.transform =

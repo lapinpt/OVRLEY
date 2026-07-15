@@ -5,7 +5,7 @@ import {
   getLinearFillRect,
   getLinearGaugeRange,
   getLinearGaugeLayout,
-} from '@/features/widget-preview/utils/linearGaugeGeometry'
+} from '@/features/widget-preview/widgets/linear-gauge/geometry'
 
 describe('linearGaugeGeometry', () => {
   test('fill percentage clamps values into the configured range', () => {

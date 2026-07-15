@@ -1,185 +1,16 @@
 /**
  * Activity file import pipeline — orchestrates GPX/FIT parsing,
- * cache update, store synchronization, and debug payload persistence.
+ * cache update, and store synchronization.
  */
 
 import * as backend from '@/api/backend'
-import { finalizeParsedActivity } from './parser.js'
-import { safeNumber } from './parse-helpers.js'
+import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
+import useStore from '@/store/useStore'
+import { syncSceneTimingToConfig } from '@/store/store-utils'
 import parseFitActivityFile from './fit-parser.js'
+import { parseGpxActivityFile } from './gpx-parser.js'
+import { parseIgcActivityFile } from './igc-parser.js'
 import { parseSrtActivityFile } from './srt-parser.js'
-
-/**
- * Handles sanitize debug filename.
- *
- * @param {*} filename - Target filename for the operation.
- * @returns {*} Result produced by the helper.
- */
-function sanitizeDebugFilename(filename) {
-  const normalizedBase = String(filename || 'activity')
-    .replace(/\.[^/.]+$/, '')
-    .replace(/[^a-zA-Z0-9._-]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-
-  return `${normalizedBase || 'activity'}-parse-debug.json`
-}
-
-/**
- * Handles persist debug payload.
- *
- * @param {*} filename - Target filename for the operation.
- * @param {*} payload - Structured payload produced by the helper.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-async function persistDebugPayload(filename, payload) {
-  try {
-    const debugFilename = sanitizeDebugFilename(filename)
-    const contents = JSON.stringify(payload, null, 2)
-    return await backend.writeParseDebugFile(debugFilename, contents)
-  } catch (error) {
-    console.warn('Failed to write parse debug file (non-fatal):', error)
-    return null
-  }
-}
-
-/**
- * Normalizes extension key.
- *
- * @param {*} value - Input value processed by the helper.
- * @returns {*} Derived data structure for downstream use.
- */
-function normalizeExtensionKey(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '')
-}
-
-/**
- * Handles collect leaf extension values.
- *
- * @param {*} element - Value for element.
- * @param {*} target - Target object, element, or value being updated.
- * @returns {*} Result produced by the helper.
- */
-function collectLeafExtensionValues(element, target) {
-  const childElements = Array.from(element.children || [])
-  if (!childElements.length) {
-    const key = normalizeExtensionKey(element.localName)
-    const value = element.textContent?.trim()
-    if (key && value) {
-      target[key] = value
-    }
-    return
-  }
-
-  childElements.forEach((child) => collectLeafExtensionValues(child, target))
-}
-
-/**
- * Reads track point metric.
- *
- * @param {*} extensionValues - Value for extension values.
- * @param {*} aliases - Alternate metric keys to inspect.
- * @returns {*} Requested value or structure.
- */
-function readTrackPointMetric(extensionValues, aliases) {
-  for (const alias of aliases) {
-    const normalizedAlias = normalizeExtensionKey(alias)
-    if (!(normalizedAlias in extensionValues)) continue
-
-    const numericValue = safeNumber(extensionValues[normalizedAlias])
-    if (numericValue !== null) {
-      return numericValue
-    }
-  }
-
-  return null
-}
-
-/**
- * Parses gpx activity file.
- *
- * @param {*} file - File object being loaded or saved.
- * @param {*} textContent - Value for text content.
- * @returns {object} Result produced by the helper.
- */
-function parseGpxActivityFile(file, textContent) {
-  const parser = new DOMParser()
-  const documentNode = parser.parseFromString(textContent, 'application/xml')
-  const parseError = documentNode.querySelector('parsererror')
-  if (parseError) {
-    throw new Error('The GPX file could not be parsed.')
-  }
-
-  const trackPoints = Array.from(documentNode.getElementsByTagNameNS('*', 'trkpt'))
-  if (!trackPoints.length) {
-    throw new Error('The GPX file does not contain any track points.')
-  }
-
-  const metadataNode = documentNode.getElementsByTagNameNS('*', 'metadata')[0] || null
-  const trackNode = documentNode.getElementsByTagNameNS('*', 'trk')[0] || null
-  const metadataName =
-    metadataNode?.getElementsByTagNameNS('*', 'name')[0]?.textContent?.trim() ||
-    trackNode?.getElementsByTagNameNS('*', 'name')[0]?.textContent?.trim() ||
-    null
-
-  const rawSamples = trackPoints.map((trackPoint) => {
-    const latitude = safeNumber(trackPoint.getAttribute('lat'))
-    const longitude = safeNumber(trackPoint.getAttribute('lon'))
-    const elevation = safeNumber(trackPoint.getElementsByTagNameNS('*', 'ele')[0]?.textContent)
-    const timestamp = trackPoint.getElementsByTagNameNS('*', 'time')[0]?.textContent?.trim() || null
-    const extensionValues = {}
-    const extensionsNode = trackPoint.getElementsByTagNameNS('*', 'extensions')[0]
-    if (extensionsNode) {
-      Array.from(extensionsNode.children || []).forEach((child) => {
-        collectLeafExtensionValues(child, extensionValues)
-      })
-    }
-
-    return {
-      airPressure: readTrackPointMetric(extensionValues, ['air_pressure', 'absolute_pressure', 'pressure']),
-      altitude: elevation,
-      cadence: readTrackPointMetric(extensionValues, ['cad', 'cadence']),
-      coreTemperature: readTrackPointMetric(extensionValues, ['core_temperature', 'coretemp', 'core_temp']),
-      distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),
-      elevation,
-      gForce: readTrackPointMetric(extensionValues, ['g_force', 'gforce']),
-      gearPosition: readTrackPointMetric(extensionValues, ['gear_position', 'gear', 'gear_ratio']),
-      gradient: readTrackPointMetric(extensionValues, ['gradient', 'grade', 'slope']),
-      groundContactTime: readTrackPointMetric(extensionValues, ['ground_contact_time', 'groundcontacttime', 'stance_time']),
-      heading: readTrackPointMetric(extensionValues, ['heading', 'course', 'bearing', 'gps_heading']),
-      heartrate: readTrackPointMetric(extensionValues, ['hr', 'heartrate', 'heart_rate']),
-      latitude,
-      leftRightBalance: readTrackPointMetric(extensionValues, ['left_right_balance', 'leftrightbalance', 'balance']),
-      longitude,
-      pace: readTrackPointMetric(extensionValues, ['pace']),
-      power: readTrackPointMetric(extensionValues, ['power', 'powerinwatts', 'watts']),
-      speed: readTrackPointMetric(extensionValues, ['speed', 'enhanced_speed']),
-      strideLength: readTrackPointMetric(extensionValues, ['stride_length', 'stridelength', 'step_length']),
-      strokeRate: readTrackPointMetric(extensionValues, ['stroke_rate', 'strokerate']),
-      temperature: readTrackPointMetric(extensionValues, ['atemp', 'temperature', 'temp']),
-      timestamp,
-      torque: readTrackPointMetric(extensionValues, ['torque']),
-      verticalOscillation: readTrackPointMetric(extensionValues, ['vertical_oscillation', 'verticaloscillation']),
-      verticalSpeed: readTrackPointMetric(extensionValues, ['vertical_speed', 'verticalspeed', 'vam']),
-    }
-  })
-
-  return finalizeParsedActivity({
-    fileName: file.name,
-    fileFormat: 'gpx',
-    metadata: {
-      activity_name: metadataName,
-      creator: documentNode.documentElement?.getAttribute('creator') || null,
-    },
-    rawSamples,
-    options: {
-      useLegacyGpxDerivations: true,
-    },
-  })
-}
 
 /**
  * Parses activity file.
@@ -189,67 +20,48 @@ function parseGpxActivityFile(file, textContent) {
  */
 async function parseActivityFile(file) {
   const lowerName = file.name.toLowerCase()
-  if (lowerName.endsWith('.fit')) return parseFitActivityFile(file)
-  if (lowerName.endsWith('.srt')) return parseSrtActivityFile(await file.text(), file.name)
-  if (lowerName.endsWith('.gpx')) return parseGpxActivityFile(file, await file.text())
-  throw new Error(`Unsupported activity file format: ${file.name}`)
+  let rawActivity
+  if (lowerName.endsWith('.fit')) rawActivity = await parseFitActivityFile(file)
+  else if (lowerName.endsWith('.srt')) rawActivity = parseSrtActivityFile(await file.text(), file.name)
+  else if (lowerName.endsWith('.gpx')) rawActivity = parseGpxActivityFile(file, await file.text())
+  else if (lowerName.endsWith('.igc')) rawActivity = await parseIgcActivityFile(file)
+  else throw new Error(`Unsupported activity file format: ${file.name}`)
+
+  const finalized = await backend.finalizeActivity(rawActivity)
+  return finalized.parsed_activity
 }
 
-/**
- * Synchronizes scene duration with activity.
- *
- * @param {*} durationSeconds - Numeric duration seconds value.
- * @param {*} storeState - Current store snapshot used for synchronization.
- * @returns {*} Result produced by the helper.
- */
-function syncSceneDurationWithActivity(durationSeconds, storeState) {
-  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
-    console.warn('Parsed activity did not produce a duration value')
-    return
-  }
-
-  const wholeSeconds = Math.floor(durationSeconds)
-  const { config, setConfig, setDummyDurationSeconds, setEndSecond, setSelectedSecond, setStartSecond } = storeState
-
-  console.log('Setting activity duration:', durationSeconds, 'seconds')
-  setDummyDurationSeconds(wholeSeconds)
-  setStartSecond(0)
-  setEndSecond(wholeSeconds)
-  setSelectedSecond(0)
-
-  if (config) {
-    setConfig({
-      ...config,
-      scene: {
-        ...config.scene,
-        start: 0,
-        end: wholeSeconds,
-      },
-    })
-  }
-}
-
-/**
- * Loads a parsed activity into store state.
- *
- * @param {object} options - Structured options for the helper.
- * @param {*} options.filename - Target filename for the operation.
- * @param {*} options.parsedActivity - Normalized activity payload used by the app.
- * @param {*} options.debugPayload - Value for debug payload.
- * @param {*} options.storeState - Current store snapshot used for synchronization.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-async function loadActivityIntoStore({ filename, parsedActivity, debugPayload, storeState }) {
-  const { setActivitySummary, setActivityFilename, setParsedActivity } = storeState
+async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
+  const { setActivityFilename, activateActivityFile } = storeState
 
   setActivityFilename(filename)
-  setParsedActivity(parsedActivity)
-  setActivitySummary(parsedActivity)
-  const debugPath = await persistDebugPayload(filename, debugPayload)
-  console.log('Parse debug JSON written:', debugPath)
-  console.log('Activity filename set in store:', filename)
+  activateActivityFile(parsedActivity)
 
-  syncSceneDurationWithActivity(parsedActivity?.metadata?.duration_seconds || 0, storeState)
+  const durationSeconds = Number(parsedActivity?.metadata?.duration_seconds || 0)
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    const wholeSeconds = Math.floor(durationSeconds)
+    storeState.setFallbackDurationSeconds(wholeSeconds)
+    storeState.setStartSecond(0)
+    storeState.setEndSecond(wholeSeconds)
+    storeState.setSelectedSecond(0)
+
+    useStore.setState((state) => {
+      syncSceneTimingToConfig(state, { startSecond: 0, endSecond: wholeSeconds })
+
+      const coursePoints = parsedActivity?.sample_course_points
+      if (coursePoints && state.config?.plots) {
+        const dims = getCourseWidgetDimensions(coursePoints)
+        if (dims) {
+          for (const plot of state.config.plots) {
+            if (plot.value === 'course') {
+              plot.width = dims.width
+              plot.height = dims.height
+            }
+          }
+        }
+      }
+    })
+  }
 }
 
 /**
@@ -276,27 +88,14 @@ export default async function importActivityFile(fileOrPath, storeActions) {
   const filename = file.name
   const store = storeActions
 
-  console.log('Starting activity processing:', {
-    source: 'file',
-    filename,
-  })
-
   try {
     store.clearActivitySummary()
 
-    const { parsedActivity, debugPayload } = await parseActivityFile(file)
-
-    console.log('Frontend activity parse successful:', {
-      durationSeconds: parsedActivity?.metadata?.duration_seconds,
-      format: parsedActivity?.file_format,
-      samples: parsedActivity?.metadata?.sample_count,
-      validAttributes: parsedActivity?.valid_attributes,
-    })
+    const parsedActivity = await parseActivityFile(file)
 
     await loadActivityIntoStore({
       filename,
       parsedActivity,
-      debugPayload,
       storeState: store,
     })
 

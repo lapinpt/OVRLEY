@@ -7,6 +7,7 @@
 <div align="center">
   <img src="docs/hero.avif" alt="OVRLEY Dashboard Interface" width="100%" />
   <img src="docs/hero2.avif" alt="OVRLEY Dashboard Interface" width="100%" />
+  <img src="docs/gauge-showcase.gif" alt="OVRLEY Gauge Showcase" width="100%" />
 </div>
 
 <br />
@@ -20,7 +21,7 @@
 
 ## Features
 
-- **Universal Import**: Supports `.fit`, `.gpx` and `.srt` files from any device or service (Strava, Garmin, DJI, GoPro, Insta360 etc.). Works for any activity: running, cycling, drones, skiing, sailing, motorcycling, and more.
+- **Universal Import**: Supports `.fit`, `.gpx`, `.srt` and `.mp4` (embedded telemetry) files from any device or service (Strava, Garmin, DJI, GoPro, Insta360 etc.). Works for any activity: running, cycling, drones, skiing, sailing, motorcycling, and more.
 - **Interactive Editor**: Drag-and-drop WYSISWG editor for live layout editing and template sharing.
 - **Full Customization**: Shape every widget with your own styling, color, font, and size.
 - **29+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, camera settings, and many more.
@@ -28,6 +29,7 @@
 - **Final Video Export**: Export your final video footage with overlays baked in - no separate compositing step required. Multiple codecs, hardware-accelerated pipelines, and custom bitrate.
 - **Hardware-Accelerated Export**: Export pipelines using GPU acceleration for maximum export speed for up to 8x and 2x export speeds (1080p@30fps and 4k@30fps).
 - **Realtimne Preview**: Preview at 4k@30fps directly inside the app before you export. Automatically syncs activity to your video, with manual offset possible.
+- **NLE-Style Timeline**: Multi-lane playback timeline with transport controls, zoom/pan, export-range markers, and keyboard shortcuts. Renders video and telemetry clips on a tick-marked axis for frame-accurate editing.
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
 - **Cross-Platform & Portable**: Runs on Windows, macOS, and Linux. Portable build - no installation required; just download and run.
 

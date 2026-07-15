@@ -4,7 +4,7 @@ import {
   getStandardMetricUnitOptions,
   getStandardMetricUnitsMode,
 } from '@/lib/widget/standard-metrics'
-import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/utils/formatUtils'
+import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric/format'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
 import { ToggleField, SelectField, SliderField } from '../widgetFormControls'
 

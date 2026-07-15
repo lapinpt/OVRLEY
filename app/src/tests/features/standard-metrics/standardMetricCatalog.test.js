@@ -169,18 +169,27 @@ describe('standard metric widget catalog', () => {
 describe('display type definitions', () => {
   test('each display type has a formal definition with label and layoutMode', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.text).toMatchObject({ label: 'Text', layoutMode: 'intrinsic' })
-    expect(DISPLAY_TYPE_DEFINITIONS.linear).toMatchObject({ label: 'Linear', layoutMode: 'boxed' })
-    expect(DISPLAY_TYPE_DEFINITIONS.bars).toMatchObject({ label: 'Bars', layoutMode: 'boxed' })
-    expect(DISPLAY_TYPE_DEFINITIONS.arc).toMatchObject({ label: 'Arc', layoutMode: 'boxed' })
-    expect(DISPLAY_TYPE_DEFINITIONS.corner).toMatchObject({ label: 'Corner', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.linear).toMatchObject({ label: 'Linear Bar', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.arc).toMatchObject({ label: 'Arc Gauge', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.corner).toMatchObject({ label: 'Corner Gauge', layoutMode: 'boxed' })
     expect(DISPLAY_TYPE_DEFINITIONS.heading_tape).toMatchObject({ label: 'Heading Tape', layoutMode: 'boxed' })
   })
 
   test('boxed display types include default frame dimensions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameWidth).toBe(200)
-    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(30)
-    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(120)
-    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(120)
+    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(24)
+    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(220)
+    expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(220)
+    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(110)
+    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(110)
+  })
+
+  test('gauge defaults select continuous fill without fixed segmented geometry', () => {
+    for (const displayType of ['linear', 'arc', 'corner']) {
+      expect(DISPLAY_TYPE_DEFINITIONS[displayType].defaults.track_fill_style).toBe('fill')
+      expect(DISPLAY_TYPE_DEFINITIONS[displayType].defaults.bar_count).toBeUndefined()
+      expect(DISPLAY_TYPE_DEFINITIONS[displayType].defaults.bar_gap).toBeUndefined()
+    }
   })
 
   test('intrinsic display types have no frame dimensions', () => {
@@ -190,7 +199,7 @@ describe('display type definitions', () => {
 
   test('DISPLAY_TYPE_LABELS is derived from definitions', () => {
     expect(DISPLAY_TYPE_LABELS.text).toBe('Text')
-    expect(DISPLAY_TYPE_LABELS.linear).toBe('Linear')
+    expect(DISPLAY_TYPE_LABELS.linear).toBe('Linear Bar')
     expect(Object.keys(DISPLAY_TYPE_LABELS)).toEqual(Object.keys(DISPLAY_TYPE_DEFINITIONS))
   })
 
@@ -207,7 +216,6 @@ describe('display type definitions', () => {
   test('isBoxedDisplayType correctly classifies display types', () => {
     expect(isBoxedDisplayType('text')).toBe(false)
     expect(isBoxedDisplayType('linear')).toBe(true)
-    expect(isBoxedDisplayType('bars')).toBe(true)
     expect(isBoxedDisplayType('arc')).toBe(true)
     expect(isBoxedDisplayType('corner')).toBe(true)
     expect(isBoxedDisplayType('heading_tape')).toBe(true)
@@ -216,8 +224,9 @@ describe('display type definitions', () => {
 
   test('getDefaultFrameDimensions returns dimensions for boxed types and null for intrinsic', () => {
     expect(getDefaultFrameDimensions('text')).toBeNull()
-    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 30 })
-    expect(getDefaultFrameDimensions('arc')).toEqual({ width: 120, height: 120 })
+    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 24 })
+    expect(getDefaultFrameDimensions('arc')).toEqual({ width: 220, height: 220 })
+    expect(getDefaultFrameDimensions('corner')).toEqual({ width: 110, height: 110 })
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
 

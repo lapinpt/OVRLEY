@@ -112,7 +112,7 @@ export default function OverlaySettingsSection({
         <div className="space-y-2">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">Framerate</Label>
           {importedVideoFps ? (
-            <div className="flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground cursor-not-allowed opacity-50">
+            <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground cursor-not-allowed opacity-50">
               Locked to {Math.round(importedVideoFps)} fps
             </div>
           ) : (
@@ -150,7 +150,7 @@ export default function OverlaySettingsSection({
         )}
       </div>
 
-      <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
+      <div className="space-y-3 rounded-xs border-none bg-surface-accent-soft/70 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
@@ -165,7 +165,7 @@ export default function OverlaySettingsSection({
             }}
           >
             {updateRateOptions.map((rate) => (
-              <TabsTrigger key={rate} value={rate.toString()} className="text-[10px] cursor-pointer">
+              <TabsTrigger key={rate} value={rate.toString()} className="text-[0.75rem] cursor-pointer font-bold">
                 1/{rate}
               </TabsTrigger>
             ))}
@@ -174,7 +174,7 @@ export default function OverlaySettingsSection({
       </div>
 
       {activitySummary && !importedVideoPath ? (
-        <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
+        <div className="space-y-3 rounded-xs border-none bg-surface-accent-soft/70 p-4">
           <ExportRangeSettings exportRange={exportRange} onExportRangeChange={onExportRangeChange} />
         </div>
       ) : null}

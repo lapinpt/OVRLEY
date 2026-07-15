@@ -42,7 +42,7 @@ const mockConfig = {
 }
 
 vi.mock('@/store/useStore', () => ({
-  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: {}, dummyDurationSeconds: 73 })),
+  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: {}, fallbackDurationSeconds: 73 })),
 }))
 
 vi.mock('@/lib/geometryUtils', () => ({
@@ -69,7 +69,7 @@ vi.mock('@/lib/geometryUtils', () => ({
   }),
 }))
 
-vi.mock('@/features/widget-preview/utils/svgPreviewUtils', () => ({
+vi.mock('@/features/widget-preview/shared/svgPreviewUtils', () => ({
   buildElevationCompletedPoints: vi.fn((points, _progressValues, elapsedFractions, _progress01, frameElapsedFraction) =>
     points.filter((_, index) => (elapsedFractions[index] ?? 0) <= frameElapsedFraction),
   ),
@@ -77,8 +77,8 @@ vi.mock('@/features/widget-preview/utils/svgPreviewUtils', () => ({
   sanitizeSvgId: vi.fn((id) => id),
 }))
 
-import { useElevationPreviewGeometry } from '@/features/widget-preview/hooks/useElevationPreviewGeometry'
-import { buildElevationCompletedPoints } from '@/features/widget-preview/utils/svgPreviewUtils'
+import { useElevationPreviewGeometry } from '@/features/widget-preview/widgets/elevation/useElevationPreviewGeometry'
+import { buildElevationCompletedPoints } from '@/features/widget-preview/shared/svgPreviewUtils'
 
 function makeActivity() {
   return {
@@ -105,7 +105,7 @@ function makeData() {
 }
 
 function makeStyle() {
-  return { width: 240, height: 48, safeGlobalScale: 1 }
+  return { globalScale: 1 }
 }
 
 const GEOMETRY_RESPONSE = {

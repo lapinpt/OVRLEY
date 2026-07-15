@@ -21,6 +21,16 @@ pub(crate) fn require_f32(v: Option<f32>, field: &str) -> CoreResult<f32> {
         })
 }
 
+pub(crate) fn require_finite_f64(v: f64, field: &str) -> CoreResult<f64> {
+    if !v.is_finite() {
+        Err(CoreError::Config(format!(
+            "{field}: must be a finite number"
+        )))
+    } else {
+        Ok(v)
+    }
+}
+
 pub(crate) fn require_bool(v: Option<bool>, field: &str) -> CoreResult<bool> {
     v.ok_or_else(|| CoreError::Config(format!("{field}: required")))
 }
@@ -33,9 +43,26 @@ pub(crate) fn require_str<'a>(v: Option<&'a str>, field: &str) -> CoreResult<&'a
     v.ok_or_else(|| CoreError::Config(format!("{field}: required")))
 }
 
+pub(crate) fn require_u32(v: Option<u32>, field: &str) -> CoreResult<u32> {
+    match v {
+        Some(n) => Ok(n),
+        None => Err(CoreError::Config(format!("{field}: required"))),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Value range checkers
 // ---------------------------------------------------------------------------
+
+pub(crate) fn require_positive_f64(v: f64, field: &str) -> CoreResult<f64> {
+    if v <= 0.0 || !v.is_finite() {
+        Err(CoreError::Config(format!(
+            "{field}: must be a positive finite number"
+        )))
+    } else {
+        Ok(v)
+    }
+}
 
 pub(crate) fn require_positive_f32(v: Option<f32>, field: &str) -> CoreResult<f32> {
     let v = v.ok_or_else(|| CoreError::Config(format!("{field}: required")))?;
@@ -45,6 +72,14 @@ pub(crate) fn require_positive_f32(v: Option<f32>, field: &str) -> CoreResult<f3
         )))
     } else {
         Ok(v)
+    }
+}
+
+pub(crate) fn require_positive_u32(v: Option<u32>, field: &str) -> CoreResult<u32> {
+    match v {
+        Some(n) if n > 0 => Ok(n),
+        Some(n) => Err(CoreError::Config(format!("{field}: must be > 0, got {n}"))),
+        None => Err(CoreError::Config(format!("{field}: required"))),
     }
 }
 
@@ -64,7 +99,31 @@ pub(crate) fn require_percentage(v: f32, field: &str) -> CoreResult<f32> {
     }
 }
 
-/// Accepts 0.0–1.0 or 0–100 (percentage), normalizes to 0.0–1.0.
+/// Requires a strict 0.0..=1.0 opacity value.
+pub(crate) fn require_unit_opacity(v: Option<f32>, field: &str) -> CoreResult<f32> {
+    let opacity = require_f32(v, field)?;
+    if !(0.0..=1.0).contains(&opacity) {
+        return Err(CoreError::Config(format!(
+            "{field}: must be 0.0..=1.0, got {opacity}"
+        )));
+    }
+    Ok(opacity)
+}
+
+pub(crate) fn require_border_fits_dimension(
+    border_thickness: f32,
+    dimension: f32,
+    field: &str,
+) -> CoreResult<()> {
+    if border_thickness * 2.0 >= dimension {
+        return Err(CoreError::Config(format!(
+            "{field}: 2 * border_thickness must be less than the dimension"
+        )));
+    }
+    Ok(())
+}
+
+/// Accepts 0.0..=1.0 or 0..=100 (percentage), normalizes to 0.0..=1.0.
 pub(crate) fn require_opacity(v: Option<f32>, field: &str) -> CoreResult<f32> {
     let v = v.ok_or_else(|| CoreError::Config(format!("{field}: required")))?;
     if !v.is_finite() {

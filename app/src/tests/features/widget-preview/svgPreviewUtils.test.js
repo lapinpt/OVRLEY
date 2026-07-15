@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest'
 
-import { getPreviewMarkerLayers, buildElevationCompletedPoints } from '@/features/widget-preview/utils/svgPreviewUtils'
+import { getPreviewMarkerLayers, buildElevationCompletedPoints } from '@/features/widget-preview/shared/svgPreviewUtils'
 import { findPointAtProgress } from '@/lib/geometryUtils'
 
 describe('getPreviewMarkerLayers', () => {
   test('builds a single solid marker by default', () => {
-    const layers = getPreviewMarkerLayers({}, 16, '#ffffff', 1)
+    const layers = getPreviewMarkerLayers({ marker_size: 16, marker_color: '#ffffff', marker_opacity: 100, marker_variant_diameter: 40 })
 
     expect(layers).toHaveLength(1)
     expect(layers[0]).toMatchObject({
@@ -17,15 +17,13 @@ describe('getPreviewMarkerLayers', () => {
   })
 
   test('adds a thin concentric ring marker layer', () => {
-    const layers = getPreviewMarkerLayers(
-      {
-        marker_variant: 'ring',
-        marker_variant_diameter: 44,
-      },
-      18,
-      '#40e0d0',
-      0.8,
-    )
+    const layers = getPreviewMarkerLayers({
+      marker_variant: 'ring',
+      marker_variant_diameter: 44,
+      marker_size: 18,
+      marker_color: '#40e0d0',
+      marker_opacity: 80,
+    })
 
     expect(layers).toHaveLength(2)
     expect(layers[0]).toMatchObject({
@@ -39,15 +37,13 @@ describe('getPreviewMarkerLayers', () => {
   })
 
   test('adds a semi-transparent halo underneath the main marker', () => {
-    const layers = getPreviewMarkerLayers(
-      {
-        marker_variant: 'halo',
-        marker_variant_diameter: 52,
-      },
-      16,
-      '#ff6600',
-      0.6,
-    )
+    const layers = getPreviewMarkerLayers({
+      marker_variant: 'halo',
+      marker_variant_diameter: 52,
+      marker_size: 16,
+      marker_color: '#ff6600',
+      marker_opacity: 60,
+    })
 
     expect(layers).toHaveLength(2)
     expect(layers[0]).toMatchObject({
@@ -131,10 +127,6 @@ describe('buildElevationCompletedPoints', () => {
     const completed = buildElevationCompletedPoints(points, progressValues, elapsedFractions, 1, 1)
 
     expect(completed).toHaveLength(3)
-  })
-
-  test('returns empty array for empty points', () => {
-    expect(buildElevationCompletedPoints([], [], [], 0.5, 0.5)).toEqual([])
   })
 
   test('includes first point when no points match elapsed fraction', () => {

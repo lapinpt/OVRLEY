@@ -6,9 +6,10 @@
 
 use super::helpers::{require_bool, require_f32, require_string};
 use super::raw::ValueConfig;
+use super::{resolve_bar_style_geometry, track_corner_radius_max, ResolvedBarGeometry};
 use crate::error::{CoreError, CoreResult};
 use crate::standard_metrics::is_standard_metric;
-use crate::types::{DisplayType, MetricKind};
+use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 
 /// Validated linear gauge orientation, restricted to horizontal or vertical.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,6 +46,8 @@ pub struct ValidatedLinearGaugeWidget {
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
     pub track_fill_flat: bool,
+    pub track_fill_style: TrackFillStyle,
+    pub bar_geometry: Option<ResolvedBarGeometry>,
     pub show_min_max_labels: bool,
     pub min_max_label_font: String,
     pub min_max_label_font_size: f32,
@@ -134,8 +137,7 @@ pub fn validate_linear_gauge(
 
     let track_empty_opacity = require_f32(value.track_empty_opacity, &p("track_empty_opacity"))?;
     let track_filled_opacity = require_f32(value.track_filled_opacity, &p("track_filled_opacity"))?;
-    let track_corner_radius = require_f32(value.track_corner_radius, &p("track_corner_radius"))?
-        .clamp(0.0, (width.min(height)) as f32 * 0.5);
+    let raw_corner_radius = require_f32(value.track_corner_radius, &p("track_corner_radius"))?;
     for (field, opacity) in [
         ("track_empty_opacity", track_empty_opacity),
         ("track_filled_opacity", track_filled_opacity),
@@ -148,6 +150,35 @@ pub fn validate_linear_gauge(
         }
     }
 
+    let track_border_thickness =
+        require_f32(value.track_border_thickness, &p("track_border_thickness"))?;
+    if track_border_thickness < 0.0 {
+        return Err(CoreError::Config(format!(
+            "{}: must be >= 0, got {track_border_thickness}",
+            p("track_border_thickness")
+        )));
+    }
+    let track_fill_style = value.track_fill_style.unwrap_or_default();
+    let bar_span = match orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => width as f32,
+        ValidatedLinearGaugeOrientation::Vertical => height as f32,
+    };
+    let bar_geometry = resolve_bar_style_geometry(
+        track_fill_style,
+        bar_span,
+        value.bar_count,
+        value.bar_gap,
+        &p("track_fill_style"),
+    )?;
+    let cross_extent = match orientation {
+        ValidatedLinearGaugeOrientation::Horizontal => height as f32,
+        ValidatedLinearGaugeOrientation::Vertical => width as f32,
+    };
+    let track_corner_radius = raw_corner_radius.clamp(
+        0.0,
+        track_corner_radius_max(cross_extent, bar_span, bar_geometry.as_ref()),
+    );
+
     Ok(ValidatedLinearGaugeWidget {
         metric: value.value,
         x: value.x,
@@ -158,16 +189,15 @@ pub fn validate_linear_gauge(
         display_type: value.display_type,
         orientation,
         track_corner_radius,
-        track_border_thickness: require_f32(
-            value.track_border_thickness,
-            &p("track_border_thickness"),
-        )?,
+        track_border_thickness,
         track_border_color: require_string(value.track_border_color, &p("track_border_color"))?,
         track_empty_color: require_string(value.track_empty_color, &p("track_empty_color"))?,
         track_empty_opacity,
         track_filled_color: require_string(value.track_filled_color, &p("track_filled_color"))?,
         track_filled_opacity,
         track_fill_flat: require_bool(value.track_fill_flat, &p("track_fill_flat"))?,
+        track_fill_style,
+        bar_geometry,
         show_min_max_labels: require_bool(value.show_min_max_labels, &p("show_min_max_labels"))?,
         min_max_label_font: require_string(value.min_max_label_font, &p("min_max_label_font"))?,
         min_max_label_font_size: require_f32(

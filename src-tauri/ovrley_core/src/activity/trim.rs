@@ -18,15 +18,26 @@ use chrono::{DateTime, SecondsFormat, Utc};
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
     // Keep validation messages frontend-friendly because they are surfaced
     // directly when a user configures an invalid export window.
-    if start < 0.0 || start >= duration {
-        return Err(CoreError::Activity(format!(
-            "Invalid scene start value in config. Value should be at least 0 and less than {duration:.3}. Current value is {start}"
-        )));
+    if start < 0.0 {
+        return Err(CoreError::Activity(
+            "The video starts before the activity. The activity has no data for the start of the video.".into(),
+        ));
     }
-    if end <= start || end > duration {
-        return Err(CoreError::Activity(format!(
-            "Invalid scene end value in config. Value should be at most {duration:.3} and greater than {start}. Current value is {end}"
-        )));
+    if start >= duration {
+        return Err(CoreError::Activity(
+            "The video starts after the activity ends. The activity has no data for the video."
+                .into(),
+        ));
+    }
+    if end <= start {
+        return Err(CoreError::Activity(
+            "The video end must be after the video start.".into(),
+        ));
+    }
+    if end > duration {
+        return Err(CoreError::Activity(
+            "The video ends after the activity ends. The activity has no data for the end of the video.".into(),
+        ));
     }
     Ok(())
 }
@@ -49,6 +60,9 @@ fn trim_numeric_series(
     start_inner_index: usize,
     end_inner_index: usize,
 ) -> Vec<Option<f64>> {
+    if data.is_empty() {
+        return Vec::new();
+    }
     // Boundary interpolation preserves continuity when the trim cuts through
     // the middle of a source sampling interval.
     let start_value = interpolate_numeric_series_value(elapsed, data, start);
@@ -61,7 +75,12 @@ fn trim_numeric_series(
 }
 
 fn last_finite(series: &[Option<f64>]) -> Option<f64> {
-    series.iter().rev().copied().flatten().find(|value| value.is_finite())
+    series
+        .iter()
+        .rev()
+        .copied()
+        .flatten()
+        .find(|value| value.is_finite())
 }
 
 /// Trims a parsed activity to a scene range.
@@ -155,7 +174,7 @@ pub fn trim_activity(
         trimmed
     };
 
-    let course = if requirements.course {
+    let course = if requirements.course && !activity.course.is_empty() {
         let start_course = interpolate_course_value(elapsed, &activity.course, start);
         let end_course = interpolate_course_value(elapsed, &activity.course, end);
         let mut course = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
@@ -167,11 +186,11 @@ pub fn trim_activity(
         Vec::new()
     };
 
-    // The trim-adjusted start time is the source start offset forward by
+    // The trim-adjusted sync time is the activity sync time offset forward by
     // the scene start, so per-frame timestamps in the dense report always
     // correspond to the correct wall-clock moment.
     let start_time = activity
-        .source_start_time
+        .sync_time
         .as_deref()
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| {
@@ -185,7 +204,7 @@ pub fn trim_activity(
     // positions so downstream interpolation has precise endpoints even when
     // the trim window cuts through a source sampling interval.
     Ok(TrimmedActivity {
-        source_start_time: start_time,
+        sync_time: start_time,
         sample_elapsed_seconds: trimmed_elapsed,
         sample_distance_progress: trimmed_distance_progress,
         course,
@@ -537,7 +556,7 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
-        time: if requirements.time {
+        time: if requirements.time && !activity.time.is_empty() {
             let start_value = interpolate_time_series_value(elapsed, &activity.time, start);
             let end_value = interpolate_time_series_value(elapsed, &activity.time, end);
             let mut trimmed =

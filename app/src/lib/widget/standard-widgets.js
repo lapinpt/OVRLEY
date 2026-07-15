@@ -3,8 +3,7 @@
  *
  * All constants derived from the canonical manifest files at
  * `assets/standard-metrics.json` and `assets/standard-widgets.json`.
- * Every export is a frozen object/array keyed off the manifest — no
- * helper functions, no runtime logic beyond construction.
+ * Every constant export is a frozen object/array keyed off the manifest.
  *
  * @module standard-widgets
  */
@@ -17,13 +16,13 @@ import standardMetricsManifest from '../../../../assets/standard-metrics.json'
 // ---------------------------------------------------------------------------
 
 /** Defaults for course plot widgets. */
-export const COURSE_PLOT_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.plot.course })
+export const COURSE_PLOT_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.plot.definitions.course.defaults })
 
 /** Defaults for elevation plot widgets. */
-export const ELEVATION_PLOT_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.plot.elevation })
+export const ELEVATION_PLOT_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.plot.definitions.elevation.defaults })
 
 /** Defaults for gradient metric value widgets. */
-export const GRADIENT_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.gradient })
+export const GRADIENT_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.gradient.definitions.gradient.defaults })
 
 // ---------------------------------------------------------------------------
 // Metric definitions (assets/standard-metrics.json)
@@ -77,10 +76,44 @@ export const TEXT_DEFAULTS = Object.freeze(_textDef.defaults)
 export const TEXT_FONT_SIZES = Object.freeze(_textDef.fontSizeByType)
 
 /** Default fields for label widgets. */
-export const TEXT_LABEL_DEFAULTS = Object.freeze(standardWidgetsManifest.label)
+export const TEXT_LABEL_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.label.definitions.label.defaults })
 
 /** Default values for the "heading_tape" display variant. */
 export const HEADING_TAPE_DEFAULTS = Object.freeze(standardMetricsManifest.displayTypes.definitions.heading_tape.defaults)
+
+// ---------------------------------------------------------------------------
+// Backdrop display type constants (assets/standard-widgets.json)
+// ---------------------------------------------------------------------------
+
+/** Map of backdrop display_type value -> definition object. */
+export const BACKDROP_TYPE_DEFINITIONS = Object.freeze(
+  Object.fromEntries(Object.entries(standardWidgetsManifest.backdrops.definitions).map(([key, definition]) => [key, Object.freeze(definition)])),
+)
+
+/** Map of backdrop display_type value -> human-readable label. */
+export const BACKDROP_TYPE_LABELS = Object.freeze(
+  Object.fromEntries(Object.entries(BACKDROP_TYPE_DEFINITIONS).map(([key, definition]) => [key, definition.label])),
+)
+
+/** The default backdrop display type list. */
+export const BACKDROP_DEFAULT_DISPLAY_TYPES = Object.freeze([...standardWidgetsManifest.backdrops.defaults])
+
+/** Defaults for circle backdrop widgets. */
+export const BACKDROP_CIRCLE_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.backdrops.definitions.circle.defaults })
+
+/** Defaults for rectangle backdrop widgets. */
+export const BACKDROP_RECTANGLE_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.backdrops.definitions.rectangle.defaults })
+
+/**
+ * Build the {value, label} option list for a backdrop display_type dropdown.
+ * @returns {Array<{value: string, label: string}>}
+ */
+export function getBackdropTypeOptions() {
+  return Object.entries(BACKDROP_TYPE_DEFINITIONS).map(([value, definition]) => ({
+    value,
+    label: definition.label,
+  }))
+}
 
 // ---------------------------------------------------------------------------
 // Derived metric-type defaults

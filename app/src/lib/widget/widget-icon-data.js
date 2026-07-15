@@ -30,6 +30,13 @@ import shutterSpeedIconSvg from '../../../../assets/widget-icons/widget-shutter-
 import focalLengthIconSvg from '../../../../assets/widget-icons/widget-focal-length.svg?raw'
 import evIconSvg from '../../../../assets/widget-icons/widget-ev.svg?raw'
 import colorTemperatureIconSvg from '../../../../assets/widget-icons/widget-color-temperature.svg?raw'
+import displayTypeTextSvg from '../../../../assets/widget-icons/display-type-text.svg?raw'
+import displayTypeLinearSvg from '../../../../assets/widget-icons/display-type-linear.svg?raw'
+import displayTypeHeadingTapeSvg from '../../../../assets/widget-icons/display-type-heading-tape.svg?raw'
+import displayTypeArcSvg from '../../../../assets/widget-icons/display-type-arc.svg?raw'
+import displayTypeCornerSvg from '../../../../assets/widget-icons/display-type-corner.svg?raw'
+import displayTypeCircleSvg from '../../../../assets/widget-icons/display-type-circle.svg?raw'
+import displayTypeRectangleSvg from '../../../../assets/widget-icons/display-type-rectangle.svg?raw'
 
 function parseMetricIconSvg(svgMarkup) {
   const strokeWidthMatch = svgMarkup.match(/stroke-width="([^"]+)"/)
@@ -73,4 +80,14 @@ export const METRIC_ICON_SVGS = {
   ev: parseMetricIconSvg(evIconSvg),
   color_temperature: parseMetricIconSvg(colorTemperatureIconSvg),
   label: parseMetricIconSvg(labelIconSvg),
+}
+
+export const DISPLAY_TYPE_ICON_SVGS = {
+  text: parseMetricIconSvg(displayTypeTextSvg),
+  linear: parseMetricIconSvg(displayTypeLinearSvg),
+  heading_tape: parseMetricIconSvg(displayTypeHeadingTapeSvg),
+  arc: parseMetricIconSvg(displayTypeArcSvg),
+  corner: parseMetricIconSvg(displayTypeCornerSvg),
+  circle: parseMetricIconSvg(displayTypeCircleSvg),
+  rectangle: parseMetricIconSvg(displayTypeRectangleSvg),
 }

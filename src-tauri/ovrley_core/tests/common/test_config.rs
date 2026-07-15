@@ -43,6 +43,11 @@ pub fn fit_activity_path() -> PathBuf {
 }
 
 #[allow(dead_code)]
+pub fn igc_raw_activity_path() -> PathBuf {
+    fixtures().join("activity").join("igc-parse-debug.json")
+}
+
+#[allow(dead_code)]
 pub fn simple_config_path() -> PathBuf {
     fixtures().join("config").join("simple.json")
 }

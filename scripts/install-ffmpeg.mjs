@@ -6,7 +6,12 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const MIN_VERSION = "8.1";
+const PINNED_BTBN_FFMPEG_BUILD = "N-125608-g150f7d15df";
+const PINNED_WINDOWS_FFMPEG_ARCHIVE =
+  "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-14-13-19/ffmpeg-N-125608-g150f7d15df-win64-gpl-shared.zip";
+const PINNED_LINUX_FFMPEG_ARCHIVE =
+  "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-14-13-19/ffmpeg-N-125608-g150f7d15df-linux64-gpl-shared.tar.xz";
+const PINNED_DARWIN_FFMPEG_VERSION = "8.1.2";
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const installDir = join(rootDir, "vendor", "ffmpeg");
 const binDir = join(installDir, "bin");
@@ -26,14 +31,20 @@ const requiredFilters =
     : ["format", "hwupload"];
 
 const defaultFfmpegArchives = {
-  win32: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip",
-  linux:
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl-shared.tar.xz",
-  darwin: "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/snapshot/ffmpeg.zip",
+  win32: PINNED_WINDOWS_FFMPEG_ARCHIVE,
+  linux: PINNED_LINUX_FFMPEG_ARCHIVE,
+  darwin: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip",
 };
 
+const expectedFfmpegBuild =
+  (process.platform === "win32" || process.platform === "linux") && !process.env.OVRLEY_FFMPEG_ARCHIVE_URL
+    ? PINNED_BTBN_FFMPEG_BUILD
+    : null;
+const expectedFfmpegVersion =
+  process.platform === "darwin" && !process.env.OVRLEY_FFMPEG_ARCHIVE_URL ? PINNED_DARWIN_FFMPEG_VERSION : null;
+
 const defaultFfprobeArchives = {
-  darwin: "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/snapshot/ffprobe.zip",
+  darwin: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
 };
 
 main().catch((error) => {
@@ -58,9 +69,7 @@ async function main() {
 
   const archiveUrl = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ?? defaultFfmpegArchives[process.platform];
   if (!archiveUrl) {
-    console.log(
-      `[ffmpeg] No bundled installer for ${process.platform}; install ffmpeg >= ${MIN_VERSION} on PATH or set OVRLEY_FFMPEG.`,
-    );
+    console.log(`[ffmpeg] No bundled installer for ${process.platform}; install ffmpeg on PATH or set OVRLEY_FFMPEG.`);
     return;
   }
 
@@ -150,7 +159,6 @@ async function copyExtractedFfmpegDir(sourceDir, destinationDir) {
   });
 }
 
-
 async function checkFfmpeg(path) {
   try {
     await stat(path);
@@ -170,10 +178,18 @@ async function checkFfmpeg(path) {
   }
 
   const version = parseVersion(result.stdout);
-  if (version === null || compareVersions(version, MIN_VERSION) < 0) {
+
+  const build = parseBuildIdentifier(result.stdout);
+  if (expectedFfmpegBuild && (!build || !build.startsWith(expectedFfmpegBuild))) {
     return {
       usable: false,
-      message: `Bundled ffmpeg version ${version ?? "unknown"} is older than ${MIN_VERSION}; downloading full build.`,
+      message: `Bundled ffmpeg build ${build ?? "unknown"} does not match pinned build ${expectedFfmpegBuild}; downloading the pinned build.`,
+    };
+  }
+  if (expectedFfmpegVersion && version !== expectedFfmpegVersion) {
+    return {
+      usable: false,
+      message: `Bundled ffmpeg version ${version} does not match pinned version ${expectedFfmpegVersion}; downloading the pinned build.`,
     };
   }
 
@@ -185,7 +201,7 @@ async function checkFfmpeg(path) {
     };
   }
 
-  const probeStatus = checkFfprobe(join(dirname(path), probeBinaryName));
+  const probeStatus = checkFfprobe(join(dirname(path), probeBinaryName), expectedFfmpegBuild, expectedFfmpegVersion);
   if (!probeStatus.usable) {
     return probeStatus;
   }
@@ -196,12 +212,27 @@ async function checkFfmpeg(path) {
   };
 }
 
-function checkFfprobe(path) {
+function checkFfprobe(path, expectedBuild = null, expectedVersion = null) {
   const result = execFfmpeg(path, ["-version"], { encoding: "utf8" });
   if (result.status !== 0) {
     return {
       usable: false,
       message: `Bundled ffprobe is missing or failed to run at ${path}; downloading full build.`,
+    };
+  }
+
+  const build = parseBuildIdentifier(result.stdout);
+  if (expectedBuild && (!build || !build.startsWith(expectedBuild))) {
+    return {
+      usable: false,
+      message: `Bundled ffprobe build ${build ?? "unknown"} does not match pinned build ${expectedBuild}; downloading the pinned build.`,
+    };
+  }
+  const version = parseVersion(result.stdout);
+  if (expectedVersion && version !== expectedVersion) {
+    return {
+      usable: false,
+      message: `Bundled ffprobe version ${version ?? "unknown"} does not match pinned version ${expectedVersion}; downloading the pinned build.`,
     };
   }
 
@@ -238,18 +269,15 @@ function firstNonEmptyLine(output) {
 }
 
 function parseVersion(output) {
-  const match = output.match(/ffmpeg version\s+(?:n-)?(\d+(?:\.\d+){0,2})/i);
+  const build = parseBuildIdentifier(output);
+  const match = build?.match(/^(?:n-?)?(\d+(?:\.\d+){0,2})(?:-|$)/i);
   return match?.[1] ?? null;
 }
 
-function compareVersions(left, right) {
-  const leftParts = left.split(".").map(Number);
-  const rightParts = right.split(".").map(Number);
-  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
-    const delta = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
-    if (delta !== 0) return delta;
-  }
-  return 0;
+function parseBuildIdentifier(output) {
+  const line = firstNonEmptyLine(output);
+  const match = line?.match(/^(?:ffmpeg|ffprobe) version\s+(\S+)/i);
+  return match?.[1] ?? null;
 }
 
 function hasRequiredFfmpegFeatures(path) {

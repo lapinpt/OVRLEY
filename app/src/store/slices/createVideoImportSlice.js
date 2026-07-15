@@ -3,13 +3,34 @@ import { createCachedPromise } from '@/lib/cached-promise'
 
 let fetchCodecsOnce = null
 
+function displayResolutionForImportedVideo(metadata) {
+  const resolution = metadata?.resolution
+  if (!resolution) {
+    return null
+  }
+
+  const width = Number(resolution.width)
+  const height = Number(resolution.height)
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null
+  }
+
+  const rotation = Number(metadata?.rotationDegrees)
+  const normalizedRotation = Number.isFinite(rotation) ? ((rotation % 360) + 360) % 360 : 0
+  if (normalizedRotation === 90 || normalizedRotation === 270) {
+    return { width: height, height: width }
+  }
+
+  return { width, height }
+}
+
 export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
   importedVideoDuration: null, // seconds (float), read via ffprobe
   importedVideoFps: null, // fps (float)
   importedVideoFpsNum: null, // exact ffprobe FPS numerator
   importedVideoFpsDen: null, // exact ffprobe FPS denominator
-  importedVideoResolution: null, // { width, height }
+  importedVideoResolution: null, // display-oriented { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
   importedVideoImportId: null, // opaque local preview server import ID
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
@@ -19,6 +40,11 @@ export const createVideoImportSlice = (set, get) => ({
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
   availableCodecs: null,
+  importedVideoCodecName: null,
+  importedVideoCodecLongName: null,
+  importedVideoBitRate: null,
+  importedVideoCameraType: null,
+  importedVideoCameraModel: null,
 
   setImportedVideo: (metadata) => {
     set({
@@ -27,17 +53,21 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFps: metadata.fps,
       importedVideoFpsNum: metadata.fpsNum,
       importedVideoFpsDen: metadata.fpsDen,
-      importedVideoResolution: metadata.resolution,
+      importedVideoResolution: displayResolutionForImportedVideo(metadata),
       importedVideoCreationTime: metadata.creationTime,
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
       importedVideoPreviewError: metadata.previewError ?? null,
       importedBackgroundImagePath: null,
+      importedVideoCodecName: metadata.codecName ?? null,
+      importedVideoCodecLongName: metadata.codecLongName ?? null,
+      importedVideoBitRate: metadata.bitRate ?? null,
+      importedVideoCameraType: metadata.cameraType ?? null,
+      importedVideoCameraModel: metadata.cameraModel ?? null,
     })
 
-    const activitySummary = get().activitySummary
-    get().computeVideoSync(activitySummary)
+    get().syncVideoMetadata()
   },
 
   setImportedBackgroundImage: (path) =>
@@ -56,9 +86,15 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: path || null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
+      importedVideoCodecName: null,
+      importedVideoCodecLongName: null,
+      importedVideoBitRate: null,
+      importedVideoCameraType: null,
+      importedVideoCameraModel: null,
     }),
 
-  clearImportedVideo: () =>
+  clearImportedVideo: () => {
+    get().clearVideoTelemetry()
     set({
       importedVideoPath: null,
       importedVideoDuration: null,
@@ -74,7 +110,13 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
-    }),
+      importedVideoCodecName: null,
+      importedVideoCodecLongName: null,
+      importedVideoBitRate: null,
+      importedVideoCameraType: null,
+      importedVideoCameraModel: null,
+    })
+  },
 
   setVideoSyncOffset: (seconds) =>
     set({
@@ -127,7 +169,7 @@ export const createVideoImportSlice = (set, get) => ({
       }
 
       const videoStart = new Date(state.importedVideoCreationTime).getTime()
-      const activityStart = new Date(activitySummary?.startTime).getTime()
+      const activityStart = new Date(activitySummary?.syncTime).getTime()
       const activityEnd = new Date(activitySummary?.endTime).getTime()
 
       if (isNaN(videoStart) || (activitySummary && (isNaN(activityStart) || isNaN(activityEnd)))) {

@@ -13,7 +13,9 @@ use crate::encode::fps::Fps;
 use crate::encode::progress::RenderController;
 use crate::encode::video::CompositeRenderRequest;
 use crate::encode::video_composite_pipeline::render_composite_video_single;
-use crate::encode::video_debug::{concat_video_segments, timestamp_nanos, write_stitch_summary};
+use crate::encode::video_debug::{
+    concat_composite_video_segments, concat_video_segments, timestamp_nanos, write_stitch_summary,
+};
 use crate::encode::video_parallel::{
     estimate_composite_segment_count, estimate_parallel_render_worker_count,
 };
@@ -24,6 +26,7 @@ use crate::encode::video_windows::{
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
@@ -380,6 +383,7 @@ pub(crate) fn render_composite_video_segmented(
                 segment_render_duration,
                 segment_trim_start,
                 update_rate,
+                false,
             );
             let _ = tx.send(SegmentEvent::Completed(index, result));
         });
@@ -481,9 +485,15 @@ pub(crate) fn render_composite_video_segmented(
     let ffmpeg_bin = resolve_ffmpeg_binary(&request.paths.repo_root)?;
     let public_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = request.paths.downloads_dir.join(&public_filename);
-    if let Err(error) =
-        concat_video_segments(request.paths, &ffmpeg_bin, &segment_filenames, &output_path)
-    {
+    if let Err(error) = concat_composite_video_segments(
+        request.paths,
+        &ffmpeg_bin,
+        &segment_filenames,
+        Path::new(request.composite_video_path),
+        trim_start,
+        render_duration,
+        &output_path,
+    ) {
         cleanup_segment_outputs(request.paths, &results);
         return Err(error);
     }
@@ -514,6 +524,7 @@ fn render_composite_single_pass(
         render_duration,
         trim_start,
         update_rate,
+        true,
     )
 }
 

@@ -5,7 +5,10 @@
 //! render-affecting defaults. The frontend must materialise all defaults
 //! before sending the config.
 
-use super::helpers::{require_f32, require_non_negative_f32, require_positive_f32};
+use super::helpers::{
+    require_f32, require_finite_f64, require_non_negative_f32, require_positive_f32,
+    require_positive_f64, require_positive_u32, require_u32,
+};
 use super::raw::SceneConfig;
 use crate::error::{CoreError, CoreResult};
 
@@ -120,41 +123,6 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         composite_video_trim_start,
         composite_widget_update_rate,
     })
-}
-
-fn require_positive_u32(v: Option<u32>, field: &str) -> CoreResult<u32> {
-    match v {
-        Some(n) if n > 0 => Ok(n),
-        Some(n) => Err(CoreError::Config(format!("{field}: must be > 0, got {n}"))),
-        None => Err(CoreError::Config(format!("{field}: required"))),
-    }
-}
-
-fn require_positive_f64(v: f64, field: &str) -> CoreResult<f64> {
-    if v <= 0.0 || !v.is_finite() {
-        Err(CoreError::Config(format!(
-            "{field}: must be a positive finite number"
-        )))
-    } else {
-        Ok(v)
-    }
-}
-
-fn require_finite_f64(v: f64, field: &str) -> CoreResult<f64> {
-    if !v.is_finite() {
-        Err(CoreError::Config(format!(
-            "{field}: must be a finite number"
-        )))
-    } else {
-        Ok(v)
-    }
-}
-
-fn require_u32(v: Option<u32>, field: &str) -> CoreResult<u32> {
-    match v {
-        Some(n) => Ok(n),
-        None => Err(CoreError::Config(format!("{field}: required"))),
-    }
 }
 
 #[cfg(test)]

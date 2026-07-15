@@ -27,6 +27,7 @@ export default async function renderVideo(overrides = {}) {
     importedVideoFpsDen,
     importedVideoFpsNum,
     importedVideoPath,
+    importedVideoResolution,
     parsedActivity,
     setActiveRenderId,
     setRenderingVideo,
@@ -58,6 +59,7 @@ export default async function renderVideo(overrides = {}) {
       importedVideoFpsDen,
       importedVideoFpsNum,
       importedVideoPath,
+      importedVideoResolution,
       timelineStart: startSecond,
       timelineEnd: endSecond,
       updateRate: activeUpdateRate,
@@ -89,18 +91,10 @@ export default async function renderVideo(overrides = {}) {
       filename: null,
     })
 
-    console.log('Sending video render request:', {
-      start: config?.scene?.start,
-      end: config?.scene?.end,
-      duration: (config?.scene?.end || 0) - (config?.scene?.start || 0),
-      updateRate: config?.scene?.update_rate,
-    })
-
     const data = await backend.renderVideo(config, parsedActivity)
 
     if (data.error) {
       if (data.cancelled || data.error.toLowerCase().includes('cancelled')) {
-        console.log('Render cancelled by user')
         return { success: false, cancelled: true }
       }
 

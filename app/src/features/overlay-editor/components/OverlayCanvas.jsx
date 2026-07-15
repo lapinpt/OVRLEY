@@ -8,8 +8,8 @@ import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
-import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
-import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
+import { useFontMetricsVersion } from '@/features/widget-preview/shared/useFontMetrics'
+import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 import { syncVideoCurrentTime } from '@/features/video-preview/utils/videoPreviewPlayback'
@@ -151,7 +151,7 @@ const OverlayCanvasWidget = memo(
       previewSecond,
     })
     const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
-    const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+    const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
     const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
     const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview)
 
@@ -165,6 +165,9 @@ const OverlayCanvasWidget = memo(
         data-widget-bounds-bottom={visualBounds?.maxY ?? 0}
         className={cn(
           'group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow',
+          widget.category === 'backdrops' && 'z-1',
+          widget.category === 'labels' && 'z-20',
+          widget.category === 'plots' && 'z-2',
           widget.category === 'values' && 'z-10',
         )}
         style={{
@@ -236,6 +239,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const { widgets, activity, previewSecond, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
+  const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const { videoSrc, importId, frozenFrameSecond, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
   const hasTransparentBackground = backgroundMode === 'transparent'
@@ -271,6 +275,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           className={videoBackgroundClassName}
           preload="metadata"
           playsInline
+          muted={isVideoMuted}
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
       )}
@@ -282,7 +287,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
       ) : null}
       {backgroundMode === 'video' && videoPreviewMessages.length > 0 ? (
         <div
-          className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex max-w-xl items-start gap-2 rounded-md border border-amber-400/40 bg-black/75 px-3 py-2 text-xs leading-snug text-amber-100 shadow-lg"
+          className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex max-w-xl items-start gap-2 rounded-sm border border-amber-400/40 bg-black/75 px-3 py-2 text-xs leading-snug text-amber-100 shadow-lg"
           aria-live="polite"
         >
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

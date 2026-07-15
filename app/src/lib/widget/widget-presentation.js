@@ -20,7 +20,7 @@
 import { ensureWidgetIdsInConfig } from './widget-config'
 
 /**
- * Flattens the config's label/value/plot arrays into a uniform widget list
+ * Flattens the config's backdrop/label/value/plot arrays into a uniform widget list
  * with consistent { id, type, category, index, name, data } entries.
  *
  * @param {*} config - Overlay template configuration data.
@@ -32,6 +32,9 @@ export function buildConfigWidgets(config) {
   const normalizedConfig = ensureWidgetIdsInConfig(config)
   const widgets = []
 
+  ;(normalizedConfig.backdrops || []).forEach((item, index) => {
+    widgets.push({ id: item.id, type: 'backdrop', category: 'backdrops', index, name: 'Backdrop', data: item })
+  })
   ;(normalizedConfig.labels || []).forEach((item, index) => {
     widgets.push({ id: item.id, type: 'label', category: 'labels', index, name: item.text || 'Text', data: item })
   })
@@ -62,8 +65,14 @@ export function groupWidgetsForSidebar(widgets, typeLabels) {
     return accumulator
   }, {})
 
+  const sortTypeNames = (left, right) => {
+    if (left === 'Backdrop') return -1
+    if (right === 'Backdrop') return 1
+    return left.localeCompare(right)
+  }
+
   return Object.keys(grouped)
-    .sort()
+    .sort(sortTypeNames)
     .flatMap((typeName) =>
       grouped[typeName].map((widget, widgetIndex) => ({
         ...widget,

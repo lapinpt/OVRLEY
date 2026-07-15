@@ -52,7 +52,7 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-center gap-4 text-center">
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-surface-accent-soft">
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-sm bg-surface-accent-soft">
           <Loader2 className="absolute h-10 w-10 animate-spin text-primary" />
           <Film className="h-5 w-5 text-primary/60" />
         </div>

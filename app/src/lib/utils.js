@@ -21,13 +21,17 @@ export function clamp(value, min, max) {
 
 /**
  * Checks whether a DOM target is inside an interactive element (input, textarea,
- * select, button, link, slider, or contenteditable). Useful for keyboard shortcut
+ * select, button, link, ARIA listbox control, slider, or contenteditable). Useful for keyboard shortcut
  * guards that should be suppressed while the user is typing.
  *
  * @param {EventTarget} target - DOM event target to inspect.
  * @returns {boolean} True if target is inside an interactive element.
  */
 export function isInteractiveElement(target) {
-  if (!(target instanceof HTMLElement)) return false
-  return Boolean(target.closest('input, textarea, select, button, a, [role="slider"], [contenteditable="true"]'))
+  if (!(target instanceof Element)) return false
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, a, [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [contenteditable="true"]',
+    ),
+  )
 }

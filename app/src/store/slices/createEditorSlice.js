@@ -11,16 +11,6 @@ import { buildConfigWidgets } from '../../lib/widget/widget-presentation'
 import { getPrimarySelectionId, normalizeSelectionIds } from '../../features/overlay-editor/utils/overlayEditorHelpers'
 
 /**
- * Builds widget wrappers for selection normalization.
- *
- * @param {object|null} config - Overlay config to inspect.
- * @returns {Array<{ id: string, data: object }>} Config widgets.
- */
-function getConfigWidgets(config) {
-  return buildConfigWidgets(config)
-}
-
-/**
  * Reconciles selection after a config replacement.
  *
  * Widget ids are durable, so selection only needs to retain ids that still
@@ -33,7 +23,7 @@ function getConfigWidgets(config) {
  * @returns {{ selectedWidgetIds: string[], selectedWidgetId: string|null }} Next selection state.
  */
 function reconcileSelection({ nextConfig, selectedWidgetIds, selectedWidgetId }) {
-  const nextWidgets = getConfigWidgets(nextConfig)
+  const nextWidgets = buildConfigWidgets(nextConfig)
   const orderedWidgetIds = nextWidgets.map((widget) => widget.id)
 
   if (!orderedWidgetIds.length) {
@@ -75,7 +65,7 @@ function reconcileSelection({ nextConfig, selectedWidgetIds, selectedWidgetId })
  * @param {string|null} [preferredWidgetId=null] - Preferred primary widget ID.
  */
 function setWidgetSelectionState(state, widgetIds, preferredWidgetId = null) {
-  const orderedWidgetIds = getConfigWidgets(state.config).map((widget) => widget.id)
+  const orderedWidgetIds = buildConfigWidgets(state.config).map((widget) => widget.id)
   const nextSelectedWidgetIds = normalizeSelectionIds(widgetIds, orderedWidgetIds)
 
   state.selectedWidgetIds = nextSelectedWidgetIds
@@ -102,12 +92,13 @@ export function createEditorSlice(set, get) {
     previewInterpolationEnabled: true,
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
-    dummyDurationSeconds: 73,
+    fallbackDurationSeconds: 73,
     startSecond: 0,
     endSecond: 73,
     selectedSecond: 0,
     previewPlaybackState: 'paused',
     previewPlaybackSource: 'timeline',
+    isVideoMuted: false,
     config: cloneSerializable(DEFAULT_CONFIG),
     autoRender: false,
 
@@ -145,9 +136,9 @@ export function createEditorSlice(set, get) {
         state.autoRender = val
       }),
 
-    setDummyDurationSeconds: (duration) =>
+    setFallbackDurationSeconds: (duration) =>
       set((state) => {
-        state.dummyDurationSeconds = duration
+        state.fallbackDurationSeconds = duration
       }),
 
     setStartSecond: (second) => {
@@ -197,6 +188,11 @@ export function createEditorSlice(set, get) {
         state.selectedSecond = safeSecond
       })
     },
+
+    toggleVideoMute: () =>
+      set((state) => {
+        state.isVideoMuted = !state.isVideoMuted
+      }),
 
     beginPreviewScrub: (second) => {
       const safeSecond = normalizePreviewSecond(second)

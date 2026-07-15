@@ -135,9 +135,10 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
 }
 
 /**
- * Returns the last known value at or before the target X using hold semantics.
+ * Returns the held value at the target X.
  * Finds the sample with the largest X <= targetX and returns its Y value.
- * Null Y values are skipped by walking backward from the insertion point.
+ * If the target is before the first valid sample, clamps to that first sample
+ * so preview behavior matches render boundary interpolation.
  *
  * @param {number[]} xValues - X-axis sample values (monotonic).
  * @param {number[]} yValues - Y-axis sample values aligned with xValues.
@@ -170,6 +171,12 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
   }
 
   if (bestIndex === -1) {
+    for (let i = 0; i < xValues.length && i < yValues.length; i += 1) {
+      if (isValidInterpolatedSample(xValues, yValues, i)) {
+        return Number(yValues[i])
+      }
+    }
+
     return null
   }
 
@@ -214,7 +221,7 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
 
 /**
  * Interpolates the time-of-day value at the given elapsed second.
- * Uses the source_start_time offset when available, otherwise
+ * Uses the sync_time offset when available, otherwise
  * interpolates the ISO time series.
  *
  * @param {object|null} activity - Parsed activity data.
@@ -222,9 +229,9 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
  * @returns {string} ISO timestamp string.
  */
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
-  const sourceStartTimeMs = Date.parse(activity?.source_start_time || '')
-  if (Number.isFinite(sourceStartTimeMs)) {
-    return new Date(sourceStartTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
+  const syncTimeMs = Date.parse(activity?.sync_time || '')
+  if (Number.isFinite(syncTimeMs)) {
+    return new Date(syncTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
   }
 
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []

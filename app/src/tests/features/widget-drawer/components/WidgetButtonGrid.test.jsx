@@ -33,6 +33,7 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByText('Map')).toBeInTheDocument()
     expect(screen.getByText('Time')).toBeInTheDocument()
     expect(screen.getByText('Grad.')).toBeInTheDocument()
+    expect(screen.getByText('Backdrop')).toBeInTheDocument()
     expect(screen.getByText('Temp.')).toBeInTheDocument()
     expect(screen.getByText('G-Force')).toBeInTheDocument()
     expect(screen.getByText('Air Press.')).toBeInTheDocument()
@@ -46,14 +47,34 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByText('Core T.')).toBeInTheDocument()
   })
 
-  test('clicking a button calls onAddWidget with the correct type', async () => {
+  test('clicking a metric display type calls onAddWidget with the correct type and display label', async () => {
     const onAddWidget = vi.fn()
     const user = userEvent.setup()
     render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
 
     await user.click(screen.getByText('Speed').closest('button'))
+    const textOptions = screen.getAllByRole('button', { name: 'Text' })
+    const textDisplayOption = textOptions[textOptions.length - 1]
+    expect(textDisplayOption).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Linear Bar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Arc' })).toBeInTheDocument()
+    await user.click(textDisplayOption)
 
-    expect(onAddWidget).toHaveBeenCalledWith('speed')
+    expect(onAddWidget).toHaveBeenCalledWith('speed', 'text')
+  })
+
+  test('clicking a backdrop display type uses backdrop labels and calls onAddWidget', async () => {
+    const onAddWidget = vi.fn()
+    const user = userEvent.setup()
+    render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
+
+    await user.click(screen.getByText('Backdrop').closest('button'))
+    expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Circle' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'rectangle' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Rectangle' }))
+
+    expect(onAddWidget).toHaveBeenCalledWith('backdrop', 'rectangle')
   })
 
   test('clicking a button does not auto-close the drawer', async () => {
@@ -62,6 +83,8 @@ describe('WidgetButtonGrid', () => {
     render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
 
     await user.click(screen.getByText('HR').closest('button'))
+    const textOptions = screen.getAllByRole('button', { name: 'Text' })
+    await user.click(textOptions[textOptions.length - 1])
 
     // onAddWidget is called but nothing else — drawer state is managed externally
     expect(onAddWidget).toHaveBeenCalledTimes(1)

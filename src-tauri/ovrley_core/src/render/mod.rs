@@ -141,6 +141,7 @@ pub fn prepare_preview_assets(
     )?;
     let (labels_image, label_cache_status) = cached_labels_image(
         paths,
+        &prepared_assets.backdrops,
         &prepared_assets.labels,
         &prepared_assets.values,
         &prepared_assets.scene,
@@ -148,6 +149,7 @@ pub fn prepare_preview_assets(
     )?;
     prepared_assets.base_rgba = prepare_base_rgba(
         paths,
+        &prepared_assets.backdrops,
         &prepared_assets.labels,
         &prepared_assets.values,
         &prepared_assets.scene,
@@ -522,7 +524,9 @@ fn render_frame_to_surface(
                         validated_time: None,
                     })?;
                 }
-                PreparedValue::HeadingTape(_) | PreparedValue::LinearGauge(_) => {}
+                PreparedValue::HeadingTape(_)
+                | PreparedValue::LinearGauge(_)
+                | PreparedValue::ArcGauge(_) => {}
             }
         }
         Ok(())

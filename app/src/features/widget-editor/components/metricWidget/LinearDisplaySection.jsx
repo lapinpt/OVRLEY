@@ -5,6 +5,8 @@ import { useMemo } from 'react'
 import { SlidersHorizontal, Tags } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
+import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
+import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
 
 const ORIENTATION_OPTIONS = [
   { value: 'horizontal', label: 'Horizontal' },
@@ -37,19 +39,17 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
   const linearData = useMemo(() => widget.data.display_variants?.linear ?? {}, [widget.data.display_variants?.linear])
   const updateLinear = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetData)
   const availableFonts = useAvailableFonts()
-  const cornerRadiusMax = useMemo(
-    () => Math.max(0, Math.min(linearData.width ?? 0, linearData.height ?? 0) * 0.5),
-    [linearData.width, linearData.height],
-  )
+  const cornerRadiusMax = getLinearTrackCornerRadiusMax(linearData)
   const updateOrientation = (orientation) => {
     if (orientation === linearData.orientation) return
     const nextWidth = linearData.height
     const nextHeight = linearData.width
+    const nextData = { ...linearData, orientation, width: nextWidth, height: nextHeight }
     updateLinear({
       orientation,
       width: nextWidth,
       height: nextHeight,
-      track_corner_radius: Math.min(Math.max(0, linearData.track_corner_radius), Math.max(0, Math.min(nextWidth ?? 0, nextHeight ?? 0) * 0.5)),
+      track_corner_radius: Math.min(linearData.track_corner_radius, getLinearTrackCornerRadiusMax(nextData)),
       min_max_label_position: LABEL_POSITION_SWAP[linearData.min_max_label_position] ?? linearData.min_max_label_position,
     })
   }
@@ -74,6 +74,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
     }
     return { min: 8, max: 100 }
   }, [linearData.orientation])
+  const barGapMax = linearData.track_fill_style === 'bars' ? getLinearBarGapMax(linearData) : 0
 
   return (
     <>
@@ -90,10 +91,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             onSliderChange={(value) =>
               updateLinear({
                 width: value,
-                track_corner_radius: Math.min(
-                  Math.max(0, linearData.track_corner_radius),
-                  Math.max(0, Math.min(value, linearData.height ?? 0) * 0.5),
-                ),
+                track_corner_radius: Math.min(linearData.track_corner_radius, getLinearTrackCornerRadiusMax({ ...linearData, width: value })),
               })
             }
           />
@@ -107,13 +105,20 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             onSliderChange={(value) =>
               updateLinear({
                 height: value,
-                track_corner_radius: Math.min(Math.max(0, linearData.track_corner_radius), Math.max(0, Math.min(linearData.width ?? 0, value) * 0.5)),
+                track_corner_radius: Math.min(linearData.track_corner_radius, getLinearTrackCornerRadiusMax({ ...linearData, height: value })),
               })
             }
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
           <SelectField label="Orientation" value={linearData.orientation} onValueChange={updateOrientation} options={ORIENTATION_OPTIONS} />
+          <BarFillStyleField data={linearData} suggestBarGeometry={getSuggestedLinearBarGeometry} updateVariant={updateLinear} />
+          <BarFillStyleDetails
+            data={linearData}
+            barGapMax={barGapMax}
+            getCornerRadiusMax={getLinearTrackCornerRadiusMax}
+            updateVariant={updateLinear}
+          />
           <SliderField
             label="Corner Radius"
             value={linearData.track_corner_radius}
@@ -130,7 +135,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             label="Border"
             value={linearData.track_border_thickness}
             min={0}
-            max={12}
+            max={6}
             step={1}
             valueDisplay={`${linearData.track_border_thickness}px`}
             onSliderChange={(value) => updateLinear({ track_border_thickness: value })}
@@ -160,10 +165,6 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             valueDisplay={`${Math.round(linearData.track_filled_opacity * 100)}%`}
             onSliderChange={(value) => updateLinear({ track_filled_opacity: value })}
           />
-          <div className="flex items-center justify-between gap-2 px-1 self-end pb-2 pt-2">
-            <span className="text-[9px] text-muted-foreground uppercase font-bold">Flat</span>
-            <ToggleField checked={linearData.track_fill_flat} onCheckedChange={(checked) => updateLinear({ track_fill_flat: checked })} />
-          </div>
         </div>
       </div>
 

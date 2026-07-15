@@ -4,7 +4,8 @@
  */
 
 import { useMemo } from 'react'
-import { createTemplateState, templateStatesEqual } from '../utils/templateSnapshot'
+import { deepEqual } from '@/store/store-utils'
+import { createTemplateState } from '../utils/templateSnapshot'
 
 /**
  * Derives the template save status from current editor state and the
@@ -44,7 +45,7 @@ export function useTemplateSaveStatus({ config, globalDefaults, updateRate, expo
       return 'Draft'
     }
 
-    return templateStatesEqual(currentTemplateState, lastSavedTemplateState) ? 'Saved' : 'Modified'
+    return deepEqual(currentTemplateState, lastSavedTemplateState) ? 'Saved' : 'Modified'
   }, [config, currentTemplateState, lastSavedTemplateState])
 
   const showTemplateStatus = status === 'Draft' || status === 'Modified'

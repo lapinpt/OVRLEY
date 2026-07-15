@@ -1,13 +1,13 @@
 import { render } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
-import { OverlayTextWidget } from '@/features/widget-preview/components/TextRenderer'
+import { OverlayTextWidget } from '@/features/widget-preview/widgets/text/TextPreview'
 
-vi.mock('@/features/widget-preview/hooks/useFontMetricsVersion', () => ({
+vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
   useFontMetricsVersion: () => 0,
 }))
 
-vi.mock('@/features/widget-preview/utils/textMeasurement', async () => {
-  const actual = await vi.importActual('@/features/widget-preview/utils/textMeasurement')
+vi.mock('@/features/widget-preview/shared/textMeasurement', async () => {
+  const actual = await vi.importActual('@/features/widget-preview/shared/textMeasurement')
   return {
     ...actual,
     getPreviewFontFamily: (fontFamily) => fontFamily || 'Arial',

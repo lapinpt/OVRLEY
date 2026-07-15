@@ -6,13 +6,15 @@
 //! place.
 
 use crate::normalize::{
-    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedLinearGaugeOrientation,
-    ValidatedLinearGaugeWidget, ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
+    ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGradientWidget,
+    ValidatedHeading, ValidatedLabel, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
+    ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
 };
-use crate::types::{DisplayType, MetricKind};
+use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::path::PathBuf;
 
 /// Geometry diagnostics emitted for preview reports.
 #[derive(Clone, Debug, serde::Serialize)]
@@ -58,6 +60,7 @@ pub struct MetricPresentationReport {
 pub enum PresentationCache {
     HeadingTape(HeadingWidgetCache),
     LinearGauge(LinearGaugeCache),
+    ArcGauge(ArcGaugeCache),
 }
 
 /// One validated render value, keyed implicitly by its index in the config array.
@@ -68,6 +71,7 @@ pub enum PreparedValue {
     Gradient(ValidatedGradientWidget),
     HeadingTape(ValidatedHeading),
     LinearGauge(ValidatedLinearGaugeWidget),
+    ArcGauge(ValidatedArcGaugeWidget),
 }
 
 impl PreparedValue {
@@ -78,6 +82,7 @@ impl PreparedValue {
             Self::Gradient(_) => MetricKind::Gradient,
             Self::HeadingTape(_) => MetricKind::Heading,
             Self::LinearGauge(value) => value.metric,
+            Self::ArcGauge(value) => value.metric,
         }
     }
 
@@ -88,6 +93,7 @@ impl PreparedValue {
             Self::Gradient(_) => DisplayType::Text,
             Self::HeadingTape(_) => DisplayType::Tape,
             Self::LinearGauge(_) => DisplayType::Linear,
+            Self::ArcGauge(value) => value.display_type,
         }
     }
 
@@ -98,6 +104,7 @@ impl PreparedValue {
             Self::Gradient(value) => value.x,
             Self::HeadingTape(value) => value.x,
             Self::LinearGauge(value) => value.x,
+            Self::ArcGauge(value) => value.x,
         }
     }
 
@@ -108,6 +115,7 @@ impl PreparedValue {
             Self::Gradient(value) => value.y,
             Self::HeadingTape(value) => value.y,
             Self::LinearGauge(value) => value.y,
+            Self::ArcGauge(value) => value.y,
         }
     }
 }
@@ -116,6 +124,7 @@ impl PreparedValue {
 #[derive(Clone, Debug)]
 pub struct PreparedRenderAssets {
     pub(crate) scene: ValidatedSceneConfig,
+    pub(crate) backdrops: Vec<ValidatedBackdrop>,
     pub(crate) labels: Vec<ValidatedLabel>,
     pub(crate) values: Vec<PreparedValue>,
     pub(crate) route_cache: Option<RouteWidgetCache>,
@@ -259,24 +268,67 @@ pub struct LinearGaugeCache {
     pub width: u32,
     pub height: u32,
     pub rotation: f32,
-    pub display_type: DisplayType,
     pub orientation: ValidatedLinearGaugeOrientation,
     pub track_corner_radius: f32,
     pub track_border_thickness: f32,
     pub track_filled_color: String,
     pub track_filled_opacity: f32,
     pub track_fill_flat: bool,
-    pub min_value: f64,
-    pub max_value: f64,
+    pub track_fill_style: TrackFillStyle,
+    pub bar_geometry: Option<ResolvedBarGeometry>,
     pub frame_states: Vec<LinearGaugeFrameState>,
 }
 
-/// Precomputed linear gauge state for one frame: the interpolated metric value
-/// and its fill fraction (0-1) for rendering the filled portion of the bar.
+/// Precomputed linear gauge fill fraction for one frame.
 #[derive(Clone, Copy, Debug)]
 pub struct LinearGaugeFrameState {
-    pub value: f64,
     pub fill01: f32,
+}
+
+/// Prepared arc gauge cache. The empty track, border, labels, and unit text
+/// are baked into `static_image`; the filled arc and numeric value are drawn
+/// per frame from the cached state below.
+#[derive(Clone, Debug)]
+pub struct ArcGaugeCache {
+    pub static_image: Image,
+    pub static_image_x: f32,
+    pub static_image_y: f32,
+    pub x: f32,
+    pub y: f32,
+    pub width: u32,
+    pub height: u32,
+    pub rotation: f32,
+    pub center_x: f32,
+    pub center_y: f32,
+    pub inner_widget_center_x: f32,
+    pub inner_widget_center_y: f32,
+    pub start_angle: f32,
+    pub sweep_angle: f32,
+    pub radius: f32,
+    pub track_thickness: f32,
+    pub track_corner_radius: f32,
+    pub track_border_thickness: f32,
+    pub track_filled_color: String,
+    pub track_filled_opacity: f32,
+    pub track_fill_flat: bool,
+    pub track_fill_style: TrackFillStyle,
+    pub bar_geometry: Option<ResolvedBarGeometry>,
+    pub text_style: crate::render::text::ResolvedTextStyle,
+    pub has_unit: bool,
+    pub unit_font_size: f32,
+    pub inner_widget_gap: f32,
+    pub inner_widget_offset_x: f32,
+    pub inner_widget_offset_y: f32,
+    pub font_dirs: Vec<PathBuf>,
+    pub frame_states: Vec<ArcGaugeFrameState>,
+}
+
+/// Per-frame arc gauge state: fill fraction and formatted value text for the
+/// dynamic inner metric layer.
+#[derive(Clone, Debug)]
+pub struct ArcGaugeFrameState {
+    pub fill01: f32,
+    pub value_text: String,
 }
 
 /// Prepared elevation widget cache.

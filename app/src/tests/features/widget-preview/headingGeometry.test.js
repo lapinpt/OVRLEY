@@ -10,7 +10,7 @@ import {
   headingLabelBaseline,
   headingTapeLayout,
   headingTickPosition,
-} from '@/features/widget-preview/utils/headingGeometry'
+} from '@/features/widget-preview/widgets/heading/geometry'
 
 describe('headingOffset', () => {
   test('centers heading 0 under the widget indicator', () => {
@@ -117,9 +117,9 @@ describe('visibleTicks', () => {
     expect(tick0.x).toBeCloseTo(50, 1) // (0*5 - 350*5) % 1800 = -1750 % 1800 = 50
   })
 
-  test('returns empty for invalid dimensions', () => {
-    expect(visibleTicks(0, 0, 200, 15, 3, true, true)).toEqual([])
-    expect(visibleTicks(0, 5, 0, 15, 3, true, true)).toEqual([])
+  test('rejects invalid dimensions', () => {
+    expect(() => visibleTicks(0, 0, 200, 15, 3, true, true)).toThrow('Heading tape dimensions must be positive')
+    expect(() => visibleTicks(0, 5, 0, 15, 3, true, true)).toThrow('Heading tape dimensions must be positive')
   })
 })
 
@@ -199,41 +199,45 @@ describe('headingTapeLayout', () => {
   }
 
   test('adds slots proportional to indicator size for visible chevrons', () => {
-    expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'top' })).toMatchObject({
-      bodyHeight: 51,
+    const top = headingTapeLayout({ ...baseConfig, indicator_placement: 'top' })
+    expect(top).toMatchObject({
+      bodyHeight: 65,
       bodyY: 15,
       hasBottomChevron: false,
       hasTopChevron: true,
-      tickScaleHeight: 80,
-      totalHeight: 66,
+      totalHeight: 80,
     })
+    expect(top.tickScaleHeight).toBeCloseTo(115)
 
-    expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'bottom' })).toMatchObject({
-      bodyHeight: 51,
+    const bottom = headingTapeLayout({ ...baseConfig, indicator_placement: 'bottom' })
+    expect(bottom).toMatchObject({
+      bodyHeight: 65,
       bodyY: 0,
       hasBottomChevron: true,
       hasTopChevron: false,
-      tickScaleHeight: 80,
-      totalHeight: 66,
+      totalHeight: 80,
     })
+    expect(bottom.tickScaleHeight).toBeCloseTo(115)
 
-    expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'both' })).toMatchObject({
-      bodyHeight: 51,
+    const both = headingTapeLayout({ ...baseConfig, indicator_placement: 'both' })
+    expect(both).toMatchObject({
+      bodyHeight: 50,
       bodyY: 15,
       hasBottomChevron: true,
       hasTopChevron: true,
-      tickScaleHeight: 80,
-      totalHeight: 81,
+      totalHeight: 80,
     })
+    expect(both.tickScaleHeight).toBeCloseTo(77.5)
   })
 
-  test('does not reserve chevron slots for highlight bars', () => {
-    expect(headingTapeLayout({ ...baseConfig, indicator_style: 'highlight_bar', indicator_placement: 'both' })).toMatchObject({
-      bodyHeight: 51,
-      bodyY: 0,
-      tickScaleHeight: 80,
-      totalHeight: 51,
+  test('adds body margin for highlight bars without shrinking the frame', () => {
+    const layout = headingTapeLayout({ ...baseConfig, indicator_style: 'highlight_bar', indicator_placement: 'both' })
+    expect(layout).toMatchObject({
+      bodyHeight: 64,
+      bodyY: 8,
+      totalHeight: 80,
     })
+    expect(layout.tickScaleHeight).toBeCloseTo(112.5)
   })
 })
 

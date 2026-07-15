@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use crate::error::{CoreError, CoreResult};
-use crate::types::{DisplayType, MetricKind};
+use crate::types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 2;
@@ -115,6 +115,67 @@ pub struct LabelConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Static geometric backdrop drawn below other widgets.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BackdropConfig {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub x: Option<f32>,
+    #[serde(default)]
+    pub y: Option<f32>,
+    #[serde(default)]
+    pub opacity: Option<f32>,
+    pub display_type: BackdropType,
+    #[serde(default)]
+    pub fill_color: Option<String>,
+    #[serde(default)]
+    pub fill_opacity: Option<f32>,
+    #[serde(default)]
+    pub border_thickness: Option<f32>,
+    #[serde(default)]
+    pub border_color: Option<String>,
+    #[serde(default)]
+    pub border_opacity: Option<f32>,
+    #[serde(default)]
+    pub display_variants: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub diameter: Option<u32>,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub corner_radius: Option<f32>,
+    #[serde(default)]
+    pub round_top_left: Option<bool>,
+    #[serde(default)]
+    pub round_top_right: Option<bool>,
+    #[serde(default)]
+    pub round_bottom_left: Option<bool>,
+    #[serde(default)]
+    pub round_bottom_right: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl BackdropConfig {
+    /// Promotes nested backdrop variant fields to the top level so validators
+    /// can consume them as flat fields while durable templates store geometry
+    /// under `display_variants.<key>`.
+    pub(crate) fn with_promoted_display_variant(
+        &self,
+        variant_key: &str,
+    ) -> CoreResult<BackdropConfig> {
+        let mut raw = serde_json::to_value(self)
+            .map_err(|e| CoreError::Config(format!("backdrop config serialization: {e}")))?;
+        strip_json_nulls(&mut raw);
+        promote_variant_keys(&mut raw, variant_key);
+
+        serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("backdrop config: {e}")))
+    }
+}
+
 /// Dynamic telemetry value configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ValueConfig {
@@ -204,6 +265,16 @@ pub struct ValueConfig {
     #[serde(default)]
     pub orientation: Option<String>,
     #[serde(default)]
+    pub arc_angle: Option<f32>,
+    #[serde(default)]
+    pub corner_orientation: Option<String>,
+    #[serde(default)]
+    pub inner_widget_offset_x: Option<f32>,
+    #[serde(default)]
+    pub inner_widget_offset_y: Option<f32>,
+    #[serde(default)]
+    pub track_thickness: Option<f32>,
+    #[serde(default)]
     pub track_corner_radius: Option<f32>,
     #[serde(default)]
     pub track_border_thickness: Option<f32>,
@@ -219,6 +290,12 @@ pub struct ValueConfig {
     pub track_filled_opacity: Option<f32>,
     #[serde(default)]
     pub track_fill_flat: Option<bool>,
+    #[serde(default)]
+    pub track_fill_style: Option<TrackFillStyle>,
+    #[serde(default)]
+    pub bar_count: Option<u32>,
+    #[serde(default)]
+    pub bar_gap: Option<f32>,
     #[serde(default)]
     pub show_min_max_labels: Option<bool>,
     #[serde(default)]
@@ -296,6 +373,8 @@ fn promote_variant_keys(raw: &mut serde_json::Value, variant_key: &str) {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RenderConfig {
     pub scene: SceneConfig,
+    #[serde(default)]
+    pub backdrops: Vec<BackdropConfig>,
     #[serde(default)]
     pub labels: Vec<LabelConfig>,
     #[serde(default)]

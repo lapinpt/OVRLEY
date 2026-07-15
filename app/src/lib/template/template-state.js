@@ -22,7 +22,7 @@
 
 import { createFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/theme'
-import { resolveActiveMetricWidgetData } from '../widget/metric-widget-resolver'
+import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '../widget/widget-resolver'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
 import {
   applyPreviewOverrides,
@@ -59,6 +59,8 @@ function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = nu
   const font = resolved.font || globals?.font_values
   if (!nextData.font && font) nextData.font = font
   if (!nextData.font_family) nextData.font_family = getFontFamilyName(font || nextData.font_family)
+  const labelFont = resolved.min_max_label_font || globals?.font_values
+  if (!nextData.min_max_label_font && labelFont) nextData.min_max_label_font = labelFont
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.icon_color === undefined) nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
   if (nextData.unit_color === undefined && resolved.value !== 'time') nextData.unit_color = globals?.color_units || '#ffffff'
@@ -81,6 +83,7 @@ function buildEffectivePlotData(widgetData = {}, globals, previewOverrides = nul
 
 export function getEffectiveWidgetData(widget, globals, previewOverrides = null) {
   if (!widget) return widget
+  if (widget.category === 'backdrops') return resolveActiveBackdropData(widget.data, previewOverrides)
   if (widget.category === 'labels') return buildEffectiveLabelData(widget.data, globals, previewOverrides)
   if (widget.category === 'values') return buildEffectiveValueData(widget.data, globals, previewOverrides)
   if (widget.category === 'plots') return buildEffectivePlotData(widget.data, globals, previewOverrides)
@@ -101,9 +104,14 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
   const nextConfig = {
     ...config,
     scene: buildEffectiveSceneData(config.scene, normalizedGlobals),
+    backdrops: config.backdrops,
     labels: config.labels,
     values: config.values,
     plots: config.plots,
+  }
+  if (Array.isArray(config.backdrops)) {
+    nextConfig.backdrops = []
+    for (const backdrop of config.backdrops) nextConfig.backdrops.push(resolveActiveBackdropData(backdrop))
   }
   if (Array.isArray(config.labels)) {
     nextConfig.labels = []

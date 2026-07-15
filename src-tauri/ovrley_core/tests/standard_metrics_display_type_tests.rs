@@ -21,6 +21,10 @@ use ovrley_core::standard_metrics::{
 };
 use ovrley_core::MetricKind;
 
+const LINEAR_FRAME: (u32, u32) = (200, 24);
+const ARC_FRAME: (u32, u32) = (220, 220);
+const CORNER_FRAME: (u32, u32) = (110, 110);
+
 #[test]
 fn display_type_definitions_load_from_manifest() {
     let text = display_type_definition("text").expect("text must exist");
@@ -30,16 +34,16 @@ fn display_type_definitions_load_from_manifest() {
     assert!(text.default_frame_height.is_none());
 
     let linear = display_type_definition("linear").expect("linear must exist");
-    assert_eq!(linear.label, "Linear");
+    assert_eq!(linear.label, "Linear Bar");
     assert_eq!(linear.layout_mode, DisplayTypeLayoutMode::Boxed);
-    assert_eq!(linear.default_frame_width, Some(200));
-    assert_eq!(linear.default_frame_height, Some(30));
+    assert_eq!(linear.default_frame_width, Some(LINEAR_FRAME.0));
+    assert_eq!(linear.default_frame_height, Some(LINEAR_FRAME.1));
 
     let arc = display_type_definition("arc").expect("arc must exist");
-    assert_eq!(arc.label, "Arc");
+    assert_eq!(arc.label, "Arc Gauge");
     assert_eq!(arc.layout_mode, DisplayTypeLayoutMode::Boxed);
-    assert_eq!(arc.default_frame_width, Some(120));
-    assert_eq!(arc.default_frame_height, Some(120));
+    assert_eq!(arc.default_frame_width, Some(ARC_FRAME.0));
+    assert_eq!(arc.default_frame_height, Some(ARC_FRAME.1));
 
     let heading_tape = display_type_definition("heading_tape").expect("heading_tape must exist");
     assert_eq!(heading_tape.label, "Heading Tape");
@@ -52,7 +56,7 @@ fn display_type_definitions_load_from_manifest() {
 fn display_type_label_returns_label_or_key() {
     assert_eq!(display_type_label("text"), "Text");
     assert_eq!(display_type_label("heading_tape"), "Heading Tape");
-    assert_eq!(display_type_label("linear"), "Linear");
+    assert_eq!(display_type_label("linear"), "Linear Bar");
     assert_eq!(display_type_label("unknown_type"), "unknown_type");
 }
 
@@ -60,7 +64,6 @@ fn display_type_label_returns_label_or_key() {
 fn is_boxed_display_type_correct() {
     assert!(!is_boxed_display_type("text"));
     assert!(is_boxed_display_type("linear"));
-    assert!(is_boxed_display_type("bars"));
     assert!(is_boxed_display_type("arc"));
     assert!(is_boxed_display_type("corner"));
     assert!(is_boxed_display_type("heading_tape"));
@@ -70,10 +73,9 @@ fn is_boxed_display_type_correct() {
 #[test]
 fn default_frame_dimensions_for_boxed_types() {
     assert_eq!(default_frame_dimensions("text"), None);
-    assert_eq!(default_frame_dimensions("linear"), Some((200, 30)));
-    assert_eq!(default_frame_dimensions("bars"), Some((200, 60)));
-    assert_eq!(default_frame_dimensions("arc"), Some((120, 120)));
-    assert_eq!(default_frame_dimensions("corner"), Some((200, 60)));
+    assert_eq!(default_frame_dimensions("linear"), Some(LINEAR_FRAME));
+    assert_eq!(default_frame_dimensions("arc"), Some(ARC_FRAME));
+    assert_eq!(default_frame_dimensions("corner"), Some(CORNER_FRAME));
     assert_eq!(default_frame_dimensions("heading_tape"), Some((600, 100)));
     assert_eq!(default_frame_dimensions("nonexistent"), None);
 }
@@ -88,6 +90,7 @@ fn supported_display_types_per_metric() {
     let speed = supported_display_types(MetricKind::Speed);
     assert!(speed.iter().any(|dt| dt == "text"));
     assert!(speed.iter().any(|dt| dt == "linear"));
+    assert!(speed.iter().any(|dt| dt == "arc"));
 
     let core_temp = supported_display_types(MetricKind::CoreTemperature);
     assert_eq!(core_temp.len(), 1);
@@ -106,6 +109,7 @@ fn supported_display_types_per_metric() {
 fn is_display_type_supported_checks_permitted_types() {
     assert!(is_display_type_supported(MetricKind::Speed, "text"));
     assert!(is_display_type_supported(MetricKind::Speed, "linear"));
+    assert!(is_display_type_supported(MetricKind::Speed, "arc"));
     assert!(!is_display_type_supported(MetricKind::Heading, "linear"));
     assert!(is_display_type_supported(
         MetricKind::Heading,
