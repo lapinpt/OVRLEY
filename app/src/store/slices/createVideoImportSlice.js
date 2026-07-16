@@ -6,17 +6,25 @@ let fetchCodecsOnce = null
 function displayResolutionForImportedVideo(metadata) {
   const resolution = metadata?.resolution
   if (!resolution) {
-    return null
+    throw new Error('Imported video metadata must include a resolution')
   }
 
   const width = Number(resolution.width)
   const height = Number(resolution.height)
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return null
+    throw new Error('Imported video metadata contains an invalid resolution')
   }
 
-  const rotation = Number(metadata?.rotationDegrees)
-  const normalizedRotation = Number.isFinite(rotation) ? ((rotation % 360) + 360) % 360 : 0
+  const rotation = metadata.rotationDegrees === null || metadata.rotationDegrees === undefined ? 0 : Number(metadata.rotationDegrees)
+  if (!Number.isFinite(rotation)) {
+    throw new Error('Imported video metadata contains an invalid rotation')
+  }
+
+  const normalizedRotation = ((rotation % 360) + 360) % 360
+  if (![0, 90, 180, 270].includes(normalizedRotation)) {
+    throw new Error('Imported video metadata contains an unsupported rotation')
+  }
+
   if (normalizedRotation === 90 || normalizedRotation === 270) {
     return { width: height, height: width }
   }
@@ -47,13 +55,15 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoCameraModel: null,
 
   setImportedVideo: (metadata) => {
+    const importedVideoResolution = displayResolutionForImportedVideo(metadata)
+
     set({
       importedVideoPath: metadata.path,
       importedVideoDuration: metadata.duration,
       importedVideoFps: metadata.fps,
       importedVideoFpsNum: metadata.fpsNum,
       importedVideoFpsDen: metadata.fpsDen,
-      importedVideoResolution: displayResolutionForImportedVideo(metadata),
+      importedVideoResolution,
       importedVideoCreationTime: metadata.creationTime,
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
@@ -68,6 +78,8 @@ export const createVideoImportSlice = (set, get) => ({
     })
 
     get().syncVideoMetadata()
+
+    return importedVideoResolution
   },
 
   setImportedBackgroundImage: (path) =>
