@@ -55,19 +55,32 @@ export function formatExportRangeTime(seconds) {
 }
 
 /**
+ * Applies a whole-second sidebar time string without allowing an inverted range.
+ *
+ * @param {{ type: string, from: number, to: number }} exportRange Current canonical range.
+ * @param {'from'|'to'} boundary Boundary being edited.
+ * @param {string} value Whole-second time string from the sidebar.
+ * @returns {{ type: string, from: number, to: number }} Updated canonical range.
+ */
+export function setExportRangeBoundaryFromTimeInput(exportRange, boundary, value) {
+  const second = timeToSeconds(value)
+  if (boundary === 'from') {
+    return { ...exportRange, from: second, to: Math.max(exportRange.to, second) }
+  }
+  return { ...exportRange, to: Math.max(second, exportRange.from) }
+}
+
+/**
  * Returns the range to use when enabling custom export range controls.
  * Existing valid custom bounds are preserved; empty/default 0-to-0 bounds are
  * expanded to cover the full activity range.
  *
- * @param {object|null|undefined} exportRange - Current export range config.
+ * @param {object} exportRange - Current export range config.
  * @param {number} activityEndSecond - Activity end in seconds.
- * @returns {{ type: string, fromTime: string, toTime: string }}
+ * @returns {{ type: string, from: number, to: number }}
  */
 export function getCustomExportRangeDefault(exportRange, activityEndSecond) {
-  const start = timeToSeconds(exportRange?.fromTime)
-  const end = timeToSeconds(exportRange?.toTime)
-
-  if (end > start) {
+  if (exportRange.to > exportRange.from) {
     return {
       ...exportRange,
       type: 'custom',
@@ -75,10 +88,10 @@ export function getCustomExportRangeDefault(exportRange, activityEndSecond) {
   }
 
   return {
-    ...(exportRange || {}),
+    ...exportRange,
     type: 'custom',
-    fromTime: formatExportRangeTime(0),
-    toTime: formatExportRangeTime(activityEndSecond),
+    from: 0,
+    to: activityEndSecond,
   }
 }
 
@@ -112,8 +125,8 @@ export function resolveExportRangeWindow(activity, exportRange, showFullActivity
     }
   }
 
-  const start = clamp(timeToSeconds(exportRange?.fromTime), 0, duration)
-  const end = clamp(timeToSeconds(exportRange?.toTime), 0, duration)
+  const start = clamp(exportRange.from, 0, duration)
+  const end = clamp(exportRange.to, 0, duration)
 
   if (!(end > start)) {
     return {

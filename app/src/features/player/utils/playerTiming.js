@@ -22,6 +22,18 @@ export function formatTimelineTime(value) {
 }
 
 /**
+ * Snaps a timeline timestamp to the nearest source-video frame.
+ *
+ * @param {number} second Timeline timestamp in seconds.
+ * @param {number} fps Imported video frame rate.
+ * @param {number} [originSecond=0] Timeline timestamp of video frame zero.
+ * @returns {number} Frame-aligned fractional timestamp.
+ */
+export function snapTimelineSecondToFrame(second, fps, originSecond = 0) {
+  return originSecond + Math.round((second - originSecond) * fps) / fps
+}
+
+/**
  * Resolves whether preview playback should be driven by the timeline or video element.
  *
  * @param {{ shouldUseVideoPlayback: boolean, playheadSecond: number, videoSyncOffsetSeconds: number, importedVideoDuration: number }} options
@@ -64,7 +76,8 @@ export function getTotalPlaybackDuration({
   const fallbackDuration = Number(fallbackDurationSeconds) || 0
   const videoEnd = importedVideoPath ? (Number(videoSyncOffsetSeconds) || 0) + (Number(importedVideoDuration) || 0) : 0
 
-  return Math.max(hasMetadataDuration ? metadataDuration : fallbackDuration, videoEnd, 0)
+  const contentDuration = hasMetadataDuration ? metadataDuration : importedVideoPath ? 0 : fallbackDuration
+  return Math.max(contentDuration, videoEnd, 0)
 }
 
 /**

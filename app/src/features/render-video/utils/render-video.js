@@ -41,7 +41,6 @@ export default async function renderVideo(overrides = {}) {
   try {
     const activeConfig = overrides.config || baseConfig
     const activeUpdateRate = overrides.updateRate ?? updateRate
-    const activeExportRange = overrides.exportRange ?? exportRange
     const activeExportMode = overrides.exportMode
     const activeExportCodec = overrides.exportCodec ?? exportCodec
     const activeExportBitrate = overrides.exportBitrate
@@ -52,7 +51,7 @@ export default async function renderVideo(overrides = {}) {
       exportBitrate: activeExportBitrate,
       exportCodec: activeExportCodec,
       exportMode: activeExportMode,
-      exportRange: activeExportRange,
+      exportRange: overrides.exportRange ?? exportRange,
       globalDefaults,
       importedVideoDuration,
       importedVideoFps,

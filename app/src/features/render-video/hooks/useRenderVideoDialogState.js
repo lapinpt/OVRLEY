@@ -13,7 +13,6 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { cancelRender } from '@/api/backend'
-import { formatExportRangeTime } from '@/features/overlay-editor/utils/exportRange'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
@@ -27,13 +26,10 @@ import {
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 
 function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
-  const start = Math.max(0, Number(offsetSeconds) || 0)
-  const duration = Math.max(0, Number(durationSeconds) || 0)
-
   return {
     type: 'custom',
-    fromTime: formatExportRangeTime(start),
-    toTime: formatExportRangeTime(start + duration),
+    from: offsetSeconds,
+    to: offsetSeconds + durationSeconds,
   }
 }
 

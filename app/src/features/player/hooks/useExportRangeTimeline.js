@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { formatExportRangeTime, timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
+import { formatExportRangeTime } from '@/features/overlay-editor/utils/exportRange'
 import useStore from '@/store/useStore'
 import { clamp } from '@/lib/utils'
 import { clampExportRangeMarkerSecond } from '../utils/timelineGeometry'
@@ -16,24 +16,24 @@ function getMarkerLabel(marker) {
 /**
  * Owns custom export-range state, marker preview, clamping, snapping, and store writes.
  *
- * @param {{ totalDuration: number }} options Export timeline inputs.
+ * @param {{ totalDuration: number, defaultEndSecond?: number }} options Export timeline inputs.
  * @param {number} options.totalDuration Total playable duration used to clamp markers.
+ * @param {number} [options.defaultEndSecond=totalDuration] End used when enabling a new custom range.
  * @returns {object} Export range timeline state and commands.
  */
-export default function useExportRangeTimeline({ totalDuration }) {
+export default function useExportRangeTimeline({ totalDuration, defaultEndSecond = totalDuration }) {
   // Store selector - export range inputs remain the source of truth outside active drag preview.
-  const { exportRange, importedVideoPath, setExportRange } = useStore(
+  const { exportRange, setExportRange } = useStore(
     useShallow((state) => ({
       exportRange: state.exportRange,
-      importedVideoPath: state.importedVideoPath,
       setExportRange: state.setExportRange,
     })),
   )
 
   // Last-write ref - prevents redundant store writes while dragging to the same snapped time.
   const writtenRangeRef = useRef({
-    fromTime: exportRange?.fromTime,
-    toTime: exportRange?.toTime,
+    from: exportRange.from,
+    to: exportRange.to,
   })
 
   // Drag preview - marker movement is visible immediately without committing sidebar/export state.
@@ -42,15 +42,15 @@ export default function useExportRangeTimeline({ totalDuration }) {
   // Store sync - reset write tracking whenever another UI changes the export range.
   useEffect(() => {
     writtenRangeRef.current = {
-      fromTime: exportRange?.fromTime,
-      toTime: exportRange?.toTime,
+      from: exportRange.from,
+      to: exportRange.to,
     }
   }, [exportRange])
 
   // Displayed seconds - preview state temporarily overrides the persisted marker being dragged.
-  const isCustom = exportRange?.type === 'custom' && !importedVideoPath
-  const fromSecond = clamp(timeToSeconds(exportRange?.fromTime), 0, totalDuration)
-  const toSecond = clamp(timeToSeconds(exportRange?.toTime), 0, totalDuration)
+  const isCustom = exportRange.type === 'custom'
+  const fromSecond = clamp(exportRange.from, 0, totalDuration)
+  const toSecond = clamp(exportRange.to, 0, totalDuration)
   const displayedFromSecond = dragPreview?.marker === 'from' ? dragPreview.second : fromSecond
   const displayedToSecond = dragPreview?.marker === 'to' ? dragPreview.second : toSecond
 
@@ -75,29 +75,28 @@ export default function useExportRangeTimeline({ totalDuration }) {
     [displayedFromSecond, displayedToSecond, isCustom, totalDuration],
   )
 
-  // Commit command - snap to whole seconds because export range persistence is timecode based.
+  // Commit command - persist the exact fractional marker position.
   const commitMarker = useCallback(
     (marker, second) => {
       if (!isCustom) return
 
-      const snappedSecond = clampExportRangeMarkerSecond({
+      const nextSecond = clampExportRangeMarkerSecond({
         marker,
-        second: Math.round(second),
+        second,
         fromSecond: displayedFromSecond,
         toSecond: displayedToSecond,
         totalDuration,
       })
-      const field = marker === 'from' ? 'fromTime' : 'toTime'
-      const nextTime = formatExportRangeTime(snappedSecond)
+      const field = marker === 'from' ? 'from' : 'to'
 
       setDragPreview(null)
-      if (writtenRangeRef.current[field] === nextTime) return
+      if (writtenRangeRef.current[field] === nextSecond) return
 
       writtenRangeRef.current = {
         ...writtenRangeRef.current,
-        [field]: nextTime,
+        [field]: nextSecond,
       }
-      setExportRange({ [field]: nextTime })
+      setExportRange({ [field]: nextSecond })
     },
     [displayedFromSecond, displayedToSecond, isCustom, setExportRange, totalDuration],
   )
@@ -106,6 +105,34 @@ export default function useExportRangeTimeline({ totalDuration }) {
   const cancelMarkerPreview = useCallback(() => {
     setDragPreview(null)
   }, [])
+
+  // Toolbar command - enable the range and set the requested bound to the playhead.
+  const setBoundary = useCallback(
+    (marker, second) => {
+      const currentFromSecond = isCustom ? fromSecond : 0
+      const currentToSecond = isCustom ? toSecond : defaultEndSecond
+      const boundarySecond = clampExportRangeMarkerSecond({
+        marker,
+        second,
+        fromSecond: currentFromSecond,
+        toSecond: currentToSecond,
+        totalDuration,
+      })
+
+      setDragPreview(null)
+      setExportRange({
+        type: 'custom',
+        from: marker === 'from' ? boundarySecond : currentFromSecond,
+        to: marker === 'to' ? boundarySecond : currentToSecond,
+      })
+    },
+    [defaultEndSecond, fromSecond, isCustom, setExportRange, toSecond, totalDuration],
+  )
+
+  const clear = useCallback(() => {
+    setDragPreview(null)
+    setExportRange({ type: 'all' })
+  }, [setExportRange])
 
   // Highlight model - lanes use this same range so preview markers and clip shading stay aligned.
   const highlightRange = useMemo(() => {
@@ -138,10 +165,13 @@ export default function useExportRangeTimeline({ totalDuration }) {
   // Export timeline API - gesture hooks call commands, components render derived marker models.
   return {
     cancelMarkerPreview,
+    clear,
     commitMarker,
     highlightRange,
     isCustom,
     markers,
     previewMarker,
+    rangeLabel: isCustom ? `[${formatExportRangeTime(displayedFromSecond)}-${formatExportRangeTime(displayedToSecond)}]` : null,
+    setBoundary,
   }
 }

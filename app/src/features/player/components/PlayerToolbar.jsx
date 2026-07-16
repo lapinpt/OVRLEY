@@ -1,4 +1,4 @@
-import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX, ZoomIn, ZoomOut } from 'lucide-react'
+import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -46,6 +46,53 @@ export default function PlayerToolbar({ toolbar }) {
             ))}
           </TabsList>
         </Tabs>
+        <div className="ml-2 flex items-center gap-1">
+          <SimpleTooltip side="top" content="Set export start at playhead">
+            <Button
+              type="button"
+              aria-label="Set export start at playhead"
+              size="toolbar-icon"
+              variant="ghost"
+              disabled={toolbar.exportRange.isDisabled}
+              onClick={toolbar.exportRange.setStart}
+            >
+              <span aria-hidden="true" className="font-mono text-base font-normal">
+                [
+              </span>
+            </Button>
+          </SimpleTooltip>
+          <SimpleTooltip side="top" content="Set export end at playhead">
+            <Button
+              type="button"
+              aria-label="Set export end at playhead"
+              size="toolbar-icon"
+              variant="ghost"
+              disabled={toolbar.exportRange.isDisabled}
+              onClick={toolbar.exportRange.setEnd}
+            >
+              <span aria-hidden="true" className="font-mono text-base font-normal">
+                ]
+              </span>
+            </Button>
+          </SimpleTooltip>
+          {toolbar.exportRange.isCustom ? (
+            <div className="ml-1 flex items-center gap-0.5 text-orange-400/70">
+              <span className="text-xs font-medium tabular-nums">{toolbar.exportRange.label}</span>
+              <SimpleTooltip side="top" content="Clear custom export range">
+                <Button
+                  type="button"
+                  aria-label="Clear custom export range"
+                  size="toolbar-icon"
+                  variant="ghost"
+                  className="text-orange-400/70 hover:text-orange-300"
+                  onClick={toolbar.exportRange.clear}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </SimpleTooltip>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex items-center gap-1 rounded-xs border border-border/30 p-0.5 shadow-sm">

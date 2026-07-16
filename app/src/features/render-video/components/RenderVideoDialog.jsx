@@ -10,7 +10,6 @@ import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import ExportRangeSettings from './ExportRangeSettings'
 import RenderProgressPanel from './RenderProgressPanel'
 import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
@@ -42,7 +41,7 @@ export default function RenderVideoDialog(props) {
   const durationSeconds = isCompositeExport
     ? Number(ctx.importedVideoDuration)
     : ctx.settings.exportRange?.type === 'custom'
-      ? timeToSeconds(ctx.settings.exportRange.toTime) - timeToSeconds(ctx.settings.exportRange.fromTime)
+      ? ctx.settings.exportRange.to - ctx.settings.exportRange.from
       : Number(ctx.config?.scene?.end) - Number(ctx.config?.scene?.start)
   const renderSummaryItems = [
     ctx.config?.scene?.width && ctx.config?.scene?.height ? `${ctx.config.scene.width}x${ctx.config.scene.height}` : null,

@@ -5,12 +5,14 @@ import {
   getTimelinePlaybackSecond,
   getTotalPlaybackDuration,
   resolvePlaybackSource,
+  snapTimelineSecondToFrame,
 } from '@/features/player/utils/playerTiming'
 
 describe('playerTiming utilities', () => {
   test('formats timeline seconds as mm:ss or h:mm:ss labels', () => {
     expect(formatTimelineTime(65)).toBe('01:05')
     expect(formatTimelineTime(3661)).toBe('1:01:01')
+    expect(snapTimelineSecondToFrame(12.38, 30, 5.25)).toBeCloseTo(12.3833333333)
   })
 
   test('extends total playback duration to include the imported video end', () => {
@@ -25,16 +27,16 @@ describe('playerTiming utilities', () => {
     ).toBe(16)
   })
 
-  test('does not let fallback duration extend a real activity timeline', () => {
+  test('does not let fallback duration extend an imported video timeline', () => {
     expect(
       getTotalPlaybackDuration({
-        activityDurationSeconds: 2.509,
+        activityDurationSeconds: 0,
         fallbackDurationSeconds: 73,
-        importedVideoDuration: 2.509,
+        importedVideoDuration: 12.509,
         importedVideoPath: 'C:\\clips\\GoPro-telemetry.MP4',
         videoSyncOffsetSeconds: 0,
       }),
-    ).toBe(2.509)
+    ).toBe(12.509)
   })
 
   test('keeps video-clock playback scoped to the imported video window', () => {

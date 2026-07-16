@@ -32,6 +32,18 @@ function displayResolutionForImportedVideo(metadata) {
   return { width, height }
 }
 
+function validateImportedVideoTiming(metadata) {
+  if (typeof metadata.path !== 'string' || metadata.path.length === 0) {
+    throw new Error('Imported video metadata must include a path')
+  }
+  if (!Number.isFinite(metadata.duration) || metadata.duration <= 0) {
+    throw new Error('Imported video metadata contains an invalid duration')
+  }
+  if (!Number.isFinite(metadata.fps) || metadata.fps <= 0) {
+    throw new Error('Imported video metadata contains an invalid frame rate')
+  }
+}
+
 export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
   importedVideoDuration: null, // seconds (float), read via ffprobe
@@ -55,6 +67,7 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoCameraModel: null,
 
   setImportedVideo: (metadata) => {
+    validateImportedVideoTiming(metadata)
     const importedVideoResolution = displayResolutionForImportedVideo(metadata)
 
     set({
@@ -130,10 +143,14 @@ export const createVideoImportSlice = (set, get) => ({
     })
   },
 
-  setVideoSyncOffset: (seconds) =>
+  setVideoSyncOffset: (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      throw new Error('Video sync offset must be a non-negative number')
+    }
     set({
       videoSyncOffsetSeconds: seconds,
-    }),
+    })
+  },
 
   setVideoSyncWarning: (msg) =>
     set({
