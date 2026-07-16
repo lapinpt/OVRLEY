@@ -102,11 +102,11 @@ export default function RenderVideoDialog(props) {
 
                 {ctx.showExportModeOverride ? (
                   <Tabs value={ctx.exportMode} onValueChange={ctx.handleExportModeChange}>
-                    <TabsList className="h-7 bg-surface p-0.5">
-                      <TabsTrigger value="transparent" className="px-3 text-[10px]">
+                    <TabsList className="h-7 bg-surface p-0.5" variant="toolbar">
+                      <TabsTrigger value="transparent" className="px-2 text-[10px]" variant="toolbar">
                         Transparent
                       </TabsTrigger>
-                      <TabsTrigger value="composite" className="px-3 text-[10px]">
+                      <TabsTrigger value="composite" className="px-2 text-[10px]" variant="toolbar">
                         Full Video
                       </TabsTrigger>
                     </TabsList>

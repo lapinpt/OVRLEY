@@ -1,6 +1,7 @@
 import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /**
  * Presentational toolbar for zoom, fit target, transport, and time display controls.
@@ -33,13 +34,18 @@ export default function PlayerToolbar({ toolbar }) {
             <RotateCcw className="h-3 w-3" />
           </Button>
         </SimpleTooltip>
-        <div className="ml-1 flex items-center gap-0.5 rounded-xs border border-border/50 p-0.5 uppercase">
-          {toolbar.fitTargets.map((target) => (
-            <Button key={target.id} type="button" size="toolbar-tab" variant="toolbar" aria-pressed={target.isActive} onClick={target.onSelect}>
-              {target.label}
-            </Button>
-          ))}
-        </div>
+        <Tabs
+          value={toolbar.fitTargets.find((target) => target.isActive)?.id ?? ''}
+          onValueChange={(targetId) => toolbar.fitTargets.find((target) => target.id === targetId).onSelect()}
+        >
+          <TabsList variant="toolbar" className="ml-1">
+            {toolbar.fitTargets.map((target) => (
+              <TabsTrigger key={target.id} value={target.id} variant="toolbar">
+                {target.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="flex items-center gap-1 rounded-xs border border-border/30 p-0.5 shadow-sm">
