@@ -4,7 +4,7 @@
 
 import { memo, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
@@ -241,7 +241,8 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const videoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
-  const { videoSrc, importId, frozenFrameSecond, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
+  const { videoSrc, importId, frozenFrameSecond, isOutOfRange, openVideoPreviewHelp, videoPreviewHelpAvailable, videoPreviewMessages } =
+    useVideoPreview(videoRef, backgroundMode === 'video')
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
   const videoBackgroundClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
@@ -295,6 +296,16 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
             {videoPreviewMessages.slice(0, 2).map((message) => (
               <p key={message}>{message}</p>
             ))}
+            {videoPreviewHelpAvailable ? (
+              <button
+                type="button"
+                className="pointer-events-auto inline-flex items-center gap-1 font-semibold text-amber-200 underline"
+                onClick={openVideoPreviewHelp}
+              >
+                Get HEVC playback support
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

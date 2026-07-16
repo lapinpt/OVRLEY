@@ -69,10 +69,8 @@ describe('useRenderWorkflow', () => {
         exportAcceleration: 'cpu',
         exportRange: {
           type: 'custom',
-          from: 0,
-          to: 0,
-          fromTime: '00:00:05',
-          toTime: '00:00:15',
+          from: 5.25,
+          to: 15.75,
         },
       })
     })
@@ -87,8 +85,8 @@ describe('useRenderWorkflow', () => {
         exportCodec: 'prores_ks',
         exportRange: expect.objectContaining({
           type: 'custom',
-          fromTime: '00:00:05',
-          toTime: '00:00:15',
+          from: 5.25,
+          to: 15.75,
         }),
         importedVideoPath: null,
       }),
@@ -98,8 +96,8 @@ describe('useRenderWorkflow', () => {
     expect(useStore.getState().exportRange).toEqual(
       expect.objectContaining({
         type: 'custom',
-        fromTime: '00:00:05',
-        toTime: '00:00:15',
+        from: 5.25,
+        to: 15.75,
       }),
     )
   })
@@ -115,10 +113,8 @@ describe('useRenderWorkflow', () => {
       exportCodec: 'prores_ks',
       exportRange: {
         type: 'custom',
-        from: 0,
-        to: 0,
-        fromTime: '00:00:01',
-        toTime: '00:00:02',
+        from: 1.25,
+        to: 2.75,
       },
     })
 
@@ -143,8 +139,8 @@ describe('useRenderWorkflow', () => {
     expect(useStore.getState().exportRange).toEqual(
       expect.objectContaining({
         type: 'custom',
-        fromTime: '00:00:01',
-        toTime: '00:00:02',
+        from: 1.25,
+        to: 2.75,
       }),
     )
   })

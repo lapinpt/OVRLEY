@@ -235,8 +235,8 @@ describe('useElevationPreviewGeometry', () => {
         },
         exportRange: {
           type: 'custom',
-          fromTime: '00:10',
-          toTime: '00:20',
+          from: 10,
+          to: 20,
         },
         previewSecond: 15,
         style: makeStyle(),

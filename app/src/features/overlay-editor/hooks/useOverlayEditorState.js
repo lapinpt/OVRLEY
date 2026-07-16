@@ -21,7 +21,6 @@ import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget
 import { resolvePreviewSecond } from '@/lib/preview-timing'
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
-import { formatExportRangeTime } from '../utils/exportRange'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'
 
@@ -33,7 +32,7 @@ function materializeWidgets(rawWidgets, globalDefaults, liveWidgetDrafts) {
   })
 }
 
-export default function useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange }) {
+export default function useOverlayEditorState({ config, globalDefaults, onConfigChange }) {
   const selectedSecond = useStore((state) => state.selectedSecond)
   const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
   const exportRange = useStore((state) => state.exportRange)
@@ -81,12 +80,12 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     [fallbackDurationSeconds, selectedSecond, sourceActivity],
   )
   const previewExportRange = useMemo(() => {
-    if (!importedVideoPath) return exportRange
-    const duration = Number(importedVideoDuration)
-    if (!Number.isFinite(duration) || duration <= 0) return null
-    const start = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
-    const end = start + duration
-    return { type: 'custom', fromTime: formatExportRangeTime(start), toTime: formatExportRangeTime(end) }
+    if (!importedVideoPath || exportRange.type === 'custom') return exportRange
+    return {
+      type: 'custom',
+      from: videoSyncOffsetSeconds,
+      to: videoSyncOffsetSeconds + importedVideoDuration,
+    }
   }, [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds])
 
   useEffect(() => {
@@ -149,7 +148,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     liveWidgetPreviews,
     moveableRef,
     onConfigChange,
-    onZoomLevelChange,
     orderedWidgetIds,
     previewExportRange,
     previewSecond,
@@ -166,6 +164,5 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     widgetNodes,
     widgetRefCallbacks,
     widgets,
-    zoomLevel,
   }
 }

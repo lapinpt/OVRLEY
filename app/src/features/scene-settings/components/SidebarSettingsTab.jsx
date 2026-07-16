@@ -39,7 +39,6 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           updateRateOptions={overlaySettings.updateRateOptions}
           onUpdateRateChange={handlers.handleUpdateRateChange}
           activitySummary={overlaySettings.activitySummary}
-          importedVideoPath={overlaySettings.importedVideoPath}
           exportRange={overlaySettings.exportRange}
           onExportRangeChange={state.setExportRange}
         />

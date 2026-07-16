@@ -32,7 +32,7 @@ export default function ControlPanel({ config, onConfigChange }) {
           </TabsList>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-4 min-h-0 [scrollbar-gutter:stable] sidebar-scrollbar">
+        <div className="flex-1 overflow-y-auto pb-4 min-h-0 [scrollbar-gutter:stable]">
           <TabsContent value="settings" className="outline-none">
             <SidebarSettingsTab config={config} onConfigChange={onConfigChange} />
           </TabsContent>

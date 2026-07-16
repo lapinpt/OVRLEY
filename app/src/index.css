@@ -5,7 +5,7 @@
  * 1. fonts.css        @font-face declarations
  * 2. theme.css        Tailwind @theme inline block (must precede @layer base)
  * 3. moveable.css     Moveable library overrides
- * 4. utilities.css    App-shell scaling, grid pattern, sidebar scrollbar
+ * 4. utilities.css    App-shell scaling, grid pattern, scrollbar styling
  */
 
 @import 'tailwindcss';

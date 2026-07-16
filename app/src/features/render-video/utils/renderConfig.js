@@ -7,9 +7,9 @@
  * imported-video composite metadata.
  */
 
-import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
+import { clamp } from '@/lib/utils'
 import { formatCompositeBitrate, isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
 
 /**
@@ -54,9 +54,9 @@ function applyCompositeSceneFields(scene, options) {
     videoSyncOffsetSeconds,
   } = options
   const sourceFps = resolveCompositeFps(importedVideoFpsNum, importedVideoFpsDen, importedVideoFps)
-  const renderDuration = Number(importedVideoDuration)
-  const displayWidth = Number(importedVideoResolution?.width)
-  const displayHeight = Number(importedVideoResolution?.height)
+  const renderDuration = importedVideoDuration
+  const displayWidth = importedVideoResolution?.width
+  const displayHeight = importedVideoResolution?.height
 
   if (!sourceFps) {
     throw new Error('Imported video FPS is required for MP4 compositing.')
@@ -67,12 +67,15 @@ function applyCompositeSceneFields(scene, options) {
   if (!Number.isFinite(displayWidth) || displayWidth <= 0 || !Number.isFinite(displayHeight) || displayHeight <= 0) {
     throw new Error('Imported video resolution is required for MP4 compositing.')
   }
+  if (!Number.isFinite(videoSyncOffsetSeconds) || videoSyncOffsetSeconds < 0) {
+    throw new Error('Imported video sync offset must be a non-negative number.')
+  }
 
   scene.width = displayWidth
   scene.height = displayHeight
   scene.composite_video_path = importedVideoPath
   scene.composite_bitrate = formatCompositeBitrate(exportBitrate)
-  scene.composite_sync_offset = Number.isFinite(Number(videoSyncOffsetSeconds)) ? Number(videoSyncOffsetSeconds) : 0
+  scene.composite_sync_offset = videoSyncOffsetSeconds
   scene.composite_video_fps_num = sourceFps.num
   scene.composite_video_fps_den = sourceFps.den
   scene.composite_video_duration = renderDuration
@@ -84,8 +87,8 @@ function applyCompositeSceneFields(scene, options) {
 /**
  * Applies the custom export-range window to the render-effective scene config.
  *
- * Composite exports always render the imported video's span, while transparent
- * exports may narrow the restored timeline window with a custom range.
+ * Transparent exports narrow the activity window directly. Composite exports
+ * translate the activity-timeline range into a video-local trim and duration.
  *
  * @param {object} scene - Render-effective scene config.
  * @param {object|null|undefined} exportRange - Requested export-range settings.
@@ -94,18 +97,41 @@ function applyCompositeSceneFields(scene, options) {
 function applyCustomExportRange(scene, exportRange, importedVideoPath) {
   scene.custom_export_range_active = Boolean(importedVideoPath)
 
-  if (importedVideoPath || exportRange?.type !== 'custom') {
+  if (exportRange?.type !== 'custom') {
     return
   }
 
-  const start = Math.trunc(timeToSeconds(exportRange.fromTime))
-  const end = Math.trunc(timeToSeconds(exportRange.toTime))
+  const start = exportRange.from
+  const end = exportRange.to
 
-  if (end > start) {
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    throw new Error('Custom export range must contain numeric start and end values.')
+  }
+  if (end <= start) {
+    throw new Error('Custom export range end must be after its start.')
+  }
+
+  if (!importedVideoPath) {
     scene.start = start
     scene.end = end
     scene.custom_export_range_active = true
+    return
   }
+
+  const videoStart = scene.composite_sync_offset
+  const videoEnd = videoStart + scene.composite_video_duration
+  const clampedStart = clamp(start, videoStart, videoEnd)
+  const clampedEnd = clamp(end, videoStart, videoEnd)
+  if (clampedEnd <= clampedStart) {
+    throw new Error('Custom export range must overlap the imported video range when exporting a composite video.')
+  }
+
+  scene.start = clampedStart
+  scene.end = clampedEnd
+  scene.custom_export_range_active = true
+  scene.composite_video_trim_start = clampedStart - videoStart
+  scene.composite_render_duration = clampedEnd - clampedStart
+  scene.composite_sync_offset = clampedStart
 }
 
 /**

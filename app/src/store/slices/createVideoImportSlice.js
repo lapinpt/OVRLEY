@@ -6,22 +6,42 @@ let fetchCodecsOnce = null
 function displayResolutionForImportedVideo(metadata) {
   const resolution = metadata?.resolution
   if (!resolution) {
-    return null
+    throw new Error('Imported video metadata must include a resolution')
   }
 
   const width = Number(resolution.width)
   const height = Number(resolution.height)
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return null
+    throw new Error('Imported video metadata contains an invalid resolution')
   }
 
-  const rotation = Number(metadata?.rotationDegrees)
-  const normalizedRotation = Number.isFinite(rotation) ? ((rotation % 360) + 360) % 360 : 0
+  const rotation = metadata.rotationDegrees === null || metadata.rotationDegrees === undefined ? 0 : Number(metadata.rotationDegrees)
+  if (!Number.isFinite(rotation)) {
+    throw new Error('Imported video metadata contains an invalid rotation')
+  }
+
+  const normalizedRotation = ((rotation % 360) + 360) % 360
+  if (![0, 90, 180, 270].includes(normalizedRotation)) {
+    throw new Error('Imported video metadata contains an unsupported rotation')
+  }
+
   if (normalizedRotation === 90 || normalizedRotation === 270) {
     return { width: height, height: width }
   }
 
   return { width, height }
+}
+
+function validateImportedVideoTiming(metadata) {
+  if (typeof metadata.path !== 'string' || metadata.path.length === 0) {
+    throw new Error('Imported video metadata must include a path')
+  }
+  if (!Number.isFinite(metadata.duration) || metadata.duration <= 0) {
+    throw new Error('Imported video metadata contains an invalid duration')
+  }
+  if (!Number.isFinite(metadata.fps) || metadata.fps <= 0) {
+    throw new Error('Imported video metadata contains an invalid frame rate')
+  }
 }
 
 export const createVideoImportSlice = (set, get) => ({
@@ -35,7 +55,6 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoImportId: null, // opaque local preview server import ID
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
   importedVideoPreviewWarnings: [],
-  importedVideoPreviewError: null,
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
@@ -47,18 +66,20 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoCameraModel: null,
 
   setImportedVideo: (metadata) => {
+    validateImportedVideoTiming(metadata)
+    const importedVideoResolution = displayResolutionForImportedVideo(metadata)
+
     set({
       importedVideoPath: metadata.path,
       importedVideoDuration: metadata.duration,
       importedVideoFps: metadata.fps,
       importedVideoFpsNum: metadata.fpsNum,
       importedVideoFpsDen: metadata.fpsDen,
-      importedVideoResolution: displayResolutionForImportedVideo(metadata),
+      importedVideoResolution,
       importedVideoCreationTime: metadata.creationTime,
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
-      importedVideoPreviewError: metadata.previewError ?? null,
       importedBackgroundImagePath: null,
       importedVideoCodecName: metadata.codecName ?? null,
       importedVideoCodecLongName: metadata.codecLongName ?? null,
@@ -68,6 +89,8 @@ export const createVideoImportSlice = (set, get) => ({
     })
 
     get().syncVideoMetadata()
+
+    return importedVideoResolution
   },
 
   setImportedBackgroundImage: (path) =>
@@ -82,7 +105,6 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
-      importedVideoPreviewError: null,
       importedBackgroundImagePath: path || null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
@@ -106,7 +128,6 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
-      importedVideoPreviewError: null,
       importedBackgroundImagePath: null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
@@ -118,19 +139,18 @@ export const createVideoImportSlice = (set, get) => ({
     })
   },
 
-  setVideoSyncOffset: (seconds) =>
+  setVideoSyncOffset: (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      throw new Error('Video sync offset must be a non-negative number')
+    }
     set({
       videoSyncOffsetSeconds: seconds,
-    }),
+    })
+  },
 
   setVideoSyncWarning: (msg) =>
     set({
       videoSyncWarning: msg,
-    }),
-
-  setImportedVideoPreviewError: (msg) =>
-    set({
-      importedVideoPreviewError: msg,
     }),
 
   setImportedVideoPreviewWarnings: (warnings) =>

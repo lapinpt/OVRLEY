@@ -185,6 +185,14 @@ export async function getPlatformInfo() {
 }
 
 /**
+ * Opens the official Windows HEVC playback support page.
+ * @returns {Promise<void>} Promise resolving when the system opener has been invoked.
+ */
+export async function openHevcSupport() {
+  await invokeCommand('backend_open_hevc_support')
+}
+
+/**
  * Sorts font names.
  *
  * @param {*} fonts - Value for fonts.

@@ -192,7 +192,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       exportRange,
       fpsMode,
       importedVideoFps,
-      importedVideoPath,
       resId,
       scene,
       updateRate,

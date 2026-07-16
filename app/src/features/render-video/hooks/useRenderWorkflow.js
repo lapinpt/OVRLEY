@@ -69,7 +69,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
     const fps = importedVideoPath && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : templateFps
     const defaultCodec = importedVideoPath ? 'libx264' : exportCodec || 'prores_ks'
-    const draftExportRange = importedVideoPath ? DEFAULT_EXPORT_RANGE : { ...DEFAULT_EXPORT_RANGE, ...(exportRange || {}) }
+    const draftExportRange = { ...DEFAULT_EXPORT_RANGE, ...(exportRange || {}) }
 
     return {
       fps,
@@ -194,12 +194,10 @@ export default function useRenderWorkflow({ backendStatus }) {
     // provides the default when a draft does not yet carry an explicit mode.
     const exportMode = renderSettingsDraft.exportMode || (useStore.getState().importedVideoPath ? 'composite' : 'transparent')
     const shouldComposite = exportMode === 'composite'
-    const nextExportRange = shouldComposite
-      ? DEFAULT_EXPORT_RANGE
-      : {
-          ...DEFAULT_EXPORT_RANGE,
-          ...(renderSettingsDraft.exportRange || {}),
-        }
+    const nextExportRange = {
+      ...DEFAULT_EXPORT_RANGE,
+      ...(renderSettingsDraft.exportRange || {}),
+    }
     const nextFps = sanitizeIntegerFps(renderSettingsDraft.fps || 30)
     const nextUpdateRate = normalizeUpdateRateForFps(nextFps, renderSettingsDraft.updateRate)
     const nextConfig = {
@@ -214,8 +212,8 @@ export default function useRenderWorkflow({ backendStatus }) {
     setUpdateRate(nextUpdateRate)
     if (!shouldComposite) {
       setExportCodec(renderSettingsDraft.exportCodec)
-      setExportRange(nextExportRange)
     }
+    setExportRange(nextExportRange)
     setActiveRenderId(null)
     setRenderProgress({
       ...DEFAULT_RENDER_PROGRESS,

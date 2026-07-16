@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import useExportRangeTimeline from '@/features/player/hooks/useExportRangeTimeline'
 import useStore from '@/store/useStore'
 
-function resetStore(exportRange = { fromTime: '00:00:10', toTime: '00:00:20', type: 'custom' }) {
+function resetStore(exportRange = { from: 10, to: 20, type: 'custom' }) {
   useStore.setState(useStore.getInitialState(), true)
   useStore.setState({ exportRange })
 }
@@ -31,7 +31,7 @@ describe('useExportRangeTimeline', () => {
     })
 
     expect(result.current.highlightRange).toEqual({ fromSecond: 18.5, toSecond: 20 })
-    expect(useStore.getState().exportRange.fromTime).toBe('00:00:10')
+    expect(useStore.getState().exportRange.from).toBe(10)
   })
 
   test('commits snapped marker movement and avoids redundant writes', () => {
@@ -41,7 +41,7 @@ describe('useExportRangeTimeline', () => {
       result.current.commitMarker('from', 18.5)
     })
 
-    expect(useStore.getState().exportRange.fromTime).toBe('00:00:19')
+    expect(useStore.getState().exportRange.from).toBe(18.5)
 
     const sameRange = useStore.getState().exportRange
     act(() => {
@@ -52,7 +52,7 @@ describe('useExportRangeTimeline', () => {
   })
 
   test('returns no markers when the export range is not custom', () => {
-    resetStore({ fromTime: '00:00:00', toTime: '00:01:00', type: 'full' })
+    resetStore({ from: 0, to: 60, type: 'full' })
 
     const { result } = renderHook(() => useExportRangeTimeline({ totalDuration: 60 }))
 
@@ -60,12 +60,26 @@ describe('useExportRangeTimeline', () => {
     expect(result.current.highlightRange).toBeNull()
   })
 
-  test('returns no markers when a video is imported', () => {
-    useStore.setState({ importedVideoPath: '/videos/ride.mp4' })
+  test('enables a custom range and sets either boundary from the playhead', () => {
+    resetStore({ from: 0, to: 0, type: 'all' })
+    const { result } = renderHook(() => useExportRangeTimeline({ defaultEndSecond: 45, totalDuration: 60 }))
 
-    const { result } = renderHook(() => useExportRangeTimeline({ totalDuration: 60 }))
+    act(() => {
+      result.current.setBoundary('from', 12.9)
+    })
 
-    expect(result.current.markers).toEqual([])
-    expect(result.current.highlightRange).toBeNull()
+    expect(useStore.getState().exportRange).toEqual(expect.objectContaining({ type: 'custom', from: 12.9, to: 45 }))
+
+    act(() => {
+      result.current.setBoundary('to', 42.9)
+    })
+
+    expect(useStore.getState().exportRange).toEqual(expect.objectContaining({ type: 'custom', from: 12.9, to: 42.9 }))
+
+    act(() => {
+      result.current.setBoundary('to', 5)
+    })
+
+    expect(result.current.rangeLabel).toBe('[00:00:12-00:00:13]')
   })
 })
