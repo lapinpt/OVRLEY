@@ -32,7 +32,7 @@ function materializeWidgets(rawWidgets, globalDefaults, liveWidgetDrafts) {
   })
 }
 
-export default function useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange }) {
+export default function useOverlayEditorState({ config, globalDefaults, onConfigChange }) {
   const selectedSecond = useStore((state) => state.selectedSecond)
   const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
   const exportRange = useStore((state) => state.exportRange)
@@ -148,7 +148,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     liveWidgetPreviews,
     moveableRef,
     onConfigChange,
-    onZoomLevelChange,
     orderedWidgetIds,
     previewExportRange,
     previewSecond,
@@ -165,6 +164,5 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     widgetNodes,
     widgetRefCallbacks,
     widgets,
-    zoomLevel,
   }
 }

@@ -76,7 +76,7 @@ export default function PlayerToolbar({ toolbar }) {
             </Button>
           </SimpleTooltip>
           {toolbar.exportRange.isCustom ? (
-            <div className="ml-1 flex items-center gap-0.5 text-orange-400/70">
+            <div className="ml-1 flex items-center gap-0.5 text-orange-400/90">
               <span className="text-xs font-medium tabular-nums">{toolbar.exportRange.label}</span>
               <SimpleTooltip side="top" content="Clear custom export range">
                 <Button
@@ -84,7 +84,7 @@ export default function PlayerToolbar({ toolbar }) {
                   aria-label="Clear custom export range"
                   size="toolbar-icon"
                   variant="ghost"
-                  className="text-orange-400/70 hover:text-orange-300"
+                  className="text-orange-400/90 hover:text-orange-300"
                   onClick={toolbar.exportRange.clear}
                 >
                   <X className="h-3.5 w-3.5" />

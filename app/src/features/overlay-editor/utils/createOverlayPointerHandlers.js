@@ -2,7 +2,6 @@
  * Provides overlay editor helpers for create overlay pointer handlers.
  */
 
-import { ZOOM_MIN, ZOOM_MAX } from '../data/overlayEditorConstants'
 import { clamp } from '@/lib/utils'
 import { buildSelectionRect, getPrimarySelectionId, hasSelectionModifier, normalizeSelectionIds, rectanglesIntersect } from './overlayEditorHelpers'
 
@@ -101,7 +100,7 @@ function getIntersectedWidgetIds({ nextSelectionRect, orderedWidgetIds, sceneEle
 
 /**
  * Creates pointer event handlers for the overlay editor — scene click/marquee
- * selection, widget mouse down (single and group), and mouse wheel zoom.
+ * selection and widget mouse down (single and group).
  *
  * @param {object} options
  * @param {Function} options.commitSelection - Commits a selection set to state and store.
@@ -109,7 +108,6 @@ function getIntersectedWidgetIds({ nextSelectionRect, orderedWidgetIds, sceneEle
  * @param {React.RefObject} options.moveableRef - Ref to Moveable instance for programmatic dragStart.
  * @param {React.MutableRefObject} options.marqueeCleanupRef - Ref for cleanup function.
  * @param {React.MutableRefObject} options.marqueeSelectionRef - Ref for marquee gesture state.
- * @param {Function} options.onZoomLevelChange - Zoom level state setter.
  * @param {string[]} options.orderedWidgetIds - Ordered widget ID list.
  * @param {HTMLElement|null} options.sceneElement - Scene container element.
  * @param {{ width: number, height: number }} options.sceneSize - Scene dimensions.
@@ -120,7 +118,7 @@ function getIntersectedWidgetIds({ nextSelectionRect, orderedWidgetIds, sceneEle
  * @param {Function} options.setSelectionRect - Setter for selection rectangle.
  * @param {Function} options.setSelectionState - Setter for widget selection.
  * @param {Object<string, HTMLElement>} options.widgetNodes - Widget DOM node map.
- * @returns {{ handleSceneMouseDown: Function, handleWheel: Function, handleWidgetMouseDown: Function }}
+ * @returns {{ handleSceneMouseDown: Function, handleWidgetMouseDown: Function }}
  *   Pointer event handlers.
  */
 export default function useOverlayPointerHandlers({
@@ -129,7 +127,6 @@ export default function useOverlayPointerHandlers({
   moveableRef,
   marqueeCleanupRef,
   marqueeSelectionRef,
-  onZoomLevelChange,
   orderedWidgetIds,
   sceneElement,
   sceneSize,
@@ -142,12 +139,6 @@ export default function useOverlayPointerHandlers({
   setSelectionState,
   widgetNodes,
 }) {
-  const handleWheel = (event) => {
-    event.preventDefault()
-    const delta = event.deltaY < 0 ? 0.05 : -0.05
-    onZoomLevelChange((current) => clamp(Number((current + delta).toFixed(2)), ZOOM_MIN, ZOOM_MAX))
-  }
-
   const handleWidgetMouseDown = (event, widgetId) => {
     event.stopPropagation()
 
@@ -292,7 +283,6 @@ export default function useOverlayPointerHandlers({
 
   return {
     handleSceneMouseDown,
-    handleWheel,
     handleWidgetMouseDown,
   }
 }

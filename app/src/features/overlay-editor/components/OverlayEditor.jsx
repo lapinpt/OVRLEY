@@ -139,7 +139,7 @@ function OverlayEditor({
   const marqueeSelectionRef = useRef(null)
 
   // Derived state hook — widgets, scene, preview, drafts
-  const overlayState = useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange })
+  const overlayState = useOverlayEditorState({ config, globalDefaults, onConfigChange })
   const activity = overlayState.activity
 
   // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
@@ -152,8 +152,12 @@ function OverlayEditor({
   })
 
   // Viewport tracking
-  const { viewportRef, fitScale } = useEditorViewport(overlayState.sceneSize)
-  const displayScale = fitScale * overlayState.zoomLevel
+  const { displayScale, handleWheel, scrollViewportRef, viewportRef } = useEditorViewport({
+    onZoomLevelChange,
+    sceneElement: overlayState.sceneElement,
+    sceneSize: overlayState.sceneSize,
+    zoomLevel,
+  })
 
   // Keyboard shortcuts
   useEditorKeyboard({
@@ -166,13 +170,12 @@ function OverlayEditor({
   })
 
   // Pointer handlers
-  const { handleSceneMouseDown, handleWidgetMouseDown, handleWheel } = useOverlayPointerHandlers({
+  const { handleSceneMouseDown, handleWidgetMouseDown } = useOverlayPointerHandlers({
     commitSelection: selection.commitSelection,
     displayScale,
     moveableRef: overlayState.moveableRef,
     marqueeCleanupRef,
     marqueeSelectionRef,
-    onZoomLevelChange,
     orderedWidgetIds: overlayState.orderedWidgetIds,
     sceneElement: overlayState.sceneElement,
     sceneSize: overlayState.sceneSize,
@@ -363,80 +366,87 @@ function OverlayEditor({
   if (!config) return <EmptyOverlayState />
 
   return (
-    <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden" onWheel={handleWheel}>
-      <div
-        ref={setStageElement}
-        data-testid="overlay-editor-stage"
-        className="relative flex h-full w-full items-center justify-center overflow-hidden py-8"
-        onMouseDown={handleSceneMouseDown}
-      >
-        <CanvasStatusBadges
-          height={overlayState.sceneSize.height}
-          showTemplateStatus={showTemplateStatus}
-          status={templateStatus}
-          width={overlayState.sceneSize.width}
-        />
-        <CanvasToolbar
-          editorControls={editorControls}
-          importedBackgroundImageFilename={importedBackgroundImageFilename}
-          importedVideoFilename={importedVideoFilename}
-        />
+    <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden">
+      <CanvasStatusBadges
+        height={overlayState.sceneSize.height}
+        showTemplateStatus={showTemplateStatus}
+        status={templateStatus}
+        width={overlayState.sceneSize.width}
+      />
+      <CanvasToolbar
+        editorControls={editorControls}
+        importedBackgroundImageFilename={importedBackgroundImageFilename}
+        importedVideoFilename={importedVideoFilename}
+      />
+      <div ref={scrollViewportRef} className="absolute inset-0 overflow-auto" onWheel={handleWheel}>
         <div
-          className="relative shrink-0"
-          style={{ width: overlayState.sceneSize.width * displayScale, height: overlayState.sceneSize.height * displayScale }}
+          ref={setStageElement}
+          data-testid="overlay-editor-stage"
+          className="relative grid min-h-full min-w-full w-max place-items-center overflow-visible p-8"
+          onMouseDown={handleSceneMouseDown}
         >
           <div
-            className="absolute left-0 top-0 mt-4"
-            style={{
-              width: overlayState.sceneSize.width,
-              height: overlayState.sceneSize.height,
-              transform: `scale(${displayScale})`,
-              transformOrigin: 'top left',
-            }}
+            className="relative shrink-0"
+            style={{ width: overlayState.sceneSize.width * displayScale, height: overlayState.sceneSize.height * displayScale }}
           >
-            <OverlayCanvas sceneProps={canvasSceneProps} displayProps={canvasDisplayProps} dataProps={canvasDataProps} callbacks={canvasCallbacks} />
-            <OverlayMoveable
-              moveableRef={overlayState.moveableRef}
-              selectedTarget={selection.selectedTarget}
-              selectedTargets={selection.selectedTargets}
-              geometryVersion={selectedRenderedGeometryVersion}
-              isGroupDragActive={isGroupDragActive}
-              sceneElement={overlayState.sceneElement}
+            <div
+              className="absolute left-0 top-0"
+              style={{
+                width: overlayState.sceneSize.width,
+                height: overlayState.sceneSize.height,
+                transform: `scale(${displayScale})`,
+                transformOrigin: 'top left',
+              }}
+            >
+              <OverlayCanvas
+                sceneProps={canvasSceneProps}
+                displayProps={canvasDisplayProps}
+                dataProps={canvasDataProps}
+                callbacks={canvasCallbacks}
+              />
+              <OverlayMoveable
+                moveableRef={overlayState.moveableRef}
+                selectedTarget={selection.selectedTarget}
+                selectedTargets={selection.selectedTargets}
+                geometryVersion={selectedRenderedGeometryVersion}
+                isGroupDragActive={isGroupDragActive}
+                sceneElement={overlayState.sceneElement}
+                displayScale={displayScale}
+                canResizeSelected={canResizeSelected}
+                canScaleSelected={canScaleSelected}
+                canRotateSelected={canRotateSelected}
+                maintainAspectRatio={maintainAspectRatio}
+                showEdgeResizeHandles={showEdgeResizeHandles}
+                elementGuidelines={selection.elementGuidelines}
+                sceneSize={overlayState.sceneSize}
+                snapToGrid={snapToGrid}
+                handlers={handlers}
+              />
+            </div>
+            <WidgetBadgeLayer
+              activity={activity}
               displayScale={displayScale}
-              canResizeSelected={canResizeSelected}
-              canScaleSelected={canScaleSelected}
-              canRotateSelected={canRotateSelected}
-              maintainAspectRatio={maintainAspectRatio}
-              showEdgeResizeHandles={showEdgeResizeHandles}
-              elementGuidelines={selection.elementGuidelines}
-              sceneSize={overlayState.sceneSize}
-              snapToGrid={snapToGrid}
-              handlers={handlers}
+              globalScale={overlayState.globalScale}
+              hoveredWidgetId={hoveredWidgetId}
+              previewSecond={overlayState.previewSecond}
+              selectedWidgetIds={selection.selectedWidgetIds}
+              widgetPreviews={overlayState.liveWidgetPreviews}
+              widgets={overlayState.renderedWidgets}
             />
           </div>
-          <WidgetBadgeLayer
-            activity={activity}
-            displayScale={displayScale}
-            globalScale={overlayState.globalScale}
-            hoveredWidgetId={hoveredWidgetId}
-            previewSecond={overlayState.previewSecond}
-            selectedWidgetIds={selection.selectedWidgetIds}
-            widgetPreviews={overlayState.liveWidgetPreviews}
-            widgets={overlayState.renderedWidgets}
-          />
+          {selectionRect ? (
+            <div
+              data-testid="selection-rect"
+              className="pointer-events-none absolute z-40 border border-primary/70 bg-primary/10"
+              style={{
+                left: selectionRect.x,
+                top: selectionRect.y,
+                width: selectionRect.width,
+                height: selectionRect.height,
+              }}
+            />
+          ) : null}
         </div>
-        {selectionRect ? (
-          <div
-            data-testid="selection-rect"
-            className="pointer-events-none absolute z-40 border border-primary/70 bg-primary/10"
-            style={{
-              left: selectionRect.x,
-              top: selectionRect.y,
-              width: selectionRect.width,
-              height: selectionRect.height,
-            }}
-          />
-        ) : null}
       </div>
     </div>
   )
