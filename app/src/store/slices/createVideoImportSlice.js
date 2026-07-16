@@ -55,7 +55,6 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoImportId: null, // opaque local preview server import ID
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
   importedVideoPreviewWarnings: [],
-  importedVideoPreviewError: null,
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
@@ -81,7 +80,6 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
-      importedVideoPreviewError: metadata.previewError ?? null,
       importedBackgroundImagePath: null,
       importedVideoCodecName: metadata.codecName ?? null,
       importedVideoCodecLongName: metadata.codecLongName ?? null,
@@ -107,7 +105,6 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
-      importedVideoPreviewError: null,
       importedBackgroundImagePath: path || null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
@@ -131,7 +128,6 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
-      importedVideoPreviewError: null,
       importedBackgroundImagePath: null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
@@ -155,11 +151,6 @@ export const createVideoImportSlice = (set, get) => ({
   setVideoSyncWarning: (msg) =>
     set({
       videoSyncWarning: msg,
-    }),
-
-  setImportedVideoPreviewError: (msg) =>
-    set({
-      importedVideoPreviewError: msg,
     }),
 
   setImportedVideoPreviewWarnings: (warnings) =>

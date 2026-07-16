@@ -20,6 +20,8 @@ use ovrley_core::commands;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
+const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
+
 /// Serializes a `Serialize` value into a JSON string or maps an error to a
 /// `String`, consolidating the repeated `.map_err(|e| e.to_string())?;
 /// serde_json::to_string(...).map_err(...)` pattern used by most commands.
@@ -45,6 +47,12 @@ pub(crate) async fn backend_health(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub(crate) async fn backend_current_os() -> Result<String, String> {
     serialize_command_result(&commands::backend_current_os())
+}
+
+/// Opens the official Microsoft Store page for Windows HEVC playback support.
+#[tauri::command]
+pub(crate) async fn backend_open_hevc_support() -> Result<(), String> {
+    open::that(WINDOWS_HEVC_EXTENSION_URL).map_err(|error| error.to_string())
 }
 
 /// Lists bundled and system fonts available to the backend renderer.

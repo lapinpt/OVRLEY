@@ -71,7 +71,6 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         importId: response.importId,
         previewUrl: response.previewUrl,
         previewWarnings: response.warnings ?? [],
-        previewError: null,
       }
       const currentConfig = useStore.getState().config
       if (!currentConfig?.scene) {

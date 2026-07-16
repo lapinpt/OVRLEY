@@ -59,6 +59,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             tauri_commands::backend_health,
             tauri_commands::backend_current_os,
+            tauri_commands::backend_open_hevc_support,
             tauri_commands::backend_list_system_fonts,
             tauri_commands::backend_render,
             tauri_commands::backend_finalize_activity,
