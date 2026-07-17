@@ -1,5 +1,5 @@
 /**
- * Activity file import pipeline — orchestrates GPX/FIT parsing,
+ * Activity file import pipeline — orchestrates browser and native activity parsing,
  * cache update, and store synchronization.
  */
 
@@ -95,6 +95,18 @@ async function importAndActivateActivity(filename, loadParsedActivity, store) {
 export async function importCsvActivityPath(path, storeActions) {
   const filename = filenameFromNativePath(path)
   return importAndActivateActivity(filename, async () => (await backend.parseCsvActivity(path)).parsed_activity, storeActions)
+}
+
+/**
+ * Imports a native VBO activity path through the Rust columnar pipeline.
+ *
+ * @param {string} path - Native path returned by the desktop file picker.
+ * @param {object} storeActions - Injected store actions.
+ * @returns {Promise<object>} Promise resolving to the activated parsed activity.
+ */
+export async function importVboActivityPath(path, storeActions) {
+  const filename = filenameFromNativePath(path)
+  return importAndActivateActivity(filename, async () => (await backend.parseVboActivity(path)).parsed_activity, storeActions)
 }
 
 /**

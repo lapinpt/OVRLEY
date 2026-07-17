@@ -103,7 +103,7 @@ function useAppShellComposition() {
   }
 
   const activityControls = {
-    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT/IGC/CSV' : activityFilename || 'Load GPX/FIT/SRT/IGC/CSV',
+    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT/IGC/CSV/VBO' : activityFilename || 'Load GPX/FIT/SRT/IGC/CSV/VBO',
     onOpenActivityFile: handleActivityFileOpen,
   }
 

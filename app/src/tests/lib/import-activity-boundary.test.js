@@ -5,10 +5,12 @@ import { describe, expect, test, vi, beforeEach } from 'vitest'
 
 const finalizeActivity = vi.hoisted(() => vi.fn())
 const parseCsvActivity = vi.hoisted(() => vi.fn())
+const parseVboActivity = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/backend', () => ({
   finalizeActivity,
   parseCsvActivity,
+  parseVboActivity,
   writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
   openVideo: vi.fn(),
 }))
@@ -34,6 +36,7 @@ describe('import-activity store boundary', () => {
     vi.resetModules()
     finalizeActivity.mockReset()
     parseCsvActivity.mockReset()
+    parseVboActivity.mockReset()
     finalizeActivity.mockResolvedValue({
       parsed_activity: {
         metadata: {
@@ -45,6 +48,13 @@ describe('import-activity store boundary', () => {
       parsed_activity: {
         metadata: {
           duration_seconds: 12.8,
+        },
+      },
+    })
+    parseVboActivity.mockResolvedValue({
+      parsed_activity: {
+        metadata: {
+          duration_seconds: 4.2,
         },
       },
     })
@@ -106,5 +116,22 @@ describe('import-activity store boundary', () => {
       },
     })
     expect(store.setEndSecond).toHaveBeenCalledWith(12)
+  })
+
+  test('imports a native VBO path without creating a browser File or finalizing RawActivity', async () => {
+    const { importVboActivityPath } = await import('@/lib/activity/import-activity')
+    const store = storeActions()
+
+    await importVboActivityPath('C:\\activities\\session.vbo', store)
+
+    expect(parseVboActivity).toHaveBeenCalledWith('C:\\activities\\session.vbo')
+    expect(finalizeActivity).not.toHaveBeenCalled()
+    expect(store.setActivityFilename).toHaveBeenCalledWith('session.vbo')
+    expect(store.activateActivityFile).toHaveBeenCalledWith({
+      metadata: {
+        duration_seconds: 4.2,
+      },
+    })
+    expect(store.setEndSecond).toHaveBeenCalledWith(4)
   })
 })

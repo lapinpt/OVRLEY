@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 const fileFromSelectedPath = vi.hoisted(() => vi.fn())
 const importActivityFile = vi.hoisted(() => vi.fn())
 const importCsvActivityPath = vi.hoisted(() => vi.fn())
+const importVboActivityPath = vi.hoisted(() => vi.fn())
 const openSinglePath = vi.hoisted(() => vi.fn())
 const setErrorMessage = vi.hoisted(() => vi.fn())
 const setProcessing = vi.hoisted(() => vi.fn())
@@ -12,7 +13,7 @@ vi.mock('@/api/backend', () => ({ hasTauriRuntime: () => true }))
 vi.mock('@/hooks/useAppStoreSelectors', () => ({
   useActivityStore: () => ({ activityFilename: null, setErrorMessage, setProcessing }),
 }))
-vi.mock('@/lib/activity/import-activity', () => ({ default: importActivityFile, importCsvActivityPath }))
+vi.mock('@/lib/activity/import-activity', () => ({ default: importActivityFile, importCsvActivityPath, importVboActivityPath }))
 vi.mock('@/lib/file-dialog', () => ({
   fileFromSelectedPath,
   openSinglePath,
@@ -38,7 +39,7 @@ describe('useActivityImport native picker boundary', () => {
     expect(fileFromSelectedPath).not.toHaveBeenCalled()
   })
 
-  test('keeps non-CSV native paths on the browser File adapter route', async () => {
+  test('keeps browser-parsed native paths on the File adapter route', async () => {
     openSinglePath.mockResolvedValue('C:\\activities\\activity.gpx')
     const { default: useActivityImport } = await import('@/features/app-shell/hooks/useActivityImport')
     const { result } = renderHook(() => useActivityImport())
@@ -47,6 +48,18 @@ describe('useActivityImport native picker boundary', () => {
 
     expect(fileFromSelectedPath).toHaveBeenCalledWith('C:\\activities\\activity.gpx', 'activity')
     expect(importActivityFile.mock.calls[0][0]).toBeInstanceOf(File)
+  })
+
+  test('passes a selected VBO path directly to the native activity importer', async () => {
+    openSinglePath.mockResolvedValue('C:\\activities\\session.vbo')
+    const { default: useActivityImport } = await import('@/features/app-shell/hooks/useActivityImport')
+    const { result } = renderHook(() => useActivityImport())
+
+    await act(() => result.current.handleActivityFileOpen())
+
+    expect(importVboActivityPath.mock.calls[0][0]).toBe('C:\\activities\\session.vbo')
+    expect(importActivityFile).not.toHaveBeenCalled()
+    expect(fileFromSelectedPath).not.toHaveBeenCalled()
   })
 
   test('reports native CSV structural errors through the existing activity error path', async () => {

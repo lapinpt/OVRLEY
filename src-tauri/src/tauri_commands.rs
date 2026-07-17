@@ -104,6 +104,18 @@ pub(crate) async fn backend_parse_csv_activity(path: String) -> Result<String, S
     call_and_serialize(commands::backend_parse_csv_activity(&path))
 }
 
+/// Parses a native VBO path through the core columnar activity pipeline.
+#[tauri::command]
+pub(crate) async fn backend_parse_vbo_activity(
+    app: AppHandle,
+    path: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_parse_vbo_activity(
+        &runtime_paths::app_paths(&app)?,
+        &path,
+    ))
+}
+
 /// Renders one transparent preview PNG for the requested second.
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(

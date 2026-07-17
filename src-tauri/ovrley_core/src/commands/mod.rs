@@ -88,6 +88,15 @@ pub fn backend_parse_csv_activity(path: &str) -> CoreResult<Value> {
     .map_err(CoreError::Serialization)
 }
 
+/// Parses and finalizes a native VBO activity without a frontend RawActivity hop.
+pub fn backend_parse_vbo_activity(paths: &AppPaths, path: &str) -> CoreResult<Value> {
+    serde_json::to_value(crate::activity::vbo::parse_vbo_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?)
+    .map_err(CoreError::Serialization)
+}
+
 /// Lists bundled font filenames plus system font family names visible to Skia.
 pub fn backend_list_system_fonts(paths: &AppPaths) -> Value {
     let mut fonts: Vec<String> = FontMgr::default()

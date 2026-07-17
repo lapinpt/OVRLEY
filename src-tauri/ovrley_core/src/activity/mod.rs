@@ -16,6 +16,8 @@ pub mod interpolate;
 pub mod schema;
 /// Scene-window trimming for parsed activity samples.
 pub mod trim;
+/// Native Racelogic VBOX extraction into canonical activity columns.
+pub mod vbo;
 
 use crate::activity::interpolate::densify_activity;
 use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity};
