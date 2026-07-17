@@ -4,14 +4,18 @@ import path from 'node:path'
 import { describe, expect, test, vi, beforeEach } from 'vitest'
 
 const finalizeActivity = vi.hoisted(() => vi.fn())
+const parseCsvActivity = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/backend', () => ({
   finalizeActivity,
+  parseCsvActivity,
   writeParseDebugFile: vi.fn().mockResolvedValue('debug-path.json'),
   openVideo: vi.fn(),
 }))
 
 const fixtureDir = path.resolve('../src-tauri/ovrley_core/tests/fixtures/activity')
+const minimalGpx = '<gpx><trk><trkseg><trkpt lat="47.1" lon="8.1"><ele>500</ele><time>2026-01-01T00:00:00Z</time></trkpt></trkseg></trk></gpx>'
+const minimalSrt = ['1', '00:00:01,000 --> 00:00:01,033', '2025-07-23 10:21:40.000', '[latitude: 47.1] [longitude: 8.1]', ''].join('\n')
 
 function storeActions() {
   return {
@@ -29,10 +33,18 @@ describe('import-activity store boundary', () => {
   beforeEach(() => {
     vi.resetModules()
     finalizeActivity.mockReset()
+    parseCsvActivity.mockReset()
     finalizeActivity.mockResolvedValue({
       parsed_activity: {
         metadata: {
           duration_seconds: 0,
+        },
+      },
+    })
+    parseCsvActivity.mockResolvedValue({
+      parsed_activity: {
+        metadata: {
+          duration_seconds: 12.8,
         },
       },
     })
@@ -57,11 +69,42 @@ describe('import-activity store boundary', () => {
     expect(rawActivity.file_name).toBe('654G6NG1.IGC')
     expect(rawActivity.file_format).toBe('igc')
     expect(rawActivity.raw_samples.length).toBeGreaterThan(0)
+    expect(parseCsvActivity).not.toHaveBeenCalled()
     expect(store.setActivityFilename).toHaveBeenCalledWith('654G6NG1.IGC')
     expect(store.activateActivityFile).toHaveBeenCalledWith({
       metadata: {
         duration_seconds: 0,
       },
     })
+  })
+
+  test.each([
+    ['gpx', async () => new File([minimalGpx], 'activity.gpx')],
+    ['fit', async () => new File([await readFile(path.join(fixtureDir, 'test-ride.fit'))], 'activity.fit')],
+    ['srt', async () => new File([minimalSrt], 'activity.srt')],
+  ])('keeps %s imports on the existing RawActivity finalizer route', async (format, createFile) => {
+    const { default: saveFile } = await import('@/lib/activity/import-activity')
+
+    await saveFile(await createFile(), storeActions())
+
+    expect(finalizeActivity.mock.calls[0][0].file_format).toBe(format)
+    expect(parseCsvActivity).not.toHaveBeenCalled()
+  })
+
+  test('imports a native CSV path without creating a browser File or finalizing RawActivity', async () => {
+    const { importCsvActivityPath } = await import('@/lib/activity/import-activity')
+    const store = storeActions()
+
+    await importCsvActivityPath('C:\\activities\\sample Racebox.csv', store)
+
+    expect(parseCsvActivity).toHaveBeenCalledWith('C:\\activities\\sample Racebox.csv')
+    expect(finalizeActivity).not.toHaveBeenCalled()
+    expect(store.setActivityFilename).toHaveBeenCalledWith('sample Racebox.csv')
+    expect(store.activateActivityFile).toHaveBeenCalledWith({
+      metadata: {
+        duration_seconds: 12.8,
+      },
+    })
+    expect(store.setEndSecond).toHaveBeenCalledWith(12)
   })
 })

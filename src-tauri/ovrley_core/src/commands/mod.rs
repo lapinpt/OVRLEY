@@ -80,6 +80,14 @@ pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> C
     .map_err(CoreError::Serialization)
 }
 
+/// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
+pub fn backend_parse_csv_activity(path: &str) -> CoreResult<Value> {
+    serde_json::to_value(crate::activity::csv::parse_csv_activity_path(Path::new(
+        path,
+    ))?)
+    .map_err(CoreError::Serialization)
+}
+
 /// Lists bundled font filenames plus system font family names visible to Skia.
 pub fn backend_list_system_fonts(paths: &AppPaths) -> Value {
     let mut fonts: Vec<String> = FontMgr::default()

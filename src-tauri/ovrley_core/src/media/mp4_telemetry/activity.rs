@@ -169,6 +169,13 @@ pub fn build_activity_columns(
         pace: none(),
         distance: none(),
         g_force,
+        g_force_x: none(),
+        g_force_y: none(),
+        g_force_z: none(),
+        rpm: none(),
+        throttle_position: none(),
+        brake_position: none(),
+        lean_angle: none(),
         vertical_speed: none(),
         torque: none(),
         stroke_rate: none(),
@@ -186,6 +193,7 @@ pub fn build_activity_columns(
         ev,
         color_temperature,
         original_sample_count: samples.len(),
+        include_original_sample_count_metadata: true,
     }
 }
 
@@ -195,5 +203,69 @@ fn advance_to_closest(candidates: &[&NativeSample], idx: &mut usize, target_ms: 
             < (candidates[*idx].timestamp_ms - target_ms).abs()
     {
         *idx += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::activity::finalize::finalize_activity_columns;
+
+    #[test]
+    fn mp4_columns_keep_existing_telemetry_and_leave_csv_metrics_absent() {
+        let samples = vec![
+            NativeSample {
+                timestamp_ms: 0.0,
+                latitude: Some(47.0),
+                longitude: Some(8.0),
+                speed: Some(5.0),
+                ..NativeSample::default()
+            },
+            NativeSample {
+                timestamp_ms: 1000.0,
+                latitude: Some(47.0001),
+                longitude: Some(8.0001),
+                speed: Some(6.0),
+                ..NativeSample::default()
+            },
+        ];
+        let columns = build_activity_columns(
+            &samples,
+            30.0,
+            1.0,
+            Some("telemetry.mp4".to_string()),
+            "GoPro",
+            Some("HERO".to_string()),
+            None,
+            "telemetry_parser",
+            "gps_anchored",
+            TelemetrySeriesCounts {
+                gps: 2,
+                imu: 0,
+                camera: 0,
+            },
+        );
+
+        let activity = finalize_activity_columns(&columns, None)
+            .unwrap()
+            .parsed_activity;
+
+        assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
+        assert_eq!(activity.speed, vec![Some(5.0), Some(6.0)]);
+        assert_eq!(
+            activity.course,
+            vec![(Some(47.0), Some(8.0)), (Some(47.0001), Some(8.0001))]
+        );
+        for series in [
+            &activity.g_force_x,
+            &activity.g_force_y,
+            &activity.g_force_z,
+            &activity.rpm,
+            &activity.throttle_position,
+            &activity.brake_position,
+            &activity.lean_angle,
+        ] {
+            assert!(series.is_empty());
+        }
     }
 }

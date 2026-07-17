@@ -98,6 +98,12 @@ pub(crate) async fn backend_finalize_activity(
     ))
 }
 
+/// Parses a native CSV path through the core columnar activity pipeline.
+#[tauri::command]
+pub(crate) async fn backend_parse_csv_activity(path: String) -> Result<String, String> {
+    call_and_serialize(commands::backend_parse_csv_activity(&path))
+}
+
 /// Renders one transparent preview PNG for the requested second.
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(

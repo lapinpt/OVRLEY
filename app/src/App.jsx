@@ -80,7 +80,7 @@ function useAppShellComposition() {
   const { config, isProcessing, globalDefaults, importingVideo, setConfig, setErrorMessage } = useAppShellStore()
   const { backendStatus } = useBackendStatus()
   const editorShell = useEditorShellState()
-  const { activityFilename, handleGpxFileOpen } = useActivityImport()
+  const { activityFilename, handleActivityFileOpen } = useActivityImport()
   const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
@@ -103,8 +103,8 @@ function useAppShellComposition() {
   }
 
   const activityControls = {
-    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT/IGC' : activityFilename || 'Load GPX/FIT/SRT/IGC',
-    onOpenActivityFile: handleGpxFileOpen,
+    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT/IGC/CSV' : activityFilename || 'Load GPX/FIT/SRT/IGC/CSV',
+    onOpenActivityFile: handleActivityFileOpen,
   }
 
   const editorControls = {

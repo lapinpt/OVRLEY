@@ -422,7 +422,11 @@ pub fn derive_activity_metric_series(
         },
     );
     insert_metric!("elevation", &null_series);
+    insert_metric!("brake_position", &null_series);
     insert_metric!("g_force", &null_series);
+    insert_metric!("g_force_x", &null_series);
+    insert_metric!("g_force_y", &null_series);
+    insert_metric!("g_force_z", &null_series);
     insert_metric!("gear_position", &null_series);
     map.insert(
         "gradient".to_string(),
@@ -432,11 +436,13 @@ pub fn derive_activity_metric_series(
     insert_metric!("heading", &derived_heading);
     insert_metric!("heartrate", &null_series);
     insert_metric!("left_right_balance", &null_series);
+    insert_metric!("lean_angle", &null_series);
     map.insert(
         "pace".to_string(),
         combine_series(&direct["pace"], &derived_pace, false),
     );
     insert_metric!("power", &null_series);
+    insert_metric!("rpm", &null_series);
     map.insert(
         "speed".to_string(),
         combine_series(&direct["speed"], &derived_speed, false),
@@ -444,6 +450,7 @@ pub fn derive_activity_metric_series(
     insert_metric!("stride_length", &null_series);
     insert_metric!("stroke_rate", &null_series);
     insert_metric!("temperature", &null_series);
+    insert_metric!("throttle_position", &null_series);
     map.insert(
         "torque".to_string(),
         combine_series(&direct["torque"], &derived_torque, false),
@@ -491,19 +498,26 @@ fn direct_metrics(
     collect!("core_temperature", core_temperature);
     direct.insert("distance", distance_series.clone());
     direct.insert("elevation", elevation_base_series.clone());
+    collect!("brake_position", brake_position);
     collect!("g_force", g_force);
+    collect!("g_force_x", g_force_x);
+    collect!("g_force_y", g_force_y);
+    collect!("g_force_z", g_force_z);
     collect!("gear_position", gear_position);
     collect!("gradient", gradient);
     collect!("ground_contact_time", ground_contact_time);
     collect!("heading", heading);
     collect!("heartrate", heartrate);
     collect!("left_right_balance", left_right_balance);
+    collect!("lean_angle", lean_angle);
     collect!("pace", pace);
     collect!("power", power);
+    collect!("rpm", rpm);
     collect!("speed", speed);
     collect!("stride_length", stride_length);
     collect!("stroke_rate", stroke_rate);
     collect!("temperature", temperature);
+    collect!("throttle_position", throttle_position);
     collect!("torque", torque);
     collect!("vertical_oscillation", vertical_oscillation);
     collect!("vertical_speed", vertical_speed);

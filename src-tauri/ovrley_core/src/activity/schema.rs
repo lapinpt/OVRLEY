@@ -137,6 +137,13 @@ pub struct ActivityColumns {
     pub pace: NumericSeries,
     pub distance: NumericSeries,
     pub g_force: NumericSeries,
+    pub g_force_x: NumericSeries,
+    pub g_force_y: NumericSeries,
+    pub g_force_z: NumericSeries,
+    pub rpm: NumericSeries,
+    pub throttle_position: NumericSeries,
+    pub brake_position: NumericSeries,
+    pub lean_angle: NumericSeries,
     pub vertical_speed: NumericSeries,
     pub torque: NumericSeries,
     pub stroke_rate: NumericSeries,
@@ -154,6 +161,7 @@ pub struct ActivityColumns {
     pub ev: NumericSeries,
     pub color_temperature: NumericSeries,
     pub original_sample_count: usize,
+    pub include_original_sample_count_metadata: bool,
 }
 
 /// Per-metric smoothing request. Phase 0 only carries this through the schema.
@@ -355,6 +363,27 @@ pub struct ParsedActivity {
     /// G-force in multiples of Earth gravity.
     #[serde(default)]
     pub g_force: NumericSeries,
+    /// Lateral or source X acceleration in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force_x: NumericSeries,
+    /// Longitudinal/inline or source Y acceleration in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force_y: NumericSeries,
+    /// Vertical or source Z acceleration in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force_z: NumericSeries,
+    /// Engine speed in revolutions per minute.
+    #[serde(default)]
+    pub rpm: NumericSeries,
+    /// Accelerator or throttle position as percent.
+    #[serde(default)]
+    pub throttle_position: NumericSeries,
+    /// Brake control position as percent.
+    #[serde(default)]
+    pub brake_position: NumericSeries,
+    /// Signed vehicle lean angle in degrees.
+    #[serde(default)]
+    pub lean_angle: NumericSeries,
     /// Air pressure in bar.
     #[serde(default)]
     pub air_pressure: NumericSeries,

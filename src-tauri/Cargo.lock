@@ -2605,6 +2605,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "csv",
  "log",
  "open",
  "serde",
