@@ -1,2 +1,3 @@
-lean angle shows -0 in render
-switching between N and digit in gear causes vertical jump and down
+- lean angle shows -0 in render, it should not show a sign when it is 0
+- when N switches to a digit (or backwards) in gear metric widget, the contents of the widget jump and down, likely the line height between digit and 'N' differs.
+- degree unit is not upper index, it sits on the baseline which looks confusing. This is likely problem both in jsx preview and rust/skia render.
