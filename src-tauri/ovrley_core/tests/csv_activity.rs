@@ -3,8 +3,129 @@ use chrono::{
     TimeZone, Utc,
 };
 use ovrley_core::activity::csv::{parse_csv_activity_path, parse_csv_activity_reader};
+use ovrley_core::activity::interpolate::densify_activity;
+use ovrley_core::activity::trim::trim_activity;
 use ovrley_core::commands::backend_parse_csv_activity;
+use ovrley_core::normalize::RenderDataRequirements;
 use std::io::Cursor;
+
+#[test]
+fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
+    let csv = "Time,GPS_Update,Latitude,Longitude,Altitude (m),Speed (Km/h),Heading,Accel X\n\
+0.0,1,10.0,20.0,100.0,36.0,90.0,0.1\n\
+0.1,0,10.0,20.0,100.0,36.0,90.0,0.2\n\
+1.0,1,10.1,20.1,110.0,72.0,100.0,0.3\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "trackaddict.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.1, 1.0]);
+    assert_eq!(
+        activity.course,
+        vec![
+            (Some(10.0), Some(20.0)),
+            (None, None),
+            (Some(10.1), Some(20.1)),
+        ]
+    );
+    assert_eq!(activity.elevation, vec![Some(100.0), None, Some(110.0)]);
+    assert_eq!(activity.speed, vec![Some(10.0), None, Some(20.0)]);
+    assert_eq!(activity.heading, vec![Some(90.0), None, Some(100.0)]);
+    assert_eq!(activity.g_force_x, vec![Some(0.1), Some(0.2), Some(0.3)]);
+    assert_eq!(activity.sample_distance_progress, vec![0.0, 0.1, 1.0]);
+
+    let requirements = RenderDataRequirements {
+        speed: true,
+        elevation: true,
+        heading: true,
+        distance_progress: true,
+        course: true,
+        ..RenderDataRequirements::default()
+    };
+    let trimmed = trim_activity(&activity, 0.0, 1.0, &requirements).unwrap();
+    let dense = densify_activity(&trimmed, 2.0, &requirements);
+
+    assert_eq!(dense.series.speed[1], Some(15.0));
+    assert_eq!(dense.series.elevation[1], Some(105.0));
+    assert_eq!(dense.series.heading[1], Some(95.0));
+    assert_eq!(dense.series.course_lat[1], Some(10.05));
+    assert_eq!(dense.series.course_lon[1], Some(20.05));
+    assert_eq!(dense.frame_distance_progress[1], Some(0.5));
+}
+
+#[test]
+fn trackaddict_rejects_malformed_gps_update_values() {
+    let csv = "Time,GPS_Update,Latitude,Longitude\n\
+0.0,1,10.0,20.0\n\
+0.1,true,10.0,20.0\n";
+
+    let error = parse_csv_activity_reader(Cursor::new(csv), "trackaddict.csv").unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("CSV row 3 GPS_Update must be 0 or 1"),
+        "{error}"
+    );
+}
+
+#[test]
+fn gps_update_does_not_mask_independently_sampled_vehicle_speed() {
+    let csv = "Time,GPS_Update,Vehicle Speed (m/s),Accel X\n\
+0.0,1,10.0,0.1\n\
+0.1,0,11.0,0.2\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "mixed-rate.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.speed, vec![Some(10.0), Some(11.0)]);
+    assert_eq!(activity.g_force_x, vec![Some(0.1), Some(0.2)]);
+}
+
+#[test]
+fn amozoc_trackaddict_fixture_uses_gps_update_cadence() {
+    let activity = parse_fixture("Amozoc - TrackAddict.csv");
+    let sample_count = activity.sample_elapsed_seconds.len();
+    let gps_count = activity
+        .course
+        .iter()
+        .filter(|(latitude, longitude)| latitude.is_some() && longitude.is_some())
+        .count();
+
+    assert_eq!(sample_count, 10_675);
+    assert_eq!(gps_count, 531);
+    assert_eq!(
+        activity
+            .speed
+            .iter()
+            .filter(|value| value.is_some())
+            .count(),
+        531
+    );
+    assert_eq!(
+        activity
+            .heading
+            .iter()
+            .filter(|value| value.is_some())
+            .count(),
+        531
+    );
+    assert!(
+        activity
+            .g_force_x
+            .iter()
+            .filter(|value| value.is_some())
+            .count()
+            > 6_000
+    );
+    assert!(activity
+        .sample_distance_progress
+        .windows(2)
+        .all(|pair| pair[0] <= pair[1]));
+    assert_eq!(activity.sample_distance_progress.last(), Some(&1.0));
+}
 
 #[test]
 fn racebox_reader_produces_canonical_activity_columns() {

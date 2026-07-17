@@ -73,6 +73,19 @@ impl Metric {
     fn is_timing(self) -> bool {
         matches!(self, Self::ElapsedSeconds | Self::Timestamp)
     }
+
+    /// Returns whether a TrackAddict GPS update flag governs this metric.
+    fn uses_gps_update(self) -> bool {
+        matches!(
+            self,
+            Self::Latitude
+                | Self::Longitude
+                | Self::Elevation
+                | Self::Speed
+                | Self::Heading
+                | Self::Distance
+        )
+    }
 }
 
 /// Opens and parses a native CSV activity path.

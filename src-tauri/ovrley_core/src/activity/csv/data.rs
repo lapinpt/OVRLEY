@@ -28,11 +28,19 @@ impl CsvColumnData {
             .max()
             .unwrap_or_default();
         let mut columns = (0..width).map(|_| None).collect::<Vec<_>>();
-        let selected_indices = header
+        let mut selected_indices = header
             .columns
             .iter()
             .map(|column| column.index)
             .collect::<Vec<_>>();
+        if let Some(index) = header.gps_update_index {
+            if index >= columns.len() {
+                columns.resize_with(index + 1, || None);
+            }
+            selected_indices.push(index);
+        }
+        selected_indices.sort_unstable();
+        selected_indices.dedup();
         for index in &selected_indices {
             columns[*index] = Some(Vec::new());
         }

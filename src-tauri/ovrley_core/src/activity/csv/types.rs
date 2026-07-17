@@ -98,4 +98,6 @@ pub(super) struct HeaderLayout {
     pub record_index: usize,
     /// Recognized columns from that header, in source order.
     pub columns: Vec<HeaderColumn>,
+    /// Optional TrackAddict-style flag identifying rows with fresh GPS data.
+    pub gps_update_index: Option<usize>,
 }

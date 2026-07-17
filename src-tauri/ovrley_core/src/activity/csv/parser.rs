@@ -31,6 +31,9 @@ pub(super) fn parse_header_candidate(
     record_index: usize,
     record: &StringRecord,
 ) -> Option<HeaderLayout> {
+    let gps_update_index = record
+        .iter()
+        .position(|value| normalize_syntax(value) == "gps update");
     let mut columns = record
         .iter()
         .enumerate()
@@ -54,6 +57,7 @@ pub(super) fn parse_header_candidate(
     (has_timing && has_telemetry).then_some(HeaderLayout {
         record_index,
         columns,
+        gps_update_index,
     })
 }
 

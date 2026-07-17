@@ -17,10 +17,22 @@ pub(super) fn selected_series(
     units_row: Option<&StringRecord>,
     data: &CsvColumnData,
 ) -> NumericSeries {
-    let Some(column) = select_column(metric, None, columns, units_row, data) else {
-        return vec![None; data.len()];
-    };
-    series_from_column(column, units_row, data)
+    selected_series_with_column(metric, columns, units_row, data).1
+}
+
+/// Selects a metric source and returns both its identity and normalized values.
+pub(super) fn selected_series_with_column<'a>(
+    metric: Metric,
+    columns: &'a [HeaderColumn],
+    units_row: Option<&StringRecord>,
+    data: &CsvColumnData,
+) -> (Option<&'a HeaderColumn>, NumericSeries) {
+    let column = select_column(metric, None, columns, units_row, data);
+    let series = column.map_or_else(
+        || vec![None; data.len()],
+        |column| series_from_column(column, units_row, data),
+    );
+    (column, series)
 }
 
 /// Selects a usable acceleration source of the requested representation.

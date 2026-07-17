@@ -7,13 +7,16 @@
 //! shared activity finalizer.
 
 pub(super) use super::data::CsvColumnData;
-use super::headers::{AccelerationKind, HeaderLayout};
-use super::metrics::{column_unit, parse_number, selected_acceleration_series, selected_series};
+use super::headers::{AccelerationKind, HeaderLayout, SourcePriority};
+use super::metrics::{
+    column_unit, parse_number, selected_acceleration_series, selected_series,
+    selected_series_with_column,
+};
 pub(super) use super::timing::LocalPreamble;
 use super::timing::{selected_absolute_timestamps, AbsoluteTimestamp};
 use super::units::convert;
 use super::Metric;
-use crate::activity::schema::{ActivityColumns, RawActivityOptions};
+use crate::activity::schema::{ActivityColumns, DirectMetricGapPolicy, RawActivityOptions};
 use crate::error::{CoreError, CoreResult};
 use csv::StringRecord;
 use serde_json::json;
@@ -121,19 +124,44 @@ pub(super) fn build_activity_columns(
         .for_each(|value| *value -= origin);
 
     let sample_count = groups.len();
+    let gps_updates = parse_gps_updates(header, data)?;
     let timestamp = coalesce_series(&absolute_timestamps, &groups)
         .into_iter()
         .map(|value| value.map(|value| value.rfc3339()))
         .collect();
     let series = |metric| {
-        coalesce_series(
-            &selected_series(metric, &header.columns, units_row, data),
-            &groups,
+        let (column, mut values) =
+            selected_series_with_column(metric, &header.columns, units_row, data);
+        let uses_gps_update = metric.uses_gps_update()
+            && column.is_some_and(|column| {
+                matches!(
+                    column.priority,
+                    SourcePriority::Preferred | SourcePriority::Direct
+                )
+            });
+        if uses_gps_update {
+            if let Some(updates) = &gps_updates {
+                values.iter_mut().zip(updates).for_each(|(value, updated)| {
+                    if !updated {
+                        *value = None;
+                    }
+                });
+            }
+        }
+        (
+            coalesce_series(&values, &groups),
+            uses_gps_update && gps_updates.is_some(),
         )
     };
-    let g_force_x = series(Metric::GForceX);
-    let g_force_y = series(Metric::GForceY);
-    let g_force_z = series(Metric::GForceZ);
+    let (latitude, _) = series(Metric::Latitude);
+    let (longitude, _) = series(Metric::Longitude);
+    let (elevation, _) = series(Metric::Elevation);
+    let (altitude, _) = series(Metric::Altitude);
+    let (speed, preserve_speed_gaps) = series(Metric::Speed);
+    let (heading, preserve_heading_gaps) = series(Metric::Heading);
+    let (g_force_x, _) = series(Metric::GForceX);
+    let (g_force_y, _) = series(Metric::GForceY);
+    let (g_force_z, _) = series(Metric::GForceZ);
     let mut g_force_source = selected_series(Metric::GForce, &header.columns, units_row, data);
     if g_force_source.iter().all(Option::is_none) {
         let lateral = selected_acceleration_series(
@@ -193,7 +221,7 @@ pub(super) fn build_activity_columns(
         }
     }
     let g_force = coalesce_series(&g_force_source, &groups);
-    let mut distance = series(Metric::Distance);
+    let (mut distance, _) = series(Metric::Distance);
     if let Some(origin) = distance.iter().flatten().next().copied() {
         distance.iter_mut().for_each(|value| {
             *value = value
@@ -201,6 +229,15 @@ pub(super) fn build_activity_columns(
                 .filter(|distance| *distance >= 0.0)
         });
     }
+    let preserve_direct_metric_gaps = DirectMetricGapPolicy {
+        speed: preserve_speed_gaps,
+        heading: preserve_heading_gaps,
+    };
+    let (rpm, _) = series(Metric::Rpm);
+    let (throttle_position, _) = series(Metric::ThrottlePosition);
+    let (brake_position, _) = series(Metric::BrakePosition);
+    let (lean_angle, _) = series(Metric::LeanAngle);
+    let (gear_position, _) = series(Metric::GearPosition);
     let empty = || vec![None; sample_count];
 
     Ok(ActivityColumns {
@@ -208,24 +245,25 @@ pub(super) fn build_activity_columns(
         file_format: "csv".to_string(),
         metadata: json!({}),
         options: RawActivityOptions::default(),
+        preserve_direct_metric_gaps,
         timestamp,
         elapsed_seconds: elapsed_seconds.into_iter().map(Some).collect(),
-        latitude: series(Metric::Latitude),
-        longitude: series(Metric::Longitude),
-        elevation: series(Metric::Elevation),
-        altitude: series(Metric::Altitude),
-        speed: series(Metric::Speed),
-        heading: series(Metric::Heading),
+        latitude,
+        longitude,
+        elevation,
+        altitude,
+        speed,
+        heading,
         distance,
         g_force,
         g_force_x,
         g_force_y,
         g_force_z,
-        rpm: series(Metric::Rpm),
-        throttle_position: series(Metric::ThrottlePosition),
-        brake_position: series(Metric::BrakePosition),
-        lean_angle: series(Metric::LeanAngle),
-        gear_position: series(Metric::GearPosition),
+        rpm,
+        throttle_position,
+        brake_position,
+        lean_angle,
+        gear_position,
         original_sample_count: data.len(),
         include_original_sample_count_metadata: false,
         heartrate: empty(),
@@ -250,6 +288,24 @@ pub(super) fn build_activity_columns(
         ev: empty(),
         color_temperature: empty(),
     })
+}
+
+/// Parses an optional GPS freshness signal as a strict row-aligned contract.
+fn parse_gps_updates(header: &HeaderLayout, data: &CsvColumnData) -> CoreResult<Option<Vec<bool>>> {
+    let Some(column) = header.gps_update_index else {
+        return Ok(None);
+    };
+    let updates = (0..data.len())
+        .map(|row| match data.value(row, column).map(str::trim) {
+            Some("0") => Ok(false),
+            Some("1") => Ok(true),
+            _ => Err(CoreError::Activity(format!(
+                "CSV row {} GPS_Update must be 0 or 1",
+                data.record_index(row) + 1
+            ))),
+        })
+        .collect::<CoreResult<Vec<_>>>()?;
+    Ok(Some(updates))
 }
 
 /// Groups adjacent source rows that share exactly the same elapsed time.

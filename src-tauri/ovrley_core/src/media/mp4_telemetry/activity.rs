@@ -153,6 +153,7 @@ pub fn build_activity_columns(
             skip_idle_gap_fill: true,
             smoothing: BTreeMap::new(),
         },
+        preserve_direct_metric_gaps: Default::default(),
         timestamp,
         elapsed_seconds,
         latitude,

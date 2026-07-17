@@ -200,13 +200,14 @@ fn finalize_columns_with_debug(
 
     let time_series = build_time_series(columns);
     let course_series = build_course_series(columns);
+    let elapsed_series = build_elapsed_series(columns, &time_series);
     let direct_distance_series: Vec<Option<f64>> = columns
         .distance
         .iter()
         .map(|value| value.and_then(finite_f64))
         .collect();
-    let distance_series = build_distance_series(&course_series, &direct_distance_series);
-    let elapsed_series = build_elapsed_series(columns, &time_series);
+    let distance_series =
+        build_distance_series(&course_series, &direct_distance_series, &elapsed_series);
     let elevation_base_series: Vec<Option<f64>> = columns
         .elevation
         .iter()
@@ -361,6 +362,7 @@ fn activity_columns_from_samples(
         file_format: raw_activity.file_format.clone(),
         metadata: raw_activity.metadata.clone(),
         options: raw_activity.options.clone(),
+        preserve_direct_metric_gaps: Default::default(),
         timestamp: raw_samples
             .iter()
             .map(|sample| sample.timestamp.clone())

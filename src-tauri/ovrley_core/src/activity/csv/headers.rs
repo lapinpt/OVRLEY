@@ -7,5 +7,5 @@
 
 pub(super) use super::parser::{is_compatible_units_row, parse_header_candidate};
 pub(super) use super::types::{
-    AccelerationKind, ControlKind, HeaderColumn, HeaderLayout, TimingKind,
+    AccelerationKind, ControlKind, HeaderColumn, HeaderLayout, SourcePriority, TimingKind,
 };

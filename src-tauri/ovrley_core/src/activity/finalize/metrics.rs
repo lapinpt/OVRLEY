@@ -373,6 +373,25 @@ fn combine_series(
     }
 }
 
+/// Selects one complete source series without repairing holes in direct data.
+fn select_series(primary: &NumericSeries, fallback: &NumericSeries) -> MetricDescriptor {
+    if primary.iter().any(Option::is_some) {
+        return MetricDescriptor {
+            series: primary.clone(),
+            source: MetricSource::Direct,
+        };
+    }
+    let source = if fallback.iter().any(Option::is_some) {
+        MetricSource::Derived
+    } else {
+        MetricSource::Missing
+    };
+    MetricDescriptor {
+        series: fallback.clone(),
+        source,
+    }
+}
+
 /// Builds every finalized metric descriptor for a raw activity.
 ///
 /// Direct source fields are collected once, shared derivations are computed from
@@ -433,7 +452,14 @@ pub fn derive_activity_metric_series(
         combine_series(&derived_gradient, &direct["gradient"], true),
     );
     insert_metric!("ground_contact_time", &null_series);
-    insert_metric!("heading", &derived_heading);
+    map.insert(
+        "heading".to_string(),
+        if columns.preserve_direct_metric_gaps.heading {
+            select_series(&direct["heading"], &derived_heading)
+        } else {
+            combine_series(&direct["heading"], &derived_heading, false)
+        },
+    );
     insert_metric!("heartrate", &null_series);
     insert_metric!("left_right_balance", &null_series);
     insert_metric!("lean_angle", &null_series);
@@ -445,7 +471,11 @@ pub fn derive_activity_metric_series(
     insert_metric!("rpm", &null_series);
     map.insert(
         "speed".to_string(),
-        combine_series(&direct["speed"], &derived_speed, false),
+        if columns.preserve_direct_metric_gaps.speed {
+            select_series(&direct["speed"], &derived_speed)
+        } else {
+            combine_series(&direct["speed"], &derived_speed, false)
+        },
     );
     insert_metric!("stride_length", &null_series);
     insert_metric!("stroke_rate", &null_series);

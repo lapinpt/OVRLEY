@@ -109,6 +109,13 @@ pub struct RawActivityOptions {
     pub smoothing: BTreeMap<String, SmoothingOption>,
 }
 
+/// Metric-scoped policy for direct observations whose gaps are intentional.
+#[derive(Clone, Debug, Default)]
+pub struct DirectMetricGapPolicy {
+    pub speed: bool,
+    pub heading: bool,
+}
+
 /// Columnar activity input used by the shared finalizer core.
 ///
 /// Browser parsers can still send row-oriented [`RawActivity`] JSON; the
@@ -121,6 +128,8 @@ pub struct ActivityColumns {
     pub file_format: String,
     pub metadata: Value,
     pub options: RawActivityOptions,
+    /// Direct metrics whose intentional source gaps must remain available for interpolation.
+    pub preserve_direct_metric_gaps: DirectMetricGapPolicy,
     pub timestamp: TimeSeries,
     pub elapsed_seconds: NumericSeries,
     pub latitude: NumericSeries,
