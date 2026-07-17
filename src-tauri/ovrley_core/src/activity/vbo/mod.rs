@@ -278,7 +278,10 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         left_right_balance: empty(),
         core_temperature: empty(),
         air_pressure: empty(),
-        gear_position: series(layout.gear_position, identity),
+        gear_position: series(layout.gear_position, identity)
+            .into_iter()
+            .map(|value| value.map(|number| number.to_string()))
+            .collect(),
         iso: empty(),
         aperture: empty(),
         shutter_speed: empty(),

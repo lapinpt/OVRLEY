@@ -531,3 +531,43 @@ fn linear_interpolation_densifies_altitude_as_smooth_line() {
         );
     }
 }
+
+#[test]
+fn vehicle_metrics_survive_trim_and_linear_densification() {
+    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::trim::trim_activity;
+
+    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "rpm": [1000.0, 3000.0, 5000.0],
+        "throttle_position": [0.0, 50.0, 100.0],
+        "brake_position": [100.0, 50.0, 0.0],
+        "lean_angle": [-30.0, 0.0, 30.0]
+    }))
+    .unwrap();
+    let requirements = RenderDataRequirements {
+        rpm: true,
+        throttle_position: true,
+        brake_position: true,
+        lean_angle: true,
+        ..RenderDataRequirements::default()
+    };
+
+    let trimmed = trim_activity(&activity, 0.5, 1.5, &requirements).unwrap();
+    assert_eq!(trimmed.rpm, vec![Some(2000.0), Some(3000.0), Some(4000.0)]);
+    assert_eq!(
+        trimmed.throttle_position,
+        vec![Some(25.0), Some(50.0), Some(75.0)]
+    );
+    assert_eq!(
+        trimmed.brake_position,
+        vec![Some(75.0), Some(50.0), Some(25.0)]
+    );
+    assert_eq!(trimmed.lean_angle, vec![Some(-15.0), Some(0.0), Some(15.0)]);
+
+    let dense = densify_activity(&trimmed, 2.0, &requirements);
+    assert_eq!(dense.series.rpm, vec![Some(2000.0), Some(3000.0)]);
+    assert_eq!(dense.series.throttle_position, vec![Some(25.0), Some(50.0)]);
+    assert_eq!(dense.series.brake_position, vec![Some(75.0), Some(50.0)]);
+    assert_eq!(dense.series.lean_angle, vec![Some(-15.0), Some(0.0)]);
+}

@@ -186,7 +186,7 @@ pub fn build_activity_columns(
         left_right_balance: none(),
         core_temperature: none(),
         air_pressure: none(),
-        gear_position: none(),
+        gear_position: vec![None; n],
         iso,
         aperture,
         shutter_speed,

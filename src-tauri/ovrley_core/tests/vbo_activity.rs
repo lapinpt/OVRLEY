@@ -144,7 +144,10 @@ time lat long rc_lateral_acc_1-canbus longitudinal_acc_1_canbus combined-acc-cal
     assert_eq!(activity.g_force_y, vec![Some(0.4), Some(0.8)]);
     assert_eq!(activity.g_force_z, vec![Some(0.1), Some(0.2)]);
     assert_eq!(activity.g_force, vec![Some(0.7), Some(1.1)]);
-    assert_eq!(activity.gear_position, vec![Some(3.0), Some(4.0)]);
+    assert_eq!(
+        activity.gear_position,
+        vec![Some("3".to_string()), Some("4".to_string())]
+    );
     assert_eq!(activity.rpm, vec![Some(4200.0), Some(4300.0)]);
     assert_eq!(activity.throttle_position, vec![Some(55.0), Some(60.0)]);
     assert_eq!(activity.brake_position, vec![Some(20.0), Some(25.0)]);
@@ -289,7 +292,7 @@ fn racechrono_vbo_fixture_resolves_standard_and_suffixed_channels() {
     assert_close(activity.g_force_y[0], 0.003);
     assert_close(activity.rpm[0], 646.0);
     assert_close(activity.throttle_position[0], 0.0);
-    assert_close(activity.gear_position[0], 1.0);
+    assert_eq!(activity.gear_position[0].as_deref(), Some("1"));
     assert_close(activity.lean_angle[0], -0.351);
 }
 

@@ -30,6 +30,10 @@ import shutterSpeedIconSvg from '../../../../assets/widget-icons/widget-shutter-
 import focalLengthIconSvg from '../../../../assets/widget-icons/widget-focal-length.svg?raw'
 import evIconSvg from '../../../../assets/widget-icons/widget-ev.svg?raw'
 import colorTemperatureIconSvg from '../../../../assets/widget-icons/widget-color-temperature.svg?raw'
+import rpmIconSvg from '../../../../assets/widget-icons/widget-rpm.svg?raw'
+import throttlePositionIconSvg from '../../../../assets/widget-icons/widget-throttle-position.svg?raw'
+import brakePositionIconSvg from '../../../../assets/widget-icons/widget-brake-position.svg?raw'
+import leanAngleIconSvg from '../../../../assets/widget-icons/widget-lean-angle.svg?raw'
 import displayTypeTextSvg from '../../../../assets/widget-icons/display-type-text.svg?raw'
 import displayTypeLinearSvg from '../../../../assets/widget-icons/display-type-linear.svg?raw'
 import displayTypeHeadingTapeSvg from '../../../../assets/widget-icons/display-type-heading-tape.svg?raw'
@@ -39,9 +43,18 @@ import displayTypeCircleSvg from '../../../../assets/widget-icons/display-type-c
 import displayTypeRectangleSvg from '../../../../assets/widget-icons/display-type-rectangle.svg?raw'
 
 function parseMetricIconSvg(svgMarkup) {
+  const rootTag = svgMarkup.match(/<svg[^>]*>/i)?.[0]
+  if (!rootTag) throw new Error('Metric icon asset must contain an SVG root element')
+
   const strokeWidthMatch = svgMarkup.match(/stroke-width="([^"]+)"/)
   const innerMarkupMatch = svgMarkup.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i)
+  const fill = rootTag.match(/\sfill="([^"]+)"/)?.[1]
+  const stroke = rootTag.match(/\sstroke="([^"]+)"/)?.[1]
+  if (!fill || !stroke) throw new Error('Metric icon SVG root must define fill and stroke')
+
   return {
+    fill,
+    stroke,
     strokeWidth: Number(strokeWidthMatch?.[1] || 2),
     innerMarkup: (innerMarkupMatch?.[1] || '').trim(),
   }
@@ -79,6 +92,10 @@ export const METRIC_ICON_SVGS = {
   focal_length: parseMetricIconSvg(focalLengthIconSvg),
   ev: parseMetricIconSvg(evIconSvg),
   color_temperature: parseMetricIconSvg(colorTemperatureIconSvg),
+  rpm: parseMetricIconSvg(rpmIconSvg),
+  throttle_position: parseMetricIconSvg(throttlePositionIconSvg),
+  brake_position: parseMetricIconSvg(brakePositionIconSvg),
+  lean_angle: parseMetricIconSvg(leanAngleIconSvg),
   label: parseMetricIconSvg(labelIconSvg),
 }
 

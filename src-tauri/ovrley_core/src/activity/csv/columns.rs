@@ -9,7 +9,7 @@
 pub(super) use super::data::CsvColumnData;
 use super::headers::{AccelerationKind, HeaderLayout, SourcePriority};
 use super::metrics::{
-    column_unit, parse_number, selected_acceleration_series, selected_series,
+    column_unit, parse_number, selected_acceleration_series, selected_gear_series, selected_series,
     selected_series_with_column,
 };
 pub(super) use super::timing::LocalPreamble;
@@ -237,7 +237,10 @@ pub(super) fn build_activity_columns(
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
     let (lean_angle, _) = series(Metric::LeanAngle);
-    let (gear_position, _) = series(Metric::GearPosition);
+    let gear_position = coalesce_series(
+        &selected_gear_series(&header.columns, units_row, data),
+        &groups,
+    );
     let empty = || vec![None; sample_count];
 
     Ok(ActivityColumns {

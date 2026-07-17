@@ -29,6 +29,24 @@ function makeActivity(type, value) {
   }
 }
 
+describe('Vehicle metric formatting', () => {
+  test.each([
+    ['rpm', 7250, 'rpm', '7250', 'RPM'],
+    ['throttle_position', 42.5, 'percent', '42.5', '%'],
+    ['brake_position', 18.5, 'percent', '18.5', '%'],
+    ['lean_angle', -37.5, 'degrees', '-37.5', '°'],
+  ])('%s uses standard decimal formatting', (type, value, displayUnit, expectedValue, expectedUnit) => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget(type, { display_unit: displayUnit, decimals: type === 'rpm' ? 0 : 1 }),
+      activity: makeActivity(type, value),
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe(expectedValue)
+    expect(model?.unitText).toBe(expectedUnit)
+  })
+})
+
 describe('Wave 2 metric formatting', () => {
   test('vertical_oscillation formats as mm', () => {
     const model = buildMetricWidgetPreviewModel({
@@ -145,11 +163,29 @@ describe('Wave 1 metric formatting', () => {
   test('gear_position formats as integer', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('gear_position', { display_unit: 'gear' }),
-      activity: makeActivity('gear_position', 5),
+      activity: makeActivity('gear_position', '5'),
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('5')
     expect(model?.unitText).toBe('GEAR')
+  })
+
+  test('gear_position formats zero as neutral', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('gear_position', { display_unit: 'gear' }),
+      activity: makeActivity('gear_position', '0'),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('N')
+  })
+
+  test('gear_position preserves drivetrain labels', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('gear_position', { display_unit: 'gear' }),
+      activity: makeActivity('gear_position', '52-34'),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('52-34')
   })
 
   test('gear_position shows placeholder when missing', () => {

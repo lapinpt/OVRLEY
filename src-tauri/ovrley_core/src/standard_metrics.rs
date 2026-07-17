@@ -23,6 +23,7 @@ pub enum StandardMetricFormatterKind {
     Shutter,
     Aperture,
     Ev,
+    Gear,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -69,6 +70,10 @@ pub enum MetricIconAssetKey {
     FocalLength,
     Ev,
     ColorTemperature,
+    Rpm,
+    ThrottlePosition,
+    BrakePosition,
+    LeanAngle,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -264,6 +269,10 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "focal_length" => Some(MetricKind::FocalLength),
         "ev" => Some(MetricKind::Ev),
         "color_temperature" => Some(MetricKind::ColorTemperature),
+        "rpm" => Some(MetricKind::Rpm),
+        "throttle_position" => Some(MetricKind::ThrottlePosition),
+        "brake_position" => Some(MetricKind::BrakePosition),
+        "lean_angle" => Some(MetricKind::LeanAngle),
         _ => None,
     }
 }
@@ -300,6 +309,10 @@ fn metric_kind_to_key(kind: MetricKind) -> &'static str {
         MetricKind::FocalLength => "focal_length",
         MetricKind::Ev => "ev",
         MetricKind::ColorTemperature => "color_temperature",
+        MetricKind::Rpm => "rpm",
+        MetricKind::ThrottlePosition => "throttle_position",
+        MetricKind::BrakePosition => "brake_position",
+        MetricKind::LeanAngle => "lean_angle",
     }
 }
 
@@ -368,6 +381,10 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
         "widget-focal-length.svg" => Some(MetricIconAssetKey::FocalLength),
         "widget-ev.svg" => Some(MetricIconAssetKey::Ev),
         "widget-color-temperature.svg" => Some(MetricIconAssetKey::ColorTemperature),
+        "widget-rpm.svg" => Some(MetricIconAssetKey::Rpm),
+        "widget-throttle-position.svg" => Some(MetricIconAssetKey::ThrottlePosition),
+        "widget-brake-position.svg" => Some(MetricIconAssetKey::BrakePosition),
+        "widget-lean-angle.svg" => Some(MetricIconAssetKey::LeanAngle),
         _ => None,
     }
 }

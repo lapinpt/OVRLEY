@@ -84,6 +84,14 @@ pub enum MetricKind {
     Ev,
     #[serde(rename = "color_temperature")]
     ColorTemperature,
+    #[serde(rename = "rpm")]
+    Rpm,
+    #[serde(rename = "throttle_position")]
+    ThrottlePosition,
+    #[serde(rename = "brake_position")]
+    BrakePosition,
+    #[serde(rename = "lean_angle")]
+    LeanAngle,
 }
 
 /// Visual representation mode for a value widget.

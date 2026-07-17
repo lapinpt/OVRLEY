@@ -250,6 +250,12 @@ function formatEv(value, decimals) {
   return { value: `${prefix}${formatted}`, units: '' }
 }
 
+function formatGearPosition(value, units) {
+  if (value === null || value === undefined) return { value: '--', units }
+  if (value === '0') return { value: 'N', units }
+  return { value, units }
+}
+
 export function formatStandardMetricDisplay(type, value, widgetData) {
   const definition = getStandardMetricDefinition(type)
   if (!definition) throw new Error(`Unknown standard metric type: ${type}`)
@@ -286,6 +292,10 @@ export function formatStandardMetricDisplay(type, value, widgetData) {
 
   if (definition.formatter === 'ev') {
     return formatEv(value, widgetData.decimals)
+  }
+
+  if (definition.formatter === 'gear') {
+    return formatGearPosition(value, effectiveUnitLabel)
   }
 
   if (type === 'distance') {

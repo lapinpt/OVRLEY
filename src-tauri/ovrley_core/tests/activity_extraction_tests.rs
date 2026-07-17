@@ -221,7 +221,7 @@ fn extract_activity_from_telemetry_fixtures() {
     }
 }
 
-fn assert_absent_metric(series: &[Option<f64>], stem: &str, metric: &str) {
+fn assert_absent_metric<T>(series: &[Option<T>], stem: &str, metric: &str) {
     assert!(
         series.iter().all(Option::is_none),
         "{stem}: {metric} must contain no values"

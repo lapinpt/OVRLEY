@@ -19,8 +19,8 @@ function ParsedSvgIcon({ data, className, ...props }) {
     <svg
       viewBox="0 0 24 24"
       color="currentColor"
-      fill="none"
-      stroke="currentColor"
+      fill={data.fill}
+      stroke={data.stroke}
       strokeWidth={data.strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -76,6 +76,9 @@ export const WIDGET_DRAWER_LABELS = {
   gear_position: 'Gear',
   vertical_oscillation: 'V. Osc.',
   core_temperature: 'Core T.',
+  throttle_position: 'Throttle',
+  brake_position: 'Brake',
+  lean_angle: 'Lean',
 }
 
 const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => !['backdrop', 'label'].includes(type))

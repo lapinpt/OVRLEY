@@ -108,29 +108,31 @@ fn interpolate_numeric_series(
         .collect()
 }
 
-// Densifies a numeric series with hold (step) interpolation.
+// Densifies a series with hold (step) interpolation.
 // Each frame takes the value of the last sample at or before that frame time.
-fn densify_hold_series(
+pub(super) fn densify_hold_series<T: Clone>(
     x_values: &[f64],
-    y_values: &NumericSeries,
+    y_values: &[Option<T>],
     target_x_values: &[f64],
-) -> Vec<Option<f64>> {
+) -> Vec<Option<T>> {
     if y_values.is_empty() {
         return Vec::new();
     }
-    // Build (x, y) pairs from valid samples
-    let points = collect_valid_numeric_points(x_values, y_values);
-    let mut last_value: Option<f64> = None;
-    let mut point_idx = 0;
+    let points = x_values
+        .iter()
+        .zip(y_values)
+        .filter_map(|(x, value)| value.clone().map(|value| (*x, value)))
+        .collect::<Vec<_>>();
+    let mut last_value = None;
+    let mut point_index = 0;
     target_x_values
         .iter()
         .map(|target| {
-            // Advance past all points before this target
-            while point_idx < points.len() && points[point_idx].0 <= *target + 1e-9 {
-                last_value = Some(points[point_idx].1);
-                point_idx += 1;
+            while point_index < points.len() && points[point_index].0 <= *target + 1e-9 {
+                last_value = Some(points[point_index].1.clone());
+                point_index += 1;
             }
-            last_value
+            last_value.clone()
         })
         .collect()
 }
@@ -362,6 +364,34 @@ pub fn densify_activity(
                 requirements.g_force,
                 crate::MetricKind::GForce,
             ),
+            rpm: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.rpm,
+                &frame_elapsed_seconds,
+                requirements.rpm,
+                crate::MetricKind::Rpm,
+            ),
+            throttle_position: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.throttle_position,
+                &frame_elapsed_seconds,
+                requirements.throttle_position,
+                crate::MetricKind::ThrottlePosition,
+            ),
+            brake_position: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.brake_position,
+                &frame_elapsed_seconds,
+                requirements.brake_position,
+                crate::MetricKind::BrakePosition,
+            ),
+            lean_angle: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.lean_angle,
+                &frame_elapsed_seconds,
+                requirements.lean_angle,
+                crate::MetricKind::LeanAngle,
+            ),
             air_pressure: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.air_pressure,
@@ -460,13 +490,15 @@ pub fn densify_activity(
                 requirements.color_temperature,
                 crate::MetricKind::ColorTemperature,
             ),
-            gear_position: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.gear_position,
-                &frame_elapsed_seconds,
-                requirements.gear_position,
-                crate::MetricKind::GearPosition,
-            ),
+            gear_position: if requirements.gear_position {
+                densify_hold_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.gear_position,
+                    &frame_elapsed_seconds,
+                )
+            } else {
+                Vec::new()
+            },
             vertical_ratio: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.vertical_ratio,

@@ -4,7 +4,7 @@ use super::data::CsvColumnData;
 use super::headers::{AccelerationKind, ControlKind, HeaderColumn};
 use super::units::{convert, parse_declared_unit, resolve_unit, DeclaredUnit, Unit};
 use super::Metric;
-use crate::activity::schema::NumericSeries;
+use crate::activity::schema::{GearSeries, NumericSeries};
 use csv::StringRecord;
 
 /// Selects and converts the best usable source for a metric.
@@ -51,6 +51,41 @@ pub(super) fn selected_acceleration_series(
     Some(series_from_column(column, units_row, data))
 }
 
+/// Selects and parses the best usable gear source into the canonical mixed-type series.
+pub(super) fn selected_gear_series(
+    columns: &[HeaderColumn],
+    units_row: Option<&StringRecord>,
+    data: &CsvColumnData,
+) -> GearSeries {
+    for column in candidate_columns(Metric::GearPosition, None, columns, units_row) {
+        let series = (0..data.len())
+            .map(|row| data.value(row, column.index).and_then(parse_gear_value))
+            .collect::<GearSeries>();
+        if series.iter().any(Option::is_some) {
+            return series;
+        }
+    }
+    vec![None; data.len()]
+}
+
+fn parse_gear_value(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("n/a")
+        || trimmed.eq_ignore_ascii_case("na")
+        || trimmed.eq_ignore_ascii_case("null")
+    {
+        return None;
+    }
+    Some(
+        trimmed
+            .parse::<f64>()
+            .ok()
+            .filter(|number| number.is_finite())
+            .map_or_else(|| trimmed.to_string(), |number| number.to_string()),
+    )
+}
+
 /// Converts every value in one selected CSV column to a canonical series.
 ///
 /// Empty, non-numeric, non-finite, and metric-invalid observations become
@@ -81,6 +116,23 @@ pub(super) fn select_column<'a>(
     units_row: Option<&StringRecord>,
     data: &CsvColumnData,
 ) -> Option<&'a HeaderColumn> {
+    candidate_columns(metric, acceleration, columns, units_row)
+        .into_iter()
+        .find(|column| {
+            let unit = column_unit(column, units_row).expect("candidate has a compatible unit");
+            let binary = control_is_binary(column, data);
+            (0..data.len()).any(|row| {
+                parse_metric_value(data.value(row, column.index), metric, unit, binary).is_some()
+            })
+        })
+}
+
+fn candidate_columns<'a>(
+    metric: Metric,
+    acceleration: Option<AccelerationKind>,
+    columns: &'a [HeaderColumn],
+    units_row: Option<&StringRecord>,
+) -> Vec<&'a HeaderColumn> {
     let mut candidates = columns
         .iter()
         .filter(|column| {
@@ -90,13 +142,7 @@ pub(super) fn select_column<'a>(
         })
         .collect::<Vec<_>>();
     candidates.sort_by_key(|column| (column.priority, column.index));
-    candidates.into_iter().find(|column| {
-        let unit = column_unit(column, units_row).expect("candidate has a compatible unit");
-        let binary = control_is_binary(column, data);
-        (0..data.len()).any(|row| {
-            parse_metric_value(data.value(row, column.index), metric, unit, binary).is_some()
-        })
-    })
+    candidates
 }
 
 /// Parses, converts, and validates one metric observation.

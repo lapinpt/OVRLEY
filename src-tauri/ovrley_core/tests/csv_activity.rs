@@ -527,7 +527,7 @@ s,km/h,m,#\n\
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(activity.speed, vec![Some(10.0), Some(20.0)]);
     assert_eq!(activity.distance, vec![Some(0.0), Some(3.0)]);
-    assert_eq!(activity.gear_position, vec![Some(2.0), Some(3.0)]);
+    assert_eq!(activity.gear_position, gear_numbers(&[2.0, 3.0]));
 }
 
 #[test]
@@ -575,14 +575,17 @@ knots,knots\n\
 #[test]
 fn vehicle_gear_outranks_calculated_gear() {
     let csv = "Time,CalculatedGear,Gear *obd\n\
-0,1,3\n\
-1,2,4\n";
+0,1,52-34\n\
+1,2,50-34\n";
 
     let activity = parse_csv_activity_reader(Cursor::new(csv), "gear.csv")
         .unwrap()
         .parsed_activity;
 
-    assert_eq!(activity.gear_position, vec![Some(3.0), Some(4.0)]);
+    assert_eq!(
+        activity.gear_position,
+        vec![Some("52-34".to_string()), Some("50-34".to_string()),]
+    );
 }
 
 #[test]
@@ -617,7 +620,7 @@ fn vehicle_sources_and_accelerator_pedals_win_and_controls_normalize_by_column()
     assert!(activity.cadence.is_empty());
     assert_eq!(activity.throttle_position, vec![Some(25.0), Some(50.0)]);
     assert_eq!(activity.brake_position, vec![Some(0.0), Some(100.0)]);
-    assert_eq!(activity.gear_position, vec![Some(3.0), Some(4.0)]);
+    assert_eq!(activity.gear_position, gear_numbers(&[3.0, 4.0]));
     assert_eq!(activity.lean_angle, vec![Some(-12.5), Some(8.25)]);
     assert_eq!(activity.extra["metric_units"]["rpm"], "rpm");
     assert_eq!(
@@ -744,7 +747,7 @@ fn trackaddict_aim_lap_legend_and_racebox_fixtures_import_existing_metrics() {
     assert_close(aim.speed[0], 0.01);
     assert_close(aim.elevation[0], 122.8322);
     assert_close(aim.distance[0], 0.0);
-    assert_close(aim.gear_position[0], 0.0);
+    assert_eq!(aim.gear_position[0].as_deref(), Some("0"));
 
     let lap_legend = parse_fixture("sample LapLegend.csv");
     assert_close(lap_legend.speed[0], 16.0 / 3.6);
@@ -798,7 +801,7 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
     assert_close(racechrono.rpm[0], 747.0);
     assert_close(racechrono.throttle_position[0], 15.3);
     assert_close(racechrono.brake_position[0], 0.0);
-    assert_close(racechrono.gear_position[0], 0.0);
+    assert_eq!(racechrono.gear_position[0].as_deref(), Some("0"));
     assert_close(racechrono.g_force[0], 0.0);
     assert_close(racechrono.g_force_x[0], 1.003);
     assert_close(racechrono.g_force_y[0], -0.017);
@@ -879,7 +882,6 @@ fn motorsport_fixtures_retain_available_new_metrics_as_finite_optional_series() 
             &activity.throttle_position,
             &activity.brake_position,
             &activity.lean_angle,
-            &activity.gear_position,
         ] {
             assert!(
                 series.iter().flatten().all(|value| value.is_finite()),
@@ -890,6 +892,11 @@ fn motorsport_fixtures_retain_available_new_metrics_as_finite_optional_series() 
                 "{name}"
             );
         }
+        assert!(
+            activity.gear_position.is_empty()
+                || activity.gear_position.len() == activity.sample_elapsed_seconds.len(),
+            "{name}"
+        );
     }
 
     let trackaddict = parse_fixture("Amozoc - TrackAddict.csv");
@@ -949,6 +956,10 @@ fn assert_close(actual: Option<f64>, expected: f64) {
         (actual - expected).abs() < 1e-9,
         "expected {expected}, got {actual}"
     );
+}
+
+fn gear_numbers(values: &[f64]) -> Vec<Option<String>> {
+    values.iter().map(|value| Some(value.to_string())).collect()
 }
 
 fn local_rfc3339(value: chrono::NaiveDateTime) -> Option<String> {

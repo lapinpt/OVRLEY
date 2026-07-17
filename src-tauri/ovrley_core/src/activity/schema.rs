@@ -37,6 +37,9 @@ use std::collections::BTreeMap;
 /// that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
 
+/// Canonical string gear observations aligned with `sample_elapsed_seconds`.
+pub type GearSeries = Vec<Option<String>>;
+
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum NumericOrBalanceSample {
@@ -162,7 +165,7 @@ pub struct ActivityColumns {
     pub left_right_balance: NumericSeries,
     pub core_temperature: NumericSeries,
     pub air_pressure: NumericSeries,
-    pub gear_position: NumericSeries,
+    pub gear_position: GearSeries,
     pub iso: NumericSeries,
     pub aperture: NumericSeries,
     pub shutter_speed: NumericSeries,
@@ -270,9 +273,9 @@ pub struct RawSample {
     /// Air pressure in bar.
     #[serde(default)]
     pub air_pressure: Option<f64>,
-    /// Discrete gear position encoded as a numeric value.
+    /// Canonical gear label normalized from a source number or string.
     #[serde(default)]
-    pub gear_position: Option<f64>,
+    pub gear_position: Option<String>,
     /// Camera ISO setting.
     #[serde(default)]
     pub iso: Option<f64>,
@@ -438,9 +441,9 @@ pub struct ParsedActivity {
     /// Color temperature in Kelvin.
     #[serde(default)]
     pub color_temperature: NumericSeries,
-    /// Gear position as a discrete numeric value.
+    /// Canonical gear labels normalized from source numbers or strings.
     #[serde(default)]
-    pub gear_position: NumericSeries,
+    pub gear_position: GearSeries,
     /// Vertical ratio in percent.
     #[serde(default)]
     pub vertical_ratio: NumericSeries,
@@ -517,6 +520,14 @@ pub struct DenseSeriesReport {
     pub pace: Vec<Option<f64>>,
     /// G-force in multiples of Earth gravity.
     pub g_force: Vec<Option<f64>>,
+    /// Engine speed in revolutions per minute.
+    pub rpm: Vec<Option<f64>>,
+    /// Accelerator or throttle position as percent.
+    pub throttle_position: Vec<Option<f64>>,
+    /// Brake control position as percent.
+    pub brake_position: Vec<Option<f64>>,
+    /// Signed vehicle lean angle in degrees.
+    pub lean_angle: Vec<Option<f64>>,
     /// Air pressure in bar.
     pub air_pressure: Vec<Option<f64>>,
     /// Ground contact time in milliseconds.
@@ -545,8 +556,8 @@ pub struct DenseSeriesReport {
     pub ev: Vec<Option<f64>>,
     /// Color temperature in Kelvin.
     pub color_temperature: Vec<Option<f64>>,
-    /// Gear position as a discrete numeric value.
-    pub gear_position: Vec<Option<f64>>,
+    /// Canonical gear labels.
+    pub gear_position: GearSeries,
     /// Vertical ratio in percent.
     pub vertical_ratio: Vec<Option<f64>>,
     /// Vertical oscillation in millimeters.
@@ -596,6 +607,14 @@ pub struct TrimmedActivity {
     pub pace: NumericSeries,
     /// Trimmed g-force samples.
     pub g_force: NumericSeries,
+    /// Trimmed engine speed samples in revolutions per minute.
+    pub rpm: NumericSeries,
+    /// Trimmed accelerator or throttle position samples as percent.
+    pub throttle_position: NumericSeries,
+    /// Trimmed brake control position samples as percent.
+    pub brake_position: NumericSeries,
+    /// Trimmed signed vehicle lean angle samples in degrees.
+    pub lean_angle: NumericSeries,
     /// Trimmed air pressure samples in bar.
     pub air_pressure: NumericSeries,
     /// Trimmed ground contact time samples in milliseconds.
@@ -625,7 +644,7 @@ pub struct TrimmedActivity {
     /// Trimmed color temperature samples in Kelvin.
     pub color_temperature: NumericSeries,
     /// Trimmed gear position samples.
-    pub gear_position: NumericSeries,
+    pub gear_position: GearSeries,
     /// Trimmed vertical ratio samples in percent.
     pub vertical_ratio: NumericSeries,
     /// Trimmed vertical oscillation samples in millimeters.

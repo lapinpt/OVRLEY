@@ -57,6 +57,10 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
         MetricKind::Temperature => &series.temperature,
         MetricKind::Pace => &series.pace,
         MetricKind::GForce => &series.g_force,
+        MetricKind::Rpm => &series.rpm,
+        MetricKind::ThrottlePosition => &series.throttle_position,
+        MetricKind::BrakePosition => &series.brake_position,
+        MetricKind::LeanAngle => &series.lean_angle,
         MetricKind::AirPressure => &series.air_pressure,
         MetricKind::GroundContactTime => &series.ground_contact_time,
         MetricKind::StrideLength => &series.stride_length,
@@ -70,12 +74,14 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
         MetricKind::FocalLength => &series.focal_length,
         MetricKind::Ev => &series.ev,
         MetricKind::ColorTemperature => &series.color_temperature,
-        MetricKind::GearPosition => &series.gear_position,
         MetricKind::VerticalRatio => &series.vertical_ratio,
         MetricKind::VerticalOscillation => &series.vertical_oscillation,
         MetricKind::CoreTemperature => &series.core_temperature,
         MetricKind::Heading => &series.heading,
-        MetricKind::LeftRightBalance | MetricKind::Gradient | MetricKind::Time => &[],
+        MetricKind::GearPosition
+        | MetricKind::LeftRightBalance
+        | MetricKind::Gradient
+        | MetricKind::Time => &[],
     }
 }
 

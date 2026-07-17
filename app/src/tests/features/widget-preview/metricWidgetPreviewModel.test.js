@@ -243,7 +243,7 @@ describe('metric widget preview model standard metric units', () => {
       },
       activity: {
         sample_elapsed_seconds: [0],
-        gear_position: [5],
+        gear_position: ['5'],
       },
       previewSecond: 0,
     })

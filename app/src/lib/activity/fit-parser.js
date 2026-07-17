@@ -3,7 +3,7 @@
  */
 
 import FitParser from 'fit-file-parser'
-import { safeNumber } from './raw-sample-utils.js'
+import { safeGearValue, safeNumber } from './raw-sample-utils.js'
 
 /**
  * Returns optional record value.
@@ -58,7 +58,7 @@ export default async function parseFitActivityFile(file) {
     elapsed_seconds: safeNumber(getOptionalRecordValue(record, ['elapsed_time'])),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),
     g_force: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
-    gear_position: safeNumber(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),
+    gear_position: safeGearValue(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),
     gradient: safeNumber(record.grade),
     ground_contact_time: safeNumber(getOptionalRecordValue(record, ['ground_contact_time', 'stance_time'])),
     heading: safeNumber(getOptionalRecordValue(record, ['gps_heading', 'compass_heading', 'heading', 'course_heading', 'navigation_heading'])),

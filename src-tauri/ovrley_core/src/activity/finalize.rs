@@ -18,12 +18,15 @@ use crate::activity::finalize::gap::{
     build_distance_series, build_progress_series, insert_idle_gap_samples, skipped_gap_debug,
 };
 use crate::activity::finalize::metrics::{
-    build_metric_coverage, derive_activity_metric_series, MetricDescriptor,
+    build_metric_coverage, derive_activity_metric_series, MetricCoverage, MetricDescriptor,
+    MetricSeries,
 };
 use crate::activity::finalize::smoothing::{
     circular_ema, smoothing_window_for_seconds, zero_phase_smooth,
 };
-use crate::activity::schema::{ActivityColumns, ParsedActivity, RawActivity, RawSample};
+use crate::activity::schema::{
+    ActivityColumns, GearSeries, ParsedActivity, RawActivity, RawSample,
+};
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{finite_f64, round_f64};
 use chrono::{DateTime, Utc};
@@ -226,8 +229,9 @@ fn finalize_columns_with_debug(
         &columns.options.smoothing,
     );
 
-    let valid_attributes = build_valid_attributes(&metric_series_map, &course_series, &time_series);
-    let extended_attributes = build_extended_attributes(&metric_series_map);
+    let coverage = build_metric_coverage(&metric_series_map);
+    let valid_attributes = build_valid_attributes(&coverage, &course_series, &time_series);
+    let extended_attributes = build_extended_attributes(&coverage);
     let duration_seconds = elapsed_series.last().copied().unwrap_or(0.0);
     let total_distance_meters = distance_series.last().copied().flatten().unwrap_or(0.0);
     let first_sample_time = time_series.iter().find_map(Clone::clone);
@@ -239,7 +243,6 @@ fn finalize_columns_with_debug(
         .map(ToOwned::to_owned)
         .or(first_sample_time);
     let end_time = time_series.iter().rev().find_map(Clone::clone);
-    let coverage = build_metric_coverage(&metric_series_map);
     let distance_progress_series = build_progress_series(&distance_series);
 
     let mut metadata = columns.metadata.clone();
@@ -275,7 +278,7 @@ fn finalize_columns_with_debug(
 
     let mut extra = BTreeMap::new();
     extra.insert("metric_units".to_string(), metric_units());
-    extra.insert("coverage".to_string(), coverage);
+    extra.insert("coverage".to_string(), json!(coverage));
     extra.insert("valid_attributes".to_string(), json!(valid_attributes));
     extra.insert(
         "extended_attributes".to_string(),
@@ -327,7 +330,7 @@ fn finalize_columns_with_debug(
         focal_length: metric(&metric_series_map, "focal_length"),
         ev: metric(&metric_series_map, "ev"),
         color_temperature: metric(&metric_series_map, "color_temperature"),
-        gear_position: metric(&metric_series_map, "gear_position"),
+        gear_position: gear_metric(&metric_series_map),
         vertical_ratio: Vec::new(),
         vertical_oscillation: metric(&metric_series_map, "vertical_oscillation"),
         core_temperature: metric(&metric_series_map, "core_temperature"),
@@ -398,7 +401,10 @@ fn activity_columns_from_samples(
         left_right_balance: collect!(left_right_balance),
         core_temperature: collect!(core_temperature),
         air_pressure: collect!(air_pressure),
-        gear_position: collect!(gear_position),
+        gear_position: raw_samples
+            .iter()
+            .map(|sample| sample.gear_position.clone())
+            .collect(),
         iso: collect!(iso),
         aperture: collect!(aperture),
         shutter_speed: collect!(shutter_speed),
@@ -593,7 +599,7 @@ fn build_elapsed_series(columns: &ActivityColumns, time_series: &[Option<String>
 /// are checked directly; numeric attributes use the derived metric map to reflect
 /// both direct and fallback-derived availability.
 fn build_valid_attributes(
-    metric_series_map: &BTreeMap<String, MetricDescriptor>,
+    coverage: &BTreeMap<String, MetricCoverage>,
     course_series: &[(Option<f64>, Option<f64>)],
     time_series: &[Option<String>],
 ) -> Vec<String> {
@@ -609,9 +615,7 @@ fn build_valid_attributes(
             if key == "time" {
                 return time_series.iter().any(Option::is_some);
             }
-            metric_series_map
-                .get(key)
-                .is_some_and(|descriptor| descriptor.series.iter().any(Option::is_some))
+            coverage[key].is_available()
         })
         .map(|value| (*value).to_string())
         .collect()
@@ -621,15 +625,10 @@ fn build_valid_attributes(
 ///
 /// This is intentionally derived after metric combination so an attribute is
 /// advertised only when the renderer can actually read a non-null value.
-fn build_extended_attributes(
-    metric_series_map: &BTreeMap<String, MetricDescriptor>,
-) -> Vec<String> {
+fn build_extended_attributes(coverage: &BTreeMap<String, MetricCoverage>) -> Vec<String> {
     EXTENDED_ACTIVITY_ATTRIBUTES
         .iter()
-        .filter(|attribute| {
-            let key = **attribute;
-            metric_series_map[key].series.iter().any(Option::is_some)
-        })
+        .filter(|attribute| coverage[**attribute].is_available())
         .map(|value| (*value).to_string())
         .collect()
 }
@@ -640,11 +639,17 @@ fn build_extended_attributes(
 /// over a map for uniform combination/coverage logic; this helper keeps that
 /// impedance match local to final assembly.
 fn metric(metric_series_map: &BTreeMap<String, MetricDescriptor>, name: &str) -> Vec<Option<f64>> {
-    let series = metric_series_map
-        .get(name)
-        .map(|descriptor| descriptor.series.clone())
-        .unwrap_or_default();
-    strip_all_none(series)
+    let MetricSeries::Numeric(series) = &metric_series_map[name].series else {
+        unreachable!("numeric activity field mapped to gear series")
+    };
+    strip_all_none(series.clone())
+}
+
+fn gear_metric(metric_series_map: &BTreeMap<String, MetricDescriptor>) -> GearSeries {
+    let MetricSeries::Gear(series) = &metric_series_map["gear_position"].series else {
+        unreachable!("gear_position mapped to numeric series")
+    };
+    strip_all_none(series.clone())
 }
 
 /// Applies parser-requested smoothing after all direct/derived metrics exist.
@@ -665,7 +670,6 @@ fn apply_metric_smoothing(
         "color_temperature",
         "ev",
         "focal_length",
-        "gear_position",
         "iso",
         "left_right_balance",
         "shutter_speed",
@@ -691,15 +695,18 @@ fn apply_metric_smoothing(
         let Some(descriptor) = metric_series_map.get_mut(metric_name) else {
             continue;
         };
+        let MetricSeries::Numeric(series) = &mut descriptor.series else {
+            continue;
+        };
 
         match option.method.as_str() {
             "circular_ema" if metric_name == "heading" => {
-                descriptor.series = circular_ema(&descriptor.series);
+                *series = circular_ema(series);
             }
             "zero_phase_ma" if zero_phase_metrics.contains(metric_name.as_str()) => {
                 let window =
                     smoothing_window_for_seconds(&sample_timestamps_ms, option.window_seconds);
-                descriptor.series = zero_phase_smooth(&descriptor.series, window);
+                *series = zero_phase_smooth(series, window);
             }
             _ => {}
         }
@@ -771,7 +778,7 @@ pub fn write_activity_debug_file(
 
 /// Replaces an all-`None` series with an empty `Vec` to avoid shipping
 /// useless null-filled arrays to the frontend.
-fn strip_all_none(series: Vec<Option<f64>>) -> Vec<Option<f64>> {
+fn strip_all_none<T>(series: Vec<Option<T>>) -> Vec<Option<T>> {
     if series.iter().all(Option::is_none) {
         Vec::new()
     } else {
