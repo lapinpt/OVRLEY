@@ -18,6 +18,7 @@ use super::units::convert;
 use super::Metric;
 use crate::activity::schema::{ActivityColumns, DirectMetricGapPolicy, RawActivityOptions};
 use crate::error::{CoreError, CoreResult};
+use crate::media::telemetry_math::lean_angle_from_lateral_g;
 use csv::StringRecord;
 use serde_json::json;
 use std::ops::Range;
@@ -236,7 +237,22 @@ pub(super) fn build_activity_columns(
     let (rpm, _) = series(Metric::Rpm);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
-    let (lean_angle, _) = series(Metric::LeanAngle);
+    let (mut lean_angle, _) = series(Metric::LeanAngle);
+    if lean_angle.iter().all(Option::is_none) {
+        if let Some(lateral) = selected_acceleration_series(
+            Metric::GForceX,
+            AccelerationKind::Semantic,
+            &header.columns,
+            units_row,
+            data,
+        ) {
+            let derived = lateral
+                .into_iter()
+                .map(|value| value.and_then(lean_angle_from_lateral_g))
+                .collect::<Vec<_>>();
+            lean_angle = coalesce_series(&derived, &groups);
+        }
+    }
     let gear_position = coalesce_series(
         &selected_gear_series(&header.columns, units_row, data),
         &groups,

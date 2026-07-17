@@ -6,7 +6,8 @@
 //! to a shared module avoids duplicating the 1g-subtraction convention and
 //! the finite-value check between the two extraction paths.
 //!
-//! Owns: [`finite_f64`], [`g_force_from_components`].
+//! Owns: [`finite_f64`], [`g_force_from_components`],
+//! [`lean_angle_from_lateral_g`].
 //! Does not own: camera metadata extraction, protobuf decoding, or smoothing.
 
 /// Returns `Some(value)` when the float is finite, `None` otherwise.
@@ -72,4 +73,10 @@ pub fn round_f64(value: f64, digits: i32) -> Option<f64> {
 pub fn g_force_from_components(x: f64, y: f64, z: f64) -> Option<f64> {
     let g = (x.powi(2) + y.powi(2) + z.powi(2)).sqrt() - 1.0;
     finite_f64(g)
+}
+
+/// Calculates signed theoretical lean angle from lateral acceleration in g.
+#[inline]
+pub fn lean_angle_from_lateral_g(lateral_g: f64) -> Option<f64> {
+    finite_f64(-lateral_g.atan().to_degrees())
 }

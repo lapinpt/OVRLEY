@@ -222,7 +222,14 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(ControlKind::Percentage),
             None,
         ),
-        "braking" | "brake state" | "brake on/off" => (
+        "braking" => (
+            Metric::BrakePosition,
+            SourcePriority::Direct,
+            None,
+            Some(ControlKind::Infer),
+            None,
+        ),
+        "brake state" | "brake on/off" => (
             Metric::BrakePosition,
             SourcePriority::Direct,
             None,

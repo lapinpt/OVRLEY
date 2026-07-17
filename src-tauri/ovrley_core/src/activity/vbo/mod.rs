@@ -9,6 +9,7 @@ mod channels;
 use crate::activity::finalize::{finalize_activity_columns, FinalizeActivityResponse};
 use crate::activity::schema::{ActivityColumns, RawActivityOptions};
 use crate::error::{CoreError, CoreResult};
+use crate::media::telemetry_math::lean_angle_from_lateral_g;
 use chrono::{Duration, NaiveDate, NaiveTime, SecondsFormat, Utc};
 use serde_json::json;
 use std::fs::File;
@@ -235,6 +236,13 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
             .map(|(x, y)| (*x).zip(*y).map(|(x, y)| x.hypot(y)))
             .collect();
     }
+    let mut lean_angle = series(layout.lean_angle, identity);
+    if lean_angle.iter().all(Option::is_none) {
+        lean_angle = series(layout.lateral_acceleration, identity)
+            .into_iter()
+            .map(|value| value.and_then(lean_angle_from_lateral_g))
+            .collect();
+    }
 
     Ok(ActivityColumns {
         file_name: file_name.to_string(),
@@ -266,7 +274,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         rpm: series(layout.rpm, identity),
         throttle_position: series(layout.throttle_position, identity),
         brake_position: series(layout.brake_position, identity),
-        lean_angle: series(layout.lean_angle, identity),
+        lean_angle,
         vertical_speed: selected_series(&sections.data, layout.vertical_speed, |value| {
             layout.vertical_speed_to_meters_per_second(value)
         }),
