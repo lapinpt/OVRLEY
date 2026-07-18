@@ -115,10 +115,12 @@ pub(super) fn build_activity_columns(
             "CSV activity must contain at least two timed samples".to_string(),
         ));
     }
-    let mut elapsed_seconds = groups
-        .iter()
-        .map(|group| elapsed_seconds[group.start])
-        .collect::<Vec<_>>();
+    if groups.len() != elapsed_seconds.len() {
+        elapsed_seconds = groups
+            .iter()
+            .map(|group| elapsed_seconds[group.start])
+            .collect();
+    }
     let origin = elapsed_seconds[0];
     elapsed_seconds
         .iter_mut()
@@ -126,7 +128,7 @@ pub(super) fn build_activity_columns(
 
     let sample_count = groups.len();
     let gps_updates = parse_gps_updates(header, data)?;
-    let timestamp = coalesce_series(&absolute_timestamps, &groups)
+    let timestamp = coalesce_series(absolute_timestamps, &groups)
         .into_iter()
         .map(|value| value.map(|value| value.rfc3339()))
         .collect();
@@ -150,7 +152,7 @@ pub(super) fn build_activity_columns(
             }
         }
         (
-            coalesce_series(&values, &groups),
+            coalesce_series(values, &groups),
             uses_gps_update && gps_updates.is_some(),
         )
     };
@@ -221,7 +223,7 @@ pub(super) fn build_activity_columns(
             }
         }
     }
-    let g_force = coalesce_series(&g_force_source, &groups);
+    let g_force = coalesce_series(g_force_source, &groups);
     let (mut distance, _) = series(Metric::Distance);
     if let Some(origin) = distance.iter().flatten().next().copied() {
         distance.iter_mut().for_each(|value| {
@@ -250,11 +252,11 @@ pub(super) fn build_activity_columns(
                 .into_iter()
                 .map(|value| value.and_then(lean_angle_from_lateral_g))
                 .collect::<Vec<_>>();
-            lean_angle = coalesce_series(&derived, &groups);
+            lean_angle = coalesce_series(derived, &groups);
         }
     }
     let gear_position = coalesce_series(
-        &selected_gear_series(&header.columns, units_row, data),
+        selected_gear_series(&header.columns, units_row, data),
         &groups,
     );
     let empty = || vec![None; sample_count];
@@ -347,10 +349,48 @@ fn equal_time_groups(elapsed_seconds: &[f64]) -> Vec<Range<usize>> {
 /// Reduces each equal-time group to its last non-missing series value.
 ///
 /// This lets a later duplicate row update only the fields it supplies while
-/// preserving earlier values for fields omitted by that row.
-fn coalesce_series<T: Clone>(series: &[Option<T>], groups: &[Range<usize>]) -> Vec<Option<T>> {
+/// preserving earlier values for fields omitted by that row. When every group
+/// contains one row, the already-owned series is returned without copying it.
+fn coalesce_series<T: Clone>(series: Vec<Option<T>>, groups: &[Range<usize>]) -> Vec<Option<T>> {
+    if groups.len() == series.len() {
+        return series;
+    }
+
     groups
         .iter()
         .map(|group| series[group.clone()].iter().rev().find_map(Clone::clone))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{coalesce_series, equal_time_groups};
+
+    struct CloneMustNotRun;
+
+    impl Clone for CloneMustNotRun {
+        fn clone(&self) -> Self {
+            panic!("unique timestamp series must not be cloned")
+        }
+    }
+
+    #[test]
+    fn unique_time_series_is_returned_without_cloning_values() {
+        let groups = equal_time_groups(&[0.0, 1.0]);
+        let series = vec![Some(CloneMustNotRun), None];
+
+        let coalesced = coalesce_series(series, &groups);
+
+        assert_eq!(coalesced.len(), 2);
+        assert!(coalesced[0].is_some());
+        assert!(coalesced[1].is_none());
+    }
+
+    #[test]
+    fn duplicate_time_series_keeps_the_last_present_value() {
+        let groups = equal_time_groups(&[0.0, 0.0, 1.0]);
+        let series = vec![Some(1), None, Some(2)];
+
+        assert_eq!(coalesce_series(series, &groups), vec![Some(1), Some(2)]);
+    }
 }
