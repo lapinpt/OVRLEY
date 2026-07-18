@@ -161,10 +161,10 @@ export async function finalizeActivity(rawActivity) {
  * Parses a native CSV activity path through the Rust columnar pipeline.
  *
  * @param {string} path - Absolute path returned by the native file picker.
- * @returns {Promise<object>} Promise resolving to parsed activity and debug payload.
+ * @returns {Promise<object>} Promise resolving to the native finalized activity response.
  */
 export async function parseCsvActivity(path) {
-  return apiCall('backend_parse_csv_activity', { path })
+  return invokeCommand('backend_parse_csv_activity', { path })
 }
 
 /**

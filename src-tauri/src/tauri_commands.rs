@@ -16,6 +16,7 @@ use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata
 use crate::runtime_paths;
 use crate::video_server::VideoServerHandle;
 use crate::BackendState;
+use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -100,8 +101,10 @@ pub(crate) async fn backend_finalize_activity(
 
 /// Parses a native CSV path through the core columnar activity pipeline.
 #[tauri::command]
-pub(crate) async fn backend_parse_csv_activity(path: String) -> Result<String, String> {
-    call_and_serialize(commands::backend_parse_csv_activity(&path))
+pub(crate) async fn backend_parse_csv_activity(
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    commands::backend_parse_csv_activity(&path).map_err(|error| error.to_string())
 }
 
 /// Parses a native VBO path through the core columnar activity pipeline.

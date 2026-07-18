@@ -432,7 +432,7 @@ fn malformed_metric_observations_become_missing_without_repairing_bounded_values
 }
 
 #[test]
-fn unusable_and_ambiguous_headers_report_file_and_record_context() {
+fn unusable_headers_and_repeated_header_rows_report_file_and_record_context() {
     let unusable = "Exporter,Example\nTime,8:30 AM\n";
     let unusable_error =
         parse_csv_activity_reader(Cursor::new(unusable), "unusable.csv").unwrap_err();
@@ -449,7 +449,7 @@ fn unusable_and_ambiguous_headers_report_file_and_record_context() {
     assert!(ambiguous_error.to_string().contains("two-headers.csv"));
     assert!(ambiguous_error
         .to_string()
-        .contains("ambiguous telemetry headers at records 1, 3"));
+        .contains("CSV row 3 has neither usable elapsed time nor usable absolute timestamp"));
 }
 
 #[test]
@@ -482,17 +482,18 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
 }
 
 #[test]
-fn csv_command_serializes_the_native_path_response() {
+fn csv_command_returns_the_native_path_response() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/sample Racebox.csv");
 
     let response = backend_parse_csv_activity(fixture.to_str().unwrap()).unwrap();
-    let activity = &response["parsed_activity"];
+    assert!(response.debug_payload.is_none());
+    let activity = response.parsed_activity;
 
-    assert_eq!(activity["file_name"], "sample Racebox.csv");
-    assert_eq!(activity["file_format"], "csv");
-    assert_eq!(activity["sample_elapsed_seconds"][0], 0.0);
-    assert_eq!(activity["speed"][0], 1.5166666666666666);
+    assert_eq!(activity.file_name.as_deref(), Some("sample Racebox.csv"));
+    assert_eq!(activity.file_format.as_deref(), Some("csv"));
+    assert_eq!(activity.sample_elapsed_seconds[0], 0.0);
+    assert_eq!(activity.speed[0], Some(1.5166666666666666));
 }
 
 #[test]

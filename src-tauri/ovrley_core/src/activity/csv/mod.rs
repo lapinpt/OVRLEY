@@ -142,18 +142,13 @@ pub fn parse_csv_activity_reader<R: Read>(
         for (record_index, record) in records.by_ref().enumerate() {
             let record = record.map_err(csv_error)?;
             record_count = record_index + 1;
-            if let Some(candidate) = headers::parse_header_candidate(record_index, &record) {
-                if let Some(existing) = &header {
-                    return Err(CoreError::Activity(format!(
-                        "Unsupported CSV: ambiguous telemetry headers at records {}, {}",
-                        existing.record_index + 1,
-                        candidate.record_index + 1
-                    )));
+            if header.is_none() {
+                if let Some(candidate) = headers::parse_header_candidate(&record) {
+                    data = Some(columns::CsvColumnData::new(&candidate));
+                    header = Some(candidate);
+                    awaiting_units_row = true;
+                    continue;
                 }
-                data = Some(columns::CsvColumnData::new(&candidate));
-                header = Some(candidate);
-                awaiting_units_row = true;
-                continue;
             }
 
             let Some(header) = &header else {

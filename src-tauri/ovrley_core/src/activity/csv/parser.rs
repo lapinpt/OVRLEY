@@ -27,10 +27,7 @@ use csv::StringRecord;
 /// recognized non-timing metric. When explicit elapsed time is present, a bare
 /// seconds-valued `Time` column is reclassified as a paired absolute Unix-time
 /// column, matching RaceChrono's two-column export shape.
-pub(super) fn parse_header_candidate(
-    record_index: usize,
-    record: &StringRecord,
-) -> Option<HeaderLayout> {
+pub(super) fn parse_header_candidate(record: &StringRecord) -> Option<HeaderLayout> {
     let gps_update_index = record
         .iter()
         .position(|value| normalize_syntax(value) == "gps update");
@@ -55,7 +52,6 @@ pub(super) fn parse_header_candidate(
     let has_timing = columns.iter().any(|column| column.metric.is_timing());
     let has_telemetry = columns.iter().any(|column| !column.metric.is_timing());
     (has_timing && has_telemetry).then_some(HeaderLayout {
-        record_index,
         columns,
         gps_update_index,
     })

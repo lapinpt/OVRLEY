@@ -91,11 +91,9 @@ pub(super) enum TimingKind {
     PairedUnix,
 }
 
-/// Resolved telemetry layout and its source record position.
+/// Resolved telemetry layout.
 #[derive(Clone, Debug)]
 pub(super) struct HeaderLayout {
-    /// Zero-based source record index containing the header.
-    pub record_index: usize,
     /// Recognized columns from that header, in source order.
     pub columns: Vec<HeaderColumn>,
     /// Optional TrackAddict-style flag identifying rows with fresh GPS data.

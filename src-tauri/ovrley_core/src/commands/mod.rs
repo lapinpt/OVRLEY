@@ -9,6 +9,7 @@
 pub mod elevation_geometry;
 pub mod route_geometry;
 
+use crate::activity::finalize::FinalizeActivityResponse;
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
 use crate::debug::RenderProgress;
@@ -81,11 +82,10 @@ pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> C
 }
 
 /// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
-pub fn backend_parse_csv_activity(path: &str) -> CoreResult<Value> {
-    serde_json::to_value(crate::activity::csv::parse_csv_activity_path(Path::new(
-        path,
-    ))?)
-    .map_err(CoreError::Serialization)
+pub fn backend_parse_csv_activity(path: &str) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::csv::parse_csv_activity_path(Path::new(path))?;
+    response.debug_payload = None;
+    Ok(response)
 }
 
 /// Parses and finalizes a native VBO activity without a frontend RawActivity hop.
