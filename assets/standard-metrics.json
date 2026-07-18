@@ -177,7 +177,8 @@
       "core_temperature": ["text"],
       "gear_position": ["text"],
       "left_right_balance": ["text"],
-      "time": ["text"]
+      "time": ["text"],
+      "lean_angle": ["text"]
     }
   },
   "definitions": [
@@ -616,7 +617,7 @@
         "source": "custom",
         "assetFile": "widget-gear-position.svg"
       },
-      "category": "cycling"
+      "category": "motosports"
     },
     {
       "type": "vertical_ratio",
@@ -891,7 +892,7 @@
         "name": "CircleGauge",
         "assetFile": "widget-rpm.svg"
       },
-      "category": "other"
+      "category": "motosports"
     },
     {
       "type": "throttle_position",
@@ -912,7 +913,7 @@
         "source": "custom",
         "assetFile": "widget-throttle-position.svg"
       },
-      "category": "other"
+      "category": "motosports"
     },
     {
       "type": "brake_position",
@@ -933,7 +934,7 @@
         "source": "custom",
         "assetFile": "widget-brake-position.svg"
       },
-      "category": "other"
+      "category": "motosports"
     },
     {
       "type": "lean_angle",
@@ -954,7 +955,7 @@
         "source": "custom",
         "assetFile": "widget-lean-angle.svg"
       },
-      "category": "other"
+      "category": "motosports"
     }
   ]
 }

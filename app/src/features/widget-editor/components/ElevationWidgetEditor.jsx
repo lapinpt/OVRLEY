@@ -82,7 +82,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             }
           />
           <SliderField
-            label="Data Density"
+            label="Profile Detail"
             value={targetDensity}
             min={0.25}
             max={1.5}

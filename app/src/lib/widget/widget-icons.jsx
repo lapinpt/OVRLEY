@@ -140,7 +140,7 @@ function getWidgetCategory(type) {
   return getStandardMetricDefinition(type)?.category || 'other'
 }
 
-const CATEGORY_ORDER = ['general', 'cycling', 'running', 'camera', 'other']
+const CATEGORY_ORDER = ['general', 'cycling', 'running', 'motosports', 'camera', 'other']
 
 export const GROUPED_QUICKMENU_ITEMS = (() => {
   const groups = {}

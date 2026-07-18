@@ -15,7 +15,7 @@
           "height": 200,
           "completed_line_opacity": 100,
           "remaining_line_opacity": 35,
-          "simplify_tolerance_px": 1,
+          "simplify_tolerance_px": 0.3,
           "target_density": 1,
           "show_full_activity": true,
           "marker_variant": "single",

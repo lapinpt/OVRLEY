@@ -1,3 +1,0 @@
-- lean_angle shows -0 in render, it should not show a sign when it is 0. Maybe because value is -0.something which displays as -0 instead of 0. Jsx. Preview is fine.
-- Gear metric widget: when N switches to a digit (or backwards), the contents of the widget jump and down, likely the line height between digit and 'N' differs.
-- degree unit is not upper index, it sits on the baseline which looks confusing. This is likely problem both in jsx preview and rust/skia render.

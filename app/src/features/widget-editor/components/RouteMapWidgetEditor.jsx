@@ -87,7 +87,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
             }
           />
           <SliderField
-            label="Data Density"
+            label="Route Detail"
             value={targetDensity}
             min={0.25}
             max={1.5}
