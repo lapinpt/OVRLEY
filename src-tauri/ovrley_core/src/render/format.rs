@@ -581,11 +581,17 @@ where
 // preview PNGs match the editor canvas' metric formatting.
 fn format_number(value: f64, decimals: usize) -> String {
     if decimals == 0 {
-        return value.round().to_string();
+        let rounded = value.round();
+        return if rounded == 0.0 {
+            "0".to_string()
+        } else {
+            rounded.to_string()
+        };
     }
 
     let factor = 10_f64.powi(decimals as i32);
     let rounded = (value * factor).round() / factor;
+    let rounded = if rounded == 0.0 { 0.0 } else { rounded };
     format!("{rounded:.decimals$}")
 }
 

@@ -6,7 +6,7 @@
 use crate::error::CoreResult;
 use crate::normalize::ValidatedValueWidget;
 use crate::render::text::{
-    draw_text, draw_text_with_vertical_metrics_text, measure_text, parse_color, ResolvedTextStyle,
+    draw_text_with_vertical_metrics_text, measure_text, parse_color, ResolvedTextStyle,
 };
 use crate::types::DisplayType;
 use skia_safe::Canvas;
@@ -114,9 +114,26 @@ pub(crate) fn draw_metric_parts(
         let mut units_style = units_style;
         units_style.color = parse_color(&unit_color_hex, base_style.opacity);
         units_style.x = value_style.x + value_measure.width + (METRIC_WIDGET_UNITS_GAP_PX * scale);
-        let units_glyph_height = (unit_measure.bounds_bottom - unit_measure.bounds_top).abs();
+        let unit_vertical_metrics_text = if unit_text == "\u{00B0}" {
+            "\u{00B0}C"
+        } else {
+            unit_text
+        };
+        let unit_vertical_measure = if unit_text == unit_vertical_metrics_text {
+            unit_measure
+        } else {
+            measure_text(unit_vertical_metrics_text, &units_style, font_dirs)?
+        };
+        let units_glyph_height =
+            (unit_vertical_measure.bounds_bottom - unit_vertical_measure.bounds_top).abs();
         units_style.y = text_group_bottom - (units_line_height + units_glyph_height) * 0.5;
-        draw_text(canvas, unit_text, &units_style, font_dirs)?;
+        draw_text_with_vertical_metrics_text(
+            canvas,
+            unit_text,
+            unit_vertical_metrics_text,
+            &units_style,
+            font_dirs,
+        )?;
     }
     Ok(())
 }
@@ -196,12 +213,14 @@ pub(crate) fn draw_static_metric_icon_for_value_validated(
 ///
 /// Numeric metrics (digits, `:`, `.`, `%`, `+`, `-`) use a stable reference
 /// string (`"888:88"`) so vertical layout does not jump when the displayed
-/// value changes. Non-numeric text passes through unchanged.
+/// value changes. Neutral gear uses the same reference; other text passes
+/// through unchanged.
 pub fn metric_vertical_metrics_text(text: &str) -> &str {
-    if !text.is_empty()
-        && text
-            .chars()
-            .all(|ch| ch.is_ascii_digit() || matches!(ch, ':' | '.' | '%' | '+' | '-'))
+    if text == "N"
+        || (!text.is_empty()
+            && text
+                .chars()
+                .all(|ch| ch.is_ascii_digit() || matches!(ch, ':' | '.' | '%' | '+' | '-')))
     {
         NUMERIC_VERTICAL_METRICS_TEXT
     } else {

@@ -113,7 +113,7 @@ function resolvePreviewVerticalMetricsText(text) {
     return ''
   }
 
-  return /^[0-9/:.%+-]+$/.test(text) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : text
+  return text === 'N' || /^[0-9/:.%+-]+$/.test(text) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : text
 }
 
 function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
@@ -177,7 +177,9 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
   const valueVerticalMetrics = getPreviewVerticalMetrics(valueText, fontSize, fontFamily)
   const showUnitText = Boolean(showUnits && unitText)
   const unitsMeasure = showUnitText ? measurePreviewText(unitText, unitsFontSize, fontFamily) : createEmptyTextMeasure()
-  const unitsVerticalMetrics = showUnitText ? getPreviewVerticalMetrics(unitText, unitsFontSize, fontFamily) : createEmptyVerticalMetrics()
+  const unitsVerticalMetrics = showUnitText
+    ? getPreviewVerticalMetrics(unitText === '\u00B0' ? '\u00B0C' : unitText, unitsFontSize, fontFamily)
+    : createEmptyVerticalMetrics()
 
   // Row layout — determine the overall row height based on the tallest element (icon vs text group)
   const textGroupHeight = showUnitText ? Math.max(valueLineHeight, unitsLineHeight) : valueLineHeight

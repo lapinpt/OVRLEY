@@ -95,9 +95,10 @@ function formatRoundedMetric(value, units, decimals) {
   }
 
   const roundedValue = decimals > 0 ? value.toFixed(decimals) : Math.round(value).toString()
+  const normalizedValue = Number(roundedValue) === 0 ? (0).toFixed(decimals) : roundedValue
 
   return {
-    value: roundedValue,
+    value: normalizedValue,
     units,
   }
 }
