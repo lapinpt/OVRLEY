@@ -112,11 +112,9 @@ pub(crate) async fn backend_parse_csv_activity(
 pub(crate) async fn backend_parse_vbo_activity(
     app: AppHandle,
     path: String,
-) -> Result<String, String> {
-    call_and_serialize(commands::backend_parse_vbo_activity(
-        &runtime_paths::app_paths(&app)?,
-        &path,
-    ))
+) -> Result<FinalizeActivityResponse, String> {
+    commands::backend_parse_vbo_activity(&runtime_paths::app_paths(&app)?, &path)
+        .map_err(|error| error.to_string())
 }
 
 /// Renders one transparent preview PNG for the requested second.
@@ -274,11 +272,9 @@ pub(crate) async fn backend_import_preview_video(
 pub(crate) async fn backend_extract_video_telemetry(
     app: AppHandle,
     file_path: String,
-) -> Result<String, String> {
-    call_and_serialize(commands::backend_extract_video_telemetry(
-        &runtime_paths::app_paths(&app)?,
-        &file_path,
-    ))
+) -> Result<Option<FinalizeActivityResponse>, String> {
+    commands::backend_extract_video_telemetry(&runtime_paths::app_paths(&app)?, &file_path)
+        .map_err(|error| error.to_string())
 }
 
 /// Clears the currently registered local HTTP preview video.

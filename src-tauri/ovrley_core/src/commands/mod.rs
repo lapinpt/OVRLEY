@@ -89,12 +89,14 @@ pub fn backend_parse_csv_activity(path: &str) -> CoreResult<FinalizeActivityResp
 }
 
 /// Parses and finalizes a native VBO activity without a frontend RawActivity hop.
-pub fn backend_parse_vbo_activity(paths: &AppPaths, path: &str) -> CoreResult<Value> {
-    serde_json::to_value(crate::activity::vbo::parse_vbo_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?)
-    .map_err(CoreError::Serialization)
+pub fn backend_parse_vbo_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response =
+        crate::activity::vbo::parse_vbo_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    response.debug_payload = None;
+    Ok(response)
 }
 
 /// Lists bundled font filenames plus system font family names visible to Skia.
@@ -561,20 +563,24 @@ fn probe_video_metadata(
 /// This command is kept as frontend wiring for video imports. It deliberately
 /// returns the same [`ParsedActivity`] shape used by the rest of the import
 /// pipeline, not the old debug-only columnar telemetry JSON.
-pub fn backend_extract_video_telemetry(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
+pub fn backend_extract_video_telemetry(
+    paths: &AppPaths,
+    file_path: &str,
+) -> CoreResult<Option<FinalizeActivityResponse>> {
     let metadata = probe_video_metadata(paths, file_path)?;
     let fps = metadata.fps.unwrap_or(30.0);
     let duration_s = metadata.duration.unwrap_or(0.0);
 
-    match crate::media::mp4_telemetry::extract_activity(
+    let mut response = crate::media::mp4_telemetry::extract_activity(
         &paths.repo_root,
         file_path,
         fps,
         duration_s,
-    )? {
-        Some(response) => serde_json::to_value(response).map_err(CoreError::Serialization),
-        None => Ok(Value::Null),
+    )?;
+    if let Some(response) = &mut response {
+        response.debug_payload = None;
     }
+    Ok(response)
 }
 
 fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {

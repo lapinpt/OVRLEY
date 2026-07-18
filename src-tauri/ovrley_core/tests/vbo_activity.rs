@@ -317,11 +317,12 @@ fn vbo_path_and_command_use_the_native_columnar_pipeline() {
 
     let paths = AppPaths::from_repo_root(debug_root.clone());
     let response = backend_parse_vbo_activity(&paths, fixture.to_str().unwrap()).unwrap();
+    assert!(response.debug_payload.is_none());
     assert_eq!(
-        response["parsed_activity"]["file_name"],
-        fixture.file_name().unwrap().to_str().unwrap()
+        response.parsed_activity.file_name.as_deref(),
+        fixture.file_name().unwrap().to_str()
     );
-    assert_eq!(response["parsed_activity"]["file_format"], "vbo");
+    assert_eq!(response.parsed_activity.file_format.as_deref(), Some("vbo"));
     assert!(debug_root
         .join("debug/activities/command-test-parse-debug.json")
         .is_file());

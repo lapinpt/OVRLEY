@@ -171,10 +171,10 @@ export async function parseCsvActivity(path) {
  * Parses a native VBO activity path through the Rust columnar pipeline.
  *
  * @param {string} path - Absolute path returned by the native file picker.
- * @returns {Promise<object>} Promise resolving to parsed activity and debug payload.
+ * @returns {Promise<object>} Promise resolving to the native finalized activity response.
  */
 export async function parseVboActivity(path) {
-  return apiCall('backend_parse_vbo_activity', { path })
+  return invokeCommand('backend_parse_vbo_activity', { path })
 }
 
 /**
@@ -469,8 +469,8 @@ export async function buildRouteGeometry(config, parsedActivity) {
  * Extracts MP4 telemetry from a video file.
  *
  * @param {string} filePath - Absolute path to the video file.
- * @returns {Promise<object|null>} Promise resolving to ParsedActivity or null if no telemetry found.
+ * @returns {Promise<object|null>} Promise resolving to the native finalized activity response or null if no telemetry is found.
  */
 export async function extractVideoTelemetry(filePath) {
-  return apiCall('backend_extract_video_telemetry', { filePath })
+  return invokeCommand('backend_extract_video_telemetry', { filePath })
 }
