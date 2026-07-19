@@ -11,15 +11,26 @@ use crate::error::{CoreError, CoreResult};
 /// Number of initial `record` calls to skip before reporting estimates.
 const WARMUP_FRAMES: u32 = 5;
 
-/// Max recent `frame_seconds` samples in the rolling window.
-const WINDOW_SIZE: usize = 16;
+/// Max recent `frame_seconds` samples in the FPS rolling window.
+const WINDOW_SIZE: usize = 64;
+
+/// Time-based rolling window for ETA estimation (seconds).
+/// Samples older than this are discarded, so the estimator adapts to
+/// throughput changes within ~45 s instead of carrying stale history.
+const ETA_WINDOW_SECONDS: f64 = 45.0;
 
 /// Clamp reported FPS to ±20 % of the warmup-excluded wall-clock throughput,
 /// rejecting single outlier batches without masking real changes.
 const WALL_TRUST_BAND: f64 = 0.20;
 
-/// ETA EMA smoothing factor.  0.70 ≈ ~3-frame half-life.
-const DEFAULT_ETA_SMOOTHING: f64 = 0.70;
+/// EMA smoothing factor for ETA.  Applied in log-space (geometric mean),
+/// so the smoothing is relative: a 5 % swing moves the estimate 5 %
+/// regardless of whether the ETA is 30 s or 6 000 s.
+const DEFAULT_ETA_SMOOTHING: f64 = 0.7;
+
+/// Relative deadband: the smoothed ETA must move by at least this fraction
+/// of the last emitted value before the display updates.
+const ETA_DEADBAND_FRACTION: f64 = 0.0002;
 
 /// Minimum spacing between `set_frame_progress` emits (~10 Hz).
 /// State still mutates on every call so `progress()` reads fresh data.
@@ -33,7 +44,10 @@ pub struct ProgressEstimator {
     elapsed_at_warmup_end: f64,
     current_at_warmup_end: u32,
     intervals: VecDeque<f64>,
+    previous_current: u32,
+    eta_samples: VecDeque<(f64, f64, u32)>,
     eta_ema_seconds: Option<f64>,
+    last_emitted_eta: Option<f64>,
 }
 
 impl ProgressEstimator {
@@ -44,7 +58,10 @@ impl ProgressEstimator {
             elapsed_at_warmup_end: 0.0,
             current_at_warmup_end: 0,
             intervals: VecDeque::with_capacity(WINDOW_SIZE),
+            previous_current: 0,
+            eta_samples: VecDeque::new(),
             eta_ema_seconds: None,
+            last_emitted_eta: None,
         }
     }
 
@@ -55,6 +72,9 @@ impl ProgressEstimator {
         frame_seconds: f64,
         elapsed_seconds: f64,
     ) -> (Option<u64>, Option<f64>) {
+        let batch_count = current.saturating_sub(self.previous_current);
+        self.previous_current = current;
+
         if self.warmup_counter < WARMUP_FRAMES {
             self.warmup_counter += 1;
             // Snapshot wall time for cold-start-excluded anchor.
@@ -63,16 +83,27 @@ impl ProgressEstimator {
             return (None, None);
         }
 
-        let valid = frame_seconds.is_finite() && frame_seconds > 0.0;
+        let valid = frame_seconds.is_finite() && frame_seconds > 0.0 && batch_count > 0;
         if valid {
             if self.intervals.len() >= WINDOW_SIZE {
                 self.intervals.pop_front();
             }
             self.intervals.push_back(frame_seconds);
+
+            let batch_time = frame_seconds * f64::from(batch_count);
+            self.eta_samples
+                .push_back((elapsed_seconds, batch_time, batch_count));
+            while let Some(&(t, _, _)) = self.eta_samples.front() {
+                if elapsed_seconds - t > ETA_WINDOW_SECONDS {
+                    self.eta_samples.pop_front();
+                } else {
+                    break;
+                }
+            }
         }
 
         let fps = self.compute_fps(current, elapsed_seconds);
-        let eta = self.compute_eta(current, total, fps);
+        let eta = self.compute_eta(current, total);
         (eta, fps)
     }
 
@@ -111,24 +142,39 @@ impl ProgressEstimator {
         (median > 0.0).then_some(1.0 / median)
     }
 
-    fn compute_eta(&mut self, current: u32, total: u32, fps: Option<f64>) -> Option<u64> {
-        let fps = fps?;
-        if fps <= 0.0 {
-            return None;
-        }
+    fn compute_eta(&mut self, current: u32, total: u32) -> Option<u64> {
         let remaining = f64::from(total.saturating_sub(current));
         if remaining <= 0.0 {
-            // Producer caught up; pin ETA to 0.
             self.eta_ema_seconds = Some(0.0);
             return Some(0);
         }
-        let raw_seconds = remaining / fps;
+
+        let (window_time, window_frames) = self
+            .eta_samples
+            .iter()
+            .fold((0.0, 0u32), |(t, f), &(_, bt, bc)| (t + bt, f + bc));
+
+        if window_frames == 0 {
+            return None;
+        }
+
+        let raw_seconds = window_time * remaining / f64::from(window_frames);
         let smoothed = match self.eta_ema_seconds {
-            Some(prev) => self.eta_smoothing * prev + (1.0 - self.eta_smoothing) * raw_seconds,
-            None => raw_seconds,
+            Some(prev) if prev > 0.0 => {
+                let a = self.eta_smoothing;
+                (prev.ln() * a + raw_seconds.ln() * (1.0 - a)).exp()
+            }
+            _ => raw_seconds,
         };
         self.eta_ema_seconds = Some(smoothed);
-        Some(smoothed.max(0.0).ceil() as u64)
+        let emitted = match self.last_emitted_eta {
+            Some(prev) if prev > 0.0 && (smoothed - prev).abs() < prev * ETA_DEADBAND_FRACTION => {
+                prev
+            }
+            _ => smoothed,
+        };
+        self.last_emitted_eta = Some(emitted);
+        Some(emitted.max(0.0).ceil() as u64)
     }
 }
 
