@@ -29,7 +29,8 @@ use ovrley_core::encode::video_composite_debug::{
     write_composite_timing_summary, CompositeTimingSummaryInput,
 };
 use ovrley_core::encode::video_composite_pipeline::{
-    derive_composite_pipeline_plan, render_composite_video_single, CompositePipelinePlan,
+    derive_composite_pipeline_plan, render_composite_video_with_frame_workers,
+    CompositePipelinePlan,
 };
 use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
@@ -232,8 +233,8 @@ pub fn render_fixture_composite_with_paths(
     let validated = validate_render_config(config).unwrap();
     let dense_activity = build_dense_activity_report_validated(&activity, &validated).unwrap();
 
-    // ── Phase 4: execute single-segment composite render ─────────────
-    let filename = render_composite_video_single(
+    // ── Phase 4: execute canonical frame-worker composite render ────
+    let filename = render_composite_video_with_frame_workers(
         &paths,
         &validated,
         &activity,
@@ -356,6 +357,8 @@ pub fn write_fixture_composite_debug_summary(path_name: &str) -> AppPaths {
         input_height: 1080,
         trim_start: 0.0,
         sync_offset: 600.0,
+        frame_render_mode: "serial",
+        frame_render_workers: 0,
     })
     .unwrap();
     paths
@@ -379,7 +382,7 @@ pub fn mutable_recent_template_config(width: u32, height: u32) -> RenderConfig {
     config
 }
 
-/// Builds a minimal end-to-end composite render config for segmented tests.
+/// Builds a minimal end-to-end composite render config.
 pub fn composite_test_config(render_duration: f64) -> ValidatedRenderConfig {
     let config = mutable_composite_test_config(render_duration);
     validate_render_config(config).unwrap()

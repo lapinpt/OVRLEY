@@ -252,7 +252,8 @@ fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
 
 #[test]
 fn finalizes_igc_raw_activity_fixture() {
-    let raw_activity_json = fs::read_to_string(common::test_config::igc_raw_activity_path()).unwrap();
+    let raw_activity_json =
+        fs::read_to_string(common::test_config::igc_raw_activity_path()).unwrap();
     let activity = finalize_raw_activity_json(&raw_activity_json, None)
         .unwrap()
         .parsed_activity;

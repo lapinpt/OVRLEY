@@ -10,7 +10,8 @@
 //!       actual encoding settings construction (see
 //!       [`crate::encode::ffmpeg_settings`], [`crate::encode::ffmpeg_composite`]).
 //!
-//! Allowed dependencies: `crate::encode::ffmpeg`, `crate::error`.
+//! Allowed dependencies: `crate::encode::ffmpeg`,
+//!       `crate::encode::ffmpeg_transparent_profiles`, `crate::error`.
 //! Forbidden dependencies: `crate::commands`, `crate::render`, `crate::normalize`.
 //!
 //! Related modules: [`crate::encode::ffmpeg_composite_profiles`] (consumes detected
@@ -22,15 +23,18 @@
 //! 8-second timeout, and waits synchronously for each. No shared mutable state.
 //!
 //! ## Performance
-//! Heavy one-time operation: spawns ~20 ffmpeg subprocesses sequentially, each
+//! Heavy one-time operation: probes each unique catalog encoder plus specialized
+//! hardware paths sequentially, each
 //! with up to 8s timeout. Called once at application startup; result is cached
 //! by the frontend. Total worst-case wall time ~160s (unlikely — most probes
 //! complete in < 1s). Not on any render hot path.
 
 use crate::encode::codec_catalog::{
-    CompositeAvailabilityRule, CompositeCodecId, TransparentAvailabilityRule, TransparentCodecId,
+    encoders, CompositeAvailabilityRule, CompositeCodecId, EncoderId, EncoderMetadata, ProbeKind,
+    TransparentAvailabilityRule, TransparentCodecId,
 };
 use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
+use crate::encode::ffmpeg_transparent_profiles::transparent_profile;
 use crate::error::CoreResult;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -155,12 +159,11 @@ impl AvailableCodecs {
 /// startup, not encode work.
 ///
 /// # Phases
-/// 1. Probe transparent codecs (prores_ks, prores_ks_vulkan, prores_videotoolbox, qtrle)
-/// 2. Probe composite codecs (libx264, libx265, h264_nvenc, hevc_nvenc, etc.)
-/// 3. Probe hardware-accelerated encode paths (QSV, AMF, VideoToolbox, VAAPI)
-/// 4. Detect CUDA and filter availability via `ffmpeg -filters`
-/// 5. Probe experimental QSV full-overlay hardware init arguments
-/// 6. Assemble the `AvailableCodecs` result struct
+/// 1. Probe each unique catalog encoder through its declared [`ProbeKind`]
+/// 2. Probe the specialized CUDA upload path
+/// 3. Detect hardware filter availability via `ffmpeg -filters`
+/// 4. Probe experimental QSV full-overlay hardware init arguments
+/// 5. Assemble the `AvailableCodecs` result struct
 ///
 /// # Performance
 /// Called once at application startup. Worst case ~160s for all ~20 probes if
@@ -176,356 +179,36 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let vaapi_device = find_vaapi_device();
 
-    // ── PHASE 1: PROBE TRANSPARENT CODECS ──
-    let prores_ks = probe_codec(
-        "prores_ks",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "prores_ks",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let prores_ks_vulkan = probe_codec(
-        "prores_ks_vulkan",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-init_hw_device",
-            "vulkan=vk",
-            "-filter_hw_device",
-            "vk",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-vf",
-            "format=yuva444p10le,hwupload",
-            "-c:v",
-            "prores_ks_vulkan",
-            "-profile:v",
-            "4",
-            "-qscale:v",
-            "4",
-            "-mbs_per_slice",
-            "4",
-            "-vendor",
-            "apl0",
-            "-alpha_bits",
-            "16",
-            "-async_depth",
-            "4",
-            "-pix_fmt",
-            "vulkan",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let prores_videotoolbox = probe_codec(
-        "prores_videotoolbox",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "prores_videotoolbox",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let qtrle = probe_codec(
-        "qtrle",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "qtrle",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
+    // ── PHASE 1: PROBE UNIQUE CATALOG ENCODERS ──
+    let encoder_availability = encoders()
+        .iter()
+        .map(|encoder| {
+            (
+                encoder.id,
+                probe_encoder(&ffmpeg_path, vaapi_device.as_deref(), encoder),
+            )
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let available = |encoder_id| encoder_availability[&encoder_id];
 
-    // ── PHASE 2: PROBE SOFTWARE COMPOSITE CODECS ──
-    let libx264 = probe_codec(
-        "libx264",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "libx264",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let libx265 = probe_codec(
-        "libx265",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "libx265",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    // ── PHASE 3: PROBE HARDWARE-ACCELERATED COMPOSITE CODECS ──
-    let h264_nvenc = probe_codec(
-        "h264_nvenc",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "h264_nvenc",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let hevc_nvenc = probe_codec(
-        "hevc_nvenc",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "hevc_nvenc",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let h264_qsv = probe_codec(
-        "h264_qsv",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "h264_qsv",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let hevc_qsv = probe_codec(
-        "hevc_qsv",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "hevc_qsv",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let h264_amf = probe_codec(
-        "h264_amf",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "h264_amf",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let hevc_amf = probe_codec(
-        "hevc_amf",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "hevc_amf",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let h264_videotoolbox = probe_codec(
-        "h264_videotoolbox",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "h264_videotoolbox",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let hevc_videotoolbox = probe_codec(
-        "hevc_videotoolbox",
-        &ffmpeg_path,
-        &[
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "nullsrc=s=256x256:d=1",
-            "-c:v",
-            "hevc_videotoolbox",
-            "-frames:v",
-            "1",
-            "-f",
-            "null",
-            "-",
-        ],
-    );
-    let h264_vaapi = vaapi_device.as_ref().is_some_and(|device_path| {
-        let args = vec![
-            "-hide_banner".to_string(),
-            "-loglevel".to_string(),
-            "error".to_string(),
-            "-vaapi_device".to_string(),
-            device_path.to_string_lossy().to_string(),
-            "-f".to_string(),
-            "lavfi".to_string(),
-            "-i".to_string(),
-            "nullsrc=s=256x256:d=1".to_string(),
-            "-vf".to_string(),
-            "format=nv12,hwupload".to_string(),
-            "-c:v".to_string(),
-            "h264_vaapi".to_string(),
-            "-frames:v".to_string(),
-            "1".to_string(),
-            "-f".to_string(),
-            "null".to_string(),
-            "-".to_string(),
-        ];
-        probe_codec_owned("h264_vaapi", &ffmpeg_path, &args)
-    });
-    let hevc_vaapi = vaapi_device.as_ref().is_some_and(|device_path| {
-        let args = vec![
-            "-hide_banner".to_string(),
-            "-loglevel".to_string(),
-            "error".to_string(),
-            "-vaapi_device".to_string(),
-            device_path.to_string_lossy().to_string(),
-            "-f".to_string(),
-            "lavfi".to_string(),
-            "-i".to_string(),
-            "nullsrc=s=256x256:d=1".to_string(),
-            "-vf".to_string(),
-            "format=nv12,hwupload".to_string(),
-            "-c:v".to_string(),
-            "hevc_vaapi".to_string(),
-            "-frames:v".to_string(),
-            "1".to_string(),
-            "-f".to_string(),
-            "null".to_string(),
-            "-".to_string(),
-        ];
-        probe_codec_owned("hevc_vaapi", &ffmpeg_path, &args)
-    });
+    let prores_ks = available(EncoderId::ProresKs);
+    let prores_ks_vulkan = available(EncoderId::ProresKsVulkan);
+    let prores_videotoolbox = available(EncoderId::ProresVideotoolbox);
+    let qtrle = available(EncoderId::Qtrle);
+    let libx264 = available(EncoderId::Libx264);
+    let libx265 = available(EncoderId::Libx265);
+    let h264_nvenc = available(EncoderId::H264Nvenc);
+    let hevc_nvenc = available(EncoderId::HevcNvenc);
+    let h264_qsv = available(EncoderId::H264Qsv);
+    let hevc_qsv = available(EncoderId::HevcQsv);
+    let h264_vaapi = available(EncoderId::H264Vaapi);
+    let hevc_vaapi = available(EncoderId::HevcVaapi);
+    let h264_amf = available(EncoderId::H264Amf);
+    let hevc_amf = available(EncoderId::HevcAmf);
+    let h264_videotoolbox = available(EncoderId::H264Videotoolbox);
+    let hevc_videotoolbox = available(EncoderId::HevcVideotoolbox);
+
+    // ── PHASE 2: PROBE CUDA UPLOAD PATH ──
     let cuda_h264_nvenc = probe_codec(
         "cuda_h264_nvenc",
         &ffmpeg_path,
@@ -572,7 +255,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     );
     let cuda = cuda_h264_nvenc || cuda_hevc_nvenc;
 
-    // ── PHASE 4: DETECT FILTER CAPABILITIES ──
+    // ── PHASE 3: DETECT FILTER CAPABILITIES ──
     let filters = detect_ffmpeg_filters(&ffmpeg_path);
     let overlay_cuda = filters.contains("overlay_cuda");
     let scale_cuda = filters.contains("scale_cuda");
@@ -588,7 +271,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let qsv_filter_stack = overlay_qsv && scale_qsv && hwupload_filter;
     let vaapi_filter_stack = scale_vaapi && overlay_vaapi && hwupload_filter;
 
-    // ── PHASE 5: PROBE EXPERIMENTAL QSV FULL-OVERLAY PATH ──
+    // ── PHASE 4: PROBE EXPERIMENTAL QSV FULL-OVERLAY PATH ──
     let qsv_full_init_args = if (h264_qsv || hevc_qsv) && qsv_filter_stack {
         detect_qsv_full_init_args(&ffmpeg_path).unwrap_or_default()
     } else {
@@ -597,7 +280,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let qsv_full = !qsv_full_init_args.is_empty();
     let vaapi_full = (h264_vaapi || hevc_vaapi) && vaapi_filter_stack;
 
-    // ── PHASE 6: ASSEMBLE RESULT ──
+    // ── PHASE 5: ASSEMBLE RESULT ──
     Ok(AvailableCodecs {
         prores_ks,
         prores_ks_vulkan,
@@ -804,6 +487,109 @@ fn probe_qsv_overlay_path(ffmpeg_path: &Path, init_args: &[String]) -> bool {
     ]);
 
     probe_codec_owned("qsv_overlay", ffmpeg_path, &args)
+}
+
+/// Executes the probe strategy declared by the unique encoder catalog entry.
+fn probe_encoder(
+    ffmpeg_path: &Path,
+    vaapi_device: Option<&Path>,
+    encoder: &EncoderMetadata,
+) -> bool {
+    match encoder.probe_kind {
+        ProbeKind::NullSource => probe_null_source_encoder(ffmpeg_path, encoder),
+        ProbeKind::TransparentProfile(codec_id) => {
+            probe_transparent_profile_encoder(ffmpeg_path, encoder, codec_id)
+        }
+        ProbeKind::VaapiDevice => {
+            vaapi_device.is_some_and(|device| probe_vaapi_encoder(ffmpeg_path, device, encoder))
+        }
+    }
+}
+
+/// Runs the common one-frame null-source probe used by ordinary encoders.
+fn probe_null_source_encoder(ffmpeg_path: &Path, encoder: &EncoderMetadata) -> bool {
+    probe_codec(
+        encoder.ffmpeg_name,
+        ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            encoder.ffmpeg_name,
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    )
+}
+
+/// Reuses a transparent profile's device, filter, and encoder fragments.
+fn probe_transparent_profile_encoder(
+    ffmpeg_path: &Path,
+    encoder: &EncoderMetadata,
+    codec_id: TransparentCodecId,
+) -> bool {
+    let profile = transparent_profile(codec_id.metadata().encoder_id.metadata().ffmpeg_name)
+        .expect("transparent probe kind must reference a transparent profile");
+    assert_eq!(profile.encoder_id, encoder.id);
+
+    let mut args = vec![
+        "-hide_banner".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+    ];
+    args.extend(profile.input_args.iter().map(|arg| arg.to_string()));
+    args.extend([
+        "-f".to_string(),
+        "lavfi".to_string(),
+        "-i".to_string(),
+        "nullsrc=s=256x256:d=1,format=rgba".to_string(),
+    ]);
+    if let Some(filter) = profile.filter_complex {
+        args.extend(["-vf".to_string(), filter.to_string()]);
+    }
+    args.extend(["-c:v".to_string(), encoder.ffmpeg_name.to_string()]);
+    args.extend(profile.output_args.iter().map(|arg| arg.to_string()));
+    args.extend([
+        "-frames:v".to_string(),
+        "1".to_string(),
+        "-f".to_string(),
+        "null".to_string(),
+        "-".to_string(),
+    ]);
+    probe_codec_owned(encoder.ffmpeg_name, ffmpeg_path, &args)
+}
+
+/// Exercises VAAPI device initialization, upload, and encode as one boundary probe.
+fn probe_vaapi_encoder(ffmpeg_path: &Path, device: &Path, encoder: &EncoderMetadata) -> bool {
+    let args = vec![
+        "-hide_banner".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+        "-vaapi_device".to_string(),
+        device.to_string_lossy().to_string(),
+        "-f".to_string(),
+        "lavfi".to_string(),
+        "-i".to_string(),
+        "nullsrc=s=256x256:d=1".to_string(),
+        "-vf".to_string(),
+        "format=nv12,hwupload".to_string(),
+        "-c:v".to_string(),
+        encoder.ffmpeg_name.to_string(),
+        "-frames:v".to_string(),
+        "1".to_string(),
+        "-f".to_string(),
+        "null".to_string(),
+        "-".to_string(),
+    ];
+    probe_codec_owned(encoder.ffmpeg_name, ffmpeg_path, &args)
 }
 
 fn probe_codec(name: &str, ffmpeg_path: &Path, args: &[&str]) -> bool {

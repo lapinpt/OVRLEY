@@ -127,7 +127,13 @@ fn draw_static_track(
         let inner_geo = inner_segment_geometry(geometry, border_thickness);
         let inner_thickness = (track_thickness - border_thickness * 2.0).max(0.0);
         let inner_cnr = (inner_corner_radius - border_thickness).max(0.0);
-        draw_segment(canvas, inner_geo, inner_thickness, inner_cnr, &clear_track_paint());
+        draw_segment(
+            canvas,
+            inner_geo,
+            inner_thickness,
+            inner_cnr,
+            &clear_track_paint(),
+        );
         draw_segment(
             canvas,
             inner_geo,
@@ -203,10 +209,13 @@ fn draw_continuous_fill(
     let inner_thickness = (cache.track_thickness - bt * 2.0).max(0.0);
     let inner_geometry = inner_segment_geometry(geometry, bt);
     let inner_corner = (cache.track_corner_radius - bt).max(0.0);
-    let end_corner = if cache.track_fill_flat { 0.0 } else { inner_corner };
-    let reveal_spec =
-        ArcTrackSpec::full(inner_geometry, inner_thickness, inner_corner)
-            .with_end_corner_radius(end_corner);
+    let end_corner = if cache.track_fill_flat {
+        0.0
+    } else {
+        inner_corner
+    };
+    let reveal_spec = ArcTrackSpec::full(inner_geometry, inner_thickness, inner_corner)
+        .with_end_corner_radius(end_corner);
     let Some(reveal) = reveal_spec.reveal_clip(fill01) else {
         return;
     };

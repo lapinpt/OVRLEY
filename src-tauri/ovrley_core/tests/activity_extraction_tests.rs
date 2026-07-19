@@ -88,12 +88,7 @@ fn extract_activity_from_telemetry_fixtures() {
         assert_aligned_or_stripped(&activity.shutter_speed, n, stem, "shutter_speed");
         assert_aligned_or_stripped(&activity.focal_length, n, stem, "focal_length");
         assert_aligned_or_stripped(&activity.ev, n, stem, "ev");
-        assert_aligned_or_stripped(
-            &activity.color_temperature,
-            n,
-            stem,
-            "color_temperature",
-        );
+        assert_aligned_or_stripped(&activity.color_temperature, n, stem, "color_temperature");
 
         let has_usable_gps = fixture_has_usable_gps(filename);
 

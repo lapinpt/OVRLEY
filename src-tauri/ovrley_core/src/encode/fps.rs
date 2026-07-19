@@ -5,6 +5,9 @@
 //! construction or metadata handoff.
 
 use crate::error::{CoreError, CoreResult};
+use std::time::Duration;
+
+const FRAME_BOUNDARY_TOLERANCE_DENOMINATOR: u128 = 10_000;
 
 /// Exact rational frames-per-second value used for FFmpeg arguments and timing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +43,43 @@ impl Fps {
     /// Formats this FPS as the rational string expected by FFmpeg.
     pub fn ffmpeg_arg(&self) -> String {
         format!("{}/{}", self.num, self.den)
+    }
+
+    /// Counts the canonical half-open frame interval for a duration.
+    ///
+    /// Duration is converted once to Rust's nanosecond timebase, then division
+    /// is performed with integers. Metadata within 1/10,000 of a frame boundary
+    /// is snapped to that boundary; larger remainders use ceiling division.
+    /// This avoids phantom frames caused by container timestamp jitter.
+    pub fn frame_count_for_duration(&self, duration_seconds: f64) -> CoreResult<u64> {
+        let duration = Duration::try_from_secs_f64(duration_seconds).map_err(|_| {
+            CoreError::Encode(format!(
+                "Frame duration must be finite and zero or greater: {duration_seconds}"
+            ))
+        })?;
+        let scaled_numerator = duration
+            .as_nanos()
+            .checked_mul(u128::from(self.num))
+            .ok_or_else(|| CoreError::Encode("Frame count numerator overflow".to_string()))?;
+        let scaled_denominator = u128::from(self.den) * 1_000_000_000;
+        let whole_frames = scaled_numerator / scaled_denominator;
+        let remainder = scaled_numerator % scaled_denominator;
+        let frame_count = if remainder == 0 {
+            whole_frames
+        } else if whole_frames > 0
+            && remainder * FRAME_BOUNDARY_TOLERANCE_DENOMINATOR <= scaled_denominator
+        {
+            whole_frames
+        } else {
+            whole_frames + 1
+        };
+        u64::try_from(frame_count)
+            .map_err(|_| CoreError::Encode("Frame count exceeds u64 capacity".to_string()))
+    }
+
+    /// Returns the timestamp of a frame index in seconds.
+    pub fn seconds_at_frame(&self, frame_index: u64) -> f64 {
+        frame_index as f64 * self.den as f64 / self.num as f64
     }
 
     /// Divides this FPS by a positive integer overlay update factor.

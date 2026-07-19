@@ -40,6 +40,7 @@ use super::fps::Fps;
 pub struct CompositeProfile {
     pub name: &'static str,
     pub codec: &'static str,
+    pub cpu_cores_per_frame_worker: usize,
     pub input_args: Vec<String>,
     pub filter_complex: Option<String>,
     pub output_args: Vec<String>,
@@ -57,6 +58,7 @@ pub struct CompositeProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
     pub selected_profile_name: String,
+    pub cpu_cores_per_frame_worker: usize,
     pub fallback_profile_name: Option<String>,
     pub hw_init_args: Vec<String>,
     pub input_0_args: Vec<String>,
@@ -313,6 +315,7 @@ pub(crate) fn build_composite_ffmpeg_settings_with_source_rotation(
 
     Ok(CompositeFfmpegSettings {
         selected_profile_name: selected_profile.name.to_string(),
+        cpu_cores_per_frame_worker: selected_profile.cpu_cores_per_frame_worker,
         fallback_profile_name: fallback_profile_name(&selected_profile),
         hw_init_args: profile_hw_init_args(&selected_profile, request.hwaccel_available),
         input_0_args,
@@ -401,6 +404,7 @@ fn select_composite_profile(
     let profile = composite_profile_template(codec_name).unwrap_or_else(|_| CompositeProfile {
         name: "custom_passthrough",
         codec: "custom",
+        cpu_cores_per_frame_worker: 4,
         input_args: Vec::new(),
         filter_complex: None,
         output_args: vec!["-c:v".to_string(), codec_name.to_string()],
@@ -426,42 +430,42 @@ fn validate_catalog_profile_availability(
         CompositeAvailabilityRule::H264Nvenc => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::HevcNvenc => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::H264Qsv => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::HevcQsv => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::H264Amf => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::HevcAmf => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::H264Videotoolbox => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::HevcVideotoolbox => validate_simple_catalog_profile(
             hwaccel_available,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
         ),
         CompositeAvailabilityRule::H264VaapiWithFullFilters => {
             validate_vaapi_full(hwaccel_available, metadata)
@@ -473,7 +477,7 @@ fn validate_catalog_profile_availability(
             hwaccel_available,
             super::codec_catalog::CompositeCodecId::NvgpuH264,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
             metadata.profile_name,
             unavailable_cuda_overlay_profile,
         ),
@@ -481,7 +485,7 @@ fn validate_catalog_profile_availability(
             hwaccel_available,
             super::codec_catalog::CompositeCodecId::NvgpuHevc,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
             metadata.profile_name,
             unavailable_cuda_overlay_profile,
         ),
@@ -489,7 +493,7 @@ fn validate_catalog_profile_availability(
             hwaccel_available,
             super::codec_catalog::CompositeCodecId::QsvH264,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
             metadata.profile_name,
             unavailable_qsv_overlay_profile,
         ),
@@ -497,7 +501,7 @@ fn validate_catalog_profile_availability(
             hwaccel_available,
             super::codec_catalog::CompositeCodecId::QsvHevc,
             metadata.id,
-            metadata.ffmpeg_codec_name,
+            metadata.encoder_id.metadata().ffmpeg_name,
             metadata.profile_name,
             unavailable_qsv_overlay_profile,
         ),
@@ -565,7 +569,7 @@ fn validate_vaapi_full(
     if !hwaccel_available.available_codecs.vaapi {
         return Err(CoreError::Encode(format!(
             "Requested encoder {} is unavailable.",
-            metadata.ffmpeg_codec_name
+            metadata.encoder_id.metadata().ffmpeg_name
         )));
     }
     if !hwaccel_available.available_codecs.vaapi_full {
@@ -596,7 +600,7 @@ pub fn fallback_profile_name(profile: &CompositeProfile) -> Option<String> {
 ///
 /// Profile templates use `{base_video_filters}`, `{width}`, and `{height}`
 /// placeholders. The base-video filter chain owns exact video trimming so the
-/// decoded frame boundary matches the segment plan more closely than input-side
+/// decoded frame boundary matches the render plan more closely than input-side
 /// seek alone.
 fn composite_filter_complex(
     width: u32,

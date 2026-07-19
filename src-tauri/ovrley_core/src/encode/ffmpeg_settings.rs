@@ -16,6 +16,8 @@ use crate::error::{CoreError, CoreResult};
 pub struct FfmpegSettings {
     /// Logical codec requested by the template.
     pub codec: String,
+    /// Logical CPU cores reserved for each frame-render worker. Zero forces one worker.
+    pub cpu_cores_per_frame_worker: usize,
     /// ffmpeg loglevel passed to `-loglevel`.
     pub loglevel: String,
     /// Input-side hardware-device setup args required before rawvideo input.
@@ -51,11 +53,15 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> CoreResult<FfmpegSettings
             "Unsupported scene.ffmpeg.codec '{codec}'. Supported codecs are prores_ks, prores_ks_vulkan, prores_videotoolbox, and qtrle."
         ))
     })?;
-    let mut output_args = profile
-        .output_args
-        .iter()
-        .map(|arg| (*arg).to_string())
-        .collect::<Vec<_>>();
+    let encoder_name = profile.encoder_id.metadata().ffmpeg_name;
+    let mut output_args = vec!["-c:v".to_string(), encoder_name.to_string()];
+    output_args.extend(
+        profile
+            .output_args
+            .iter()
+            .map(|arg| (*arg).to_string())
+            .collect::<Vec<_>>(),
+    );
     if let Some(container) = object
         .and_then(|map| map.get("container"))
         .and_then(Value::as_str)
@@ -68,7 +74,8 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> CoreResult<FfmpegSettings
     append_extra_output_args(&mut output_args, ffmpeg_config);
 
     Ok(FfmpegSettings {
-        codec: profile.codec.to_string(),
+        codec: encoder_name.to_string(),
+        cpu_cores_per_frame_worker: profile.cpu_cores_per_frame_worker,
         loglevel,
         input_args: profile
             .input_args

@@ -1,4 +1,4 @@
-//! Single-pass transparent overlay render pipeline.
+//! Transparent overlay frame-worker pipeline.
 //!
 //! Renders Skia frames and streams them to ffmpeg via stdin.
 //! Produces alpha-preserving overlay video (ProRes, QTRLE, or Vulkan).
@@ -18,51 +18,48 @@
 //!    loop, then drops the handle (EOF) so ffmpeg finalizes output.
 //! 3. **Stderr**: The monitor thread takes `child.stderr.take()`, parses
 //!    `frame=N` lines, and updates a shared `Arc<AtomicU32>` counter.
-//! 4. **Wait**: After the writer finishes, the main thread calls `child.wait()`.
-//! 5. **Cancel**: On cancellation, the render loop stops, the channel sender is
-//!    dropped (signals writer), the writer flushes and exits, and the main thread
-//!    calls `child.try_wait()` with a timeout before killing if hung.
+//! 4. **Wait**: Writer drain and FFmpeg finalization use bounded polling.
+//! 5. **Cancel**: On cancellation, FFmpeg is terminated before the writer is
+//!    joined so a blocked pipe write cannot stall teardown.
 //! 6. **Error**: If ffmpeg exits non-zero or the writer panics, the partial
 //!    output file is removed and `CoreError::Ffmpeg` or `CoreError::Encode` is
 //!    returned. A frame-count mismatch after success is also treated as a failure.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::debug::RenderProfiler;
 use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::encode::ffmpeg_settings::{build_ffmpeg_settings, FfmpegSettings};
 use crate::encode::pipeline_shared::{
-    acquire_frame_buffer, merge_timing_maps, queue_frame, writer_worker, FrameBuffer,
+    join_shutdown_thread, merge_timing_maps, terminate_ffmpeg, unblock_stalled_writer,
+    wait_for_ffmpeg, writer_worker, FfmpegChildGuard, FrameBuffer, PartialOutputGuard,
     WriterCancellation, WriterWorkerConfig,
 };
-use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
 use crate::encode::video_debug::{
     create_debug_dir, render_sample_frames_enabled, sample_frame_indices, write_prepare_summary,
     write_sample_frame, write_timing_summary_with_phase,
 };
+use crate::encode::video_frame_parallel::{
+    diagnose_frame_worker_count, render_frames_parallel, FrameRenderTask, ParallelFramePoolPlan,
+    ParallelFrameProgress, ParallelFrameRenderRequest,
+};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
-use crate::render::{prepare_preview_assets, render_frame_rgba, FrameRenderRequest, RenderTarget};
+use crate::render::prepare_preview_assets;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
 
-const FRAME_QUEUE_SIZE: usize = 12;
-
 /// Renders one transparent-overlay video by streaming Skia frames to ffmpeg.
 ///
-/// This is the single-pass pipeline: it prepares reusable Skia assets, spawns
-/// ffmpeg configured to accept raw RGBA on stdin, then runs a hot render loop
-/// that produces one frame at a time into pooled buffers. A writer thread drains
-/// the frame queue and feeds ffmpeg stdin, while a monitor thread parses stderr
-/// for progress. The render loop checks cancellation between every frame.
+/// The pipeline diagnoses a profile-specific worker count, prepares reusable
+/// Skia assets, and sends ordered worker output through one FFmpeg process.
 ///
 /// # Arguments
 ///
@@ -95,16 +92,16 @@ const FRAME_QUEUE_SIZE: usize = 12;
 /// # Cancellation
 ///
 /// Checks `controller.cancel_flag` between every frame and at buffer-acquire
-/// time. On cancellation: drops the channel sender (signals writer), joins
-/// threads, waits for ffmpeg (with kill timeout fallback), removes the partial
-/// output file, and returns `CoreError::Cancelled`.
+/// time. On cancellation, FFmpeg is terminated before threads are joined, the
+/// partial output is removed, and `CoreError::Cancelled` is returned.
 ///
 /// # Performance
 ///
 /// This is a render hot path. Frame rendering and ffmpeg stdin writing overlap
-/// via a bounded channel (capacity 12) and a pooled buffer ring (13 buffers).
-/// Avoid per-frame allocations inside the loop — buffers are reused.
-pub(crate) fn render_video_single(
+/// via a bounded channel and a pooled buffer ring. Parallel rendering sizes the
+/// pool from resolution and a fixed memory ceiling. Avoid per-frame allocations
+/// inside the loop — buffers are reused.
+pub(crate) fn render_video_with_frame_workers(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
@@ -123,6 +120,14 @@ pub(crate) fn render_video_single(
     // that would not change the visible overlay at the configured rate.
     let total_frames = rendered_frame_count(dense_activity.frame_count, update_rate) as u32;
     let container_fps = scene.fps / f64::from(scene.update_rate.max(1));
+    let workers = diagnose_frame_worker_count(
+        total_frames as usize,
+        ffmpeg_settings.cpu_cores_per_frame_worker,
+    );
+    let pool = ParallelFramePoolPlan::for_resolution(width, height, workers)?;
+    let frame_byte_len = pool.frame_byte_len;
+    let queue_capacity = pool.queue_capacity;
+    let buffer_count = pool.buffer_count;
     let debug_dir = create_debug_dir(paths, "phase_6")?;
     // ── PHASE 2: BUILD SKIA ASSETS — pre-render maps, fonts, and label cache ──
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
@@ -140,18 +145,17 @@ pub(crate) fn render_video_single(
         ffmpeg_settings.extension
     );
     let output_path = paths.downloads_dir.join(&public_filename);
+    let mut output_guard = PartialOutputGuard::new(&output_path);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt();
     let encoded_frames = Arc::new(AtomicU32::new(0));
     let cancel_flag = controller.cancel_flag();
-    let mut aggregate_profiler = RenderProfiler::default();
     let render_started = Instant::now();
 
     // ── PHASE 3: CREATE BUFFER POOL (N+1 buffers for N-slot bounded channel) ──
-    let frame_byte_len = (width as usize) * (height as usize) * 4;
-    let (sender, receiver) = mpsc::sync_channel::<FrameBuffer>(FRAME_QUEUE_SIZE);
-    let (free_sender, free_receiver) = mpsc::sync_channel::<FrameBuffer>(FRAME_QUEUE_SIZE + 1);
-    for _ in 0..(FRAME_QUEUE_SIZE + 1) {
+    let (sender, receiver) = mpsc::sync_channel::<FrameBuffer>(queue_capacity);
+    let (free_sender, free_receiver) = mpsc::sync_channel::<FrameBuffer>(buffer_count);
+    for _ in 0..buffer_count {
         free_sender
             .send(FrameBuffer {
                 pixels: vec![0u8; frame_byte_len],
@@ -161,15 +165,18 @@ pub(crate) fn render_video_single(
     // ── PHASE 4: SPAWN FFMPEG & WORKER THREADS (writer + monitor) ──
     // ffmpeg is spawned before the render loop starts. The writer owns stdin
     // and drains the bounded frame queue; the monitor parses stderr for progress.
-    let mut child = spawn_ffmpeg_process(
-        &ffmpeg_bin,
-        &ffmpeg_settings,
-        &output_path,
-        width,
-        height,
-        container_fps,
-        &input_pix_fmt,
-    )?;
+    let mut child = FfmpegChildGuard::new(
+        spawn_ffmpeg_process(
+            &ffmpeg_bin,
+            &ffmpeg_settings,
+            &output_path,
+            width,
+            height,
+            container_fps,
+            &input_pix_fmt,
+        )?,
+        "transparent",
+    );
 
     let stderr = child
         .stderr
@@ -181,6 +188,8 @@ pub(crate) fn render_video_single(
         .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stdin".to_string()))?;
     let encoded_frames_for_monitor = encoded_frames.clone();
     let monitor_thread = thread::spawn(move || monitor_ffmpeg(stderr, encoded_frames_for_monitor));
+    let pipeline_failed = Arc::new(AtomicBool::new(false));
+    let pipeline_failed_for_writer = Arc::clone(&pipeline_failed);
     let cancel_flag_for_writer = cancel_flag.clone();
     let writer_thread = thread::spawn(move || {
         writer_worker(
@@ -188,9 +197,10 @@ pub(crate) fn render_video_single(
             receiver,
             free_sender,
             WriterWorkerConfig {
+                pipeline_failed: pipeline_failed_for_writer,
                 cancellation: WriterCancellation::StopWhenCancelled(cancel_flag_for_writer),
                 write_error_context: "Failed writing frame to ffmpeg",
-                queue_wait_metric: Some("encoder.queue_wait"),
+                queue_wait_metric: Some("writer.rendered_frame_wait"),
                 release_wait_metric: Some("buffer.release_wait"),
                 release_error_message: Some("Frame buffer pool disconnected"),
                 flush_error_is_fatal: true,
@@ -198,119 +208,178 @@ pub(crate) fn render_video_single(
         )
     });
 
-    let sample_frames = if render_sample_frames_enabled() {
+    let sample_frames = if render_sample_frames_enabled()? {
         sample_frame_indices(total_frames as usize)
     } else {
         Vec::new()
     };
+    let sample_output_frame_indices = sample_frames
+        .iter()
+        .copied()
+        .map(|index| {
+            u64::try_from(index).map_err(|_| {
+                CoreError::Encode("Sample frame index exceeds u64 capacity".to_string())
+            })
+        })
+        .collect::<CoreResult<Vec<_>>>()?;
     let scale = prepared_preview_assets.scene().scale;
-    let mut estimator = ProgressEstimator::default();
-    let mut rendered_frames = 0u32;
     // ── PHASE 5: HOT RENDER LOOP ──
     // ffmpeg is running, the writer is draining the channel, the monitor is
     // parsing stderr. We own the render thread and produce exactly total_frames.
-    // The bounded channel (capacity 12) provides backpressure: if the writer
-    // falls behind, the next queue_frame call blocks, capping memory usage.
-    let render_result = (|| -> CoreResult<()> {
-        for output_frame_index in 0..(total_frames as usize) {
-            if cancel_flag.load(Ordering::SeqCst) {
-                break;
-            }
-            // Poll ffmpeg liveness. If ffmpeg exits mid-render (e.g. disk full,
-            // codec error), we catch it here rather than discovering it only
-            // after the loop when we call child.wait() and have no diagnostics.
-            if let Some(status) = child
-                .try_wait()
-                .map_err(|error| CoreError::Encode(format!("ffmpeg process error: {error}")))?
-            {
-                return Err(CoreError::Encode(format!(
-                    "ffmpeg exited unexpectedly with status {status}"
-                )));
-            }
-
-            let frame_started = Instant::now();
-            let frame_index = source_frame_index(output_frame_index, update_rate, dense_activity);
-            let mut frame_buffer =
-                acquire_frame_buffer(&free_receiver, &cancel_flag, &mut aggregate_profiler)?;
-            render_frame_rgba(FrameRenderRequest {
-                paths,
-                dense_activity,
-                prepared_assets: &prepared_preview_assets.prepared_assets,
-                frame_index,
-                scale,
-                labels_image: None,
-                target: RenderTarget {
-                    width,
-                    height,
-                    pixels: frame_buffer.pixels.as_mut_slice(),
-                },
-                frame_profiler: &mut aggregate_profiler,
-            })?;
-            if sample_frames.contains(&output_frame_index) {
-                aggregate_profiler.measure("debug.sample_frame_write", || {
-                    write_sample_frame(
-                        &ffmpeg_bin,
-                        &debug_dir,
-                        width,
-                        height,
-                        frame_buffer.pixels.as_slice(),
-                        frame_index,
-                        &input_pix_fmt,
-                    )
-                })?;
-            }
-            queue_frame(&sender, frame_buffer, &cancel_flag, &mut aggregate_profiler)?;
-            rendered_frames += 1;
-            let frame_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
-            aggregate_profiler.record_ms("frame.total", frame_ms);
-            let (estimate, rendering_fps) = estimator.record(
-                rendered_frames,
-                total_frames,
-                frame_ms / 1000.0,
-                render_started.elapsed().as_secs_f64(),
-            );
-            controller.set_frame_progress(
-                rendered_frames,
-                total_frames,
-                encoded_frames.load(Ordering::SeqCst),
-                estimate,
-                rendering_fps,
-            );
+    // The bounded channel provides backpressure: if the writer falls behind,
+    // the next queue_frame call blocks, capping memory usage.
+    let tasks = (0..(total_frames as usize))
+        .map(|output_frame_index| FrameRenderTask {
+            output_frame_index: output_frame_index as u64,
+            dense_frame_index: source_frame_index(output_frame_index, update_rate, dense_activity),
+        })
+        .collect::<Vec<_>>();
+    let current_for_written_frames = |written_frames: u64| written_frames as u32;
+    let encoded_for_current = |_current_progress: u32| encoded_frames.load(Ordering::SeqCst);
+    let observe_ordered_frame = |task: FrameRenderTask, buffer: &FrameBuffer| {
+        if sample_output_frame_indices
+            .binary_search(&task.output_frame_index)
+            .is_ok()
+        {
+            write_sample_frame(
+                &ffmpeg_bin,
+                &debug_dir,
+                width,
+                height,
+                buffer.pixels.as_slice(),
+                task.dense_frame_index,
+                &input_pix_fmt,
+            )?;
         }
         Ok(())
-    })();
-
+    };
+    let render_result = render_frames_parallel(ParallelFrameRenderRequest {
+        paths,
+        dense_activity,
+        prepared_assets: &prepared_preview_assets.prepared_assets,
+        tasks: &tasks,
+        width,
+        height,
+        scale,
+        workers,
+        progress: ParallelFrameProgress {
+            total: total_frames,
+            current_for_written_frames: &current_for_written_frames,
+            encoded_for_current: &encoded_for_current,
+            effective_fps_multiplier: std::num::NonZeroU32::new(scene.update_rate)
+                .expect("validated scene update rate is non-zero"),
+        },
+        ffmpeg_process_name: "transparent",
+        controller,
+        cancel_flag: cancel_flag.as_ref(),
+        pipeline_failed: pipeline_failed.as_ref(),
+        frame_sender: &sender,
+        ordered_frame_observer: Some(&observe_ordered_frame),
+        free_receiver,
+        ffmpeg_child: &mut child,
+        render_started,
+    });
+    let mut was_cancelled = cancel_flag.load(Ordering::SeqCst);
+    let producer_failed = render_result.is_err();
+    let writer_failed_before_teardown = pipeline_failed.load(Ordering::SeqCst);
     drop(sender);
     // ── PHASE 6: THREAD JOIN & FFMPEG WAIT ──
     // Dropping the sender signals the writer to exit its recv() loop.
     // The writer flushes stdin and returns, which causes ffmpeg to see EOF
     // and finalize the output file. We join threads before waiting on ffmpeg
     // so pipe-write errors are collected before we check the exit status.
-    let writer_result = writer_thread
-        .join()
-        .map_err(|_| CoreError::Encode("Encoder writer thread panicked".to_string()))??;
-    monitor_thread
-        .join()
-        .map_err(|_| CoreError::Encode("FFmpeg monitor thread panicked".to_string()))?;
-    let status = child
-        .wait()
-        .map_err(|error| CoreError::Encode(error.to_string()))?;
-
-    if let Err(error) = render_result {
-        // Clean up partial output on any render-loop error. The file is
-        // incomplete and ffmpeg may have written a truncated header — keeping
-        // it would mislead the user into importing a broken video.
-        let _ = fs::remove_file(&output_path);
-        return Err(error);
+    let mut shutdown_error = None;
+    if was_cancelled || producer_failed || writer_failed_before_teardown {
+        if let Err(error) = terminate_ffmpeg(&mut child, "transparent") {
+            shutdown_error = Some(error);
+        }
+    } else {
+        match unblock_stalled_writer(
+            &writer_thread,
+            &mut child,
+            "transparent",
+            cancel_flag.as_ref(),
+        ) {
+            Ok(cancelled) => was_cancelled |= cancelled,
+            Err(error) => shutdown_error = Some(error),
+        }
     }
-    // Check cancel flag again after the loop. The render may have finished
-    // all frames but the user cancelled during the final frame — we still
-    // treat that as a cancellation and clean up.
-    if cancel_flag.load(Ordering::SeqCst) {
-        let _ = child.kill();
+    let writer_result = join_shutdown_thread(writer_thread, "Encoder writer thread");
+    let status = if was_cancelled || producer_failed || writer_failed_before_teardown {
+        child.try_wait().map_err(|error| {
+            CoreError::Encode(format!("transparent ffmpeg process error: {error}"))
+        })?
+    } else {
+        match wait_for_ffmpeg(&mut child, "transparent", cancel_flag.as_ref()) {
+            Ok((status, cancelled)) => {
+                was_cancelled |= cancelled;
+                Some(status)
+            }
+            Err(error) => {
+                if shutdown_error.is_none() {
+                    shutdown_error = Some(error);
+                }
+                child.try_wait().map_err(|wait_error| {
+                    CoreError::Encode(format!("transparent ffmpeg process error: {wait_error}"))
+                })?
+            }
+        }
+    };
+    let monitor_result = join_shutdown_thread(monitor_thread, "FFmpeg monitor thread");
+
+    if was_cancelled {
         let _ = fs::remove_file(&output_path);
         return Err(CoreError::Cancelled);
     }
+    let writer_result = match writer_result {
+        Err(error) => {
+            let _ = fs::remove_file(&output_path);
+            if !writer_failed_before_teardown {
+                if let Err(producer_error) = render_result {
+                    return Err(producer_error);
+                }
+            }
+            return Err(error);
+        }
+        Ok(result) => result,
+    };
+    if writer_failed_before_teardown {
+        let _ = fs::remove_file(&output_path);
+        return Err(writer_result.err().unwrap_or_else(|| {
+            CoreError::Encode("Encoder writer stopped without reporting its failure".to_string())
+        }));
+    }
+
+    let producer_result = match render_result {
+        Ok(result) => result,
+        Err(error) => {
+            // Clean up partial output on any render-loop error. The file is
+            // incomplete and ffmpeg may have written a truncated header — keeping
+            // it would mislead the user into importing a broken video.
+            let _ = fs::remove_file(&output_path);
+            return Err(error);
+        }
+    };
+    let rendered_frames = producer_result.rendered_frames;
+    let producer_timings = producer_result.timings;
+    // Check cancel flag again after the loop. The render may have finished
+    // all frames but the user cancelled during the final frame — we still
+    // treat that as a cancellation and clean up.
+    let writer_result = match writer_result {
+        Ok(result) => result,
+        Err(error) => {
+            let _ = fs::remove_file(&output_path);
+            return Err(error);
+        }
+    };
+    if let Some(error) = shutdown_error {
+        let _ = fs::remove_file(&output_path);
+        return Err(error);
+    }
+    monitor_result?;
+    let status = status.ok_or_else(|| {
+        CoreError::Encode("transparent ffmpeg did not report an exit status".to_string())
+    })?;
     if !status.success() {
         let _ = fs::remove_file(&output_path);
         return Err(CoreError::Encode(format!(
@@ -327,11 +396,12 @@ pub(crate) fn render_video_single(
             writer_result.written_frames, total_frames
         )));
     }
+    output_guard.preserve();
 
     let total_time_taken = render_started.elapsed().as_secs_f64();
 
     // ── PHASE 7: FINALIZATION — write debug summary, return public filename ──
-    let merged_timings = merge_timing_maps(aggregate_profiler.summary(), writer_result.timings);
+    let merged_timings = merge_timing_maps(producer_timings, writer_result.timings);
     write_timing_summary_with_phase(
         &debug_dir,
         prepared_preview_assets.scene(),

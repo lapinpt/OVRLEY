@@ -326,16 +326,7 @@ fn heading_tape_layout_adds_only_visible_chevron_slots() {
 
 #[test]
 fn heading_tape_layout_adds_body_margin_for_highlight_bars() {
-    let layout = heading_tape_layout(
-        80.0,
-        true,
-        "highlight_bar",
-        "both",
-        10.0,
-        40.0,
-        4.0,
-        12.0,
-    );
+    let layout = heading_tape_layout(80.0, true, "highlight_bar", "both", 10.0, 40.0, 4.0, 12.0);
 
     assert!((layout.body_y - 8.0).abs() < f32::EPSILON);
     assert!((layout.body_height - 64.0).abs() < f32::EPSILON);

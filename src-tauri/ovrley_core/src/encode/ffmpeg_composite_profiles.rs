@@ -5,7 +5,7 @@
 //! FPS, dimensions, trim filters, and output path are injected by the
 //! composite builder.
 
-use super::codec_catalog::composite_codec;
+use super::codec_catalog::{composite_codec, EncoderId};
 use super::ffmpeg_composite::CompositeProfile;
 use crate::error::{CoreError, CoreResult};
 
@@ -15,7 +15,8 @@ use crate::error::{CoreError, CoreResult};
 /// mixing them with render-time values generated for each export.
 struct CompositeProfileTemplate {
     name: &'static str,
-    codec: &'static str,
+    encoder_id: EncoderId,
+    cpu_cores_per_frame_worker: usize,
     input_args: &'static [&'static str],
     filter_complex: Option<&'static str>,
     output_args: &'static [&'static str],
@@ -58,19 +59,19 @@ const QSV_FULL_FILTER: &str =
 const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     CompositeProfileTemplate {
         name: "software_h264",
-        codec: "libx264",
+        encoder_id: EncoderId::Libx264,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &["-c:v", "libx264", "-preset", "veryfast"],
+        output_args: &["-preset", "veryfast"],
     },
     CompositeProfileTemplate {
         name: "software_hevc",
-        codec: "libx265",
+        encoder_id: EncoderId::Libx265,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
         output_args: &[
-            "-c:v",
-            "libx265",
             "-pix_fmt",
             "yuv420p10le",
             "-profile:v",
@@ -83,12 +84,11 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     },
     CompositeProfileTemplate {
         name: "nvgpu_h264",
-        codec: "h264_nvenc",
+        encoder_id: EncoderId::H264Nvenc,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
         output_args: &[
-            "-c:v",
-            "h264_nvenc",
             "-rc:v",
             "cbr",
             "-bf:v",
@@ -101,23 +101,16 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     },
     CompositeProfileTemplate {
         name: "nvgpu_hevc",
-        codec: "hevc_nvenc",
+        encoder_id: EncoderId::HevcNvenc,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &[
-            "-c:v",
-            "hevc_nvenc",
-            "-rc:v",
-            "cbr",
-            "-bf:v",
-            "3",
-            "-spatial-aq",
-            "true",
-        ],
+        output_args: &["-rc:v", "cbr", "-bf:v", "3", "-spatial-aq", "true"],
     },
     CompositeProfileTemplate {
         name: "nnvgpu_h264",
-        codec: "h264_nvenc",
+        encoder_id: EncoderId::H264Nvenc,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[
             "-init_hw_device",
             "cuda=cuda",
@@ -130,8 +123,6 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
         ],
         filter_complex: Some(CUDA_H264_FILTER),
         output_args: &[
-            "-c:v",
-            "h264_nvenc",
             "-rc:v",
             "cbr",
             "-bf:v",
@@ -144,7 +135,8 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     },
     CompositeProfileTemplate {
         name: "nnvgpu_hevc",
-        codec: "hevc_nvenc",
+        encoder_id: EncoderId::HevcNvenc,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[
             "-init_hw_device",
             "cuda=cuda",
@@ -156,86 +148,87 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
             "cuda",
         ],
         filter_complex: Some(CUDA_HEVC_FILTER),
-        output_args: &[
-            "-c:v",
-            "hevc_nvenc",
-            "-rc:v",
-            "cbr",
-            "-bf:v",
-            "3",
-            "-spatial-aq",
-            "true",
-        ],
+        output_args: &["-rc:v", "cbr", "-bf:v", "3", "-spatial-aq", "true"],
     },
     CompositeProfileTemplate {
         name: "qsv_h264",
-        codec: "h264_qsv",
+        encoder_id: EncoderId::H264Qsv,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &["-c:v", "h264_qsv"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "qsv_hevc",
-        codec: "hevc_qsv",
+        encoder_id: EncoderId::HevcQsv,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-c:v", "hevc_qsv"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "qsv_full_h264",
-        codec: "h264_qsv",
+        encoder_id: EncoderId::H264Qsv,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-c:v", "h264_qsv"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "qsv_full_hevc",
-        codec: "hevc_qsv",
+        encoder_id: EncoderId::HevcQsv,
+        cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-c:v", "hevc_qsv"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "mac_h264",
-        codec: "h264_videotoolbox",
+        encoder_id: EncoderId::H264Videotoolbox,
+        cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &["-c:v", "h264_videotoolbox"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "mac_hevc",
-        codec: "hevc_videotoolbox",
+        encoder_id: EncoderId::HevcVideotoolbox,
+        cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-c:v", "hevc_videotoolbox"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "vaapi_h264",
-        codec: "h264_vaapi",
+        encoder_id: EncoderId::H264Vaapi,
+        cpu_cores_per_frame_worker: 4,
         input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-c:v", "h264_vaapi"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "vaapi_hevc",
-        codec: "hevc_vaapi",
+        encoder_id: EncoderId::HevcVaapi,
+        cpu_cores_per_frame_worker: 4,
         input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-c:v", "hevc_vaapi"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "amf_h264",
-        codec: "h264_amf",
+        encoder_id: EncoderId::H264Amf,
+        cpu_cores_per_frame_worker: 4,
         input_args: AMF_D3D11_INPUT_ARGS,
         filter_complex: Some(AMF_D3D11_FILTER),
-        output_args: &["-c:v", "h264_amf"],
+        output_args: &[],
     },
     CompositeProfileTemplate {
         name: "amf_hevc",
-        codec: "hevc_amf",
+        encoder_id: EncoderId::HevcAmf,
+        cpu_cores_per_frame_worker: 4,
         input_args: AMF_D3D11_INPUT_ARGS,
         filter_complex: Some(AMF_D3D11_FILTER),
-        output_args: &["-c:v", "hevc_amf"],
+        output_args: &[],
     },
 ];
 
@@ -265,19 +258,45 @@ pub fn composite_profile_template(name_or_codec: &str) -> CoreResult<CompositePr
 /// The returned profile deliberately excludes bitrate, FPS, output path, and
 /// raw-overlay pipe arguments because those are derived for each render.
 fn expand_template(template: &CompositeProfileTemplate) -> CompositeProfile {
+    let encoder_name = template.encoder_id.metadata().ffmpeg_name;
+    let mut output_args = vec!["-c:v".to_string(), encoder_name.to_string()];
+    output_args.extend(template.output_args.iter().map(|arg| arg.to_string()));
     CompositeProfile {
         name: template.name,
-        codec: template.codec,
+        codec: encoder_name,
+        cpu_cores_per_frame_worker: template.cpu_cores_per_frame_worker,
         input_args: template
             .input_args
             .iter()
             .map(|arg| arg.to_string())
             .collect(),
         filter_complex: template.filter_complex.map(str::to_string),
-        output_args: template
-            .output_args
-            .iter()
-            .map(|arg| arg.to_string())
-            .collect(),
+        output_args,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn videotoolbox_profiles_force_one_worker_and_all_others_reserve_four_cores() {
+        for profile in BUILTIN_PROFILES {
+            let expected = if profile
+                .encoder_id
+                .metadata()
+                .ffmpeg_name
+                .ends_with("_videotoolbox")
+            {
+                0
+            } else {
+                4
+            };
+            assert_eq!(
+                profile.cpu_cores_per_frame_worker, expected,
+                "unexpected frame-worker CPU cost for {}",
+                profile.name
+            );
+        }
     }
 }

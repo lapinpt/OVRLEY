@@ -1,6 +1,6 @@
 //! Multi-pass composite MP4 render pipeline.
 //!
-//! Renders Skia frames, composites with source video segments,
+//! Renders Skia frames, composites them with source video,
 //! and produces final H.264/H.265 MP4 output.
 //!
 //! Must not import from [`video_pipeline`].
@@ -9,6 +9,7 @@
 //! overlay FPS and streams them to FFmpeg, which composites them over input
 //! video frames and writes the final MP4 output.
 
+use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -16,11 +17,9 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 use std::time::Instant;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::debug::RenderProfiler;
 use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings_with_source_rotation, CompositeFfmpegBuildRequest,
@@ -28,10 +27,10 @@ use crate::encode::ffmpeg_composite::{
 };
 use crate::encode::fps::Fps;
 use crate::encode::pipeline_shared::{
-    acquire_frame_buffer, merge_timing_maps, queue_frame, writer_worker, FrameBuffer,
+    join_shutdown_thread, merge_timing_maps, terminate_ffmpeg, unblock_stalled_writer,
+    wait_for_ffmpeg, writer_worker, FfmpegChildGuard, FrameBuffer, PartialOutputGuard,
     WriterCancellation, WriterWorkerConfig,
 };
-use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
 use crate::encode::video_composite_debug::{
     write_composite_timing_summary, CompositeTimingSummaryInput,
@@ -41,10 +40,16 @@ use crate::encode::video_composite_support::{
     verify_successful_composite_output,
 };
 use crate::encode::video_debug::timestamp_nanos;
+use crate::encode::video_frame_parallel::{
+    diagnose_frame_worker_count, render_frames_parallel, FrameRenderTask, ParallelFramePoolPlan,
+    ParallelFrameProgress, ParallelFrameRenderRequest,
+};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
-use crate::render::{prepare_preview_assets, render_frame_rgba, FrameRenderRequest, RenderTarget};
+use crate::render::prepare_preview_assets;
+
+const FFMPEG_STDERR_LINE_LIMIT: usize = 200;
 
 /// Composite render values derived from render-time scene fields.
 ///
@@ -184,7 +189,6 @@ pub struct CompositePipelinePlan {
     pub render_duration: f64,
     pub overlay_frame_count: u64,
     pub output_frame_count: u64,
-    pub first_overrun_overlay_index: u64,
     pub widget_update_rate: u32,
     pub trim_start: f64,
     pub codec_name: String,
@@ -209,7 +213,7 @@ pub struct CompositePipelinePlan {
 // Called from multiple sites across video.rs, tests, and benchmarks;
 // request-struct refactor deferred to avoid destabilising test seams.
 #[allow(clippy::too_many_arguments)]
-pub fn render_composite_video_single(
+pub fn render_composite_video_with_frame_workers(
     // test seam
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
@@ -246,11 +250,24 @@ pub fn render_composite_video_single(
         composite_widget_update_rate,
         include_audio,
     )?;
+    let width = scene.width;
+    let height = scene.height;
+    let task_count =
+        usize::try_from(expected_guarded_overlay_frame_count(&plan)).map_err(|_| {
+            CoreError::Encode("Composite overlay frame count exceeds usize".to_string())
+        })?;
+    let workers =
+        diagnose_frame_worker_count(task_count, plan.ffmpeg_settings.cpu_cores_per_frame_worker);
+    let pool = ParallelFramePoolPlan::for_resolution(width, height, workers)?;
+    let frame_byte_len = pool.frame_byte_len;
+    let queue_capacity = pool.queue_capacity;
+    let buffer_count = pool.buffer_count;
 
     std::fs::create_dir_all(&paths.downloads_dir).map_err(|error| CoreError::Io {
         path: paths.downloads_dir.clone(),
         source: error,
     })?;
+    let mut output_guard = PartialOutputGuard::new(&plan.output_path);
     controller.set_frame_progress(
         0,
         plan.output_frame_count.min(u64::from(u32::MAX)) as u32,
@@ -265,7 +282,10 @@ pub fn render_composite_video_single(
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
 
     // ── PHASE 3: SPAWN FFMPEG & WORKER THREADS ──
-    let mut child = spawn_composite_ffmpeg_process(&ffmpeg_bin, &plan)?;
+    let mut child = FfmpegChildGuard::new(
+        spawn_composite_ffmpeg_process(&ffmpeg_bin, &plan)?,
+        "composite",
+    );
     let stdin = child
         .stdin
         .take()
@@ -273,29 +293,25 @@ pub fn render_composite_video_single(
     let stderr = child.stderr.take().ok_or_else(|| {
         CoreError::Encode("Failed to capture composite ffmpeg stderr".to_string())
     })?;
-    let stderr_lines = Arc::new(Mutex::new(Vec::new()));
+    let stderr_lines = Arc::new(Mutex::new(VecDeque::with_capacity(
+        FFMPEG_STDERR_LINE_LIMIT,
+    )));
     let monitor_lines = stderr_lines.clone();
     let monitor_thread = thread::spawn(move || monitor_composite_ffmpeg(stderr, monitor_lines));
 
     let scene = prepared_preview_assets.scene();
-    let width = scene.width;
-    let height = scene.height;
-    let frame_byte_len = (width as usize) * (height as usize) * 4;
     let scale = scene.scale;
     let total_progress = plan.output_frame_count.min(u64::from(u32::MAX)) as u32;
     let cancel_flag = controller.cancel_flag();
-    let mut profiler = RenderProfiler::default();
-    let mut overlay_frame_index = 0u64;
     let render_started = Instant::now();
     let render_loop_started = Instant::now();
-    let output_frame_equivalent_multiplier =
-        plan.output_fps.as_f64() / plan.overlay_pipe_fps.as_f64();
-    let mut estimator = ProgressEstimator::default();
+    let frame_render_mode = "frame_workers";
+    let frame_render_workers = workers.get();
+    let mut parallel_free_receiver = None;
 
-    let frame_queue_size = 4usize;
-    let (sender, receiver) = mpsc::sync_channel::<FrameBuffer>(frame_queue_size);
-    let (free_sender, free_receiver) = mpsc::sync_channel::<FrameBuffer>(frame_queue_size + 1);
-    for _ in 0..(frame_queue_size + 1) {
+    let (sender, receiver) = mpsc::sync_channel::<FrameBuffer>(queue_capacity);
+    let (free_sender, free_receiver) = mpsc::sync_channel::<FrameBuffer>(buffer_count);
+    for _ in 0..buffer_count {
         free_sender
             .send(FrameBuffer {
                 pixels: vec![0u8; frame_byte_len],
@@ -305,15 +321,18 @@ pub fn render_composite_video_single(
             })?;
     }
 
+    let pipeline_failed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let pipeline_failed_for_writer = Arc::clone(&pipeline_failed);
     let writer_thread = thread::spawn(move || {
         writer_worker(
             stdin,
             receiver,
             free_sender,
             WriterWorkerConfig {
+                pipeline_failed: pipeline_failed_for_writer,
                 cancellation: WriterCancellation::DrainUntilQueueCloses,
                 write_error_context: "Failed writing composite overlay frame",
-                queue_wait_metric: None,
+                queue_wait_metric: Some("writer.rendered_frame_wait"),
                 release_wait_metric: None,
                 release_error_message: None,
                 flush_error_is_fatal: false,
@@ -325,101 +344,98 @@ pub fn render_composite_video_single(
     // The bounded channel (capacity 4 for composite) provides backpressure; the
     // writer drains it and feeds ffmpeg stdin. Overlay frames are rendered at
     // the pipe FPS; ffmpeg repeats them across output frames internally.
-    let render_result = (|| -> CoreResult<()> {
-        loop {
-            if cancel_flag.load(Ordering::SeqCst) {
-                break;
-            }
-            if let Some(status) = child
-                .try_wait()
-                .map_err(|error| CoreError::Encode(format!("ffmpeg process error: {error}")))?
-            {
-                return Err(CoreError::Encode(format!(
-                    "composite ffmpeg exited unexpectedly with status {status}"
-                )));
-            }
-
-            let video_local_time = overlay_frame_index as f64 / plan.overlay_pipe_fps.as_f64();
-            if video_local_time >= plan.render_duration {
-                break;
-            }
-            let frame_started = Instant::now();
-            let activity_time = composite_sync_offset + video_local_time;
-            let frame_result = (|| -> CoreResult<()> {
-                let dense_frame_index = dense_frame_index_for_overlay(
+    let render_result = (|| -> CoreResult<_> {
+        let tasks = (0..task_count)
+            .map(|overlay_index| {
+                let video_local_time = plan.overlay_pipe_fps.seconds_at_frame(overlay_index as u64);
+                let activity_time = composite_sync_offset + video_local_time;
+                dense_frame_index_for_overlay(
                     prepared_preview_assets.scene(),
                     dense_activity,
                     &plan,
                     activity_time,
-                )?;
+                )
+                .map(|dense_frame_index| FrameRenderTask {
+                    output_frame_index: overlay_index as u64,
+                    dense_frame_index,
+                })
+            })
+            .collect::<CoreResult<Vec<_>>>()?;
+        let current_for_written_frames = |written_frames: u64| {
+            let video_local_time = plan.overlay_pipe_fps.seconds_at_frame(written_frames - 1);
+            output_progress_for_overlay_time(video_local_time, &plan)
+        };
+        let encoded_for_current = |current_progress: u32| current_progress;
 
-                let mut frame_buffer =
-                    acquire_frame_buffer(&free_receiver, cancel_flag.as_ref(), &mut profiler)?;
-                render_frame_rgba(FrameRenderRequest {
-                    paths,
-                    dense_activity,
-                    prepared_assets: &prepared_preview_assets.prepared_assets,
-                    frame_index: dense_frame_index,
-                    scale,
-                    labels_image: None,
-                    target: RenderTarget {
-                        width,
-                        height,
-                        pixels: frame_buffer.pixels.as_mut_slice(),
-                    },
-                    frame_profiler: &mut profiler,
-                })?;
-                queue_frame(&sender, frame_buffer, cancel_flag.as_ref(), &mut profiler)?;
-                Ok(())
-            })();
-            profiler.record_ms(
-                "frame.total",
-                frame_started.elapsed().as_secs_f64() * 1000.0,
-            );
-            frame_result?;
-
-            overlay_frame_index += 1;
-            let estimated_output_progress =
-                output_progress_for_overlay_time(video_local_time, &plan);
-            let current_progress = estimated_output_progress.min(total_progress);
-            let output_equivalent_frame_seconds =
-                frame_started.elapsed().as_secs_f64() / output_frame_equivalent_multiplier;
-            let (estimate, rendering_fps) = estimator.record(
-                current_progress,
-                total_progress,
-                output_equivalent_frame_seconds,
-                render_started.elapsed().as_secs_f64(),
-            );
-            controller.set_frame_progress(
-                current_progress,
-                total_progress,
-                current_progress,
-                estimate,
-                rendering_fps,
-            );
-        }
-        Ok(())
+        let result = render_frames_parallel(ParallelFrameRenderRequest {
+            paths,
+            dense_activity,
+            prepared_assets: &prepared_preview_assets.prepared_assets,
+            tasks: &tasks,
+            width,
+            height,
+            scale,
+            workers,
+            progress: ParallelFrameProgress {
+                total: total_progress,
+                current_for_written_frames: &current_for_written_frames,
+                encoded_for_current: &encoded_for_current,
+                // Composite progress already advances in output-frame equivalents.
+                effective_fps_multiplier: std::num::NonZeroU32::MIN,
+            },
+            ffmpeg_process_name: "composite",
+            controller,
+            cancel_flag: cancel_flag.as_ref(),
+            pipeline_failed: pipeline_failed.as_ref(),
+            frame_sender: &sender,
+            ordered_frame_observer: None,
+            free_receiver,
+            ffmpeg_child: &mut child,
+            render_started,
+        })?;
+        parallel_free_receiver = Some(result.free_receiver);
+        Ok(result.timings)
     })();
     let render_loop_ms = render_loop_started.elapsed().as_secs_f64() * 1000.0;
 
     // ── PHASE 5: DRAIN WRITER, FINALIZE FFMPEG, JOIN MONITOR ──
+    let mut was_cancelled = cancel_flag.load(Ordering::SeqCst);
+    let producer_failed = render_result.is_err();
+    let writer_failed_before_teardown = pipeline_failed.load(Ordering::SeqCst);
     drop(sender);
-    let writer_result = writer_thread
-        .join()
-        .map_err(|_| CoreError::Encode("Composite encoder writer thread panicked".to_string()))?;
-    let was_cancelled = cancel_flag.load(Ordering::SeqCst);
     let ffmpeg_finalize_started = Instant::now();
-    let status = if was_cancelled {
-        terminate_composite_ffmpeg_after_cancel(&mut child)?
+    let mut shutdown_error = None;
+    let mut status = None;
+    if was_cancelled || producer_failed || writer_failed_before_teardown {
+        match terminate_ffmpeg(&mut child, "composite") {
+            Ok(exit_status) => status = Some(exit_status),
+            Err(error) => shutdown_error = Some(error),
+        }
     } else {
-        child
-            .wait()
-            .map_err(|error| CoreError::Encode(error.to_string()))?
-    };
+        match unblock_stalled_writer(
+            &writer_thread,
+            &mut child,
+            "composite",
+            cancel_flag.as_ref(),
+        ) {
+            Ok(cancelled) => was_cancelled |= cancelled,
+            Err(error) => shutdown_error = Some(error),
+        }
+    }
+    let writer_result = join_shutdown_thread(writer_thread, "Composite encoder writer thread");
+    drop(parallel_free_receiver);
+    if status.is_none() && !was_cancelled && !producer_failed && !writer_failed_before_teardown {
+        match wait_for_ffmpeg(&mut child, "composite", cancel_flag.as_ref()) {
+            Ok((exit_status, cancelled)) => {
+                status = Some(exit_status);
+                was_cancelled |= cancelled;
+            }
+            Err(error) if shutdown_error.is_none() => shutdown_error = Some(error),
+            Err(_) => {}
+        }
+    }
     let ffmpeg_finalize_wait_ms = ffmpeg_finalize_started.elapsed().as_secs_f64() * 1000.0;
-    monitor_thread
-        .join()
-        .map_err(|_| CoreError::Encode("Composite ffmpeg monitor thread panicked".to_string()))?;
+    let monitor_result = join_shutdown_thread(monitor_thread, "Composite ffmpeg monitor thread");
 
     // Once the user has cancelled, teardown noise from ffmpeg finalization
     // should not be surfaced as a render failure in the UI.
@@ -427,6 +443,54 @@ pub fn render_composite_video_single(
         let _ = std::fs::remove_file(&plan.output_path);
         return Err(CoreError::Cancelled);
     }
+
+    let writer_result = match writer_result {
+        Ok(result) => result,
+        Err(error) => {
+            let _ = std::fs::remove_file(&plan.output_path);
+            if !writer_failed_before_teardown {
+                if let Err(producer_error) = render_result {
+                    return Err(producer_error);
+                }
+            }
+            return Err(error);
+        }
+    };
+    if writer_failed_before_teardown {
+        let _ = std::fs::remove_file(&plan.output_path);
+        let error = writer_result.err().unwrap_or_else(|| {
+            CoreError::Encode(
+                "Composite encoder writer stopped without reporting its failure".to_string(),
+            )
+        });
+        let Some(status) = status else {
+            return Err(error);
+        };
+        let stderr = stderr_snapshot(&stderr_lines);
+        let error_str = error.to_string();
+        if is_pipe_write_error(&error_str) {
+            return Err(CoreError::Encode(format_pipe_write_failure(
+                error_str, status, &stderr, &plan,
+            )));
+        }
+        return Err(error);
+    }
+
+    let producer_timings = match render_result {
+        Ok(timings) => timings,
+        Err(error) => {
+            let _ = std::fs::remove_file(&plan.output_path);
+            return Err(error);
+        }
+    };
+    if let Some(error) = shutdown_error {
+        let _ = std::fs::remove_file(&plan.output_path);
+        return Err(error);
+    }
+    monitor_result?;
+    let status = status.ok_or_else(|| {
+        CoreError::Encode("composite ffmpeg did not report an exit status".to_string())
+    })?;
 
     let writer = match writer_result {
         Ok(w) => w,
@@ -449,23 +513,6 @@ pub fn render_composite_video_single(
         }
     };
 
-    if let Err(error) = render_result {
-        let _ = std::fs::remove_file(&plan.output_path);
-        let stderr = stderr_snapshot(&stderr_lines);
-        let error_str = error.to_string();
-        if is_pipe_write_error(&error_str) {
-            return Err(CoreError::Encode(format_pipe_write_failure(
-                error_str, status, &stderr, &plan,
-            )));
-        }
-        if stderr.is_empty() {
-            return Err(error);
-        }
-        return Err(CoreError::Encode(format!(
-            "{error}. FFmpeg stderr:\n{}",
-            stderr_tail(&stderr)
-        )));
-    }
     if !status.success() {
         let _ = std::fs::remove_file(&plan.output_path);
         let stderr = stderr_snapshot(&stderr_lines);
@@ -483,10 +530,11 @@ pub fn render_composite_video_single(
         )));
     }
     verify_successful_composite_output(&plan.output_path)?;
+    output_guard.preserve();
 
     // ── PHASE 6: WRITE DEBUG SUMMARY ──
     let total_ms = render_started.elapsed().as_secs_f64() * 1000.0;
-    let merged_timings = merge_timing_maps(profiler.summary(), writer.timings);
+    let merged_timings = merge_timing_maps(producer_timings, writer.timings);
     write_composite_timing_summary(CompositeTimingSummaryInput {
         debug_render_dir: &paths.debug_render_dir,
         ffmpeg_settings: &plan.ffmpeg_settings,
@@ -507,6 +555,8 @@ pub fn render_composite_video_single(
         input_height: height,
         trim_start: plan.trim_start,
         sync_offset: composite_sync_offset,
+        frame_render_mode,
+        frame_render_workers,
     })?;
     controller.set_frame_progress(
         total_progress,
@@ -516,33 +566,6 @@ pub fn render_composite_video_single(
         None,
     );
     Ok(plan.output_filename)
-}
-
-/// Terminates FFmpeg after a user cancellation request.
-///
-/// Closing stdin gives FFmpeg a short chance to exit cleanly; if it keeps
-/// running, the process is killed and waited so no encoder process is orphaned.
-fn terminate_composite_ffmpeg_after_cancel(
-    child: &mut std::process::Child,
-) -> CoreResult<std::process::ExitStatus> {
-    for _ in 0..10 {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|error| CoreError::Encode(error.to_string()))?
-        {
-            return Ok(status);
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-
-    child.kill().map_err(|error| {
-        CoreError::Encode(format!(
-            "Failed to terminate composite ffmpeg after cancellation: {error}"
-        ))
-    })?;
-    child
-        .wait()
-        .map_err(|error| CoreError::Encode(error.to_string()))
 }
 
 /// Derives composite timing and FFmpeg settings.
@@ -605,12 +628,8 @@ pub fn derive_composite_pipeline_plan(
         verify_composite_source_resolution(paths, composite_video_path, width, height)?;
 
     // ── PHASE 2: COMPUTE FRAME COUNTS & OVERRUN GUARD ──
-    let overlay_frame_count = (render_duration * overlay_pipe_fps.as_f64())
-        .ceil()
-        .max(0.0) as u64;
-    let output_frame_count = (render_duration * output_fps.as_f64()).ceil().max(0.0) as u64;
-    let first_overrun_overlay_index =
-        first_fractional_overrun_overlay_index(render_duration, overlay_pipe_fps);
+    let overlay_frame_count = overlay_pipe_fps.frame_count_for_duration(render_duration)?;
+    let output_frame_count = output_fps.frame_count_for_duration(render_duration)?;
     // ── PHASE 3: BUILD COMPOSITE FFMPEG SETTINGS ──
     let mut hwaccel_info = HwAccelInfo::trust_selected_profile();
     hwaccel_info.available_codecs.qsv_full_init_args = composite_qsv_full_init_args(scene);
@@ -641,7 +660,6 @@ pub fn derive_composite_pipeline_plan(
         render_duration,
         overlay_frame_count,
         output_frame_count,
-        first_overrun_overlay_index,
         widget_update_rate: update_rate,
         trim_start,
         codec_name,
@@ -749,7 +767,7 @@ pub fn dense_frame_index_for_overlay(
     plan: &CompositePipelinePlan,
     activity_time: f64,
 ) -> CoreResult<usize> {
-    let direct_index = if dense_report_matches_composite_window(scene, plan) {
+    let direct_index = if dense_report_matches_composite_window(scene, dense_activity, plan) {
         let video_local_time = activity_time - scene.start;
         Some((video_local_time * plan.overlay_pipe_fps.as_f64()).round() as usize)
     } else {
@@ -785,44 +803,42 @@ pub fn dense_frame_index_for_overlay(
 /// when valid.
 fn dense_report_matches_composite_window(
     scene: &crate::normalize::ValidatedSceneConfig,
+    dense_activity: &DenseActivityReport,
     plan: &CompositePipelinePlan,
 ) -> bool {
     let expected_end = scene.start + plan.render_duration;
     (scene.end - expected_end).abs() <= 1e-6
         && (scene.fps - plan.overlay_pipe_fps.as_f64()).abs() <= 1e-9
-        && dense_report_frame_count_matches(scene, plan)
-}
-
-/// Checks whether scene timing implies the same guarded overlay frame count.
-fn dense_report_frame_count_matches(
-    scene: &crate::normalize::ValidatedSceneConfig,
-    plan: &CompositePipelinePlan,
-) -> bool {
-    let scene_frames = ((scene.end - scene.start) * scene.fps).ceil().max(0.0) as u64;
-    scene_frames == expected_guarded_overlay_frame_count(plan)
+        && u64::try_from(dense_activity.frame_count).ok() == Some(plan.overlay_frame_count)
 }
 
 /// Counts overlay frames whose timestamps are strictly inside render duration.
 pub fn expected_guarded_overlay_frame_count(plan: &CompositePipelinePlan) -> u64 {
     // test seam
-    plan.first_overrun_overlay_index
+    plan.overlay_frame_count
 }
 
 /// Reads FFmpeg stderr without blocking the encoder process.
-fn monitor_composite_ffmpeg(stderr: std::process::ChildStderr, lines: Arc<Mutex<Vec<String>>>) {
+fn monitor_composite_ffmpeg(
+    stderr: std::process::ChildStderr,
+    lines: Arc<Mutex<VecDeque<String>>>,
+) {
     let reader = BufReader::new(stderr);
     for line in reader.lines().map_while(Result::ok) {
         if let Ok(mut locked) = lines.lock() {
-            locked.push(line);
+            if locked.len() == FFMPEG_STDERR_LINE_LIMIT {
+                locked.pop_front();
+            }
+            locked.push_back(line);
         }
     }
 }
 
 /// Returns a best-effort snapshot of collected FFmpeg stderr lines.
-fn stderr_snapshot(lines: &Arc<Mutex<Vec<String>>>) -> String {
+fn stderr_snapshot(lines: &Arc<Mutex<VecDeque<String>>>) -> String {
     lines
         .lock()
-        .map(|lines| lines.join("\n"))
+        .map(|lines| lines.iter().cloned().collect::<Vec<_>>().join("\n"))
         .unwrap_or_default()
 }
 
@@ -859,23 +875,4 @@ fn composite_qsv_full_init_args(scene: &crate::normalize::ValidatedSceneConfig) 
                 .collect()
         })
         .unwrap_or_default()
-}
-
-/// Finds the first overlay frame index that the render loop must reject.
-///
-/// The render loop uses the equivalent guard
-/// `video_local_time >= render_duration` so fractional durations never emit an
-/// extra tail frame.
-pub fn first_fractional_overrun_overlay_index(render_duration: f64, overlay_pipe_fps: Fps) -> u64 {
-    // test seam
-    let mut index = (render_duration * overlay_pipe_fps.as_f64())
-        .floor()
-        .max(0.0) as u64;
-    loop {
-        let video_local_time = index as f64 / overlay_pipe_fps.as_f64();
-        if video_local_time >= render_duration {
-            return index;
-        }
-        index += 1;
-    }
 }

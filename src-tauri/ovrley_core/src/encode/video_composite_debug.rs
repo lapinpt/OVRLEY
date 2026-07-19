@@ -5,12 +5,15 @@
 //! the transparent render debug path.
 //!
 //! Write failures are best-effort — the composite render continues even if
-//! debug artifact creation fails. Artifacts accumulate indefinitely; there is
-//! no automatic cleanup.
+//! debug artifact creation fails. Completed timing artifacts have bounded
+//! retention.
 
 use crate::debug::TimingBucket;
 use crate::encode::ffmpeg_composite::CompositeFfmpegSettings;
 use crate::encode::fps::Fps;
+use crate::encode::video_debug::{
+    prune_completed_timing_directories, DEBUG_TIMING_RETENTION_LIMIT,
+};
 use crate::error::{CoreError, CoreResult};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -62,6 +65,8 @@ struct PerFrameTiming {
 #[derive(Serialize)]
 /// FFmpeg and render-plan diagnostics included with the timing summary.
 struct CompositeDiagnostics {
+    frame_render_mode: String,
+    frame_render_workers: usize,
     codec: String,
     bitrate: String,
     source_fps: String,
@@ -100,6 +105,8 @@ pub struct CompositeTimingSummaryInput<'a> {
     pub input_height: u32,
     pub trim_start: f64,
     pub sync_offset: f64,
+    pub frame_render_mode: &'a str,
+    pub frame_render_workers: usize,
 }
 
 /// Writes the composite timing summary JSON.
@@ -142,6 +149,8 @@ pub fn write_composite_timing_summary(
         performance,
         timings: input.timings,
         diagnostics: CompositeDiagnostics {
+            frame_render_mode: input.frame_render_mode.to_string(),
+            frame_render_workers: input.frame_render_workers,
             codec: input.codec.to_string(),
             bitrate: input.bitrate.to_string(),
             source_fps: input.source_fps.ffmpeg_arg(),
@@ -167,6 +176,10 @@ pub fn write_composite_timing_summary(
         path: summary_path.clone(),
         source: error,
     })?;
+    prune_completed_timing_directories(
+        &input.debug_render_dir.join(COMPOSITE_DEBUG_PHASE),
+        DEBUG_TIMING_RETENTION_LIMIT,
+    );
     Ok(summary_path)
 }
 

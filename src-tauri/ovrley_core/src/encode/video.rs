@@ -1,28 +1,20 @@
 //! Render lifecycle orchestration facade.
 //!
 //! This module keeps the public encode entry points stable while delegating the
-//! heavy lifting to focused helpers. Single-pass frame production lives in the
-//! pipeline modules, benchmark-only multi-render work lives in
-//! `video_parallel`, and segmented transparent/composite orchestration lives in
-//! `video_segmented`.
+//! heavy lifting to the canonical transparent and composite frame-worker
+//! pipelines.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::encode::video_composite_pipeline::render_composite_video_single;
-use crate::encode::video_pipeline::render_video_single;
-use crate::encode::video_segmented::{
-    render_composite_video_segmented, render_video_segmented, should_parallelize_composite,
-    should_parallelize_segmented,
-};
-use crate::error::{CoreError, CoreResult};
+use crate::encode::video_composite_pipeline::render_composite_video_with_frame_workers;
+use crate::encode::video_pipeline::render_video_with_frame_workers;
+use crate::error::CoreResult;
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 
 pub use crate::encode::progress::RenderController;
-pub use crate::encode::video_parallel::run_parallel_renders;
 pub use crate::encode::video_pipeline::rendered_frame_count;
-pub use crate::encode::video_windows::{composite_output_frame_windows, CompositeSegmentWindow};
 
-/// Renders a video, using segmentation when the selected codec benefits from it.
+/// Renders a transparent overlay through the canonical frame-worker pipeline.
 pub fn render_video(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
@@ -30,16 +22,10 @@ pub fn render_video(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> CoreResult<String> {
-    if should_parallelize_segmented(config, dense_activity) {
-        return render_video_segmented(paths, config, activity, dense_activity, controller);
-    }
-    render_video_single(paths, config, activity, dense_activity, controller)
+    render_video_with_frame_workers(paths, config, activity, dense_activity, controller)
 }
 
 /// Bundled parameters for composite MP4 rendering.
-///
-/// The request shape stays public and stable while the facade can delegate the
-/// same bundle to either single-pass or segmented composite paths.
 ///
 /// Fields such as `composite_render_duration` and `composite_video_trim_start`
 /// are optional because callers that have already computed them from the render
@@ -64,33 +50,9 @@ pub struct CompositeRenderRequest<'a> {
 
 /// Renders an imported video with the Skia overlay composited into an MP4 output.
 ///
-/// Longer renders are automatically split into parallel segments for better CPU
-/// utilization and then stitched with FFmpeg stream copy.
+/// The selected codec profile and frame count determine the frame-worker count.
 pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResult<String> {
-    let render_duration = request.composite_render_duration;
-    let trim_start = request.composite_video_trim_start;
-    let update_rate = request.composite_widget_update_rate.max(1);
-
-    let codec = request
-        .config
-        .scene
-        .ffmpeg
-        .as_object()
-        .and_then(|map| map.get("codec"))
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            CoreError::Encode("scene.ffmpeg.codec must be provided by the frontend".into())
-        })?;
-    if should_parallelize_composite(
-        render_duration,
-        request.composite_video_fps_num,
-        update_rate,
-        codec,
-    ) {
-        return render_composite_video_segmented(request, render_duration, trim_start, update_rate);
-    }
-
-    render_composite_video_single(
+    render_composite_video_with_frame_workers(
         request.paths,
         request.config,
         request.activity,
@@ -102,9 +64,9 @@ pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResul
         request.composite_video_fps_num,
         request.composite_video_fps_den,
         request.composite_video_duration,
-        render_duration,
-        trim_start,
-        update_rate,
+        request.composite_render_duration,
+        request.composite_video_trim_start,
+        request.composite_widget_update_rate,
         true,
     )
 }

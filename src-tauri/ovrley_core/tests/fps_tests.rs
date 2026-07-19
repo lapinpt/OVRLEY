@@ -89,7 +89,7 @@ fn converts_common_float_fallback_rates() {
 fn integer_fps_frame_count_for_duration() {
     let fps = Fps::new(30, 1).unwrap();
     assert!((fps.as_f64() - 30.0).abs() < 1e-12);
-    assert_eq!((10.0 * fps.as_f64()).ceil() as u64, 300);
+    assert_eq!(fps.frame_count_for_duration(10.0).unwrap(), 300);
 }
 
 #[test]
@@ -100,6 +100,25 @@ fn zero_denominator_rejected() {
 #[test]
 fn fractional_duration_frame_count() {
     let fps = Fps::new(30, 1).unwrap();
-    assert_eq!((7.3 * fps.as_f64()).ceil() as u64, 219);
-    assert_eq!((0.033 * fps.as_f64()).ceil() as u64, 1);
+    assert_eq!(fps.frame_count_for_duration(7.3).unwrap(), 219);
+    assert_eq!(fps.frame_count_for_duration(0.033).unwrap(), 1);
+    assert_eq!(fps.frame_count_for_duration(0.000_000_001).unwrap(), 1);
+}
+
+#[test]
+fn frame_count_ignores_sub_boundary_metadata_jitter() {
+    let fps = Fps::new(30000, 1001).unwrap();
+    let exact_duration = fps.seconds_at_frame(1753);
+    let reported_duration = exact_duration + 0.00001 / fps.as_f64();
+
+    assert!((reported_duration * fps.as_f64() - 1753.00001).abs() < 1e-8);
+    assert_eq!(
+        fps.frame_count_for_duration(reported_duration).unwrap(),
+        1753
+    );
+    assert_eq!(
+        fps.frame_count_for_duration(exact_duration + 0.001)
+            .unwrap(),
+        1754
+    );
 }

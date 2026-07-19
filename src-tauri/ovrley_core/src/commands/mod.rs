@@ -271,9 +271,11 @@ fn start_composite_render(
     apply_composite_scene_timing(&mut validated.scene, &plan);
     let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
 
-    let output_frame_count = (plan.render_duration * plan.source_fps.as_f64())
-        .ceil()
-        .max(1.0) as u32;
+    let output_frame_count = u32::try_from(
+        plan.source_fps
+            .frame_count_for_duration(plan.render_duration)?,
+    )
+    .map_err(|_| CoreError::Encode("Composite progress frame count exceeds u32".to_string()))?;
     let render_id = controller.try_start(output_frame_count, "Compositing video...")?;
 
     let controller_clone = controller.clone();

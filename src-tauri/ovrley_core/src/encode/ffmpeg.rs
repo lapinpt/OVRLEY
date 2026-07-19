@@ -10,7 +10,7 @@ use std::process::Command;
 
 use crate::error::{CoreError, CoreResult};
 
-/// Resolves the ffmpeg executable used for previews, encoding, and stitching.
+/// Resolves the ffmpeg executable used for previews and encoding.
 ///
 /// Search order is: explicit environment override, known app-local vendor
 /// locations, then `PATH`. Returning a concrete path lets health checks and

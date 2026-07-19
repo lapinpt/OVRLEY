@@ -16,6 +16,7 @@
 //! - Custom container overrides ignored
 
 use ovrley_core::encode::ffmpeg_settings::build_ffmpeg_settings;
+use ovrley_core::encode::ffmpeg_transparent_profiles::PRORES_KS_VULKAN_FILTER;
 use ovrley_core::error::CoreResult;
 use serde_json::json;
 
@@ -44,7 +45,11 @@ fn prores_ks_vulkan_defaults() -> CoreResult<()> {
     assert_eq!(settings.codec, "prores_ks_vulkan");
     assert_eq!(settings.extension, "mov");
     assert_eq!(settings.input_args.len(), 4);
-    assert!(settings.filter_complex.is_some());
+    assert_eq!(
+        settings.filter_complex.as_deref(),
+        Some(PRORES_KS_VULKAN_FILTER)
+    );
+    assert_argument_pair(&settings.output_args, "-qscale:v", "5");
     assert_argument_pair(&settings.output_args, "-pix_fmt", "vulkan");
     Ok(())
 }

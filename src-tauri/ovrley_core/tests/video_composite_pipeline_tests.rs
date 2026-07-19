@@ -1,8 +1,7 @@
 //! Composite video pipeline integration tests.
 //!
 //! The largest test suite in the crate. Covers the full composite pipeline:
-//! `derive_composite_pipeline_plan`, `render_composite_video_single`,
-//! `render_composite_video` (segmented/parallel), frame-window partitioning,
+//! `derive_composite_pipeline_plan`, canonical frame-worker rendering,
 //! fractional overrun guards, sync-offset correctness, FPS preservation,
 //! audio track copying, progress reporting, cancellation lifecycle,
 //! FFmpeg failure diagnostics, broken-pipe handling, and composite debug
@@ -32,7 +31,7 @@
 //! - Audio track dropped during composite rendering
 //! - Cancellation leaving partial output files or zombie processes
 //! - FFmpeg crash producing unhelpful error messages
-//! - Parallel segmentation producing wrong frame windows or overlapping segments
+//! - Parallel frame production writing frames out of order
 //! - Lower overlay update rate producing incorrect frame counts
 //! - Debug timing summaries missing expected fields
 
@@ -47,7 +46,7 @@ use ovrley_core::encode::video::CompositeRenderRequest;
 use ovrley_core::encode::video::RenderController;
 use ovrley_core::encode::video_composite_pipeline::{
     dense_frame_index_for_overlay, derive_composite_pipeline_plan,
-    expected_guarded_overlay_frame_count, first_fractional_overrun_overlay_index,
+    expected_guarded_overlay_frame_count,
 };
 use ovrley_core::encode::video_composite_support::{
     format_pipe_write_failure, is_pipe_write_error, output_progress_for_overlay_time,
@@ -118,9 +117,9 @@ fn test_4_4_builds_ffmpeg_settings_inside_composite_shell() {
 fn fractional_overrun_guard_rejects_first_timestamp_at_or_after_duration() {
     let fps = Fps::new(30000, 1001).unwrap();
 
-    let overrun_index = first_fractional_overrun_overlay_index(1.0, fps);
-    let previous_time = (overrun_index - 1) as f64 / fps.as_f64();
-    let overrun_time = overrun_index as f64 / fps.as_f64();
+    let overrun_index = fps.frame_count_for_duration(1.0).unwrap();
+    let previous_time = fps.seconds_at_frame(overrun_index - 1);
+    let overrun_time = fps.seconds_at_frame(overrun_index);
 
     assert!(previous_time < 1.0);
     assert!(overrun_time >= 1.0);
@@ -604,19 +603,68 @@ fn test_manual_full_duration_4k_composite() {
 }
 
 #[test]
-/// End-to-end parallel composite render with 2 segments.
-///
-/// Configures a 5-second composite render at 29.97 FPS split across 2
-/// parallel segments. Uses `render_composite_video` (the segmented
-/// dispatcher) rather than `render_composite_video_single`. Verifies
-/// output file exists and is non-empty.
-///
-/// Requires live ffmpeg and the test-1080p.mp4 fixture.
-///
-/// Regressions guarded: parallel segmentation producing corrupt output,
-/// segment boundary misalignment, render_composite_video returning error
-/// for valid inputs.
-fn test_parallel_composite_render_2_segments() {
+fn test_frame_workers_render_short_composite_in_order() {
+    let paths = test_paths_named("parallel_frame_workers_short_composite");
+    let validated = composite_test_config(0.2);
+    let activity = fixture_activity();
+    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
+    let controller = RenderController::default();
+    controller
+        .try_start(dense.frame_count as u32, "test_parallel_frame_workers")
+        .unwrap();
+    let video_path = common::test_config::sample_video_path()
+        .to_string_lossy()
+        .to_string();
+
+    let filename = render_composite_video(&CompositeRenderRequest {
+        paths: &paths,
+        config: &validated,
+        activity: &activity,
+        dense_activity: &dense,
+        controller: &controller,
+        composite_video_path: &video_path,
+        composite_bitrate: "10M",
+        composite_sync_offset: 0.0,
+        composite_video_fps_num: 30000,
+        composite_video_fps_den: 1001,
+        composite_video_duration: 35.0,
+        composite_render_duration: 0.2,
+        composite_video_trim_start: 0.0,
+        composite_widget_update_rate: 1,
+    })
+    .unwrap();
+
+    let output_path = paths.downloads_dir.join(filename);
+    assert!(output_path.is_file());
+    assert!(std::fs::metadata(&output_path).unwrap().len() > 0);
+    let progress = controller.progress();
+    assert_eq!(progress.current, 6);
+    assert_eq!(progress.current, progress.total);
+    assert_eq!(progress.encoded, progress.total);
+    let rates = ffprobe_video_rates(&output_path);
+    assert!(rates.contains("r_frame_rate=30000/1001"));
+
+    let summary = composite_debug_timing_summary(&paths);
+    assert_eq!(summary["diagnostics"]["frame_render_mode"], "frame_workers");
+    let workers = summary["diagnostics"]["frame_render_workers"]
+        .as_u64()
+        .unwrap();
+    assert!((1..=4).contains(&workers));
+    for timing in [
+        "frame.draw",
+        "parallel.worker_frame",
+        "parallel.result_wait",
+        "parallel.reorder_hold",
+        "writer.rendered_frame_wait",
+        "ffmpeg.write",
+    ] {
+        assert!(summary["timings"][timing].is_object(), "missing {timing}");
+    }
+}
+
+#[test]
+/// End-to-end composite render through the canonical frame-worker pipeline.
+fn test_frame_worker_composite_render() {
     let paths = test_paths();
     let validated = composite_test_config(5.0);
     let activity = fixture_activity();
@@ -654,20 +702,17 @@ fn test_parallel_composite_render_2_segments() {
 }
 
 #[test]
-/// End-to-end parallel composite render with audio-copy and trim start.
+/// End-to-end frame-worker composite render with audio-copy and trim start.
 ///
 /// Configures a 5-second composite render at 29.97 FPS with a 15-second
 /// video trim start (trimming the first 15 seconds of the source video)
-/// and audio track copying. Uses `render_composite_video` (segmented
-/// dispatcher). Verifies output file exists and is non-empty.
+/// and audio track copying. Verifies output file exists and is non-empty.
 ///
 /// Requires live ffmpeg and the test-1080p.mp4 fixture (which has an
 /// audio track).
 ///
-/// Regressions guarded: trim start with audio causing sync issues,
-/// parallel segments dropping audio, render_composite_video failing
-/// when trim and audio are both active.
-fn test_parallel_composite_render_with_audio() {
+/// Regressions guarded: trim start with audio causing sync issues or failures.
+fn test_frame_worker_composite_render_with_audio() {
     let paths = test_paths();
     let validated = composite_test_config(5.0);
     let activity = fixture_activity();
