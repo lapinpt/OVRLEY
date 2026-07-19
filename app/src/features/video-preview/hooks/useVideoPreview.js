@@ -151,6 +151,7 @@ export function useVideoPreview(videoRef, isActive = true) {
     importId: importedVideoImportId,
     frozenFrameSecond,
     isOutOfRange,
+    hevcPlaybackWarning,
     openVideoPreviewHelp,
     videoPreviewHelpAvailable,
     videoPreviewMessages,

@@ -25,7 +25,7 @@ export const SLOW_SEEK_WARNING_MS = 1_200
 export const SLOW_SEEK_WARNING_COUNT = 2
 
 /** Time allowed for an HEVC frame to reach the webview compositor after metadata loads. */
-export const HEVC_FRAME_TIMEOUT_MS = 8_000
+export const HEVC_FRAME_TIMEOUT_MS = 3_000
 
 /**
  * When true, the preview URL is served via the local HTTP preview server.
