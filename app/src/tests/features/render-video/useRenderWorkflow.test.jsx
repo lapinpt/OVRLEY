@@ -15,6 +15,7 @@ vi.mock('@/api/backend', () => ({
     status: 'rendering',
     message: '',
   }),
+  subscribeRenderProgress: vi.fn().mockResolvedValue(vi.fn()),
   listAvailableFonts: vi.fn().mockResolvedValue({
     recommendedFonts: [],
     systemFonts: [],

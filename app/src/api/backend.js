@@ -302,6 +302,27 @@ export async function getRenderProgress() {
 }
 
 /**
+ * Subscribes to streamed `render-progress` events emitted by the backend
+ * `RenderController`. Each event carries a `RenderProgress` payload identical
+ * to what `getRenderProgress` would return as a snapshot — the streaming
+ * subscription replaces the previous 500 ms polling loop and delivers updates
+ * at the true frame-production rate (per in-order frame-front advancement).
+ *
+ * The returned `UnlistenFn` must be invoked to release the subscription when
+ * the consumer unmounts or the render session ends.
+ *
+ * @param {(progress: object) => void} handler - Called with each `RenderProgress` payload.
+ * @returns {Promise<() => void>} Resolves to an unlisten function.
+ */
+export async function subscribeRenderProgress(handler) {
+  if (!hasTauriRuntime()) {
+    return () => {}
+  }
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen('render-progress', (event) => handler(event.payload))
+}
+
+/**
  * Checks whether cancel render.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
