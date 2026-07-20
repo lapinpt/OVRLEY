@@ -4,7 +4,7 @@
 //! tests that only documented hypothetical live-pipeline transitions were
 //! removed because they were redundant and never exercised in normal runs.
 
-use ovrley_core::encode::video::RenderController;
+use ovrley_core::encode::progress::RenderController;
 
 /// Double cancel is idempotent: no panic, no deadlock.
 #[test]

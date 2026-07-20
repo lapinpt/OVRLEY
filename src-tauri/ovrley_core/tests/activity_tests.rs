@@ -479,7 +479,7 @@ fn parsed_activity_handles_nulls_in_new_series() {
 
 #[test]
 fn hold_interpolation_densifies_iso_as_step_function() {
-    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 
     // iso samples: 200 at t=0, 800 at t=1
     // With hold interpolation, all frames before t=1 should hold 200
@@ -489,7 +489,11 @@ fn hold_interpolation_densifies_iso_as_step_function() {
     requirements.iso = true;
 
     // fps=4 → frames at t=0, 0.25, 0.5, 0.75 (all before t=1)
-    let report = densify_activity(&trimmed, 4.0, &requirements);
+    let report = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 4.0).unwrap(),
+        &requirements,
+    );
 
     assert_eq!(report.series.iso.len(), 4);
     // Hold: all frames before t=1 should be 200 (the last known value at or before each frame)
@@ -504,7 +508,7 @@ fn hold_interpolation_densifies_iso_as_step_function() {
 
 #[test]
 fn linear_interpolation_densifies_altitude_as_smooth_line() {
-    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 
     // altitude samples: 100 at t=0, 200 at t=1
     let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
@@ -513,7 +517,11 @@ fn linear_interpolation_densifies_altitude_as_smooth_line() {
     requirements.altitude = true;
 
     // fps=4 → frames at t=0, 0.25, 0.5, 0.75
-    let report = densify_activity(&trimmed, 4.0, &requirements);
+    let report = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 4.0).unwrap(),
+        &requirements,
+    );
 
     assert_eq!(report.series.altitude.len(), 4);
     // Linear: t=0→100, t=0.25→125, t=0.5→150, t=0.75→175
@@ -535,7 +543,7 @@ fn linear_interpolation_densifies_altitude_as_smooth_line() {
 
 #[test]
 fn vehicle_metrics_survive_trim_and_linear_densification() {
-    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
     use ovrley_core::activity::trim::trim_activity;
 
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
@@ -566,7 +574,11 @@ fn vehicle_metrics_survive_trim_and_linear_densification() {
     );
     assert_eq!(trimmed.lean_angle, vec![Some(-15.0), Some(0.0), Some(15.0)]);
 
-    let dense = densify_activity(&trimmed, 2.0, &requirements);
+    let dense = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 2.0).unwrap(),
+        &requirements,
+    );
     assert_eq!(dense.series.rpm, vec![Some(2000.0), Some(3000.0)]);
     assert_eq!(dense.series.throttle_position, vec![Some(25.0), Some(50.0)]);
     assert_eq!(dense.series.brake_position, vec![Some(75.0), Some(50.0)]);

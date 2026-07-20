@@ -34,53 +34,66 @@ fn preserves_ntsc_rational_fps() {
 fn divides_overlay_fps_exactly() {
     // Rational divisions
     let ntsc = Fps::new(60000, 1001).unwrap();
-    assert_eq!(ntsc.divided_by(2).unwrap(), Fps::new(30000, 1001).unwrap());
-    assert_eq!(ntsc.divided_by(6).unwrap(), Fps::new(10000, 1001).unwrap());
+    assert_eq!(
+        ntsc.divided_by(std::num::NonZeroU32::new(2).unwrap())
+            .unwrap(),
+        Fps::new(30000, 1001).unwrap()
+    );
+    assert_eq!(
+        ntsc.divided_by(std::num::NonZeroU32::new(6).unwrap())
+            .unwrap(),
+        Fps::new(10000, 1001).unwrap()
+    );
 
     // Integer divisions
     let fps60 = Fps::new(60, 1).unwrap();
-    assert_eq!(fps60.divided_by(2).unwrap(), Fps::new(30, 1).unwrap());
-    assert_eq!(fps60.divided_by(4).unwrap(), Fps::new(15, 1).unwrap());
+    assert_eq!(
+        fps60
+            .divided_by(std::num::NonZeroU32::new(2).unwrap())
+            .unwrap(),
+        Fps::new(30, 1).unwrap()
+    );
+    assert_eq!(
+        fps60
+            .divided_by(std::num::NonZeroU32::new(4).unwrap())
+            .unwrap(),
+        Fps::new(15, 1).unwrap()
+    );
 }
 
 #[test]
 // Verifies zero factors are rejected before division.
-fn rejects_zero_division_factor() {
-    let source = Fps::new(60000, 1001).unwrap();
-
-    assert_eq!(
-        source.divided_by(0).unwrap_err().to_string(),
-        "Encoding error: FPS division factor must be greater than zero"
-    );
+fn rejects_zero_division_factor_at_construction() {
+    assert!(std::num::NonZeroU32::new(0).is_none());
 }
 
 #[test]
 // Verifies common float metadata can be converted when rationals are absent.
-fn converts_common_float_fallback_rates() {
+fn converts_common_external_float_metadata_rates() {
     assert_eq!(
-        Fps::from_f64_fallback(23.976).unwrap().ffmpeg_arg(),
+        Fps::from_f64_metadata(23.976).unwrap().ffmpeg_arg(),
         "24000/1001"
     );
     assert_eq!(
-        Fps::from_f64_fallback(29.97).unwrap().ffmpeg_arg(),
+        Fps::from_f64_metadata(29.97).unwrap().ffmpeg_arg(),
         "30000/1001"
     );
     assert_eq!(
-        Fps::from_f64_fallback(59.94).unwrap().ffmpeg_arg(),
+        Fps::from_f64_metadata(59.94).unwrap().ffmpeg_arg(),
         "60000/1001"
     );
-    assert_eq!(Fps::from_f64_fallback(25.0).unwrap().ffmpeg_arg(), "25/1");
-    assert_eq!(Fps::from_f64_fallback(30.0).unwrap().ffmpeg_arg(), "30/1");
-    assert_eq!(Fps::from_f64_fallback(60.0).unwrap().ffmpeg_arg(), "60/1");
-    assert_eq!(Fps::from_f64_fallback(24.0).unwrap().ffmpeg_arg(), "24/1");
-    assert_eq!(Fps::from_f64_fallback(48.0).unwrap().ffmpeg_arg(), "48/1");
-    assert_eq!(Fps::from_f64_fallback(50.0).unwrap().ffmpeg_arg(), "50/1");
-    assert_eq!(Fps::from_f64_fallback(120.0).unwrap().ffmpeg_arg(), "120/1");
+    assert_eq!(Fps::from_f64_metadata(25.0).unwrap().ffmpeg_arg(), "25/1");
+    assert_eq!(Fps::from_f64_metadata(30.0).unwrap().ffmpeg_arg(), "30/1");
+    assert_eq!(Fps::from_f64_metadata(60.0).unwrap().ffmpeg_arg(), "60/1");
+    assert_eq!(Fps::from_f64_metadata(24.0).unwrap().ffmpeg_arg(), "24/1");
+    assert_eq!(Fps::from_f64_metadata(48.0).unwrap().ffmpeg_arg(), "48/1");
+    assert_eq!(Fps::from_f64_metadata(50.0).unwrap().ffmpeg_arg(), "50/1");
+    assert_eq!(Fps::from_f64_metadata(120.0).unwrap().ffmpeg_arg(), "120/1");
     assert_eq!(
-        Fps::from_f64_fallback(119.880).unwrap().ffmpeg_arg(),
+        Fps::from_f64_metadata(119.880).unwrap().ffmpeg_arg(),
         "120/1"
     );
-    assert_eq!(Fps::from_f64_fallback(47.5).unwrap().ffmpeg_arg(), "48/1");
+    assert_eq!(Fps::from_f64_metadata(47.5).unwrap().ffmpeg_arg(), "48/1");
 }
 
 // --- Snapshot / golden tests (Step 11d) ---
@@ -120,5 +133,20 @@ fn frame_count_ignores_sub_boundary_metadata_jitter() {
         fps.frame_count_for_duration(exact_duration + 0.001)
             .unwrap(),
         1754
+    );
+}
+
+#[test]
+fn timeline_uses_the_same_boundary_count_as_the_source_video_plan() {
+    let fps = Fps::new(30000, 1001).unwrap();
+    let reported_duration = fps.seconds_at_frame(610) + 0.00001 / fps.as_f64();
+
+    assert_eq!(
+        fps.frame_count_for_duration(reported_duration).unwrap(),
+        610
+    );
+    assert_eq!(
+        fps.timeline_for_duration(reported_duration).unwrap().len(),
+        610
     );
 }

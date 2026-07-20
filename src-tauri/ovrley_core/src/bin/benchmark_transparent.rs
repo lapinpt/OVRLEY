@@ -11,8 +11,9 @@
 
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
-use ovrley_core::encode::codec_detect::detect_codecs;
-use ovrley_core::encode::video::{render_video, rendered_frame_count, RenderController};
+use ovrley_core::encode::ffmpeg::detect::detect_codecs;
+use ovrley_core::encode::pipeline::transparent::{render_video, rendered_frame_count};
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::paths::AppPaths;
 use serde::Serialize;
 use serde_json::Value;
@@ -201,7 +202,7 @@ fn main() -> Result<(), String> {
     let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
     let res_width = base_validated.scene.width;
     let res_height = base_validated.scene.height;
-    let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate);
+    let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate.get());
 
     let mut results = BTreeMap::new();
 
@@ -243,7 +244,8 @@ fn main() -> Result<(), String> {
                 .map_err(|e| e.to_string())?;
 
             let update_rate = config.widget_update_rate();
-            let total_frames = rendered_frame_count(dense.frame_count, update_rate as usize) as u32;
+            let total_frames = rendered_frame_count(dense.frame_count, update_rate)
+                .map_err(|error| error.to_string())? as u32;
             let overlay_duration = config.scene.end - config.scene.start;
 
             let controller = RenderController::default();
@@ -286,7 +288,7 @@ fn main() -> Result<(), String> {
                         run: run_num,
                         success: true,
                         resolution: Some(format!("{res_width}x{res_height}")),
-                        widget_update_rate: Some(update_rate),
+                        widget_update_rate: Some(update_rate.get()),
                         total_frames: Some(total_frames),
                         overlay_duration_seconds: Some(overlay_duration),
                         job_time: Some(format_mmss(elapsed_secs)),

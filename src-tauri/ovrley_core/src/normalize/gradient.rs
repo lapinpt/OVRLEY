@@ -177,4 +177,3 @@ pub fn validate_gradient_widget(
         triangle_negative_color,
     })
 }
-

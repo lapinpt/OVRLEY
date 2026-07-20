@@ -44,7 +44,7 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
         const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null)
         const left = renderGeometry.badgeLeft * displayScale - 2
-        const top = Math.max(renderGeometry.badgeTop * displayScale - 8, 0)
+        const top = Math.max(renderGeometry.badgeTop * displayScale - 20, 0)
 
         return (
           <div

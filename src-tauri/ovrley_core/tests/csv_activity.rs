@@ -44,7 +44,11 @@ fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
         ..RenderDataRequirements::default()
     };
     let trimmed = trim_activity(&activity, 0.0, 1.0, &requirements).unwrap();
-    let dense = densify_activity(&trimmed, 2.0, &requirements);
+    let dense = densify_activity(
+        &trimmed,
+        ovrley_core::activity::interpolate::frame_timeline_for_fps(1.0, 2.0).unwrap(),
+        &requirements,
+    );
 
     assert_eq!(dense.series.speed[1], Some(15.0));
     assert_eq!(dense.series.elevation[1], Some(105.0));

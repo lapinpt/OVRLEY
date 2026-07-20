@@ -41,25 +41,22 @@ use std::process::Command;
 
 use ovrley_core::activity::build_dense_activity_report_validated;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::video::render_composite_video;
-use ovrley_core::encode::video::CompositeRenderRequest;
-use ovrley_core::encode::video::RenderController;
-use ovrley_core::encode::video_composite_pipeline::{
-    dense_frame_index_for_overlay, derive_composite_pipeline_plan,
-    expected_guarded_overlay_frame_count,
+use ovrley_core::encode::pipeline::composite::render_composite_video;
+use ovrley_core::encode::pipeline::composite_plan::{
+    derive_composite_pipeline_plan, derive_composite_render_plan,
 };
-use ovrley_core::encode::video_composite_support::{
-    format_pipe_write_failure, is_pipe_write_error, output_progress_for_overlay_time,
-    verify_successful_composite_output,
+use ovrley_core::encode::pipeline::composite_support::{
+    format_pipe_write_failure, is_pipe_write_error, verify_successful_composite_output,
 };
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::validate_render_config;
 
 use common::composite::{
     assert_argument_pair, cancel_after_delay, composite_debug_timing_summary,
     composite_debug_timing_summary_path, composite_test_config, composited_outputs,
     derive_fixture_composite_plan, ffprobe_audio_codecs, ffprobe_video_rates, fixture_activity,
-    has_argument_pair, mutable_recent_template_config, recent_template_config,
-    render_fixture_composite, spawn_fixture_composite_render, test_paths, test_paths_named,
+    has_argument_pair, mutable_recent_template_config, render_fixture_composite,
+    spawn_fixture_composite_render, test_paths, test_paths_named,
     write_fixture_composite_debug_summary,
 };
 
@@ -78,11 +75,10 @@ fn test_4_3_derives_composite_shell_timing_without_rounding() {
         2,
     );
 
-    assert_eq!(plan.source_fps, Fps::new(30000, 1001).unwrap());
-    assert_eq!(plan.output_fps, Fps::new(30000, 1001).unwrap());
-    assert_eq!(plan.overlay_pipe_fps, Fps::new(15000, 1001).unwrap());
-    assert_eq!(plan.overlay_frame_count, 150);
-    assert_eq!(plan.output_frame_count, 300);
+    assert_argument_pair(&plan.ffmpeg_settings.output_args, "-r", "30000/1001");
+    assert_argument_pair(&plan.ffmpeg_settings.input_1_args, "-r", "15000/1001");
+    assert_eq!(plan.render.overlay_frame_count, 150);
+    assert_eq!(plan.render.output_frame_count, 300);
 }
 
 #[test]
@@ -106,8 +102,9 @@ fn test_4_4_builds_ffmpeg_settings_inside_composite_shell() {
     assert!(plan.ffmpeg_settings.filter_complex.contains("[0:v]"));
     assert!(plan.ffmpeg_settings.filter_complex.contains("[1:v]"));
     assert!(plan.ffmpeg_settings.filter_complex.contains("[out]"));
-    assert!(plan.output_filename.starts_with("video_composited_"));
-    assert!(plan.output_filename.ends_with(".mp4"));
+    let output_filename = plan.output_path.file_name().unwrap().to_str().unwrap();
+    assert!(output_filename.starts_with("video_composited_"));
+    assert!(output_filename.ends_with(".mp4"));
 }
 
 /// Verifies the fractional overrun guard: the first overlay-index whose
@@ -222,23 +219,21 @@ fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
 /// input uses trim-based seeking and the filter graph uses `trim=start=0`.
 #[test]
 fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
-    let config = recent_template_config(3840, 2160);
+    let mut config = mutable_recent_template_config(3840, 2160);
+    config.scene.composite_video_path = Some("tmp/test-1080p.mp4".to_string());
+    config.scene.composite_bitrate = Some("20M".to_string());
+    config.scene.composite_sync_offset = Some(0.0);
+    config.scene.composite_video_fps_num = Some(30000);
+    config.scene.composite_video_fps_den = Some(1001);
+    config.scene.composite_video_duration = Some(20.0);
+    config.scene.composite_render_duration = Some(0.2);
+    config.scene.composite_video_trim_start = Some(0.0);
+    config.scene.composite_widget_update_rate = Some(1);
+    let config = validate_render_config(config).unwrap();
     let paths = test_paths();
-    let scene = config.scene.clone();
-    let plan = derive_composite_pipeline_plan(
-        &paths,
-        &scene,
-        "tmp/test-1080p.mp4",
-        "20M",
-        30000,
-        1001,
-        20.0,
-        0.2,
-        0.0,
-        1,
-        true,
-    )
-    .unwrap();
+    let mut scene = config.scene.clone();
+    let render = derive_composite_render_plan(&mut scene, None).unwrap();
+    let plan = derive_composite_pipeline_plan(&paths, &scene, render, true, None).unwrap();
 
     assert!(!has_argument_pair(
         &plan.ffmpeg_settings.input_0_args,
@@ -267,14 +262,12 @@ fn test_5_7_fractional_duration_uses_overrun_guard() {
         1,
     );
 
-    assert_eq!(plan.overlay_frame_count, 4);
-    assert_eq!(expected_guarded_overlay_frame_count(&plan), 4);
-    let last_written_time =
-        (expected_guarded_overlay_frame_count(&plan) - 1) as f64 / plan.overlay_pipe_fps.as_f64();
-    let first_rejected_time =
-        expected_guarded_overlay_frame_count(&plan) as f64 / plan.overlay_pipe_fps.as_f64();
-    assert!(last_written_time < plan.render_duration);
-    assert!(first_rejected_time >= plan.render_duration);
+    assert_eq!(plan.render.overlay_frame_count, 4);
+    let overlay_fps = Fps::new(30000, 1001).unwrap();
+    let last_written_time = overlay_fps.seconds_at_frame(plan.render.overlay_frame_count - 1);
+    let first_rejected_time = overlay_fps.seconds_at_frame(plan.render.overlay_frame_count);
+    assert!(last_written_time < 0.101);
+    assert!(first_rejected_time >= 0.101);
 }
 
 /// Composite render of a source video that has an audio track must produce
@@ -286,40 +279,6 @@ fn test_5_8_video_with_audio_copies_audio_track() {
     let audio = ffprobe_audio_codecs(&result.output_path);
 
     assert!(audio.contains("codec_name=aac"));
-}
-
-/// When a sync offset places the active window outside the dense activity
-/// range, `dense_frame_index_for_overlay` must return an error that
-/// mentions "outside dense activity range".
-#[test]
-fn test_5_9_invalid_dense_frame_range_fails_clearly() {
-    let mut config = mutable_recent_template_config(1920, 1080);
-    config.scene.start = 0.0;
-    config.scene.end = 1.0;
-    config.scene.fps = 30.0;
-    let scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    let validated = validate_render_config(config).unwrap();
-    let dense_activity =
-        build_dense_activity_report_validated(&fixture_activity(), &validated).unwrap();
-    let paths = test_paths();
-    let plan = derive_composite_pipeline_plan(
-        &paths,
-        &scene,
-        "tmp/test-1080p.mp4",
-        "20M",
-        30,
-        1,
-        20.0,
-        0.2,
-        0.0,
-        1,
-        true,
-    )
-    .unwrap();
-
-    let error = dense_frame_index_for_overlay(&scene, &dense_activity, &plan, 600.0).unwrap_err();
-
-    assert!(error.to_string().contains("outside dense activity range"));
 }
 
 #[test]
@@ -387,42 +346,30 @@ fn test_6_3_progress_uses_output_frames_with_lower_overlay_fps() {
         0.0,
         6,
     );
-    let first_overlay_progress = output_progress_for_overlay_time(0.0, &plan);
-    let second_overlay_progress =
-        output_progress_for_overlay_time(1.0 / plan.overlay_pipe_fps.as_f64(), &plan);
+    let first_overlay_progress = plan.output_progress(1);
+    let second_overlay_progress = plan.output_progress(2);
 
-    assert_eq!(plan.output_frame_count, 60);
-    assert_eq!(plan.overlay_frame_count, 10);
+    assert_eq!(plan.render.output_frame_count, 60);
+    assert_eq!(plan.render.overlay_frame_count, 10);
     assert_eq!(first_overlay_progress, 0);
     assert_eq!(second_overlay_progress, 6);
 }
 
-/// Spawns a composite render with an unknown codec name and verifies the
-/// error message contains "FFmpeg stderr" and references encoder errors.
+/// Rejects unknown codecs at config ingress instead of passing malformed
+/// state through to FFmpeg as a custom encoder name.
 #[test]
-fn test_6_4_ffmpeg_failure_reports_stderr() {
-    let error = spawn_fixture_composite_render(
-        test_paths(),
-        RenderController::default(),
-        "tmp/test-1080p.mp4",
-        30,
-        1,
-        0.2,
-        1,
-        600.0,
-        1920,
-        1080,
-        "definitely_not_a_codec",
-    )
-    .join()
-    .unwrap()
-    .unwrap_err();
+fn test_6_4_unknown_codec_fails_at_ingress() {
+    let mut config = mutable_recent_template_config(1920, 1080);
+    config.scene.ffmpeg = serde_json::json!({"codec": "definitely_not_a_codec"});
 
-    assert!(error.contains("FFmpeg stderr"));
-    assert!(
-        error.contains("Unknown encoder")
-            || error.contains("Error selecting an encoder")
-            || error.contains("terminated before all overlay frames")
+    let error = match validate_render_config(config) {
+        Ok(_) => panic!("unknown codec unexpectedly validated"),
+        Err(error) => error,
+    };
+
+    assert_eq!(
+        error.to_string(),
+        "Invalid configuration: scene.ffmpeg.codec is unsupported: definitely_not_a_codec"
     );
 }
 
@@ -614,33 +561,26 @@ fn test_manual_full_duration_4k_composite() {
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_frame_workers_render_short_composite_in_order() {
     let paths = test_paths_named("parallel_frame_workers_short_composite");
-    let validated = composite_test_config(0.2);
+    let video_path = common::test_config::sample_video_path()
+        .to_string_lossy()
+        .to_string();
+    let mut validated = composite_test_config(0.2, &video_path, 0.0);
     let activity = fixture_activity();
+    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
     let controller = RenderController::default();
     controller
         .try_start(dense.frame_count as u32, "test_parallel_frame_workers")
         .unwrap();
-    let video_path = common::test_config::sample_video_path()
-        .to_string_lossy()
-        .to_string();
-
-    let filename = render_composite_video(&CompositeRenderRequest {
-        paths: &paths,
-        config: &validated,
-        activity: &activity,
-        dense_activity: &dense,
-        controller: &controller,
-        composite_video_path: &video_path,
-        composite_bitrate: "10M",
-        composite_sync_offset: 0.0,
-        composite_video_fps_num: 30000,
-        composite_video_fps_den: 1001,
-        composite_video_duration: 35.0,
-        composite_render_duration: 0.2,
-        composite_video_trim_start: 0.0,
-        composite_widget_update_rate: 1,
-    })
+    let filename = render_composite_video(
+        &paths,
+        &validated,
+        &activity,
+        &dense,
+        &controller,
+        render_plan,
+        true,
+    )
     .unwrap();
 
     let output_path = paths.downloads_dir.join(filename);
@@ -676,33 +616,27 @@ fn test_frame_workers_render_short_composite_in_order() {
 /// End-to-end composite render through the canonical frame-worker pipeline.
 fn test_frame_worker_composite_render() {
     let paths = test_paths();
-    let validated = composite_test_config(5.0);
+    let video_path = common::test_config::sample_video_path()
+        .to_string_lossy()
+        .to_string();
+    let mut validated = composite_test_config(5.0, &video_path, 0.0);
     let activity = fixture_activity();
+    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
     let controller = RenderController::default();
     controller
         .try_start(dense.frame_count as u32, "test_parallel_2")
         .unwrap();
 
-    let video_path = common::test_config::sample_video_path()
-        .to_string_lossy()
-        .to_string();
-    let result = render_composite_video(&CompositeRenderRequest {
-        paths: &paths,
-        config: &validated,
-        activity: &activity,
-        dense_activity: &dense,
-        controller: &controller,
-        composite_video_path: &video_path,
-        composite_bitrate: "10M",
-        composite_sync_offset: 0.0,
-        composite_video_fps_num: 30000,
-        composite_video_fps_den: 1001,
-        composite_video_duration: 35.0,
-        composite_render_duration: 5.0,
-        composite_video_trim_start: 0.0,
-        composite_widget_update_rate: 1,
-    });
+    let result = render_composite_video(
+        &paths,
+        &validated,
+        &activity,
+        &dense,
+        &controller,
+        render_plan,
+        true,
+    );
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);
@@ -725,33 +659,27 @@ fn test_frame_worker_composite_render() {
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_frame_worker_composite_render_with_audio() {
     let paths = test_paths();
-    let validated = composite_test_config(5.0);
+    let video_path = common::test_config::sample_video_path()
+        .to_string_lossy()
+        .to_string();
+    let mut validated = composite_test_config(5.0, &video_path, 15.0);
     let activity = fixture_activity();
+    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
     let controller = RenderController::default();
     controller
         .try_start(dense.frame_count as u32, "test_parallel_audio")
         .unwrap();
 
-    let video_path = common::test_config::sample_video_path()
-        .to_string_lossy()
-        .to_string();
-    let result = render_composite_video(&CompositeRenderRequest {
-        paths: &paths,
-        config: &validated,
-        activity: &activity,
-        dense_activity: &dense,
-        controller: &controller,
-        composite_video_path: &video_path,
-        composite_bitrate: "10M",
-        composite_sync_offset: 0.0,
-        composite_video_fps_num: 30000,
-        composite_video_fps_den: 1001,
-        composite_video_duration: 35.0,
-        composite_render_duration: 5.0,
-        composite_video_trim_start: 15.0,
-        composite_widget_update_rate: 1,
-    });
+    let result = render_composite_video(
+        &paths,
+        &validated,
+        &activity,
+        &dense,
+        &controller,
+        render_plan,
+        true,
+    );
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
     let output = paths.downloads_dir.join(&filename);

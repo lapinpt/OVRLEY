@@ -199,4 +199,3 @@ pub fn validate_elevation_plot(
         label_color,
     })
 }
-

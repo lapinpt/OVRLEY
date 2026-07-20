@@ -41,7 +41,7 @@
 use anyhow::{bail, Context, Result};
 use ovrley_core::activity::parse_activity_json;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
-use ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary;
+use ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary;
 use ovrley_core::normalize::{
     parse_template_value, validate_render_config, ValidatedRenderConfig, ValidatedSceneConfig,
 };

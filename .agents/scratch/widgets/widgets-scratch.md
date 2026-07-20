@@ -5,6 +5,9 @@ The following widgets must be implemented in the manifest, frontend jsx preview 
 - **Distance to home:** Units are meters, kilometers, miles. Must be derived in finalize activity from GPS coordinates and the initial gps coordinate. Do any formats, e.g. srt natively supply 'distance to home'? Icon must be exact copy of Lucide's 'icon'. Category other. How do drones typically calculated this? Do they take elevation into account? Do they take distance between two projected gps coordinates? What's the industry standard?
 - **Total ascent:** Units are meters, feet. Must be derived in finalize activity from altitude/elevation. How do we calculate this, just by adding difference between altitude/elevation points if the difference is positive? Is there a better way? Do fit files and/or gpx (in extensions) ever supply this directly? Similar to 'distance' widget, provide a switch to toggle total ascent which shows after a slash. Icon must be exact copy of Lucide's 'arrow-up-narrow-wide'. Category general.
 
-Random Note:
-
-- **Encoding Pipeline:** The encoding pipeline (~5K LOC) was essentially completely rewritten to a cannonical workflow that can spawn multiple frame render workers. The old pipeline segmented the video/overlay into multiple segments, spawned a separate ffmpeg process for each segment, and then concatenated the segments. This apparently created issues, e.g. malformed files, for some users, especially for very long videos. The new pipeline is a single ffmpeg process fed by 1 or more workers depending on codec profile and the number of CPU cores available. In most cases, the performance is unchanged and in some cases faster by 5-10%. The main benefit is robustness and (hopefully) stability, especially for MacOS users.
+pipeline/composite.rs render_composite_video 192
+pipeline/composite_plan.rs derive_composite_render_plan 120
+pipeline/frames.rs render_frames_parallel 318
+pipeline/transparent.rs render_video 205
+ffmpeg/composite.rs build_composite_ffmpeg_settings 161
+ffmpeg/detect.rs detect_codecs 111
