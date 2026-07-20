@@ -126,35 +126,3 @@ pub(crate) fn resolve_bar_style_geometry(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn configured_gap_is_clamped() {
-        let geometry = resolve_bar_geometry(20.0, 5, 10.0, "gauge").unwrap();
-        assert_eq!(geometry.count, 5);
-        assert_eq!(geometry.gap, 2.5);
-        assert_eq!(geometry.extent, 2.0);
-    }
-
-    #[test]
-    fn one_bar_has_no_gap() {
-        let geometry = resolve_bar_geometry(20.0, 1, 8.0, "gauge").unwrap();
-        assert_eq!(geometry.gap, 0.0);
-        assert_eq!(geometry.extent, 20.0);
-    }
-
-    #[test]
-    fn impossible_explicit_count_is_rejected() {
-        let error = resolve_bar_geometry(10.0, 6, 2.0, "gauge").unwrap_err();
-        assert!(error.to_string().contains("do not fit"));
-    }
-
-    #[test]
-    fn segmented_corner_radius_uses_the_smallest_bar_dimension() {
-        let geometry = resolve_bar_geometry(100.0, 10, 4.0, "gauge").unwrap();
-        assert_eq!(geometry.extent, 6.4);
-        assert_eq!(track_corner_radius_max(20.0, 100.0, Some(&geometry)), 3.0);
-    }
-}

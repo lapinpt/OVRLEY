@@ -45,7 +45,7 @@ const BUILTIN_PROFILES: &[TransparentProfile] = &[
     TransparentProfile {
         name: "prores_ks_vulkan",
         encoder_id: EncoderId::ProresKsVulkan,
-        cpu_cores_per_frame_worker: 3,
+        cpu_cores_per_frame_worker: 4,
         input_args: &["-init_hw_device", "vulkan=vk", "-filter_hw_device", "vk"],
         filter_complex: Some(PRORES_KS_VULKAN_FILTER),
         output_args: &[
@@ -74,7 +74,7 @@ const BUILTIN_PROFILES: &[TransparentProfile] = &[
     TransparentProfile {
         name: "qtrle",
         encoder_id: EncoderId::Qtrle,
-        cpu_cores_per_frame_worker: 4,
+        cpu_cores_per_frame_worker: 6,
         input_args: &[],
         filter_complex: None,
         output_args: &["-f", "mov", "-pix_fmt", "argb"],
