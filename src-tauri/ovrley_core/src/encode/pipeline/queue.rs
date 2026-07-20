@@ -2,13 +2,13 @@
 
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::debug::{RenderProfiler, TimingBucket};
+use crate::encode::pipeline::lifecycle::PipelineShutdown;
 use crate::error::{CoreError, CoreResult};
 
 /// Reusable raw RGBA frame buffer exchanged through the encode queues.
@@ -19,7 +19,7 @@ pub(crate) struct FrameBuffer {
 
 /// The two intentional FFmpeg writer behaviors.
 pub(crate) enum WriterMode {
-    Transparent { cancel_flag: Arc<AtomicBool> },
+    Transparent,
     Composite,
 }
 
@@ -51,25 +51,19 @@ pub(crate) fn merge_timing_maps(
     left
 }
 
-/// Sends a completed frame to the writer thread while respecting cancellation.
+/// Sends a completed frame to the writer thread while respecting shutdown.
 pub(crate) fn queue_frame(
     sender: &SyncSender<FrameBuffer>,
     frame_buffer: FrameBuffer,
-    cancel_flag: &AtomicBool,
-    pipeline_failed: &AtomicBool,
+    shutdown: &PipelineShutdown,
     profiler: &mut RenderProfiler,
 ) -> CoreResult<()> {
-    // `try_send` lets the render loop poll cancellation while backpressure
+    // `try_send` lets the render loop poll shutdown while backpressure
     // clears, instead of blocking indefinitely inside `send`.
     let started = Instant::now();
     let mut payload = frame_buffer;
     loop {
-        if cancel_flag.load(Ordering::SeqCst) {
-            return Err(CoreError::Cancelled);
-        }
-        if pipeline_failed.load(Ordering::SeqCst) {
-            return Err(CoreError::Encode("Encoder writer failed".to_string()));
-        }
+        shutdown.check()?;
         match sender.try_send(payload) {
             Ok(()) => {
                 profiler.record_ms("queue.put_wait", started.elapsed().as_secs_f64() * 1000.0);
@@ -91,16 +85,12 @@ pub(crate) fn writer_worker(
     stdin: std::process::ChildStdin,
     receiver: Receiver<FrameBuffer>,
     free_sender: SyncSender<FrameBuffer>,
-    pipeline_failed: Arc<AtomicBool>,
+    shutdown: Arc<PipelineShutdown>,
     mode: WriterMode,
 ) -> CoreResult<WriterResult> {
-    // Keep the pool sender alive until the failure flag is published. Otherwise
-    // workers can observe a disconnected pool in the brief interval between
-    // `writer_worker_inner` dropping the sender and this wrapper setting the
-    // flag, which hides the writer's actual FFmpeg error.
-    let result = writer_worker_inner(stdin, receiver, &free_sender, &mode);
+    let result = writer_worker_inner(stdin, receiver, &free_sender, &shutdown, &mode);
     if result.is_err() {
-        pipeline_failed.store(true, Ordering::SeqCst);
+        shutdown.signal_failure(CoreError::Encode("Encoder writer failed".to_string()));
     }
     result
 }
@@ -109,10 +99,9 @@ fn writer_worker_inner(
     mut stdin: std::process::ChildStdin,
     receiver: Receiver<FrameBuffer>,
     free_sender: &SyncSender<FrameBuffer>,
+    shutdown: &PipelineShutdown,
     mode: &WriterMode,
 ) -> CoreResult<WriterResult> {
-    // The writer owns ffmpeg stdin. It returns buffers to the free pool after a
-    // successful write so the renderer can reuse allocations across frames.
     let mut profiler = RenderProfiler::default();
     let mut written_frames = 0u64;
     loop {
@@ -133,15 +122,14 @@ fn writer_worker_inner(
                 break;
             }
         };
-        if matches!(mode, WriterMode::Transparent { cancel_flag } if cancel_flag.load(Ordering::SeqCst))
-        {
+        if shutdown.is_stopped() {
             break;
         }
         let write_started = Instant::now();
         stdin
             .write_all(frame.pixels.as_slice())
             .map_err(|error| match mode {
-                WriterMode::Transparent { .. } => {
+                WriterMode::Transparent => {
                     CoreError::Encode(format!("Failed writing frame to ffmpeg: {error}"))
                 }
                 WriterMode::Composite => {
@@ -156,7 +144,7 @@ fn writer_worker_inner(
 
         let release_started = Instant::now();
         let release_result = free_sender.send(frame);
-        if matches!(mode, WriterMode::Transparent { .. }) {
+        if matches!(mode, WriterMode::Transparent) {
             profiler.record_ms(
                 "buffer.release_wait",
                 release_started.elapsed().as_secs_f64() * 1000.0,
@@ -172,7 +160,7 @@ fn writer_worker_inner(
     let flush_result = stdin
         .flush()
         .map_err(|error| CoreError::Encode(error.to_string()));
-    if matches!(mode, WriterMode::Transparent { .. }) {
+    if matches!(mode, WriterMode::Transparent) {
         flush_result?;
     }
 

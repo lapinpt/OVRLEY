@@ -95,7 +95,7 @@ After every change, these must hold:
 
 ## Reject
 
-Reject refactors that merely: rename variables, move code into methods, extract unchanged closures, or wrap all dependencies in one large struct.
+Reject refactors that are ONLY cosmetic or surface-level: rename variables, move code into methods, extract unchanged closures, or wrap all dependencies in one large struct.
 
 ## Success
 

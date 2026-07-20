@@ -11,7 +11,7 @@
 //! workers that claimed later frames.
 
 use super::frame_pool::{ParallelFrameProgress, ParallelFrameRenderResult};
-use super::lifecycle::PipelineKind;
+use super::lifecycle::{PipelineKind, PipelineShutdown};
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::pipeline::queue::{merge_timing_maps, queue_frame, FrameBuffer};
 use crate::encode::progress::{ProgressEstimator, RenderController};
@@ -20,7 +20,7 @@ use crate::render::VideoFrameRenderer;
 use std::collections::BTreeMap;
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::process::Child;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -89,25 +89,22 @@ pub(crate) fn render_frames_parallel(
     progress: ParallelFrameProgress<'_>,
     pipeline: PipelineKind,
     controller: &RenderController,
-    pipeline_failed: &AtomicBool,
+    shutdown: &PipelineShutdown,
     frame_sender: &SyncSender<FrameBuffer>,
     ordered_frame_observer: Option<&dyn Fn(u64, usize, &FrameBuffer) -> CoreResult<()>>,
     free_receiver: Receiver<FrameBuffer>,
     ffmpeg_child: &mut Child,
     render_started: Instant,
 ) -> CoreResult<ParallelFrameRenderResult> {
-    let cancel_flag = controller.cancel_flag();
     let mut prewarm_profiler = RenderProfiler::default();
     let prewarmed_frame = prewarm_first_frame(
         renderer,
         frame_count,
         &free_receiver,
-        pipeline_failed,
-        cancel_flag.as_ref(),
+        shutdown,
         &mut prewarm_profiler,
     )?;
     let next_task = AtomicUsize::new(usize::from(prewarmed_frame.is_some()));
-    let stop = Arc::new(AtomicBool::new(false));
     let free_receiver = Arc::new(Mutex::new(free_receiver));
     let (result_sender, result_receiver) = std::sync::mpsc::channel::<WorkerEvent>();
 
@@ -117,31 +114,26 @@ pub(crate) fn render_frames_parallel(
             let result_sender = result_sender.clone();
             let free_receiver = Arc::clone(&free_receiver);
             let next_task = &next_task;
-            let stop = Arc::clone(&stop);
-            let cancel_flag = cancel_flag.as_ref();
 
             handles.push(scope.spawn(move || {
                 let mut profiler = RenderProfiler::default();
                 loop {
-                    if stop.load(Ordering::SeqCst)
-                        || cancel_flag.load(Ordering::SeqCst)
-                        || pipeline_failed.load(Ordering::SeqCst)
-                    {
+                    if shutdown.is_stopped() {
                         break;
                     }
 
                     let frame_started = Instant::now();
                     let mut frame_buffer = match acquire_worker_frame_buffer(
                         &free_receiver,
-                        cancel_flag,
-                        pipeline_failed,
-                        stop.as_ref(),
+                        shutdown,
                         &mut profiler,
                     ) {
                         Ok(Some(frame_buffer)) => frame_buffer,
                         Ok(None) => break,
                         Err(error) => {
-                            stop.store(true, Ordering::SeqCst);
+                            shutdown.signal_failure(CoreError::Encode(format!(
+                                "Frame buffer acquisition failed: {error}"
+                            )));
                             let _ = result_sender.send(WorkerEvent::Failed { error });
                             break;
                         }
@@ -164,7 +156,9 @@ pub(crate) fn render_frames_parallel(
                                 (output_frame_index, dense_frame_index)
                             }
                             (Err(error), _) | (_, Err(error)) => {
-                                stop.store(true, Ordering::SeqCst);
+                                shutdown.signal_failure(CoreError::Encode(format!(
+                                    "Frame index error: {error}"
+                                )));
                                 let _ = result_sender.send(WorkerEvent::Failed { error });
                                 break;
                             }
@@ -197,9 +191,11 @@ pub(crate) fn render_frames_parallel(
                                 break;
                             }
                         }
-                        Err(CoreError::Cancelled) if stop.load(Ordering::SeqCst) => break,
+                        Err(CoreError::Cancelled) if shutdown.is_stopped() => break,
                         Err(error) => {
-                            stop.store(true, Ordering::SeqCst);
+                            shutdown.signal_failure(CoreError::Encode(format!(
+                                "Frame render failed: {error}"
+                            )));
                             let _ = result_sender.send(WorkerEvent::Failed { error });
                             break;
                         }
@@ -229,11 +225,8 @@ pub(crate) fn render_frames_parallel(
 
         let coordinator_result = (|| -> CoreResult<()> {
             while written_frames < total_frames {
-                if cancel_flag.load(Ordering::SeqCst) {
-                    return Err(CoreError::Cancelled);
-                }
-                if pipeline_failed.load(Ordering::SeqCst) {
-                    return Err(CoreError::Encode("Encoder writer failed".to_string()));
+                if let Err(e) = shutdown.check() {
+                    return Err(e);
                 }
 
                 let wait_started = Instant::now();
@@ -248,7 +241,7 @@ pub(crate) fn render_frames_parallel(
                         output_frame_index,
                         frame,
                     }) => {
-                        if stop.load(Ordering::SeqCst) {
+                        if shutdown.is_stopped() {
                             continue;
                         }
                         let ready_frames = ordered_frames.insert(output_frame_index, frame)?;
@@ -264,8 +257,7 @@ pub(crate) fn render_frames_parallel(
                             queue_frame(
                                 frame_sender,
                                 ready.buffer,
-                                cancel_flag.as_ref(),
-                                pipeline_failed,
+                                shutdown,
                                 &mut coordinator_profiler,
                             )?;
                             written_frames += 1;
@@ -333,10 +325,12 @@ pub(crate) fn render_frames_parallel(
                         }
                     }
                     Ok(WorkerEvent::Failed { error }) => {
-                        stop.store(true, Ordering::SeqCst);
                         return Err(error);
                     }
                     Err(RecvTimeoutError::Timeout) => {
+                        if let Err(e) = shutdown.check() {
+                            return Err(e);
+                        }
                         if let Some(status) = ffmpeg_child.try_wait().map_err(|error| {
                             CoreError::Encode(format!("ffmpeg process error: {error}"))
                         })? {
@@ -353,6 +347,9 @@ pub(crate) fn render_frames_parallel(
                         }
                     }
                     Err(RecvTimeoutError::Disconnected) => {
+                        if let Err(e) = shutdown.check() {
+                            return Err(e);
+                        }
                         return Err(CoreError::Encode(format!(
                             "parallel render result channel closed after producing {written_frames} of {} frames",
                             frame_count
@@ -362,7 +359,6 @@ pub(crate) fn render_frames_parallel(
             }
             Ok(())
         })();
-        stop.store(true, Ordering::SeqCst);
 
         let mut timings = coordinator_profiler.summary();
         let mut worker_panic = None;
@@ -402,21 +398,13 @@ pub(crate) fn render_frames_parallel(
 
 fn acquire_worker_frame_buffer(
     receiver: &Mutex<Receiver<FrameBuffer>>,
-    cancel_flag: &AtomicBool,
-    pipeline_failed: &AtomicBool,
-    stop: &AtomicBool,
+    shutdown: &PipelineShutdown,
     profiler: &mut RenderProfiler,
 ) -> CoreResult<Option<FrameBuffer>> {
     let started = Instant::now();
     loop {
-        if stop.load(Ordering::SeqCst) {
+        if shutdown.is_stopped() {
             return Ok(None);
-        }
-        if cancel_flag.load(Ordering::SeqCst) {
-            return Err(CoreError::Cancelled);
-        }
-        if pipeline_failed.load(Ordering::SeqCst) {
-            return Err(CoreError::Encode("Encoder writer failed".to_string()));
         }
         let receive_result = receiver
             .lock()
@@ -444,19 +432,13 @@ fn prewarm_first_frame(
     renderer: VideoFrameRenderer<'_>,
     frame_count: usize,
     free_receiver: &Receiver<FrameBuffer>,
-    pipeline_failed: &AtomicBool,
-    cancel_flag: &AtomicBool,
+    shutdown: &PipelineShutdown,
     profiler: &mut RenderProfiler,
 ) -> CoreResult<Option<WorkerEvent>> {
     if frame_count == 0 {
         return Ok(None);
     }
-    if cancel_flag.load(Ordering::SeqCst) {
-        return Err(CoreError::Cancelled);
-    }
-    if pipeline_failed.load(Ordering::SeqCst) {
-        return Err(CoreError::Encode("Encoder writer failed".to_string()));
-    }
+    shutdown.check()?;
 
     let acquire_started = Instant::now();
     let mut buffer = free_receiver

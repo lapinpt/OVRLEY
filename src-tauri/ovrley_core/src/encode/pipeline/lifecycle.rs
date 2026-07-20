@@ -4,6 +4,7 @@ use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ExitStatus};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -11,6 +12,63 @@ use std::time::{Duration, Instant};
 use crate::error::{CoreError, CoreResult};
 
 use super::queue::WriterResult;
+
+/// Single source of truth for whether the pipeline should stop and why.
+///
+/// Wraps the controller's cancel flag and adds error recording so the dual
+/// `cancel_flag` + `pipeline_failed` atomics are replaced by one abstraction
+/// that records whether shutdown was initiated by user cancellation or by a
+/// pipeline failure, preserving the first error.
+pub(crate) struct PipelineShutdown {
+    flag: Arc<AtomicBool>,
+    error: Mutex<Option<CoreError>>,
+}
+
+impl PipelineShutdown {
+    pub(crate) fn new(cancel_flag: Arc<AtomicBool>) -> Self {
+        Self {
+            flag: cancel_flag,
+            error: Mutex::new(None),
+        }
+    }
+
+    pub(crate) fn shared(cancel_flag: Arc<AtomicBool>) -> Arc<Self> {
+        Arc::new(Self::new(cancel_flag))
+    }
+
+    pub(crate) fn is_stopped(&self) -> bool {
+        self.flag.load(Ordering::SeqCst)
+    }
+
+    /// Records a failure and signals all observers to stop.
+    ///
+    /// The error is stored before the flag is set so that any observer
+    /// seeing `is_stopped() == true` will also observe the recorded error.
+    pub(crate) fn signal_failure(&self, error: CoreError) {
+        self.error.lock().unwrap().get_or_insert(error);
+        self.flag.store(true, Ordering::SeqCst);
+    }
+
+    pub(crate) fn has_error(&self) -> bool {
+        self.error.lock().unwrap().is_some()
+    }
+
+    pub(crate) fn take_error(&self) -> Option<CoreError> {
+        self.error.lock().unwrap().take()
+    }
+
+    /// Returns `Err` if shutdown has been signalled, distinguishing
+    /// cancellation (no error recorded) from pipeline failure.
+    pub(crate) fn check(&self) -> CoreResult<()> {
+        if self.flag.load(Ordering::SeqCst) {
+            if self.has_error() {
+                return Err(CoreError::Encode("Encoder writer failed".to_string()));
+            }
+            return Err(CoreError::Cancelled);
+        }
+        Ok(())
+    }
+}
 
 const WRITER_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 const FFMPEG_FINALIZE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -145,8 +203,7 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
     writer_thread: JoinHandle<CoreResult<WriterResult>>,
     monitor_thread: JoinHandle<()>,
     producer_result: CoreResult<T>,
-    cancel_flag: &AtomicBool,
-    pipeline_failed: &AtomicBool,
+    shutdown: &PipelineShutdown,
     pipeline: PipelineKind,
     failure_policy: &P,
 ) -> CoreResult<PipelineOutcome<T>> {
@@ -157,9 +214,9 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
             "Composite ffmpeg monitor thread",
         ),
     };
-    let mut was_cancelled = cancel_flag.load(Ordering::SeqCst);
+    let mut was_cancelled = shutdown.is_stopped() && !shutdown.has_error();
     let producer_failed = producer_result.is_err();
-    let writer_failed_before_teardown = pipeline_failed.load(Ordering::SeqCst);
+    let writer_failed_before_teardown = shutdown.has_error();
     let mut shutdown_error = None;
     let mut status = None;
 
@@ -169,7 +226,7 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
             Err(error) => shutdown_error = Some(error),
         }
     } else {
-        match unblock_stalled_writer(&writer_thread, child, pipeline, cancel_flag) {
+        match unblock_stalled_writer(&writer_thread, child, pipeline, shutdown) {
             Ok(cancelled) => was_cancelled |= cancelled,
             Err(error) => shutdown_error = Some(error),
         }
@@ -182,7 +239,7 @@ pub(crate) fn finalize_pipeline<T, P: PipelineFailurePolicy>(
         && !producer_failed
         && !writer_failed_before_teardown
     {
-        match wait_for_ffmpeg(child, pipeline, cancel_flag) {
+        match wait_for_ffmpeg(child, pipeline, shutdown) {
             Ok((exit_status, cancelled)) => {
                 status = Some(exit_status);
                 was_cancelled |= cancelled;
@@ -239,11 +296,11 @@ pub(crate) fn unblock_stalled_writer<T>(
     writer: &JoinHandle<T>,
     child: &mut Child,
     pipeline: PipelineKind,
-    cancel_flag: &AtomicBool,
+    shutdown: &PipelineShutdown,
 ) -> CoreResult<bool> {
     let deadline = Instant::now() + WRITER_DRAIN_TIMEOUT;
     while !writer.is_finished() && Instant::now() < deadline {
-        if cancel_flag.load(Ordering::SeqCst) {
+        if shutdown.is_stopped() {
             let _ = terminate_ffmpeg(child, pipeline)?;
             if wait_for_thread(writer, FFMPEG_TERMINATE_TIMEOUT) {
                 return Ok(true);
@@ -275,16 +332,16 @@ pub(crate) fn unblock_stalled_writer<T>(
 pub(crate) fn wait_for_ffmpeg(
     child: &mut Child,
     pipeline: PipelineKind,
-    cancel_flag: &AtomicBool,
+    shutdown: &PipelineShutdown,
 ) -> CoreResult<(ExitStatus, bool)> {
     let deadline = Instant::now() + FFMPEG_FINALIZE_TIMEOUT;
     loop {
         if let Some(status) = child.try_wait().map_err(|error| {
             CoreError::Encode(format!("{pipeline} ffmpeg process error: {error}"))
         })? {
-            return Ok((status, cancel_flag.load(Ordering::SeqCst)));
+            return Ok((status, shutdown.is_stopped()));
         }
-        if cancel_flag.load(Ordering::SeqCst) {
+        if shutdown.is_stopped() {
             return terminate_ffmpeg(child, pipeline).map(|status| (status, true));
         }
         if Instant::now() >= deadline {

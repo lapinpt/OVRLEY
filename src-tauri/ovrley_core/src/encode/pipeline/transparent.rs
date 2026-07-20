@@ -40,6 +40,7 @@ use crate::encode::pipeline::frame_pool::{
 use crate::encode::pipeline::frames::render_frames_parallel;
 use crate::encode::pipeline::lifecycle::{
     finalize_pipeline, FfmpegChildGuard, PartialOutputGuard, PipelineFailurePolicy, PipelineKind,
+    PipelineShutdown,
 };
 use crate::encode::pipeline::queue::{merge_timing_maps, writer_worker, FrameBuffer, WriterMode};
 use crate::encode::progress::RenderController;
@@ -48,7 +49,7 @@ use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, FrameSize, VideoFrameRenderer};
 use std::io::{BufRead, BufReader};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
@@ -174,7 +175,7 @@ pub fn render_video(
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt()?;
     let encoded_frames = Arc::new(AtomicU32::new(0));
-    let cancel_flag = controller.cancel_flag();
+    let shutdown = PipelineShutdown::shared(controller.cancel_flag());
     let render_started = Instant::now();
 
     // ── PHASE 3: CREATE BUFFER POOL (N+1 buffers for N-slot bounded channel) ──
@@ -205,18 +206,14 @@ pub fn render_video(
         .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stdin".to_string()))?;
     let encoded_frames_for_monitor = encoded_frames.clone();
     let monitor_thread = thread::spawn(move || monitor_ffmpeg(stderr, encoded_frames_for_monitor));
-    let pipeline_failed = Arc::new(AtomicBool::new(false));
-    let pipeline_failed_for_writer = Arc::clone(&pipeline_failed);
-    let cancel_flag_for_writer = cancel_flag.clone();
+    let shutdown_for_writer = Arc::clone(&shutdown);
     let writer_thread = thread::spawn(move || {
         writer_worker(
             stdin,
             frame_receiver,
             free_sender,
-            pipeline_failed_for_writer,
-            WriterMode::Transparent {
-                cancel_flag: cancel_flag_for_writer,
-            },
+            shutdown_for_writer,
+            WriterMode::Transparent,
         )
     });
 
@@ -264,7 +261,7 @@ pub fn render_video(
         ParallelFrameProgress::Transparent(&encoded_frames),
         PipelineKind::Transparent,
         controller,
-        pipeline_failed.as_ref(),
+        shutdown.as_ref(),
         &frame_sender,
         Some(&observe_ordered_frame),
         free_receiver,
@@ -282,8 +279,7 @@ pub fn render_video(
         writer_thread,
         monitor_thread,
         render_result,
-        cancel_flag.as_ref(),
-        pipeline_failed.as_ref(),
+        shutdown.as_ref(),
         PipelineKind::Transparent,
         &TransparentFailurePolicy,
     )?;
