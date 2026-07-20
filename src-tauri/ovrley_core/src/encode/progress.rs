@@ -298,7 +298,7 @@ impl RenderController {
         estimate: Option<u64>,
         rendering_fps: Option<f64>,
     ) {
-        let refresh_fps = match self.last_fps_emit_at.lock() {
+        let due = match self.last_fps_emit_at.lock() {
             Ok(mut last) => {
                 let now = Instant::now();
                 let due = match *last {
@@ -308,7 +308,6 @@ impl RenderController {
                 if due {
                     *last = Some(now);
                 }
-                drop(last);
                 due
             }
             Err(_) => true,
@@ -319,7 +318,7 @@ impl RenderController {
             progress.total = total;
             progress.encoded = encoded;
             progress.estimated_seconds_remaining = estimate;
-            if refresh_fps {
+            if due {
                 progress.rendering_fps = rendering_fps;
             }
             progress.message = if current >= total {
@@ -329,7 +328,9 @@ impl RenderController {
             };
             let snapshot = progress.clone();
             drop(progress);
-            self.progress_sink.emit_progress(&snapshot);
+            if due {
+                self.progress_sink.emit_progress(&snapshot);
+            }
         }
     }
 
