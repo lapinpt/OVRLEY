@@ -24,6 +24,7 @@ vi.mock('@/store/useStore', () => ({ default: { getState: () => ({}) } }))
 describe('useActivityImport native picker boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     fileFromSelectedPath.mockResolvedValue(new File(['activity'], 'activity.gpx'))
   })
 

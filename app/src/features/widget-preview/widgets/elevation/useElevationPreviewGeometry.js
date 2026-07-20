@@ -77,6 +77,11 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   useEffect(() => {
     if (!geometryConfig) return
 
+    if (typeof window !== 'undefined' && window.__OVRLEY_MOCK_ELEVATION_GEOMETRY) {
+      setRustGeometry(window.__OVRLEY_MOCK_ELEVATION_GEOMETRY)
+      return
+    }
+
     let cancelled = false
     buildElevationGeometry(geometryConfig, activity).then((geometry) => {
       if (!cancelled) setRustGeometry(geometry)

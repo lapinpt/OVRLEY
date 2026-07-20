@@ -58,6 +58,11 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   useEffect(() => {
     if (!geometryConfig) return
 
+    if (typeof window !== 'undefined' && window.__OVRLEY_MOCK_ROUTE_GEOMETRY) {
+      setRustGeometry(window.__OVRLEY_MOCK_ROUTE_GEOMETRY)
+      return
+    }
+
     let cancelled = false
     buildRouteGeometry(geometryConfig, activity).then((geometry) => {
       if (!cancelled) setRustGeometry(geometry)

@@ -49,7 +49,10 @@ fn prores_ks_vulkan_defaults() -> CoreResult<()> {
         settings.filter_complex.as_deref(),
         Some(PRORES_KS_VULKAN_FILTER)
     );
-    assert_argument_pair(&settings.output_args, "-qscale:v", "5");
+    assert_argument_pair(&settings.output_args, "-profile:v", "4");
+    assert_argument_pair(&settings.output_args, "-mbs_per_slice", "8");
+    assert_argument_pair(&settings.output_args, "-vendor", "apl0");
+    assert_argument_pair(&settings.output_args, "-alpha_bits", "8");
     assert_argument_pair(&settings.output_args, "-pix_fmt", "vulkan");
     Ok(())
 }

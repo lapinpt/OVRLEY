@@ -145,6 +145,7 @@ fn composite_shell_uses_provided_codec_for_mp4_output() {
 /// End-to-end composite render at 29.97 FPS with 1x update rate and 4K
 /// resolution. Verifies output file exists and is non-empty.
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_5_1_basic_software_h264_composite_creates_mp4() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
@@ -157,6 +158,7 @@ fn test_5_1_basic_software_h264_composite_creates_mp4() {
 /// container reports 30000/1001 (not a rounded integer) in r_frame_rate
 /// or avg_frame_rate.
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_5_2_preserves_29_97_output_fps() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
@@ -169,6 +171,7 @@ fn test_5_2_preserves_29_97_output_fps() {
 /// Probes the output of a 59.94 FPS composite render and asserts the
 /// container reports 60000/1001 (not a rounded 60/1).
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_5_3_preserves_59_94_output_fps_when_requested() {
     let result = render_fixture_composite(
         "tmp/test-1080p.mp4",
@@ -189,6 +192,7 @@ fn test_5_3_preserves_59_94_output_fps_when_requested() {
 /// 60→30 overlay FPS at 2x update rate: 0.2s render = 12 output frames
 /// (6 overlay frames halved in pipe). Verifies progress matches.
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 60000, 1001, 0.2, 2, 600.0, 3840, 2160);
@@ -202,6 +206,7 @@ fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
 /// At 6x update rate the overlay pipe runs at 10 FPS (60÷6) but the output
 /// stays at 59.94 FPS. Progress still reports output frame count (12).
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 60000, 1001, 0.2, 6, 600.0, 3840, 2160);
@@ -275,6 +280,7 @@ fn test_5_7_fractional_duration_uses_overrun_guard() {
 /// Composite render of a source video that has an audio track must produce
 /// output with AAC audio copy (the probe should report codec_name=aac).
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_5_8_video_with_audio_copies_audio_track() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
     let audio = ffprobe_audio_codecs(&result.output_path);
@@ -357,6 +363,7 @@ fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
 #[test]
 /// After a successful composite render, progress must show `current ==
 /// total == encoded` and the total must match the expected output frame count.
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_6_2_progress_reaches_completion_on_success() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
     let progress = result.controller.progress();
@@ -465,6 +472,7 @@ fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
 /// On success, `verify_successful_composite_output` must not error for a
 /// real rendered composite MP4.
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
 
@@ -603,6 +611,7 @@ fn test_manual_full_duration_4k_composite() {
 }
 
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_frame_workers_render_short_composite_in_order() {
     let paths = test_paths_named("parallel_frame_workers_short_composite");
     let validated = composite_test_config(0.2);
@@ -663,6 +672,7 @@ fn test_frame_workers_render_short_composite_in_order() {
 }
 
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 /// End-to-end composite render through the canonical frame-worker pipeline.
 fn test_frame_worker_composite_render() {
     let paths = test_paths();
@@ -712,6 +722,7 @@ fn test_frame_worker_composite_render() {
 /// audio track).
 ///
 /// Regressions guarded: trim start with audio causing sync issues or failures.
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_frame_worker_composite_render_with_audio() {
     let paths = test_paths();
     let validated = composite_test_config(5.0);

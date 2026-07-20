@@ -24,6 +24,7 @@ describe('renderVideo', () => {
         sample_elapsed_seconds: [0, 10, 20],
       },
     })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.mocked(backend.renderVideo).mockResolvedValue({
       started: true,
       render_id: 'render-1',

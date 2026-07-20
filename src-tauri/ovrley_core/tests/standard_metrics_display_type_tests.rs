@@ -23,7 +23,7 @@ use ovrley_core::MetricKind;
 
 const LINEAR_FRAME: (u32, u32) = (200, 24);
 const ARC_FRAME: (u32, u32) = (220, 220);
-const CORNER_FRAME: (u32, u32) = (110, 110);
+const CORNER_FRAME: (u32, u32) = (162, 162);
 
 #[test]
 fn display_type_definitions_load_from_manifest() {

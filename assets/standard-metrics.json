@@ -178,7 +178,13 @@
       "gear_position": ["text"],
       "left_right_balance": ["text"],
       "time": ["text"],
-      "lean_angle": ["text"]
+      "lean_angle": ["text"],
+      "iso": ["text"],
+      "aperture": ["text"],
+      "shutter_speed": ["text"],
+      "focal_length": ["text"],
+      "ev": ["text"],
+      "color_temperature": ["text"]
     }
   },
   "definitions": [

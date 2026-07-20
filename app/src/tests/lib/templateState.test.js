@@ -193,7 +193,7 @@ describe('normalizeTemplateConfig', () => {
             heading_tape: {
               width: 400,
               height: 80,
-              label_font: 'Teko.ttf',
+              label_font_size: 16,
               major_tick_thickness: 4,
               minor_tick_thickness: 1,
             },
@@ -205,7 +205,7 @@ describe('normalizeTemplateConfig', () => {
     const result = normalizeTemplateConfig(config)
 
     expect(result.values[0].display_type).toBe('heading_tape')
-    expect(result.values[0].display_variants.heading_tape.label_font).toBe('Teko.ttf')
+    expect(result.values[0].display_variants.heading_tape.label_font_size).toBe(16)
     expect(result.values[0].display_variants.heading_tape.major_tick_thickness).toBe(4)
     expect(result.values[0].display_variants.heading_tape.minor_tick_thickness).toBe(1)
   })
@@ -237,7 +237,7 @@ describe('normalizeTemplateConfig', () => {
     expect(result.values[0].display_variants.linear.height).toBe(80)
     expect(result.values[0].display_variants.linear.track_corner_radius).toBe(10)
     expect(result.values[0].display_variants.linear.orientation).toBe('horizontal')
-    expect(result.values[0].display_variants.linear.track_fill_flat).toBe(true)
+    expect(result.values[0].display_variants.linear.track_fill_flat).toBe(false)
     expect(result.values[0].display_variants.linear.show_min_max_labels).toBe(false)
     expect(result.values[0].display_variants.linear.min_max_label_position).toBe('bottom')
   })

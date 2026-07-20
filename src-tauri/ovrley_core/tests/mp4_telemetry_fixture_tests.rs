@@ -4,6 +4,7 @@ use std::path::Path;
 use ovrley_core::media::mp4_telemetry;
 
 #[test]
+#[ignore = "requires video fixtures under tests/fixtures/video/"]
 fn extracts_supported_mp4_telemetry_fixtures_with_provenance() {
     let fixtures = discover_telemetry_fixtures();
     assert!(!fixtures.is_empty(), "no telemetry fixtures found");

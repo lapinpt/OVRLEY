@@ -5,6 +5,7 @@ use std::path::Path;
 use ovrley_core::media::mp4_telemetry;
 
 #[test]
+#[ignore = "requires video fixtures under tests/fixtures/video/"]
 fn extract_activity_from_telemetry_fixtures() {
     let known_sync_times: HashMap<&str, &str> = [
         ("DJI-telemetry.MP4", "2026-03-15T23:58:14+00:00"),

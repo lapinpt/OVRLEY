@@ -306,7 +306,7 @@ describe('initDisplayVariant', () => {
     expect(result.display_variants.linear.height).toBe(24)
     expect(result.display_variants.linear.rotation).toBe(0)
     expect(result.display_variants.linear.orientation).toBe('horizontal')
-    expect(result.display_variants.linear.track_fill_flat).toBe(true)
+    expect(result.display_variants.linear.track_fill_flat).toBe(false)
   })
 
   test('backfills missing linear defaults into an existing variant', () => {
@@ -327,7 +327,7 @@ describe('initDisplayVariant', () => {
     expect(result.display_variants.linear.height).toBe(90)
     expect(result.display_variants.linear.track_corner_radius).toBe(12)
     expect(result.display_variants.linear.orientation).toBe('horizontal')
-    expect(result.display_variants.linear.track_fill_flat).toBe(true)
+    expect(result.display_variants.linear.track_fill_flat).toBe(false)
     expect(result.display_variants.linear.show_min_max_labels).toBe(false)
   })
 

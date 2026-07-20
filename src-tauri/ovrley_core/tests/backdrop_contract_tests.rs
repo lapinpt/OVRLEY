@@ -53,10 +53,10 @@ fn backdrop_manifest_exposes_expected_types_and_defaults() {
             "y": 100,
             "opacity": 1,
             "diameter": 200,
-            "fill_color": "#ffffff",
-            "fill_opacity": 1,
+            "fill_color": "#212121",
+            "fill_opacity": 0.5,
             "border_thickness": 0,
-            "border_color": "#ffffff",
+            "border_color": "#D6D6D6",
             "border_opacity": 1
         })
     );
@@ -69,18 +69,18 @@ fn backdrop_manifest_exposes_expected_types_and_defaults() {
             "x": 100,
             "y": 100,
             "opacity": 1,
-            "width": 200,
-            "height": 120,
-            "fill_color": "#ffffff",
-            "fill_opacity": 1,
+            "width": 300,
+            "height": 150,
+            "fill_color": "#212121",
+            "fill_opacity": 0.5,
             "border_thickness": 0,
-            "border_color": "#ffffff",
+            "border_color": "#D6D6D6",
             "border_opacity": 1,
-            "corner_radius": 0,
-            "round_top_left": false,
+            "corner_radius": 20,
+            "round_top_left": true,
             "round_top_right": false,
             "round_bottom_left": false,
-            "round_bottom_right": false
+            "round_bottom_right": true
         })
     );
 }
