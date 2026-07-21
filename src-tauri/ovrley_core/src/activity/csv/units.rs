@@ -127,7 +127,7 @@ pub(super) fn declaration_compatible(metric: Metric, declaration: DeclaredUnit) 
         DeclaredUnit::Unsupported(UnitDimension::Length) => {
             matches!(
                 metric,
-                Metric::Elevation | Metric::Altitude | Metric::Distance
+                Metric::Elevation | Metric::BarometricAltitude | Metric::Distance
             )
         }
         DeclaredUnit::Unsupported(UnitDimension::Unknown) => false,
@@ -169,7 +169,7 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
             unit,
             Unit::MetresPerSecond | Unit::KilometresPerHour | Unit::MilesPerHour
         ),
-        Metric::Elevation | Metric::Altitude | Metric::Distance => {
+        Metric::Elevation | Metric::BarometricAltitude | Metric::Distance => {
             matches!(unit, Unit::Metres | Unit::Kilometres | Unit::Feet)
         }
         Metric::Heading => matches!(unit, Unit::Degrees),
@@ -208,7 +208,7 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::ElapsedSeconds | Metric::Timestamp => Unit::Seconds,
         Metric::Latitude | Metric::Longitude => Unit::DecimalDegrees,
         Metric::Speed => Unit::KilometresPerHour,
-        Metric::Elevation | Metric::Altitude | Metric::Distance => Unit::Metres,
+        Metric::Elevation | Metric::BarometricAltitude | Metric::Distance => Unit::Metres,
         Metric::Heading => Unit::Degrees,
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
         Metric::Rpm => Unit::RevolutionsPerMinute,

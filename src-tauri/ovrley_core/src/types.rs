@@ -92,6 +92,14 @@ pub enum MetricKind {
     BrakePosition,
     #[serde(rename = "lean_angle")]
     LeanAngle,
+    #[serde(rename = "gps_coordinates")]
+    GpsCoordinates,
+    #[serde(rename = "distance_to_home")]
+    DistanceToHome,
+    #[serde(rename = "total_ascent")]
+    TotalAscent,
+    #[serde(rename = "calories")]
+    Calories,
 }
 
 /// Visual representation mode for a value widget.

@@ -740,7 +740,7 @@ fn trackaddict_aim_lap_legend_and_racebox_fixtures_import_existing_metrics() {
     let trackaddict = parse_fixture("Amozoc - TrackAddict.csv");
     assert_close(trackaddict.speed[0], 24.9 / 3.6);
     assert_close(trackaddict.elevation[0], 2297.6);
-    assert_close(trackaddict.altitude[0], 0.0);
+    assert_close(trackaddict.barometric_altitude[0], 0.0);
     assert_close(trackaddict.heading[0], 213.8);
     assert!(trackaddict.sync_time.is_some());
 
@@ -871,7 +871,7 @@ fn motorsport_fixtures_retain_available_new_metrics_as_finite_optional_series() 
         }));
         for series in [
             &activity.elevation,
-            &activity.altitude,
+            &activity.barometric_altitude,
             &activity.speed,
             &activity.heading,
             &activity.distance,

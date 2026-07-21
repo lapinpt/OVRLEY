@@ -14,6 +14,7 @@ pub mod gap;
 pub mod metrics;
 pub mod smoothing;
 
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::finalize::gap::{
     build_distance_series, build_progress_series, insert_idle_gap_samples, skipped_gap_debug,
 };
@@ -48,11 +49,13 @@ const CORE_ACTIVITY_ATTRIBUTES: &[&str] = &[
 
 const EXTENDED_ACTIVITY_ATTRIBUTES: &[&str] = &[
     "air_pressure",
-    "altitude",
+    "barometric_altitude",
+    "calories",
     "aperture",
     "color_temperature",
     "core_temperature",
     "distance",
+    "distance_to_home",
     "ev",
     "focal_length",
     "brake_position",
@@ -71,6 +74,7 @@ const EXTENDED_ACTIVITY_ATTRIBUTES: &[&str] = &[
     "shutter_speed",
     "stroke_rate",
     "stride_length",
+    "total_ascent",
     "torque",
     "throttle_position",
     "vertical_oscillation",
@@ -203,6 +207,7 @@ fn finalize_columns_with_debug(
 
     let time_series = build_time_series(columns);
     let course_series = build_course_series(columns);
+    validate_course_coordinate_ranges(&course_series)?;
     let elapsed_series = build_elapsed_series(columns, &time_series);
     let direct_distance_series: Vec<Option<f64>> = columns
         .distance
@@ -216,6 +221,13 @@ fn finalize_columns_with_debug(
         .iter()
         .map(|value| value.and_then(finite_f64))
         .collect();
+    let barometric_altitude_series: Vec<Option<f64>> = columns
+        .barometric_altitude
+        .iter()
+        .map(|value| value.and_then(finite_f64))
+        .collect();
+    let elevation_profile_series =
+        preferred_elevation_series(&barometric_altitude_series, &elevation_base_series).to_vec();
     let mut metric_series_map = derive_activity_metric_series(
         &course_series,
         &distance_series,
@@ -298,9 +310,13 @@ fn finalize_columns_with_debug(
         trim_start_seconds: 0.0,
         trim_end_seconds: round_f64(duration_seconds, 3).unwrap_or(0.0),
         sample_course_points: course_series.clone(),
-        sample_elevations: metric(&metric_series_map, "elevation"),
+        sample_elevations: elevation_profile_series.to_vec(),
         course: course_series,
         elevation: metric(&metric_series_map, "elevation"),
+        calories: metric(&metric_series_map, "calories"),
+        distance_to_home: metric(&metric_series_map, "distance_to_home"),
+        total_ascent: metric(&metric_series_map, "total_ascent"),
+        barometric_altitude: metric(&metric_series_map, "barometric_altitude"),
         speed: metric(&metric_series_map, "speed"),
         distance: metric(&metric_series_map, "distance"),
         heartrate: metric(&metric_series_map, "heartrate"),
@@ -323,7 +339,6 @@ fn finalize_columns_with_debug(
         stroke_rate: metric(&metric_series_map, "stroke_rate"),
         torque: metric(&metric_series_map, "torque"),
         vertical_speed: metric(&metric_series_map, "vertical_speed"),
-        altitude: metric(&metric_series_map, "altitude"),
         iso: metric(&metric_series_map, "iso"),
         aperture: metric(&metric_series_map, "aperture"),
         shutter_speed: metric(&metric_series_map, "shutter_speed"),
@@ -374,13 +389,14 @@ fn activity_columns_from_samples(
         latitude: collect!(latitude),
         longitude: collect!(longitude),
         elevation: collect!(elevation),
-        altitude: collect!(altitude),
+        barometric_altitude: collect!(barometric_altitude),
         speed: collect!(speed),
         heading: collect!(heading),
         heartrate: collect!(heartrate),
         cadence: collect!(cadence),
         power: collect!(power),
         temperature: collect!(temperature),
+        calories: collect!(calories),
         gradient: collect!(gradient),
         pace: collect!(pace),
         distance: collect!(distance),
@@ -429,13 +445,14 @@ fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
         ("latitude", columns.latitude.len()),
         ("longitude", columns.longitude.len()),
         ("elevation", columns.elevation.len()),
-        ("altitude", columns.altitude.len()),
+        ("barometric_altitude", columns.barometric_altitude.len()),
         ("speed", columns.speed.len()),
         ("heading", columns.heading.len()),
         ("heartrate", columns.heartrate.len()),
         ("cadence", columns.cadence.len()),
         ("power", columns.power.len()),
         ("temperature", columns.temperature.len()),
+        ("calories", columns.calories.len()),
         ("gradient", columns.gradient.len()),
         ("pace", columns.pace.len()),
         ("distance", columns.distance.len()),
@@ -492,6 +509,24 @@ fn build_course_series(columns: &ActivityColumns) -> Vec<(Option<f64>, Option<f6
             )
         })
         .collect()
+}
+
+fn validate_course_coordinate_ranges(
+    course_series: &[(Option<f64>, Option<f64>)],
+) -> CoreResult<()> {
+    for (index, (latitude, longitude)) in course_series.iter().enumerate() {
+        if latitude.is_some_and(|value| !(-90.0..=90.0).contains(&value)) {
+            return Err(CoreError::Activity(format!(
+                "Invalid latitude at activity sample {index}: expected -90..=90 degrees"
+            )));
+        }
+        if longitude.is_some_and(|value| !(-180.0..=180.0).contains(&value)) {
+            return Err(CoreError::Activity(format!(
+                "Invalid longitude at activity sample {index}: expected -180..=180 degrees"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Normalizes source timestamps into UTC millisecond RFC 3339 strings.
@@ -720,12 +755,14 @@ fn apply_metric_smoothing(
 fn metric_units() -> Value {
     json!({
         "air_pressure": "bar",
-        "altitude": "m",
+        "barometric_altitude": "m",
         "aperture": "fnum",
+        "calories": "kcal",
         "cadence": "rpm",
         "color_temperature": "kelvin",
         "core_temperature": "celsius",
         "distance": "m",
+        "distance_to_home": "m",
         "elevation": "m",
         "ev": "ev",
         "focal_length": "mm",
@@ -751,6 +788,7 @@ fn metric_units() -> Value {
         "stroke_rate": "strokes_per_minute",
         "temperature": "celsius",
         "throttle_position": "percent",
+        "total_ascent": "m",
         "torque": "nm",
         "vertical_oscillation": "raw",
         "vertical_speed": "mps",

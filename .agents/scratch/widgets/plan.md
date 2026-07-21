@@ -160,11 +160,6 @@ Also clean up the altitude schema so elevation-consuming features can prefer bar
 - `src-tauri/ovrley_core/src/normalize/mod.rs`
   - Add `calories` to `RenderDataRequirements`.
 
-### Verification
-
-- Unit test with a sample FIT file containing `record.calories`.
-- Unit test with a GPX file containing a calorie extension.
-
 ---
 
 ## 5. Implement distance-to-home derivation
@@ -193,10 +188,6 @@ Also clean up the altitude schema so elevation-consuming features can prefer bar
   - Ensure distance formatter handles `distance_to_home` with m/km/mi.
 - `app/src/features/widget-preview/widgets/metric/format.js`
   - Ensure distance formatter handles the new widget.
-
-### Verification
-
-- Unit test: known GPS path, verify distance to home at each point matches expected haversine values.
 
 ---
 
@@ -252,8 +243,8 @@ Also clean up the altitude schema so elevation-consuming features can prefer bar
 
 ### Coordinate formats
 
-**DMS**: `40° 26′ 46″ N`
-**DDM**: `40° 26.767′ N`
+**DMS**: `N 40° 26′ 46″`
+**DDM**: `N 40° 26.767′`
 
 ### Files
 
@@ -293,6 +284,8 @@ Also clean up the altitude schema so elevation-consuming features can prefer bar
 ## 8. Icon assets
 
 ### Files
+
+The icons from Lucide and link: https://static.vecteezy.com/system/resources/previews/060/183/274/non_2x/calorie-burn-icon-fire-flame-and-kcal-symbol-in-black-vector.jpg must recreated ABSOLUTELY EXACTLY, download the lucide icons and literally copy the paths. Recreate the flame icon without text/label based on the reference image. All icons must be standalone SVG assets.
 
 - `assets/widget-icons/`
   - Add `widget-house.svg` — recreate from Lucide `house` (or equivalent) as a standalone SVG asset.
@@ -387,5 +380,5 @@ Also clean up the altitude schema so elevation-consuming features can prefer bar
 
 ## Open risks
 
-- Removing `altitude` raw field may affect saved templates or persisted activity data. Check for serialization/versioning implications. Templates should be storing altitude field anywhere, but double check.
+- Unless you have 100% evidence that old template needs a shim for the altitude-barometric_altitude change, do not add any compatibility shims. I do not think that this should be the case - the templates store widgets, not which data the widget pulls from.
 - GPS coordinates “both” mode requires special two-line rendering in both SVG and Skia; keep the layout logic duplicated but consistent.

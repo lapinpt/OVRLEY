@@ -223,9 +223,13 @@ pub struct ValueConfig {
     #[serde(default)]
     pub show_full_distance: Option<bool>,
     #[serde(default)]
+    pub show_full_ascent: Option<bool>,
+    #[serde(default)]
     pub unit_color: Option<String>,
     #[serde(default)]
     pub display_unit: Option<String>,
+    #[serde(default)]
+    pub coordinate_format: Option<String>,
     #[serde(default)]
     pub balance_format: Option<String>,
     #[serde(default)]

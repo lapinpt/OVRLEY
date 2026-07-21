@@ -11,6 +11,62 @@ function splitGradientUnitSuffix(text) {
   return text.endsWith('%') ? [text.slice(0, -1), '%'] : [text, '']
 }
 
+function buildMetricTextRuns({ widget, content, visualBounds, shadowFilterIds }) {
+  if (content.type === 'coordinates') {
+    const runs = []
+    for (let index = 0; index < content.layout.lines.length; index += 1) {
+      const line = content.layout.lines[index]
+      if (line.direction) {
+        runs.push({
+          key: `coordinate-direction-${index}`,
+          text: line.direction,
+          x: line.directionLeft + visualBounds.offsetX,
+          baseline: line.baseline + visualBounds.offsetY,
+          color: line.directionColor,
+          fontSize: content.layout.fontSize,
+          shadowFilterId: shadowFilterIds.value,
+        })
+      }
+      runs.push({
+        key: `coordinate-value-${index}`,
+        text: line.valueText,
+        x: line.valueLeft + visualBounds.offsetX,
+        baseline: line.baseline + visualBounds.offsetY,
+        color: widget.data.color,
+        fontSize: content.layout.fontSize,
+        shadowFilterId: shadowFilterIds.value,
+      })
+    }
+    return runs
+  }
+
+  const { layout, valueText, unitText } = content
+  return [
+    {
+      key: 'value',
+      text: valueText,
+      x: layout.value.left + visualBounds.offsetX,
+      baseline: layout.value.baseline + visualBounds.offsetY,
+      color: widget.data.color,
+      fontSize: widget.data.font_size,
+      shadowFilterId: shadowFilterIds.value,
+    },
+    ...(layout.units
+      ? [
+          {
+            key: 'units',
+            text: unitText,
+            x: layout.units.left + visualBounds.offsetX,
+            baseline: layout.units.baseline + visualBounds.offsetY,
+            color: widget.data.unit_color,
+            fontSize: layout.units.fontSize,
+            shadowFilterId: shadowFilterIds.units,
+          },
+        ]
+      : []),
+  ]
+}
+
 /**
  * Builds the presentation model for the metric preview renderer.
  *
@@ -53,13 +109,11 @@ export function useMetricPreviewPresentation({ widget, activity, previewSecond, 
         }))
 
     let valueText
-    let unitText
     const currentGradientValue = getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0
 
     // Gradient values are formatted inline because they depend on the live activity sample.
     if (isGradient) {
       valueText = `${formatGradientValue(widget, getInterpolatedActivityValue(activity, 'gradient', previewSecond))}%`
-      unitText = ''
     }
 
     // Layout selection: only gradient widgets need triangle/value layout.
@@ -78,25 +132,32 @@ export function useMetricPreviewPresentation({ widget, activity, previewSecond, 
 
     if (!isGradient) {
       // Standard metric mode: icon/value/unit layout comes from the preview model.
+      const { content } = previewModel
+      const metricLayout = content.layout
       const visualBounds = previewModel.visualBounds
-
-      valueText = previewModel.valueText
-      unitText = previewModel.unitText
+      const shadowFilterIds = {
+        value: sanitizeSvgId(`${widget.id}-value-shadow`),
+        units: sanitizeSvgId(`${widget.id}-units-shadow`),
+      }
 
       return {
         mode: 'metric',
         fontFamily,
         widgetOpacity,
         shadow,
-        valueText,
-        unitText,
         iconSvg: METRIC_ICON_SVGS[widget.type],
-        metricLayout: previewModel.metricLayout,
+        metricLayout,
+        textRuns: buildMetricTextRuns({
+          widget,
+          content,
+          visualBounds,
+          shadowFilterIds,
+        }),
         visualBounds,
-        iconLeft: previewModel.metricLayout.icon ? previewModel.metricLayout.icon.left + widget.data.icon_offset_x + visualBounds.offsetX : 0,
-        iconTop: previewModel.metricLayout.icon ? previewModel.metricLayout.icon.top + widget.data.icon_offset_y + visualBounds.offsetY : 0,
-        valueShadowFilterId: sanitizeSvgId(`${widget.id}-value-shadow`),
-        unitsShadowFilterId: sanitizeSvgId(`${widget.id}-units-shadow`),
+        iconLeft: metricLayout.icon ? metricLayout.icon.left + widget.data.icon_offset_x + visualBounds.offsetX : 0,
+        iconTop: metricLayout.icon ? metricLayout.icon.top + widget.data.icon_offset_y + visualBounds.offsetY : 0,
+        valueShadowFilterId: shadowFilterIds.value,
+        unitsShadowFilterId: shadowFilterIds.units,
         iconShadowFilterId: sanitizeSvgId(`${widget.id}-icon-shadow`),
       }
     }

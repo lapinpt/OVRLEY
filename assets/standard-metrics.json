@@ -39,6 +39,12 @@
             "decimals": 1,
             "show_full_distance": true
           },
+          "gps_coordinates": {
+            "coordinate_format": "dms"
+          },
+          "total_ascent": {
+            "show_full_ascent": false
+          },
           "left_right_balance": {
             "balance_format": "percent_label"
           }
@@ -184,7 +190,11 @@
       "shutter_speed": ["text"],
       "focal_length": ["text"],
       "ev": ["text"],
-      "color_temperature": ["text"]
+      "color_temperature": ["text"],
+      "gps_coordinates": ["text"],
+      "distance_to_home": ["text"],
+      "total_ascent": ["text"],
+      "calories": ["text"]
     }
   },
   "definitions": [
@@ -256,6 +266,116 @@
         "assetFile": "widget-distance.svg"
       },
       "category": "general"
+    },
+    {
+      "type": "gps_coordinates",
+      "current": true,
+      "label": "GPS Coordinates",
+      "defaultDisplayUnit": "both",
+      "supportedDisplayUnits": [
+        {
+          "value": "latitude",
+          "label": "Lat"
+        },
+        {
+          "value": "longitude",
+          "label": "Lon"
+        },
+        {
+          "value": "both",
+          "label": "Lat/Lon"
+        }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "coordinates",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-satellite.svg"
+      },
+      "category": "general"
+    },
+    {
+      "type": "distance_to_home",
+      "current": true,
+      "label": "Distance to Home",
+      "defaultDisplayUnit": "m",
+      "supportedDisplayUnits": [
+        {
+          "value": "m",
+          "label": "m",
+          "renderLabel": "m"
+        },
+        {
+          "value": "km",
+          "label": "km",
+          "renderLabel": "km"
+        },
+        {
+          "value": "mi",
+          "label": "mi",
+          "renderLabel": "mi"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "distance",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-house.svg"
+      },
+      "category": "other"
+    },
+    {
+      "type": "total_ascent",
+      "current": true,
+      "label": "Total Ascent",
+      "defaultDisplayUnit": "m",
+      "supportedDisplayUnits": [
+        {
+          "value": "m",
+          "label": "m",
+          "renderLabel": "M"
+        },
+        {
+          "value": "ft",
+          "label": "ft",
+          "renderLabel": "FT"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "elevation",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-arrow-up-narrow-wide.svg"
+      },
+      "category": "general"
+    },
+    {
+      "type": "calories",
+      "current": true,
+      "label": "Calories",
+      "defaultDisplayUnit": "kcal",
+      "supportedDisplayUnits": [
+        {
+          "value": "kcal",
+          "label": "kcal",
+          "renderLabel": "KCAL"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-calories.svg"
+      },
+      "category": "other"
     },
     {
       "type": "heartrate",
@@ -727,6 +847,7 @@
       "type": "altitude",
       "current": true,
       "label": "Altitude",
+      "dataSource": "elevation",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
         {

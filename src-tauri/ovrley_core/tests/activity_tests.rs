@@ -414,10 +414,10 @@ fn trimmed_exports_keep_absolute_distance_progress() {
 }
 
 #[test]
-fn parsed_activity_deserializes_new_srt_series() {
+fn parsed_activity_deserializes_barometric_altitude_series() {
     let json = serde_json::json!({
         "sample_elapsed_seconds": [0.0, 1.0, 2.0],
-        "altitude": [100.0, 110.0, 120.0],
+        "barometric_altitude": [100.0, 110.0, 120.0],
         "iso": [200.0, 400.0, 800.0],
         "aperture": [1.7, 2.8, 4.0],
         "shutter_speed": [0.0003125, 0.001, 0.002],
@@ -428,7 +428,7 @@ fn parsed_activity_deserializes_new_srt_series() {
     let activity: ParsedActivity = serde_json::from_value(json).unwrap();
 
     assert_eq!(
-        activity.altitude,
+        activity.barometric_altitude,
         vec![Some(100.0), Some(110.0), Some(120.0)]
     );
     assert_eq!(activity.iso, vec![Some(200.0), Some(400.0), Some(800.0)]);
@@ -455,7 +455,7 @@ fn parsed_activity_new_series_default_to_empty() {
     });
     let activity: ParsedActivity = serde_json::from_value(json).unwrap();
 
-    assert!(activity.altitude.is_empty());
+    assert!(activity.barometric_altitude.is_empty());
     assert!(activity.iso.is_empty());
     assert!(activity.aperture.is_empty());
     assert!(activity.shutter_speed.is_empty());
@@ -475,6 +475,41 @@ fn parsed_activity_handles_nulls_in_new_series() {
 
     assert_eq!(activity.iso, vec![Some(200.0), None, Some(800.0)]);
     assert_eq!(activity.ev, vec![None, Some(-1.0), None]);
+}
+
+#[test]
+fn finalization_emits_calories_and_distance_to_home_series() {
+    let raw_activity = serde_json::json!({
+        "file_name": "activity.fit",
+        "file_format": "fit",
+        "raw_samples": [
+            {"elapsed_seconds": 0.0, "latitude": 0.0, "longitude": 0.0, "calories": 100.0},
+            {"elapsed_seconds": 1.0, "latitude": 0.0, "longitude": 1.0, "calories": 150.0}
+        ]
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.calories, vec![Some(100.0), Some(150.0)]);
+    assert_eq!(activity.distance_to_home.first(), Some(&Some(0.0)));
+    assert!((activity.distance_to_home[1].unwrap() - 111_194.927).abs() < 0.001);
+}
+
+#[test]
+fn finalization_rejects_out_of_range_gps_coordinates() {
+    let raw_activity = serde_json::json!({
+        "file_name": "activity.fit",
+        "file_format": "fit",
+        "raw_samples": [
+            {"elapsed_seconds": 0.0, "latitude": 91.0, "longitude": 0.0},
+            {"elapsed_seconds": 1.0, "latitude": 0.0, "longitude": 1.0}
+        ]
+    });
+
+    let error = finalize_raw_activity_json(&raw_activity.to_string(), None).unwrap_err();
+    assert!(error.to_string().contains("Invalid latitude"));
 }
 
 #[test]
@@ -503,24 +538,24 @@ fn hold_interpolation_densifies_iso_as_step_function() {
 }
 
 #[test]
-fn linear_interpolation_densifies_altitude_as_smooth_line() {
+fn linear_interpolation_densifies_barometric_altitude_as_smooth_line() {
     use ovrley_core::activity::interpolate::densify_activity;
 
-    // altitude samples: 100 at t=0, 200 at t=1
+    // barometric-altitude samples: 100 at t=0, 200 at t=1
     let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
-    trimmed.altitude = vec![Some(100.0), Some(200.0)];
+    trimmed.barometric_altitude = vec![Some(100.0), Some(200.0)];
     let mut requirements = RenderDataRequirements::default();
-    requirements.altitude = true;
+    requirements.barometric_altitude = true;
 
     // fps=4 → frames at t=0, 0.25, 0.5, 0.75
     let report = densify_activity(&trimmed, 4.0, &requirements);
 
-    assert_eq!(report.series.altitude.len(), 4);
+    assert_eq!(report.series.barometric_altitude.len(), 4);
     // Linear: t=0→100, t=0.25→125, t=0.5→150, t=0.75→175
     let expected = [100.0, 125.0, 150.0, 175.0];
     for (i, (value, exp)) in report
         .series
-        .altitude
+        .barometric_altitude
         .iter()
         .zip(expected.iter())
         .enumerate()

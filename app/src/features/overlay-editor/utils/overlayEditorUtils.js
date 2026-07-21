@@ -10,7 +10,7 @@
 import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
-import { getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
+import { getStandardMetricDefinition, getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.
@@ -201,7 +201,8 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
  */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-  const series = activity?.[key]
+  const activityKey = getStandardMetricDefinition(key)?.dataSource ?? key
+  const series = activity?.[activityKey]
 
   if (!Array.isArray(series) || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null

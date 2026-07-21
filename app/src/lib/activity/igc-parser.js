@@ -9,7 +9,8 @@
  *
  * Mapping summary:
  * - B-record GPS fixes become one RawSample each.
- * - GPS altitude maps to `elevation`; pressure altitude maps to `altitude`.
+ * - GPS altitude maps to `elevation`; pressure altitude is not emitted because
+ *   IGC is not currently a documented barometric source for the shared schema.
  * - Invalid V-flag fixes keep their timestamp slot but clear position and
  *   altitude values so the backend can preserve the source timeline.
  * - Optional IGC extension fields are promoted when present:
@@ -184,7 +185,6 @@ function rawSampleFromFix(fix, firstTimestamp, oatDivisor) {
     latitude: validFix ? safeNumber(fix.latitude) : null,
     longitude: validFix ? safeNumber(fix.longitude) : null,
     elevation: validFix ? safeNumber(fix.gpsAltitude) : null,
-    altitude: validFix ? safeNumber(fix.pressureAltitude) : null,
     speed,
     heading,
     vertical_speed: verticalSpeed,

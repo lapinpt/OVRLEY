@@ -64,6 +64,10 @@ pub struct RenderDataRequirements {
     pub speed: bool,
     pub distance: bool,
     pub elevation: bool,
+    pub barometric_altitude: bool,
+    pub calories: bool,
+    pub distance_to_home: bool,
+    pub total_ascent: bool,
     pub gradient: bool,
     pub heartrate: bool,
     pub cadence: bool,
@@ -82,7 +86,6 @@ pub struct RenderDataRequirements {
     pub stroke_rate: bool,
     pub torque: bool,
     pub vertical_speed: bool,
-    pub altitude: bool,
     pub iso: bool,
     pub aperture: bool,
     pub shutter_speed: bool,
@@ -216,6 +219,16 @@ impl ValidatedRenderConfig {
             match value.metric_kind() {
                 MetricKind::Speed => requirements.speed = true,
                 MetricKind::Distance => requirements.distance = true,
+                MetricKind::DistanceToHome => {
+                    requirements.distance_to_home = true;
+                    requirements.course = true;
+                }
+                MetricKind::GpsCoordinates => requirements.course = true,
+                MetricKind::TotalAscent => {
+                    requirements.elevation = true;
+                    requirements.barometric_altitude = true;
+                    requirements.total_ascent = true;
+                }
                 MetricKind::Elevation => requirements.elevation = true,
                 MetricKind::Gradient => requirements.gradient = true,
                 MetricKind::Heartrate => requirements.heartrate = true,
@@ -235,7 +248,7 @@ impl ValidatedRenderConfig {
                 MetricKind::StrokeRate => requirements.stroke_rate = true,
                 MetricKind::Torque => requirements.torque = true,
                 MetricKind::VerticalSpeed => requirements.vertical_speed = true,
-                MetricKind::Altitude => requirements.altitude = true,
+                MetricKind::Altitude => requirements.elevation = true,
                 MetricKind::Iso => requirements.iso = true,
                 MetricKind::Aperture => requirements.aperture = true,
                 MetricKind::ShutterSpeed => requirements.shutter_speed = true,
@@ -248,6 +261,7 @@ impl ValidatedRenderConfig {
                 MetricKind::CoreTemperature => requirements.core_temperature = true,
                 MetricKind::Heading => requirements.heading = true,
                 MetricKind::Time => requirements.time = true,
+                MetricKind::Calories => requirements.calories = true,
             }
         }
 
@@ -257,6 +271,7 @@ impl ValidatedRenderConfig {
 
         if self.elevation_plot.is_some() {
             requirements.elevation = true;
+            requirements.barometric_altitude = true;
             requirements.distance_progress = true;
         }
 

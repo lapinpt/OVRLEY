@@ -118,6 +118,8 @@ pub fn validate_time_value(
             icon_offset_y,
             show_units: false,
             show_full_distance: None,
+            show_full_ascent: None,
+            coordinate_format: None,
             unit_color: color,
             display_unit: String::new(),
             prefix,

@@ -119,6 +119,45 @@ describe('MetricWidgetEditor distance formatting controls', () => {
   })
 })
 
+describe('MetricWidgetEditor new metric controls', () => {
+  test('shows coordinate format and enabled coordinate unit controls for GPS coordinates', () => {
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('gps_coordinates', { display_unit: 'both', coordinate_format: 'dms' })}
+        updateWidgetData={vi.fn()}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Coordinate Format')).toBeInTheDocument()
+    expect(screen.getByText('Degrees / Minutes / Seconds')).toBeInTheDocument()
+
+    const selectors = screen.getAllByRole('combobox')
+    expect(screen.getByText('Lat/Lon')).toBeInTheDocument()
+    expect(selectors[selectors.length - 1]).not.toBeDisabled()
+  })
+
+  test('toggles full ascent for total ascent widgets', async () => {
+    const user = userEvent.setup()
+    const updateWidgetData = vi.fn()
+
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('total_ascent', { display_unit: 'm', show_full_ascent: true })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    const showFullAscentRow = screen.getByText('Show Full Ascent').closest('div')
+    const showFullAscentSwitch = showFullAscentRow?.parentElement?.querySelector('[role="switch"]')
+
+    expect(showFullAscentSwitch).not.toBeNull()
+    await user.click(showFullAscentSwitch)
+    expect(updateWidgetData).toHaveBeenCalledWith('value-0', { show_full_ascent: false })
+  })
+})
+
 describe('MetricWidgetEditor balance format', () => {
   test('shows balance format label for left_right_balance', () => {
     render(

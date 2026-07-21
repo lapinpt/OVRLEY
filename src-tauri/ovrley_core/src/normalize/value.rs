@@ -68,6 +68,8 @@ pub struct ValidatedValueWidget {
     pub icon_offset_y: f32,
     pub show_units: bool,
     pub show_full_distance: Option<bool>,
+    pub show_full_ascent: Option<bool>,
+    pub coordinate_format: Option<String>,
     pub unit_color: [u8; 4],
     pub display_unit: String,
     pub prefix: String,
@@ -119,6 +121,12 @@ fn validate_value_widget_fields(
             "{}: metric {:?} is outside the standard metric text/value validation slice",
             p("value"),
             value.value
+        )));
+    }
+    if !require_icon_fields && value.value == MetricKind::GpsCoordinates {
+        return Err(CoreError::Config(format!(
+            "{}: gps_coordinates only supports text display",
+            p("value")
         )));
     }
 
@@ -186,6 +194,38 @@ fn validate_value_widget_fields(
     } else {
         value.show_full_distance
     };
+    let show_full_ascent = if value.value == MetricKind::TotalAscent {
+        Some(require_bool(
+            value.show_full_ascent,
+            &p("show_full_ascent"),
+        )?)
+    } else {
+        if value.show_full_ascent.is_some() {
+            return Err(CoreError::Config(format!(
+                "{}: is only valid for total_ascent widgets",
+                p("show_full_ascent")
+            )));
+        }
+        None
+    };
+    let coordinate_format = if value.value == MetricKind::GpsCoordinates {
+        let coordinate_format = require_string(value.coordinate_format, &p("coordinate_format"))?;
+        if !matches!(coordinate_format.as_str(), "dms" | "ddm") {
+            return Err(CoreError::Config(format!(
+                "{}: expected 'dms' or 'ddm', got '{coordinate_format}'",
+                p("coordinate_format")
+            )));
+        }
+        Some(coordinate_format)
+    } else {
+        if value.coordinate_format.is_some() {
+            return Err(CoreError::Config(format!(
+                "{}: is only valid for gps_coordinates widgets",
+                p("coordinate_format")
+            )));
+        }
+        None
+    };
 
     let unit_color = rgba_from_hex(
         require_str(value.unit_color.as_deref(), &p("unit_color"))?,
@@ -193,6 +233,34 @@ fn validate_value_widget_fields(
         opacity,
     )?;
     let display_unit = require_string(value.display_unit, &p("display_unit"))?;
+    if value.value == MetricKind::GpsCoordinates
+        && !matches!(display_unit.as_str(), "latitude" | "longitude" | "both")
+    {
+        return Err(CoreError::Config(format!(
+            "{}: expected 'latitude', 'longitude', or 'both', got '{display_unit}'",
+            p("display_unit")
+        )));
+    }
+    if value.value == MetricKind::TotalAscent && !matches!(display_unit.as_str(), "m" | "ft") {
+        return Err(CoreError::Config(format!(
+            "{}: expected 'm' or 'ft', got '{display_unit}'",
+            p("display_unit")
+        )));
+    }
+    if value.value == MetricKind::DistanceToHome
+        && !matches!(display_unit.as_str(), "m" | "km" | "mi")
+    {
+        return Err(CoreError::Config(format!(
+            "{}: expected 'm', 'km', or 'mi', got '{display_unit}'",
+            p("display_unit")
+        )));
+    }
+    if value.value == MetricKind::Calories && display_unit != "kcal" {
+        return Err(CoreError::Config(format!(
+            "{}: expected 'kcal', got '{display_unit}'",
+            p("display_unit")
+        )));
+    }
 
     // -- affixes are output-affecting and must be explicit ----------------
     let prefix = require_string(value.prefix, &p("prefix"))?;
@@ -280,6 +348,8 @@ fn validate_value_widget_fields(
         icon_offset_y,
         show_units,
         show_full_distance,
+        show_full_ascent,
+        coordinate_format,
         unit_color,
         display_unit,
         prefix,

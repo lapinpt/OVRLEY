@@ -26,6 +26,10 @@ describe('standard metric widget catalog', () => {
     expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual([
       'speed',
       'distance',
+      'gps_coordinates',
+      'distance_to_home',
+      'total_ascent',
+      'calories',
       'heartrate',
       'cadence',
       'power',
@@ -81,6 +85,35 @@ describe('standard metric widget catalog', () => {
     expect(distance.supportedDisplayUnits.map((option) => option.value)).toEqual(['m', 'km', 'mi'])
   })
 
+  test('exposes the new text metric definitions from the shared manifest', () => {
+    expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(['gps_coordinates', 'distance_to_home', 'total_ascent', 'calories']))
+    expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(['gps_coordinates', 'distance_to_home', 'total_ascent', 'calories']))
+    expect(getStandardMetricDefinition('gps_coordinates')).toMatchObject({
+      formatter: 'coordinates',
+      defaultDisplayUnit: 'both',
+      supportedDisplayUnits: [{ value: 'latitude' }, { value: 'longitude' }, { value: 'both' }],
+      showUnitsByDefault: false,
+      category: 'general',
+    })
+    expect(getStandardMetricDefinition('distance_to_home')).toMatchObject({
+      formatter: 'distance',
+      defaultDisplayUnit: 'm',
+      category: 'other',
+    })
+    expect(getStandardMetricDefinition('total_ascent')).toMatchObject({
+      formatter: 'elevation',
+      defaultDisplayUnit: 'm',
+      category: 'general',
+    })
+    expect(getStandardMetricDefinition('calories')).toMatchObject({
+      formatter: 'integer',
+      defaultDisplayUnit: 'kcal',
+      showUnitsByDefault: true,
+      category: 'other',
+    })
+    expect(getSupportedDisplayTypes('gps_coordinates')).toEqual(['text'])
+  })
+
   test('records the planned icon catalog for future standard metric widgets', () => {
     expect(getStandardMetricDefinition('pace').icon).toEqual({
       source: 'lucide',
@@ -131,6 +164,7 @@ describe('standard metric widget catalog', () => {
       expect(def.interpolation).toBeDefined()
       expect(def.unitsMode).toBeDefined()
     }
+    expect(getStandardMetricDefinition('altitude').dataSource).toBe('elevation')
   })
 
   test('Phase 1 new metric definitions carry correct interpolation policy', () => {
@@ -171,6 +205,12 @@ describe('standard metric widget catalog', () => {
       fill: 'currentColor',
       stroke: 'none',
     })
+  })
+
+  test('registers shared icons for the new metric widgets', () => {
+    for (const type of ['gps_coordinates', 'distance_to_home', 'total_ascent', 'calories']) {
+      expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')
+    }
   })
 
   test('existing metrics carry interpolation and unitsMode defaults', () => {

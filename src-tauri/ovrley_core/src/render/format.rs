@@ -51,19 +51,58 @@ pub enum MetricIconKind {
     ThrottlePosition,
     BrakePosition,
     LeanAngle,
+    House,
+    Satellite,
+    ArrowUpNarrowWide,
+    Calories,
 }
 
-/// Split metric text used by icon+value+unit widgets.
+/// Display content used by icon+value+unit widgets.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MetricDisplayContent {
+    /// Main metric/time text and optional unit suffix.
+    Standard {
+        value_text: String,
+        unit_text: Option<String>,
+    },
+    /// Coordinate lines with independently colored direction letters.
+    Coordinates(MetricCoordinateDisplay),
+}
+
+/// Formatted metric content plus its shared icon configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetricDisplayParts {
-    /// Main numeric or time text.
-    pub value_text: String,
-    /// Optional unit suffix drawn with a smaller font.
-    pub unit_text: Option<String>,
-    /// Whether the metric icon should be drawn.
+    pub content: MetricDisplayContent,
     pub show_icon: bool,
-    /// Icon kind matching the metric, if supported.
     pub icon_kind: Option<MetricIconKind>,
+}
+
+impl MetricDisplayParts {
+    /// Returns standard value/unit text. Coordinate content is invalid here.
+    pub fn standard_text(&self) -> (&str, Option<&str>) {
+        match &self.content {
+            MetricDisplayContent::Standard {
+                value_text,
+                unit_text,
+            } => (value_text, unit_text.as_deref()),
+            MetricDisplayContent::Coordinates(_) => {
+                panic!("coordinate display content has no standard value/unit text")
+            }
+        }
+    }
+}
+
+/// One formatted latitude or longitude line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MetricCoordinateLine {
+    pub direction: Option<String>,
+    pub value_text: String,
+}
+
+/// Coordinate display content. Two lines are used for the `both` unit mode.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MetricCoordinateDisplay {
+    pub lines: Vec<MetricCoordinateLine>,
 }
 
 enum MetricValue<'a> {
@@ -222,7 +261,7 @@ fn raw_value(
             .flatten(),
         MetricKind::Altitude => dense_activity
             .series
-            .altitude
+            .elevation
             .get(frame_index)
             .copied()
             .flatten(),
@@ -281,6 +320,25 @@ fn raw_value(
             .get(frame_index)
             .copied()
             .flatten(),
+        MetricKind::DistanceToHome => dense_activity
+            .series
+            .distance_to_home
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Calories => dense_activity
+            .series
+            .calories
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::TotalAscent => dense_activity
+            .series
+            .total_ascent
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::GpsCoordinates => None,
         MetricKind::Time => None,
     }
 }
@@ -295,6 +353,43 @@ pub fn format_validated_metric_parts(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> Option<MetricDisplayParts> {
+    let icon_kind = super::widgets::value::metric_icon_kind_for_value(validated.metric);
+    if validated.metric == MetricKind::GpsCoordinates {
+        let latitude = dense_activity
+            .series
+            .course_lat
+            .get(frame_index)
+            .copied()
+            .flatten();
+        let longitude = dense_activity
+            .series
+            .course_lon
+            .get(frame_index)
+            .copied()
+            .flatten();
+        let mut coordinate = format_coordinates(
+            latitude,
+            longitude,
+            &validated.display_unit,
+            validated
+                .coordinate_format
+                .as_deref()
+                .expect("gps_coordinates widget must have a validated coordinate_format"),
+        );
+        for line in &mut coordinate.lines {
+            line.value_text = format!(
+                "{}{}{}",
+                validated.prefix, line.value_text, validated.suffix
+            );
+        }
+
+        return Some(MetricDisplayParts {
+            content: MetricDisplayContent::Coordinates(coordinate),
+            show_icon: validated.show_icon,
+            icon_kind,
+        });
+    }
+
     let value = match validated.metric {
         MetricKind::GearPosition => MetricValue::Gear(
             dense_activity
@@ -305,7 +400,7 @@ pub fn format_validated_metric_parts(
         ),
         metric => MetricValue::Numeric(raw_value(metric, dense_activity, frame_index)),
     };
-    let (mut value_text, unit_text, icon_kind) =
+    let (mut value_text, unit_text) =
         format_validated_standard_metric_parts(validated, dense_activity, value);
 
     if !validated.prefix.is_empty() {
@@ -316,8 +411,10 @@ pub fn format_validated_metric_parts(
     }
 
     Some(MetricDisplayParts {
-        value_text,
-        unit_text,
+        content: MetricDisplayContent::Standard {
+            value_text,
+            unit_text,
+        },
         show_icon: validated.show_icon,
         icon_kind,
     })
@@ -366,8 +463,10 @@ pub fn format_validated_time_parts(
     }
 
     MetricDisplayParts {
-        value_text,
-        unit_text: None,
+        content: MetricDisplayContent::Standard {
+            value_text,
+            unit_text: None,
+        },
         show_icon: validated.base.show_icon,
         icon_kind: super::widgets::value::metric_icon_kind_for_value(MetricKind::Time),
     }
@@ -377,7 +476,7 @@ fn format_validated_standard_metric_parts<'a>(
     validated: &ValidatedValueWidget,
     dense_activity: &DenseActivityReport,
     value: MetricValue<'a>,
-) -> (String, Option<String>, Option<MetricIconKind>) {
+) -> (String, Option<String>) {
     let (raw, gear) = match value {
         MetricValue::Numeric(raw) => (raw, None),
         MetricValue::Gear(gear) => (None, gear),
@@ -432,14 +531,18 @@ fn format_validated_standard_metric_parts<'a>(
                 )
             })
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Decimal) => raw
+        Some(
+            StandardMetricFormatterKind::Decimal
+            | StandardMetricFormatterKind::Distance
+            | StandardMetricFormatterKind::Elevation,
+        ) => raw
             .map(|value| {
-                if kind == MetricKind::Distance {
+                if matches!(kind, MetricKind::Distance | MetricKind::DistanceToHome) {
                     let current = format_number(
                         convert_standard_metric_value(kind, display_unit, value),
                         decimals,
                     );
-                    if validated.show_full_distance == Some(true) {
+                    if kind == MetricKind::Distance && validated.show_full_distance == Some(true) {
                         if let Some(total) = dense_activity.full_activity_distance {
                             let total = format_number(
                                 convert_standard_metric_value(kind, display_unit, total),
@@ -453,10 +556,23 @@ fn format_validated_standard_metric_parts<'a>(
                         current
                     }
                 } else {
-                    format_number(
+                    let current = format_number(
                         convert_standard_metric_value(kind, display_unit, value),
                         decimals,
-                    )
+                    );
+                    if kind == MetricKind::TotalAscent && validated.show_full_ascent == Some(true) {
+                        if let Some(total) = dense_activity.full_activity_total_ascent {
+                            let total = format_number(
+                                convert_standard_metric_value(kind, display_unit, total),
+                                decimals,
+                            );
+                            format!("{current}/{total}")
+                        } else {
+                            current
+                        }
+                    } else {
+                        current
+                    }
                 }
             })
             .unwrap_or_else(|| "--".to_string()),
@@ -486,14 +602,13 @@ fn format_validated_standard_metric_parts<'a>(
             Some(value) => value.to_string(),
             None => "--".to_string(),
         },
+        Some(StandardMetricFormatterKind::Coordinates) => {
+            unreachable!("planned metric formatter reached the active renderer")
+        }
         None => "--".to_string(),
     };
 
-    (
-        value_text,
-        unit_text,
-        super::widgets::value::metric_icon_kind_for_value(kind),
-    )
+    (value_text, unit_text)
 }
 
 fn validated_decimals(formatting: &ValidatedValueFormatting) -> usize {
@@ -595,6 +710,90 @@ fn format_number(value: f64, decimals: usize) -> String {
     format!("{rounded:.decimals$}")
 }
 
+fn format_coordinates(
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+    display_unit: &str,
+    coordinate_format: &str,
+) -> MetricCoordinateDisplay {
+    let lines = match display_unit {
+        "latitude" => vec![format_coordinate_line(latitude, true, coordinate_format)],
+        "longitude" => vec![format_coordinate_line(longitude, false, coordinate_format)],
+        "both" => vec![
+            format_coordinate_line(latitude, true, coordinate_format),
+            format_coordinate_line(longitude, false, coordinate_format),
+        ],
+        _ => unreachable!("gps_coordinates display_unit was validated at ingress"),
+    };
+    MetricCoordinateDisplay { lines }
+}
+
+fn format_coordinate_line(
+    value: Option<f64>,
+    latitude: bool,
+    coordinate_format: &str,
+) -> MetricCoordinateLine {
+    let Some(value) = value else {
+        return MetricCoordinateLine {
+            direction: None,
+            value_text: format_coordinate_placeholder(coordinate_format),
+        };
+    };
+
+    let direction = if latitude {
+        if value < 0.0 {
+            "S"
+        } else {
+            "N"
+        }
+    } else if value < 0.0 {
+        "W"
+    } else {
+        "E"
+    };
+    let absolute = value.abs();
+    let mut degrees = absolute.floor() as i64;
+    let minutes_total = (absolute - degrees as f64) * 60.0;
+    let mut minutes = minutes_total.floor() as i64;
+
+    let value_text = match coordinate_format {
+        "dms" => {
+            let mut seconds = ((minutes_total - minutes as f64) * 60.0).round() as i64;
+            if seconds == 60 {
+                seconds = 0;
+                minutes += 1;
+            }
+            if minutes == 60 {
+                minutes = 0;
+                degrees += 1;
+            }
+            format!("{degrees}°{minutes}′{seconds}″")
+        }
+        "ddm" => {
+            let mut decimal_minutes = minutes_total;
+            if decimal_minutes >= 59.9995 {
+                decimal_minutes = 0.0;
+                degrees += 1;
+            }
+            format!("{degrees}°{decimal_minutes:.3}′")
+        }
+        _ => unreachable!("gps_coordinates coordinate_format was validated at ingress"),
+    };
+
+    MetricCoordinateLine {
+        direction: Some(direction.to_string()),
+        value_text,
+    }
+}
+
+fn format_coordinate_placeholder(coordinate_format: &str) -> String {
+    match coordinate_format {
+        "dms" => "--°--′--″".to_string(),
+        "ddm" => "--°--.---′".to_string(),
+        _ => unreachable!("gps_coordinates coordinate_format was validated at ingress"),
+    }
+}
+
 fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, value: f64) -> f64 {
     match kind {
         MetricKind::Heartrate
@@ -611,7 +810,7 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
                 value
             }
         }
-        MetricKind::Distance => match display_unit.unwrap_or("km") {
+        MetricKind::Distance | MetricKind::DistanceToHome => match display_unit.unwrap_or("km") {
             "m" => value,
             "mi" => value / 1609.344,
             _ => value / 1000.0,
@@ -630,6 +829,13 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
             _ => value * 1000.0,
         },
         MetricKind::Altitude => {
+            if display_unit == Some("ft") {
+                value * 3.280_84
+            } else {
+                value
+            }
+        }
+        MetricKind::TotalAscent => {
             if display_unit == Some("ft") {
                 value * 3.280_84
             } else {
@@ -705,7 +911,7 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
 
 #[cfg(test)]
 mod tests {
-    use super::{format_balance_value, format_number};
+    use super::{format_balance_value, format_coordinates, format_number};
 
     #[test]
     fn balance_percent_label_omits_spaces_around_slash() {
@@ -726,5 +932,29 @@ mod tests {
     fn number_format_preserves_requested_trailing_zeroes() {
         assert_eq!(format_number(2.0, 1), "2.0");
         assert_eq!(format_number(2.3, 2), "2.30");
+    }
+
+    #[test]
+    fn coordinate_format_handles_equator_and_prime_meridian() {
+        let display = format_coordinates(Some(0.0), Some(0.0), "both", "dms");
+        assert_eq!(display.lines[0].direction.as_deref(), Some("N"));
+        assert_eq!(display.lines[0].value_text, "0°0′0″");
+        assert_eq!(display.lines[1].direction.as_deref(), Some("E"));
+        assert_eq!(display.lines[1].value_text, "0°0′0″");
+    }
+
+    #[test]
+    fn coordinate_format_uses_unpadded_fields_without_spaces() {
+        let dms = format_coordinates(Some(8.1), Some(-8.1), "both", "dms");
+        assert_eq!(dms.lines[0].value_text, "8°6′0″");
+        assert_eq!(dms.lines[1].value_text, "8°6′0″");
+
+        let ddm = format_coordinates(Some(8.0), Some(-8.0), "both", "ddm");
+        assert_eq!(ddm.lines[0].value_text, "8°0.000′");
+        assert_eq!(ddm.lines[1].value_text, "8°0.000′");
+
+        let missing = format_coordinates(None, None, "both", "dms");
+        assert_eq!(missing.lines[0].value_text, "--°--′--″");
+        assert_eq!(missing.lines[1].value_text, "--°--′--″");
     }
 }

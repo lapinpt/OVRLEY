@@ -8,6 +8,7 @@
 
 /// Native CSV extraction into canonical activity columns.
 pub mod csv;
+pub(crate) mod elevation;
 /// Backend-owned post-processing from raw extraction samples to ParsedActivity.
 pub mod finalize;
 /// Interpolation helpers used for numeric, coordinate, and timestamp series.

@@ -255,7 +255,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         latitude,
         longitude,
         elevation: series(layout.elevation, identity),
-        altitude: empty(),
+        barometric_altitude: empty(),
         speed: selected_series(&sections.data, layout.speed, |value| {
             layout.speed_to_meters_per_second(value)
         }),
@@ -264,6 +264,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         cadence: empty(),
         power: empty(),
         temperature: empty(),
+        calories: empty(),
         gradient: empty(),
         pace: empty(),
         distance: build_distance(&sections.data, layout.distance)?,

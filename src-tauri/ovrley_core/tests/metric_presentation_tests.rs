@@ -58,6 +58,8 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         icon_offset_y: None,
         show_units: None,
         show_full_distance: None,
+        show_full_ascent: None,
+        coordinate_format: None,
         unit_color: None,
         display_unit: None,
         balance_format: None,
@@ -157,6 +159,7 @@ fn default_dense_activity() -> DenseActivityReport {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series: empty_dense_series(),
     }
 }
@@ -461,6 +464,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series: empty_dense_series(),
     };
     let paths = AppPaths {
@@ -543,6 +547,7 @@ fn render_preserves_multiple_boxed_reports() {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series,
     };
     let fonts_dir = workspace_root.join("fonts");
@@ -635,6 +640,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series: empty_dense_series(),
     };
     let fonts_dir = workspace_root.join("fonts");

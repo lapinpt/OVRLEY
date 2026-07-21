@@ -86,7 +86,7 @@ pub fn prepare_arc_gauge_cache(
         let text_style = validated_value_style(&gauge.inner_value, scene, scale);
         let unit_parts = format_validated_metric_parts(&gauge.inner_value, dense_activity, 0)
             .expect("validated arc gauge metric must have a formatter");
-        let unit_text = unit_parts.unit_text;
+        let unit_text = unit_parts.standard_text().1.map(str::to_owned);
         let static_unit_font_size = unit_font_size(&text_style, scale);
         let frame_states = metric_values(&dense_activity.series, gauge.metric)
             .iter()
@@ -98,7 +98,7 @@ pub fn prepare_arc_gauge_cache(
                         .expect("validated arc gauge metric must have a formatter");
                 ArcGaugeFrameState {
                     fill01: fill_percentage(value, min_value, max_value),
-                    value_text: parts.value_text,
+                    value_text: parts.standard_text().0.to_string(),
                 }
             })
             .collect::<Vec<_>>();

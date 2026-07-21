@@ -237,6 +237,55 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        calories: if requirements.calories {
+            trim_numeric_series(
+                elapsed,
+                &activity.calories,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        distance_to_home: if requirements.distance_to_home {
+            trim_numeric_series(
+                elapsed,
+                &activity.distance_to_home,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        total_ascent: if requirements.total_ascent {
+            trim_numeric_series(
+                elapsed,
+                &activity.total_ascent,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        full_activity_total_ascent: last_finite(&activity.total_ascent),
+        barometric_altitude: if requirements.barometric_altitude {
+            trim_numeric_series(
+                elapsed,
+                &activity.barometric_altitude,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
         speed: if requirements.speed {
             trim_numeric_series(
                 elapsed,
@@ -457,18 +506,6 @@ pub fn trim_activity(
             trim_numeric_series(
                 elapsed,
                 &activity.vertical_speed,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-            )
-        } else {
-            Vec::new()
-        },
-        altitude: if requirements.altitude {
-            trim_numeric_series(
-                elapsed,
-                &activity.altitude,
                 start,
                 end,
                 start_inner_index,

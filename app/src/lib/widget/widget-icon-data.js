@@ -34,6 +34,10 @@ import rpmIconSvg from '../../../../assets/widget-icons/widget-rpm.svg?raw'
 import throttlePositionIconSvg from '../../../../assets/widget-icons/widget-throttle-position.svg?raw'
 import brakePositionIconSvg from '../../../../assets/widget-icons/widget-brake-position.svg?raw'
 import leanAngleIconSvg from '../../../../assets/widget-icons/widget-lean-angle.svg?raw'
+import houseIconSvg from '../../../../assets/widget-icons/widget-house.svg?raw'
+import satelliteIconSvg from '../../../../assets/widget-icons/widget-satellite.svg?raw'
+import arrowUpNarrowWideIconSvg from '../../../../assets/widget-icons/widget-arrow-up-narrow-wide.svg?raw'
+import caloriesIconSvg from '../../../../assets/widget-icons/widget-calories.svg?raw'
 import displayTypeTextSvg from '../../../../assets/widget-icons/display-type-text.svg?raw'
 import displayTypeLinearSvg from '../../../../assets/widget-icons/display-type-linear.svg?raw'
 import displayTypeHeadingTapeSvg from '../../../../assets/widget-icons/display-type-heading-tape.svg?raw'
@@ -96,6 +100,10 @@ export const METRIC_ICON_SVGS = {
   throttle_position: parseMetricIconSvg(throttlePositionIconSvg),
   brake_position: parseMetricIconSvg(brakePositionIconSvg),
   lean_angle: parseMetricIconSvg(leanAngleIconSvg),
+  gps_coordinates: parseMetricIconSvg(satelliteIconSvg),
+  distance_to_home: parseMetricIconSvg(houseIconSvg),
+  total_ascent: parseMetricIconSvg(arrowUpNarrowWideIconSvg),
+  calories: parseMetricIconSvg(caloriesIconSvg),
   label: parseMetricIconSvg(labelIconSvg),
 }
 

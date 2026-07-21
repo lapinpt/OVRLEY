@@ -9,8 +9,9 @@
 //! Phase 0 intentionally uses the standard gradient derivation for every format;
 //! the legacy GPX path is not ported.
 
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::{ActivityColumns, GearSeries, NumericSeries};
-use crate::media::telemetry_math::{bearing_degrees, finite_f64, round_f64};
+use crate::media::telemetry_math::{bearing_degrees, finite_f64, haversine_distance, round_f64};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -89,25 +90,31 @@ pub fn build_metric_coverage(
 ///
 /// Gradient amplifies meter-level altitude noise, so the standard derivation
 /// averages neighboring elevation samples before computing slope over distance.
-fn smooth_elevation_series(elevation_series: &NumericSeries, radius: usize) -> NumericSeries {
-    elevation_series
-        .iter()
-        .enumerate()
-        .map(|(index, value)| {
-            value.and_then(finite_f64)?;
-            let start = index.saturating_sub(radius);
-            let end = (index + radius).min(elevation_series.len().saturating_sub(1));
-            let mut total = 0.0;
-            let mut count = 0.0;
-            for neighbor in elevation_series.iter().take(end + 1).skip(start) {
-                if let Some(neighbor_value) = neighbor.and_then(finite_f64) {
-                    total += neighbor_value;
-                    count += 1.0;
-                }
+fn smooth_elevation_series(elevation_series: &[Option<f64>], radius: usize) -> NumericSeries {
+    let mut smoothed = Vec::with_capacity(elevation_series.len());
+    for index in 0..elevation_series.len() {
+        if elevation_series[index].and_then(finite_f64).is_none() {
+            smoothed.push(None);
+            continue;
+        }
+
+        let start = index.saturating_sub(radius);
+        let end = (index + radius).min(elevation_series.len().saturating_sub(1));
+        let mut total = 0.0;
+        let mut count = 0.0;
+        for neighbor in &elevation_series[start..=end] {
+            if let Some(neighbor_value) = neighbor.and_then(finite_f64) {
+                total += neighbor_value;
+                count += 1.0;
             }
-            (count > 0.0).then(|| round_f64(total / count, 3)).flatten()
-        })
-        .collect()
+        }
+        smoothed.push(if count > 0.0 {
+            round_f64(total / count, 3)
+        } else {
+            None
+        });
+    }
+    smoothed
 }
 
 /// Derives percent grade over a roughly 5 meter distance window.
@@ -250,6 +257,79 @@ pub fn derive_heading_series(
     }
 
     derived
+}
+
+/// Derives the surface distance from the first valid GPS coordinate.
+///
+/// The home coordinate is selected once from source order. Coordinate ranges
+/// were validated by the finalization ingress before this derivation runs.
+/// Samples with a missing coordinate remain missing; no synthetic position is
+/// introduced for an absent GPS observation.
+pub fn derive_distance_to_home_series(
+    course_series: &[(Option<f64>, Option<f64>)],
+) -> NumericSeries {
+    let mut home = None;
+    for point in course_series {
+        if let Some(coordinate) = present_gps_point(*point) {
+            home = Some(coordinate);
+            break;
+        }
+    }
+    let Some((home_latitude, home_longitude)) = home else {
+        return vec![None; course_series.len()];
+    };
+
+    let mut distances = Vec::with_capacity(course_series.len());
+    for point in course_series {
+        let distance = match present_gps_point(*point) {
+            Some((latitude, longitude)) => round_f64(
+                haversine_distance(home_latitude, home_longitude, latitude, longitude),
+                3,
+            ),
+            None => None,
+        };
+        distances.push(distance);
+    }
+    distances
+}
+
+/// Derives cumulative positive elevation gain from the preferred altitude source.
+///
+/// Barometric altitude is selected for the whole activity when at least one
+/// valid barometric sample exists. Otherwise generic elevation is used. The
+/// selected source is smoothed before adjacent valid samples are compared so
+/// high-rate sensor noise does not become ascent. Missing samples stay missing
+/// while the cumulative total is preserved for the next valid observation.
+pub fn derive_total_ascent_series(
+    barometric_altitude: &[Option<f64>],
+    elevation: &[Option<f64>],
+) -> NumericSeries {
+    let source = preferred_elevation_series(barometric_altitude, elevation);
+    let smoothed = smooth_elevation_series(source, 2);
+    let mut cumulative = 0.0;
+    let mut previous_altitude: Option<f64> = None;
+
+    let mut ascent = Vec::with_capacity(smoothed.len());
+    for altitude in smoothed {
+        let Some(altitude) = altitude.and_then(finite_f64) else {
+            ascent.push(None);
+            continue;
+        };
+
+        if let Some(previous_altitude) = previous_altitude {
+            cumulative += (altitude - previous_altitude).max(0.0);
+        }
+        previous_altitude = Some(altitude);
+        ascent.push(round_f64(cumulative, 3));
+    }
+    ascent
+}
+
+fn present_gps_point(point: (Option<f64>, Option<f64>)) -> Option<(f64, f64)> {
+    match point {
+        (Some(latitude), Some(longitude)) => Some((latitude, longitude)),
+        _ => None,
+    }
 }
 
 /// Resolves a bearing between two optional course points.
@@ -429,10 +509,15 @@ pub fn derive_activity_metric_series(
 ) -> BTreeMap<String, MetricDescriptor> {
     let direct = direct_metrics(columns, distance_series, elevation_base_series);
     let null_series: NumericSeries = columns.timestamp.iter().map(|_| None).collect();
+    let preferred_altitude =
+        preferred_elevation_series(&direct["barometric_altitude"], &direct["elevation"]).to_vec();
     let derived_speed = derive_numeric_rate_series(distance_series, elapsed_series);
     let derived_heading = derive_heading_series(course_series, distance_series, 2.0);
-    let derived_gradient = derive_gradient_series(&direct["elevation"], distance_series);
-    let derived_vertical_speed = derive_numeric_rate_series(&direct["elevation"], elapsed_series);
+    let derived_distance_to_home = derive_distance_to_home_series(course_series);
+    let derived_total_ascent =
+        derive_total_ascent_series(&direct["barometric_altitude"], &direct["elevation"]);
+    let derived_gradient = derive_gradient_series(&preferred_altitude, distance_series);
+    let derived_vertical_speed = derive_numeric_rate_series(&preferred_altitude, elapsed_series);
     let derived_pace = derive_pace_series(
         &direct["speed"]
             .iter()
@@ -453,14 +538,37 @@ pub fn derive_activity_metric_series(
     }
 
     insert_metric!("air_pressure", &null_series);
-    insert_metric!("altitude", &direct["elevation"]);
+    insert_metric!("barometric_altitude", &null_series);
     insert_metric!("cadence", &null_series);
     insert_metric!("core_temperature", &null_series);
+    insert_metric!("calories", &null_series);
     map.insert(
         "distance".to_string(),
         MetricDescriptor {
             series: MetricSeries::Numeric(direct["distance"].clone()),
             source: MetricSource::Direct,
+        },
+    );
+    map.insert(
+        "distance_to_home".to_string(),
+        MetricDescriptor {
+            source: if derived_distance_to_home.iter().any(Option::is_some) {
+                MetricSource::Derived
+            } else {
+                MetricSource::Missing
+            },
+            series: MetricSeries::Numeric(derived_distance_to_home),
+        },
+    );
+    map.insert(
+        "total_ascent".to_string(),
+        MetricDescriptor {
+            source: if derived_total_ascent.iter().any(Option::is_some) {
+                MetricSource::Derived
+            } else {
+                MetricSource::Missing
+            },
+            series: MetricSeries::Numeric(derived_total_ascent),
         },
     );
     insert_metric!("elevation", &null_series);
@@ -556,8 +664,9 @@ fn direct_metrics(
         };
     }
     collect!("air_pressure", air_pressure);
-    collect!("altitude", altitude);
+    collect!("barometric_altitude", barometric_altitude);
     collect!("cadence", cadence);
+    collect!("calories", calories);
     collect!("core_temperature", core_temperature);
     direct.insert("distance", distance_series.clone());
     direct.insert("elevation", elevation_base_series.clone());
@@ -590,4 +699,56 @@ fn direct_metrics(
     collect!("ev", ev);
     collect!("color_temperature", color_temperature);
     direct
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{derive_distance_to_home_series, derive_total_ascent_series};
+
+    #[test]
+    fn distance_to_home_uses_first_present_coordinate_and_preserves_gaps() {
+        let series = derive_distance_to_home_series(&[
+            (None, Some(0.0)),
+            (Some(0.0), Some(0.0)),
+            (Some(0.0), Some(0.0)),
+            (Some(0.0), Some(1.0)),
+            (Some(0.0), None),
+        ]);
+
+        assert_eq!(series[0], None);
+        assert_eq!(series[1], Some(0.0));
+        assert_eq!(series[2], Some(0.0));
+        assert!((series[3].expect("valid coordinate has a distance") - 111_194.927).abs() < 0.001);
+        assert_eq!(series[4], None);
+    }
+
+    #[test]
+    fn total_ascent_prefers_barometric_altitude_and_smooths_noise() {
+        let series = derive_total_ascent_series(
+            &[
+                Some(100.0),
+                Some(100.2),
+                Some(100.0),
+                Some(101.0),
+                Some(101.1),
+            ],
+            &[Some(0.0), Some(50.0), Some(100.0), Some(150.0), Some(200.0)],
+        );
+
+        assert_eq!(series.last().copied().flatten(), Some(0.633));
+        assert!(series.windows(2).all(|pair| match (pair[0], pair[1]) {
+            (Some(previous), Some(current)) => current >= previous,
+            _ => true,
+        }));
+    }
+
+    #[test]
+    fn total_ascent_falls_back_to_elevation_when_barometric_is_absent() {
+        let series = derive_total_ascent_series(
+            &[None, None, None],
+            &[Some(10.0), Some(12.0), Some(11.0), Some(15.0)],
+        );
+
+        assert_eq!(series, vec![Some(0.0), Some(1.0), Some(1.0), Some(1.667)]);
+    }
 }

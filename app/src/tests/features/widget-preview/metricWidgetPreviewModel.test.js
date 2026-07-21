@@ -139,6 +139,52 @@ describe('metric widget preview model standard metric units', () => {
     expect(model?.unitText).toBe('mi')
   })
 
+  test('formats the altitude widget from the canonical elevation series', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'altitude',
+        data: {
+          display_unit: 'ft',
+          decimals: 0,
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        elevation: [100],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('328')
+    expect(model?.unitText).toBe('FT')
+  })
+
+  test('formats calories from the parsed activity series', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'calories',
+        data: {
+          display_unit: 'kcal',
+          decimals: 0,
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        calories: [742],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('742')
+    expect(model?.unitText).toBe('KCAL')
+  })
+
   test('preserves requested trailing zeros for full distance formatting', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: {

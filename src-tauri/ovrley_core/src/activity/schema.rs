@@ -138,7 +138,7 @@ pub struct ActivityColumns {
     pub latitude: NumericSeries,
     pub longitude: NumericSeries,
     pub elevation: NumericSeries,
-    pub altitude: NumericSeries,
+    pub barometric_altitude: NumericSeries,
     pub speed: NumericSeries,
     pub heading: NumericSeries,
     pub heartrate: NumericSeries,
@@ -165,6 +165,7 @@ pub struct ActivityColumns {
     pub left_right_balance: NumericSeries,
     pub core_temperature: NumericSeries,
     pub air_pressure: NumericSeries,
+    pub calories: NumericSeries,
     pub gear_position: GearSeries,
     pub iso: NumericSeries,
     pub aperture: NumericSeries,
@@ -213,9 +214,9 @@ pub struct RawSample {
     /// Elevation used by route/elevation/gradient widgets.
     #[serde(default)]
     pub elevation: Option<f64>,
-    /// Alternate altitude channel preserved as its own metric.
+    /// Barometric altitude in meters when the source identifies it explicitly.
     #[serde(default)]
-    pub altitude: Option<f64>,
+    pub barometric_altitude: Option<f64>,
     /// Direct source speed in meters per second.
     #[serde(default)]
     pub speed: Option<f64>,
@@ -234,6 +235,9 @@ pub struct RawSample {
     /// Ambient/device temperature in Celsius.
     #[serde(default)]
     pub temperature: Option<f64>,
+    /// Cumulative energy expenditure in kilocalories.
+    #[serde(default)]
+    pub calories: Option<f64>,
     /// Direct source gradient when available; standard derivation may override.
     #[serde(default)]
     pub gradient: Option<f64>,
@@ -351,6 +355,18 @@ pub struct ParsedActivity {
     /// Elevation in meters.
     #[serde(default)]
     pub elevation: NumericSeries,
+    /// Cumulative energy expenditure in kilocalories.
+    #[serde(default)]
+    pub calories: NumericSeries,
+    /// Surface distance from the first valid GPS coordinate in meters.
+    #[serde(default)]
+    pub distance_to_home: NumericSeries,
+    /// Cumulative positive elevation gain in meters.
+    #[serde(default)]
+    pub total_ascent: NumericSeries,
+    /// Barometric altitude in meters when available.
+    #[serde(default)]
+    pub barometric_altitude: NumericSeries,
     /// Speed in meters per second.
     #[serde(default)]
     pub speed: NumericSeries,
@@ -420,9 +436,6 @@ pub struct ParsedActivity {
     /// Vertical speed in meters per second.
     #[serde(default)]
     pub vertical_speed: NumericSeries,
-    /// Altitude in meters (from SRT `abs_alt`).
-    #[serde(default)]
-    pub altitude: NumericSeries,
     /// ISO sensitivity.
     #[serde(default)]
     pub iso: NumericSeries,
@@ -493,6 +506,8 @@ pub struct DenseActivityReport {
     pub frame_distance_progress: Vec<Option<f64>>,
     /// Final source-activity distance from the parsed distance series.
     pub full_activity_distance: Option<f64>,
+    /// Final source-activity cumulative positive elevation gain.
+    pub full_activity_total_ascent: Option<f64>,
     /// Densified telemetry vectors used by text values and widgets.
     pub series: DenseSeriesReport,
 }
@@ -506,6 +521,14 @@ pub struct DenseSeriesReport {
     pub distance: Vec<Option<f64>>,
     /// Elevation in meters.
     pub elevation: Vec<Option<f64>>,
+    /// Cumulative energy expenditure in kilocalories.
+    pub calories: Vec<Option<f64>>,
+    /// Surface distance from the first valid GPS coordinate in meters.
+    pub distance_to_home: Vec<Option<f64>>,
+    /// Cumulative positive elevation gain in meters.
+    pub total_ascent: Vec<Option<f64>>,
+    /// Barometric altitude in meters.
+    pub barometric_altitude: Vec<Option<f64>>,
     /// Gradient in percent.
     pub gradient: Vec<Option<f64>>,
     /// Heart rate in beats per minute.
@@ -542,8 +565,6 @@ pub struct DenseSeriesReport {
     pub torque: Vec<Option<f64>>,
     /// Vertical speed in meters per second.
     pub vertical_speed: Vec<Option<f64>>,
-    /// Altitude in meters.
-    pub altitude: Vec<Option<f64>>,
     /// ISO sensitivity.
     pub iso: Vec<Option<f64>>,
     /// Aperture f-number.
@@ -591,6 +612,16 @@ pub struct TrimmedActivity {
     pub course: CourseSeries,
     /// Trimmed elevation samples in meters.
     pub elevation: NumericSeries,
+    /// Trimmed cumulative energy expenditure in kilocalories.
+    pub calories: NumericSeries,
+    /// Trimmed surface distance from the first valid GPS coordinate in meters.
+    pub distance_to_home: NumericSeries,
+    /// Trimmed cumulative positive elevation gain in meters.
+    pub total_ascent: NumericSeries,
+    /// Full-activity cumulative positive elevation gain in meters.
+    pub full_activity_total_ascent: Option<f64>,
+    /// Trimmed barometric-altitude samples in meters.
+    pub barometric_altitude: NumericSeries,
     /// Trimmed speed samples in meters per second.
     pub speed: NumericSeries,
     /// Trimmed cumulative distance samples in meters.
@@ -629,8 +660,6 @@ pub struct TrimmedActivity {
     pub torque: NumericSeries,
     /// Trimmed vertical speed samples in meters per second.
     pub vertical_speed: NumericSeries,
-    /// Trimmed altitude samples in meters.
-    pub altitude: NumericSeries,
     /// Trimmed ISO samples.
     pub iso: NumericSeries,
     /// Trimmed aperture samples.

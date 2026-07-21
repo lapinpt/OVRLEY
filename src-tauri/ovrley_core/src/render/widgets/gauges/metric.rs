@@ -50,11 +50,13 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
     match metric {
         MetricKind::Speed => &series.speed,
         MetricKind::Distance => &series.distance,
+        MetricKind::DistanceToHome => &series.distance_to_home,
         MetricKind::Elevation => &series.elevation,
         MetricKind::Heartrate => &series.heartrate,
         MetricKind::Cadence => &series.cadence,
         MetricKind::Power => &series.power,
         MetricKind::Temperature => &series.temperature,
+        MetricKind::Calories => &series.calories,
         MetricKind::Pace => &series.pace,
         MetricKind::GForce => &series.g_force,
         MetricKind::Rpm => &series.rpm,
@@ -67,7 +69,7 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
         MetricKind::StrokeRate => &series.stroke_rate,
         MetricKind::Torque => &series.torque,
         MetricKind::VerticalSpeed => &series.vertical_speed,
-        MetricKind::Altitude => &series.altitude,
+        MetricKind::Altitude => &series.elevation,
         MetricKind::Iso => &series.iso,
         MetricKind::Aperture => &series.aperture,
         MetricKind::ShutterSpeed => &series.shutter_speed,
@@ -81,6 +83,8 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
         MetricKind::GearPosition
         | MetricKind::LeftRightBalance
         | MetricKind::Gradient
+        | MetricKind::GpsCoordinates
+        | MetricKind::TotalAscent
         | MetricKind::Time => &[],
     }
 }

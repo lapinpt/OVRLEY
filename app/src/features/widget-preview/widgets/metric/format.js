@@ -121,6 +121,7 @@ function formatDistanceValue(value, unit, decimals, showUnits) {
 function convertStandardMetricValue(type, value, displayUnit) {
   switch (type) {
     case 'distance':
+    case 'distance_to_home':
       switch (displayUnit) {
         case 'km':
           return value / 1000
@@ -165,6 +166,8 @@ function convertStandardMetricValue(type, value, displayUnit) {
           return value
       }
     case 'altitude':
+      return displayUnit === 'ft' ? value * 3.28084 : value
+    case 'total_ascent':
       return displayUnit === 'ft' ? value * 3.28084 : value
     case 'vertical_oscillation':
       switch (displayUnit) {
@@ -257,6 +260,72 @@ function formatGearPosition(value, units) {
   return { value, units }
 }
 
+function formatCoordinatePlaceholder(coordinateFormat) {
+  if (coordinateFormat === 'dms') return '--°--′--″'
+  if (coordinateFormat === 'ddm') return '--°--.---′'
+  throw new Error(`Unknown GPS coordinate format: ${coordinateFormat}`)
+}
+
+function formatDmsCoordinate(absolute) {
+  let degrees = Math.floor(absolute)
+  const minutesTotal = (absolute - degrees) * 60
+  let minutes = Math.floor(minutesTotal)
+  let seconds = Math.round((minutesTotal - minutes) * 60)
+  if (seconds === 60) {
+    seconds = 0
+    minutes += 1
+  }
+  if (minutes === 60) {
+    minutes = 0
+    degrees += 1
+  }
+  return `${degrees}°${minutes}′${seconds}″`
+}
+
+function formatDdmCoordinate(absolute) {
+  let degrees = Math.floor(absolute)
+  let decimalMinutes = (absolute - degrees) * 60
+  if (decimalMinutes >= 59.9995) {
+    decimalMinutes = 0
+    degrees += 1
+  }
+  return `${degrees}°${decimalMinutes.toFixed(3)}′`
+}
+
+function formatCoordinateLine(coordinate, isLatitude, coordinateFormat, directionColor) {
+  if (coordinate === null || coordinate === undefined) {
+    return { direction: '', valueText: formatCoordinatePlaceholder(coordinateFormat), directionColor }
+  }
+
+  const direction = isLatitude ? (coordinate < 0 ? 'S' : 'N') : coordinate < 0 ? 'W' : 'E'
+  const valueFormatter = { dms: formatDmsCoordinate, ddm: formatDdmCoordinate }[coordinateFormat]
+  return {
+    direction,
+    valueText: valueFormatter(Math.abs(coordinate)),
+    directionColor,
+  }
+}
+
+/**
+ * Formats decimal latitude/longitude values as DMS or DDM text.
+ *
+ * @param {[number|null, number|null]} value - Latitude/longitude pair.
+ * @param {'latitude'|'longitude'|'both'} displayUnit - Coordinate selection.
+ * @param {'dms'|'ddm'} coordinateFormat - Coordinate notation.
+ * @param {string} unitColor - Direction-letter color consumed by the renderer.
+ * @returns {{type: 'coordinates', lines: Array<{direction: string, valueText: string, directionColor: string}>}} Coordinate display lines.
+ */
+export function formatCoordinates(value, displayUnit, coordinateFormat, unitColor) {
+  const [latitude, longitude] = value
+  const latitudeLine = formatCoordinateLine(latitude, true, coordinateFormat, unitColor)
+  const longitudeLine = formatCoordinateLine(longitude, false, coordinateFormat, unitColor)
+
+  if (displayUnit === 'latitude') return { type: 'coordinates', lines: [latitudeLine] }
+  if (displayUnit === 'longitude') return { type: 'coordinates', lines: [longitudeLine] }
+  if (displayUnit === 'both') return { type: 'coordinates', lines: [latitudeLine, longitudeLine] }
+  throw new Error(`Unknown GPS coordinate display unit: ${displayUnit}`)
+}
+
 export function formatStandardMetricDisplay(type, value, widgetData) {
   const definition = getStandardMetricDefinition(type)
   if (!definition) throw new Error(`Unknown standard metric type: ${type}`)
@@ -299,7 +368,11 @@ export function formatStandardMetricDisplay(type, value, widgetData) {
     return formatGearPosition(value, effectiveUnitLabel)
   }
 
-  if (type === 'distance') {
+  if (definition.formatter === 'coordinates') {
+    return formatCoordinates(value, displayUnit, widgetData.coordinate_format, widgetData.unit_color)
+  }
+
+  if (definition.formatter === 'distance') {
     return formatDistanceValue(
       value === null || value === undefined ? value : convertStandardMetricValue(type, value, displayUnit),
       effectiveUnitLabel,

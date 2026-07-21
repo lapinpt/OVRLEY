@@ -16,9 +16,29 @@
  */
 
 import { formatStandardMetricDisplay, formatTimeValue } from './format'
-import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily, measureArcPreviewText } from '../../shared/textMeasurement'
-import { getInterpolatedActivityValue, getInterpolatedTimeValue, NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor'
+import {
+  getMetricWidgetLayout,
+  getMetricWidgetVisualBounds,
+  getPreviewFontFamily,
+  getPreviewTextBaseline,
+  measureArcPreviewText,
+  measurePreviewText,
+} from '../../shared/textMeasurement'
+import {
+  getInterpolatedActivityValue,
+  getInterpolatedSeriesValue,
+  getInterpolatedTimeValue,
+  NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
+} from '@/features/overlay-editor'
 import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
+
+function getInterpolatedCoordinateValue(activity, componentIndex, previewSecond) {
+  if (activity === null) return null
+
+  const coordinateSeries = []
+  for (const point of activity.course) coordinateSeries.push(point[componentIndex])
+  return getInterpolatedSeriesValue(activity.sample_elapsed_seconds, coordinateSeries, previewSecond)
+}
 
 /**
  * Returns the last finite numeric value in a metric series.
@@ -26,11 +46,9 @@ import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/sta
  * @returns {number|null} Last finite value, or null when none exists.
  */
 function getLastFiniteValue(series) {
-  if (!series) return null
-
   for (let index = series.length - 1; index >= 0; index -= 1) {
     const candidate = series[index]
-    if (candidate !== null) return candidate
+    if (candidate !== null && candidate !== undefined) return candidate
   }
 
   return null
@@ -48,7 +66,7 @@ export function formatDistancePreviewDisplay(activity, previewSecond, widgetData
   const current = formatStandardMetricDisplay('distance', currentDistance, widgetData)
   if (!widgetData.show_full_distance) return current
 
-  const totalDistance = getLastFiniteValue(activity?.distance)
+  const totalDistance = getLastFiniteValue(activity.distance)
   if (totalDistance === null) return current
 
   const total = formatStandardMetricDisplay('distance', totalDistance, {
@@ -63,6 +81,127 @@ export function formatDistancePreviewDisplay(activity, previewSecond, widgetData
 }
 
 /**
+ * Formats current ascent, optionally paired with the full activity ascent.
+ * @param {object} activity - Activity data containing total_ascent samples.
+ * @param {number} previewSecond - Current preview time.
+ * @param {object} widgetData - Normalized ascent-widget data.
+ * @returns {{value: string, units: string}} Formatted ascent display.
+ */
+export function formatTotalAscentPreviewDisplay(activity, previewSecond, widgetData) {
+  const currentAscent = getInterpolatedActivityValue(activity, 'total_ascent', previewSecond)
+  const current = formatStandardMetricDisplay('total_ascent', currentAscent, widgetData)
+  if (!widgetData.show_full_ascent) return current
+
+  const totalAscent = getLastFiniteValue(activity.total_ascent)
+  if (totalAscent === null) return current
+
+  const total = formatStandardMetricDisplay('total_ascent', totalAscent, {
+    ...widgetData,
+    show_units: false,
+  })
+  return {
+    value: `${current.value}/${total.value}`,
+    units: current.units,
+  }
+}
+
+function buildCoordinateLayout({ widget, formatted, fontFamily }) {
+  const lineFontSize = formatted.lines.length === 2 ? widget.data.font_size * 0.4 : widget.data.font_size
+  const lineHeight = lineFontSize * 0.92
+  const lineGap = formatted.lines.length === 2 ? lineFontSize * 0.08 : 0
+  const directionGap = lineFontSize * 0.08
+  const lines = []
+  for (const line of formatted.lines) {
+    const valueText = `${widget.data.prefix}${line.valueText}${widget.data.suffix}`
+    const directionMeasure = measurePreviewText(line.direction, lineFontSize, fontFamily)
+    const valueMeasure = measurePreviewText(valueText, lineFontSize, fontFamily)
+    const baseline = getPreviewTextBaseline({
+      lineHeight,
+      ascent: valueMeasure.ascent,
+      glyphHeight: valueMeasure.glyphHeight,
+    })
+    lines.push({
+      ...line,
+      valueText,
+      directionWidth: directionMeasure.width,
+      valueWidth: valueMeasure.width,
+      baseline,
+    })
+  }
+  let directionColumnWidth = 0
+  let valueColumnWidth = 0
+  for (const line of lines) {
+    directionColumnWidth = Math.max(directionColumnWidth, line.directionWidth)
+    valueColumnWidth = Math.max(valueColumnWidth, line.valueWidth)
+  }
+  const textWidth = valueColumnWidth + (directionColumnWidth ? directionColumnWidth + directionGap : 0)
+  const totalTextHeight = lineHeight * lines.length + lineGap * Math.max(lines.length - 1, 0)
+  const iconSize = widget.data.icon_size
+  const rowHeight = Math.max(widget.data.show_icon ? iconSize : 0, totalTextHeight)
+  const textGroupLeft = widget.data.show_icon ? iconSize + 8 + Math.max(widget.data.font_size * 0.08, 8) : 0
+  const textTop = (rowHeight - totalTextHeight) / 2
+
+  return {
+    fontSize: lineFontSize,
+    icon: widget.data.show_icon ? { left: 0, top: (rowHeight - iconSize) / 2, size: iconSize } : null,
+    lines: buildPositionedCoordinateLines(lines, textGroupLeft, textTop, lineHeight, lineGap, directionColumnWidth, valueColumnWidth, directionGap),
+    width: textGroupLeft + textWidth,
+    height: rowHeight,
+  }
+}
+
+function buildPositionedCoordinateLines(lines, textGroupLeft, textTop, lineHeight, lineGap, directionColumnWidth, valueColumnWidth, directionGap) {
+  const positionedLines = []
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    positionedLines.push({
+      ...line,
+      directionLeft: textGroupLeft,
+      valueLeft: textGroupLeft + (directionColumnWidth ? directionColumnWidth + directionGap : 0) + (valueColumnWidth - line.valueWidth),
+      baseline: textTop + index * (lineHeight + lineGap) + line.baseline,
+    })
+  }
+  return positionedLines
+}
+
+function getCoordinateVisualBounds(layout, widgetData) {
+  const minX = Math.min(0, layout.icon ? layout.icon.left + widgetData.icon_offset_x : 0)
+  const minY = Math.min(0, layout.icon ? layout.icon.top + widgetData.icon_offset_y : 0)
+  const maxX = Math.max(layout.width, layout.icon ? layout.icon.left + widgetData.icon_offset_x + layout.icon.size : 0)
+  const maxY = Math.max(layout.height, layout.icon ? layout.icon.top + widgetData.icon_offset_y + layout.icon.size : 0)
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+    offsetX: -minX,
+    offsetY: -minY,
+  }
+}
+
+const SPECIAL_METRIC_PREVIEW_FORMATTERS = {
+  distance: formatDistancePreviewDisplay,
+  total_ascent: formatTotalAscentPreviewDisplay,
+}
+
+function formatMetricWidgetValue({ widget, activity, previewSecond }) {
+  const specialFormatter = SPECIAL_METRIC_PREVIEW_FORMATTERS[widget.type]
+  if (specialFormatter) return specialFormatter(activity, previewSecond, widget.data)
+
+  if (widget.type === 'gps_coordinates') {
+    return formatStandardMetricDisplay(
+      widget.type,
+      [getInterpolatedCoordinateValue(activity, 0, previewSecond), getInterpolatedCoordinateValue(activity, 1, previewSecond)],
+      widget.data,
+    )
+  }
+
+  return formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), widget.data)
+}
+
+/**
  * Builds the text content consumed by boxed gauges that retain the metric
  * value in their frame. Unlike the intrinsic metric model, this deliberately
  * has no icon layout: arc gauges stack value and unit vertically.
@@ -74,10 +213,10 @@ export function formatDistancePreviewDisplay(activity, previewSecond, widgetData
  * @returns {{ valueText: string, unitText: string, fontFamily: string, fontSize: number, valueMeasure: object, valueVerticalMeasure: object, unitMeasure: object|null }|null}
  */
 export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond }) {
-  const formatted =
-    widget.type === 'distance'
-      ? formatDistancePreviewDisplay(activity, previewSecond, widget.data)
-      : formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), widget.data)
+  const formatted = formatMetricWidgetValue({ widget, activity, previewSecond })
+  if (widget.type === 'gps_coordinates') {
+    throw new Error('GPS coordinate widgets only support text display')
+  }
   const fontFamily = getPreviewFontFamily(widget.data.font)
   const valueText = `${widget.data.prefix}${formatted.value}${widget.data.suffix}`
   const unitText = widget.data.show_units ? formatted.units : ''
@@ -114,14 +253,22 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
   const fontFamily = getPreviewFontFamily(widget.data.font)
 
   // Value formatting — format the interpolated activity value based on widget type (speed, heartrate, cadence, power, time, temperature)
-  let valueText = '--'
-  let unitText = ''
+  let valueText
+  let unitText
 
   if (isStandardMetricWidgetType(widget.type)) {
-    const formatted =
-      widget.type === 'distance'
-        ? formatDistancePreviewDisplay(activity, previewSecond, widget.data)
-        : formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), widget.data)
+    const formatted = formatMetricWidgetValue({ widget, activity, previewSecond })
+    if (widget.type === 'gps_coordinates') {
+      const coordinateLayout = buildCoordinateLayout({ widget, formatted, fontFamily })
+      return {
+        content: {
+          type: 'coordinates',
+          layout: coordinateLayout,
+        },
+        metricLayout: coordinateLayout,
+        visualBounds: getCoordinateVisualBounds(coordinateLayout, widget.data),
+      }
+    }
     valueText = formatted.value
     unitText = formatted.units
   } else if (widget.type === 'time') {
@@ -142,6 +289,12 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
   })
 
   return {
+    content: {
+      type: 'standard',
+      valueText,
+      unitText,
+      layout: metricLayout,
+    },
     metricLayout,
     unitText,
     valueText,

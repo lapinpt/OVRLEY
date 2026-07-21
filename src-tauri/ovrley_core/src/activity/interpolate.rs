@@ -293,6 +293,7 @@ pub fn densify_activity(
         frame_elapsed_seconds: frame_elapsed_seconds.clone(),
         frame_distance_progress,
         full_activity_distance: trimmed.full_activity_distance,
+        full_activity_total_ascent: trimmed.full_activity_total_ascent,
         series: DenseSeriesReport {
             speed: densify(
                 &trimmed.sample_elapsed_seconds,
@@ -313,6 +314,34 @@ pub fn densify_activity(
                 &trimmed.elevation,
                 &frame_elapsed_seconds,
                 requirements.elevation,
+                crate::MetricKind::Elevation,
+            ),
+            calories: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.calories,
+                &frame_elapsed_seconds,
+                requirements.calories,
+                crate::MetricKind::Calories,
+            ),
+            distance_to_home: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.distance_to_home,
+                &frame_elapsed_seconds,
+                requirements.distance_to_home,
+                crate::MetricKind::DistanceToHome,
+            ),
+            total_ascent: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.total_ascent,
+                &frame_elapsed_seconds,
+                requirements.total_ascent,
+                crate::MetricKind::TotalAscent,
+            ),
+            barometric_altitude: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.barometric_altitude,
+                &frame_elapsed_seconds,
+                requirements.barometric_altitude,
                 crate::MetricKind::Elevation,
             ),
             gradient: densify(
@@ -440,13 +469,6 @@ pub fn densify_activity(
                 &frame_elapsed_seconds,
                 requirements.vertical_speed,
                 crate::MetricKind::VerticalSpeed,
-            ),
-            altitude: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.altitude,
-                &frame_elapsed_seconds,
-                requirements.altitude,
-                crate::MetricKind::Altitude,
             ),
             iso: densify(
                 &trimmed.sample_elapsed_seconds,

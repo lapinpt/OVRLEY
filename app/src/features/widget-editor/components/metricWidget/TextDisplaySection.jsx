@@ -8,6 +8,11 @@ import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
 import { ToggleField, SelectField, SliderField } from '../widgetFormControls'
 
+const COORDINATE_FORMAT_OPTIONS = [
+  { value: 'dms', label: 'Degrees / Minutes / Seconds' },
+  { value: 'ddm', label: 'Degrees / Decimal Minutes' },
+]
+
 /**
  * Renders text-specific display controls: font, decimals/balance, icon, units.
  *
@@ -25,6 +30,8 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
   const hasDecimalControl = definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
   const hasBalanceFormat = definition?.formatter === 'balance'
   const isDistanceWidget = widget.type === 'distance'
+  const isCoordinateWidget = widget.type === 'gps_coordinates'
+  const isTotalAscentWidget = widget.type === 'total_ascent'
   const maxDecimals = isDistanceWidget ? 2 : 1
   const defaultDecimals = isDistanceWidget ? 1 : 0
   const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
@@ -66,6 +73,27 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
         </div>
       ) : null}
 
+      {isCoordinateWidget ? (
+        <SelectField
+          label="Coordinate Format"
+          value={widget.data.coordinate_format}
+          onValueChange={(value) => updateWidgetData(widget.id, { coordinate_format: value })}
+          options={COORDINATE_FORMAT_OPTIONS}
+        />
+      ) : null}
+
+      {isTotalAscentWidget ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between py-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Show Full Ascent</span>
+            <ToggleField
+              checked={widget.data.show_full_ascent}
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_ascent: checked })}
+            />
+          </div>
+        </div>
+      ) : null}
+
       <IconSection
         widget={widget}
         updateWidgetData={updateWidgetData}
@@ -85,6 +113,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
               value={getStandardMetricDisplayUnit(widget.type, widget.data)}
               onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
               options={supportsUnitSelection ? unitOptions : undefined}
+              showToggle={!isCoordinateWidget}
             />
           ) : null
         }

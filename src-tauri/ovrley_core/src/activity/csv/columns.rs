@@ -159,7 +159,7 @@ pub(super) fn build_activity_columns(
     let (latitude, _) = series(Metric::Latitude);
     let (longitude, _) = series(Metric::Longitude);
     let (elevation, _) = series(Metric::Elevation);
-    let (altitude, _) = series(Metric::Altitude);
+    let (barometric_altitude, _) = series(Metric::BarometricAltitude);
     let (speed, preserve_speed_gaps) = series(Metric::Speed);
     let (heading, preserve_heading_gaps) = series(Metric::Heading);
     let (g_force_x, _) = series(Metric::GForceX);
@@ -272,7 +272,7 @@ pub(super) fn build_activity_columns(
         latitude,
         longitude,
         elevation,
-        altitude,
+        barometric_altitude,
         speed,
         heading,
         distance,
@@ -291,6 +291,7 @@ pub(super) fn build_activity_columns(
         cadence: empty(),
         power: empty(),
         temperature: empty(),
+        calories: empty(),
         gradient: empty(),
         pace: empty(),
         vertical_speed: empty(),

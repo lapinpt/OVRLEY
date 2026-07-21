@@ -41,7 +41,7 @@ enum Metric {
     /// GPS or sensor elevation in metres.
     Elevation,
     /// Pressure or barometric altitude in metres.
-    Altitude,
+    BarometricAltitude,
     /// Ground speed in metres per second.
     Speed,
     /// Course or bearing in degrees clockwise from north.

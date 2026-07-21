@@ -29,6 +29,10 @@ Shared metric SVG icons used by both the Rust backend (`include_str!`) and the R
 | `widget-ground-contact-time.svg`    | `ground_contact_time`   | `custom`    |                |
 | `widget-torque.svg`                 | `torque`                | `custom`    |                |
 | `widget-gear-position.svg`          | `gear_position`         | `custom`    |                |
+| `widget-satellite.svg`              | `gps_coordinates`      | `lucide`    | `Satellite`   |
+| `widget-house.svg`                  | `distance_to_home`    | `lucide`    | `House`       |
+| `widget-arrow-up-narrow-wide.svg`   | `total_ascent`        | `lucide`    | `ArrowUpNarrowWide` |
+| `widget-calories.svg`               | `calories`            | `custom`    |                |
 
 ## Usage Notes
 

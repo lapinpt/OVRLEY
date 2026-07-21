@@ -67,7 +67,6 @@ pub fn build_activity_columns(
     let mut timestamp = vec![None; n];
     let mut latitude = vec![None; n];
     let mut longitude = vec![None; n];
-    let mut altitude = vec![None; n];
     let mut elevation = vec![None; n];
     let mut speed = vec![None; n];
     let mut heading = vec![None; n];
@@ -87,7 +86,6 @@ pub fn build_activity_columns(
         if let Some(gps_sample) = last_gps.and_then(|gps_index| gps.get(gps_index)) {
             latitude[index] = gps_sample.latitude;
             longitude[index] = gps_sample.longitude;
-            altitude[index] = gps_sample.altitude;
             elevation[index] = gps_sample.altitude;
             speed[index] = gps_sample.speed;
             heading[index] = gps_sample.heading;
@@ -159,13 +157,14 @@ pub fn build_activity_columns(
         latitude,
         longitude,
         elevation,
-        altitude,
+        barometric_altitude: none(),
         speed,
         heading,
         heartrate: none(),
         cadence: none(),
         power: none(),
         temperature: none(),
+        calories: none(),
         gradient: none(),
         pace: none(),
         distance: none(),

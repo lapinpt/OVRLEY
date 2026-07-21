@@ -168,10 +168,14 @@ mod tests {
             frame_elapsed_seconds: vec![0.0],
             frame_distance_progress: vec![Some(0.0)],
             full_activity_distance: None,
+            full_activity_total_ascent: None,
             series: DenseSeriesReport {
                 speed: vec![Some(10.0)],
                 distance: vec![],
                 elevation: vec![],
+                calories: vec![],
+                distance_to_home: vec![],
+                total_ascent: vec![],
                 gradient: vec![],
                 heartrate: vec![],
                 cadence: vec![],
@@ -190,7 +194,7 @@ mod tests {
                 stroke_rate: vec![],
                 torque: vec![],
                 vertical_speed: vec![],
-                altitude: vec![],
+                barometric_altitude: vec![],
                 iso: vec![],
                 aperture: vec![],
                 shutter_speed: vec![],
@@ -254,15 +258,19 @@ mod tests {
             border_color: None,
             border_thickness: 0.0,
         };
-        let dense = DenseActivityReport {
+        let mut dense = DenseActivityReport {
             frame_count: 1,
             frame_elapsed_seconds: vec![0.0],
             frame_distance_progress: vec![Some(0.0)],
             full_activity_distance: None,
+            full_activity_total_ascent: None,
             series: DenseSeriesReport {
                 speed: vec![Some(10.0)],
                 distance: vec![],
                 elevation: vec![],
+                calories: vec![],
+                distance_to_home: vec![],
+                total_ascent: vec![],
                 gradient: vec![],
                 heartrate: vec![],
                 cadence: vec![],
@@ -281,7 +289,7 @@ mod tests {
                 stroke_rate: vec![],
                 torque: vec![],
                 vertical_speed: vec![],
-                altitude: vec![],
+                barometric_altitude: vec![],
                 iso: vec![],
                 aperture: vec![],
                 shutter_speed: vec![],
@@ -299,7 +307,7 @@ mod tests {
             },
         };
         let mut surface = create_surface(400, 200).unwrap();
-        let validated = crate::normalize::ValidatedValueWidget {
+        let mut validated = crate::normalize::ValidatedValueWidget {
             metric: crate::MetricKind::Speed,
             x: 10.0,
             y: 20.0,
@@ -315,6 +323,8 @@ mod tests {
             icon_offset_y: 0.0,
             show_units: true,
             show_full_distance: None,
+            show_full_ascent: None,
+            coordinate_format: None,
             unit_color: [0xff, 0xff, 0xff, 0xff],
             display_unit: "kmh".to_string(),
             prefix: String::new(),
@@ -341,6 +351,32 @@ mod tests {
             })
             .unwrap(),
             "Text display type should be handled by value module"
+        );
+
+        dense.series.course_lat = vec![Some(40.446111)];
+        dense.series.course_lon = vec![Some(-73.987222)];
+        validated.metric = crate::MetricKind::GpsCoordinates;
+        validated.show_units = false;
+        validated.display_unit = "both".to_string();
+        validated.coordinate_format = Some("dms".to_string());
+
+        assert!(
+            draw_metric_value_widget_with_config(MetricWidgetRequest {
+                canvas: surface.canvas(),
+                metric_kind: crate::MetricKind::GpsCoordinates,
+                display_type: DisplayType::Text,
+                base_style: &style,
+                dense_activity: &dense,
+                frame_index: 0,
+                scale: 1.0,
+                font_dirs: &[],
+                static_icon_rendered: false,
+                validated: Some(&validated),
+                validated_gradient: None,
+                validated_time: None,
+            })
+            .unwrap(),
+            "GPS coordinate text should be handled by value module"
         );
     }
 }

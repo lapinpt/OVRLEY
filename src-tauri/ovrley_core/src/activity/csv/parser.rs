@@ -133,9 +133,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
         ),
         "elevation" | "altitude" => (Metric::Elevation, SourcePriority::Direct, None, None, None),
-        "pressure altitude" | "barometric altitude" => {
-            (Metric::Altitude, SourcePriority::Direct, None, None, None)
-        }
+        "pressure altitude" | "barometric altitude" => (
+            Metric::BarometricAltitude,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "heading" | "bearing" => (Metric::Heading, SourcePriority::Direct, None, None, None),
         "accel xyz" | "combined acceleration" => {
             (Metric::GForce, SourcePriority::Direct, None, None, None)

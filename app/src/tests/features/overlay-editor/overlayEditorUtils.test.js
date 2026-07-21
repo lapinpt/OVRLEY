@@ -39,7 +39,7 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
   const baseActivity = {
     sample_elapsed_seconds: [0, 1, 2, 3, 4],
     iso: [100, 200, 400, 800, 1600],
-    altitude: [10, 20, 30, 40, 50],
+    elevation: [10, 20, 30, 40, 50],
   }
 
   test('hold metric returns last known value at or before elapsedSecond, not interpolated', () => {
