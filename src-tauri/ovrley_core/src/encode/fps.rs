@@ -12,8 +12,8 @@ const FRAME_BOUNDARY_TOLERANCE_DENOMINATOR: u128 = 10_000;
 /// Exact rational frames-per-second value used for FFmpeg arguments and timing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Fps {
-    pub num: u32,
-    pub den: u32,
+    num: u32,
+    den: u32,
 }
 
 impl Fps {
@@ -32,12 +32,21 @@ impl Fps {
                 "FPS denominator must be greater than zero".to_string(),
             ));
         }
-        Ok(Self { num, den }.reduced())
+        let gcd = gcd_u32(num, den);
+        Ok(Self {
+            num: num / gcd,
+            den: den / gcd,
+        })
     }
 
     /// Converts this rational FPS to a floating point value for duration math.
     pub fn as_f64(&self) -> f64 {
         self.num as f64 / self.den as f64
+    }
+
+    /// Returns the reduced numerator and denominator.
+    pub fn components(&self) -> (u32, u32) {
+        (self.num, self.den)
     }
 
     /// Formats this FPS as the rational string expected by FFmpeg.
@@ -82,39 +91,33 @@ impl Fps {
         frame_index as f64 * self.den as f64 / self.num as f64
     }
 
+    /// Builds the canonical half-open frame timeline for a duration.
+    pub fn timeline_for_duration(&self, duration_seconds: f64) -> CoreResult<Vec<f64>> {
+        let frame_count = usize::try_from(self.frame_count_for_duration(duration_seconds)?)
+            .map_err(|_| CoreError::Encode("Frame timeline exceeds usize capacity".to_string()))?;
+        Ok((0..frame_count)
+            .map(|frame_index| self.seconds_at_frame(frame_index as u64))
+            .collect())
+    }
+
     /// Divides this FPS by a positive integer overlay update factor.
     ///
     /// Composite mode uses this to derive overlay pipe FPS from source video FPS
     /// without rounding fractional NTSC rates.
-    pub fn divided_by(&self, factor: u32) -> CoreResult<Fps> {
-        if factor == 0 {
-            return Err(CoreError::Encode(
-                "FPS division factor must be greater than zero".to_string(),
-            ));
-        }
-        Ok(Fps {
-            num: self.num,
-            den: self.den.saturating_mul(factor),
-        }
-        .reduced())
-    }
-
-    /// Returns the mathematically reduced form of this rational FPS.
-    pub fn reduced(&self) -> Fps {
-        let gcd = gcd_u32(self.num, self.den);
-        Fps {
-            num: self.num / gcd,
-            den: self.den / gcd,
-        }
+    pub fn divided_by(&self, factor: std::num::NonZeroU32) -> CoreResult<Fps> {
+        let den = self.den.checked_mul(factor.get()).ok_or_else(|| {
+            CoreError::Encode("FPS denominator overflow while dividing rate".to_string())
+        })?;
+        Fps::new(self.num, den)
     }
 
     /// Converts floating point FPS metadata to rational rates.
     ///
-    /// This is a fallback for callers that do not yet have numerator and
-    /// denominator metadata; exact rational fields should be preferred. Common
-    /// broadcast/video rates are mapped to their canonical rationals. Other
-    /// positive finite values are rounded to integer FPS.
-    pub fn from_f64_fallback(value: f64) -> CoreResult<Fps> {
+    /// This is the ingress adapter for external metadata sources that expose
+    /// only a floating-point rate. Common broadcast/video rates are mapped to
+    /// their canonical rationals; other positive finite values use the nearest
+    /// integer rate supplied by that external format.
+    pub fn from_f64_metadata(value: f64) -> CoreResult<Fps> {
         if !value.is_finite() || value <= 0.0 {
             return Err(CoreError::Encode(format!(
                 "FPS value must be finite and positive: {value}"
@@ -147,11 +150,11 @@ impl Fps {
 ///
 /// The helper uses Euclid's algorithm and returns at least `1` for non-zero FPS
 /// inputs so callers can safely divide numerator and denominator.
-pub fn gcd_u32(mut left: u32, mut right: u32) -> u32 {
+fn gcd_u32(mut left: u32, mut right: u32) -> u32 {
     while right != 0 {
         let next = left % right;
         left = right;
         right = next;
     }
-    left.max(1)
+    left
 }

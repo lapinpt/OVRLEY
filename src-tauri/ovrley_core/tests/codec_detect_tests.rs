@@ -12,7 +12,7 @@
 //! - Filter name extraction breaking after ffmpeg output format changes
 //! - Missing hardware filter detection (overlay_cuda, scale_qsv, etc.)
 
-use ovrley_core::encode::codec_detect::parse_ffmpeg_filter_names;
+use ovrley_core::encode::ffmpeg::detect::parse_ffmpeg_filter_names;
 
 #[test]
 fn parses_ffmpeg_filter_names_from_filter_listing() {

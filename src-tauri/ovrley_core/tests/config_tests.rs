@@ -8,6 +8,7 @@
 mod common;
 
 use ovrley_core::commands::{parse_and_validate_config, validate_template_contents};
+use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId};
 use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
 use serde_json::json;
 
@@ -61,7 +62,17 @@ fn validated_composite_config_preserves_fields() {
     assert_eq!(validated.scene.composite_video_duration, Some(20.0));
     assert_eq!(validated.scene.composite_render_duration, Some(10.0));
     assert_eq!(validated.scene.composite_video_trim_start, Some(0.0));
-    assert_eq!(validated.scene.composite_widget_update_rate, Some(2));
+    assert_eq!(
+        validated.scene.ffmpeg.codec,
+        CodecSelection::Composite(CompositeCodecId::SoftwareH264)
+    );
+    assert_eq!(
+        validated
+            .scene
+            .composite_widget_update_rate
+            .map(std::num::NonZeroU32::get),
+        Some(2)
+    );
 }
 
 #[test]

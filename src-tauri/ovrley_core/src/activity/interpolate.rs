@@ -74,25 +74,24 @@ pub fn interpolate_time_series_value(
 }
 
 // Builds the per-frame time axis for a scene duration and frame rate.
-fn build_target_x_values(duration: f64, fps: f64) -> Vec<f64> {
+pub fn frame_timeline_for_fps(duration: f64, fps: f64) -> crate::error::CoreResult<Vec<f64>> {
     // A frame exists at t=0, then every 1/fps seconds strictly before duration.
     // This mirrors video frame timing and avoids generating a duplicate final
     // frame exactly at the scene end.
-    let safe_fps = fps.max(1.0);
-    let mut values = Vec::new();
-    let mut frame_index = 0usize;
-    loop {
-        let target = frame_index as f64 / safe_fps;
-        if target + 1e-9 >= duration && frame_index > 0 {
-            break;
-        }
-        values.push(target.min(duration));
-        frame_index += 1;
-        if frame_index > 10_000_000 {
-            break;
-        }
+    if !duration.is_finite() || duration <= 0.0 {
+        return Err(crate::error::CoreError::Activity(format!(
+            "Dense timeline duration must be finite and positive: {duration}"
+        )));
     }
-    values
+    if !fps.is_finite() || fps <= 0.0 {
+        return Err(crate::error::CoreError::Activity(format!(
+            "Dense timeline FPS must be finite and positive: {fps}"
+        )));
+    }
+    let frame_count = (duration * fps).ceil() as usize;
+    Ok((0..frame_count)
+        .map(|frame_index| frame_index as f64 / fps)
+        .collect())
 }
 
 // Interpolates a numeric series over all target frame times.
@@ -221,19 +220,12 @@ fn interpolate_time_series(
 /// 3. Densify every requested numeric telemetry series into per-frame vectors.
 pub fn densify_activity(
     trimmed: &TrimmedActivity,
-    fps: f64,
+    frame_elapsed_seconds: Vec<f64>,
     requirements: &RenderDataRequirements,
 ) -> DenseActivityReport {
     // ── Phase 1: build the canonical frame timeline ──────────────────────
     // Every enabled series uses this same target vector so all rendered
     // values and widgets stay frame-aligned.
-    let duration = trimmed
-        .sample_elapsed_seconds
-        .last()
-        .copied()
-        .unwrap_or_default();
-    let frame_elapsed_seconds = build_target_x_values(duration, fps);
-
     // ── Phase 2: interpolate distance progress, course, timestamps ───────
     // Distance progress is absolute (not trim-relative) so route/elevation
     // widgets can use it without additional normalization.

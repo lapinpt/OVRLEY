@@ -36,7 +36,7 @@ mod progress_sink;
 mod runtime_paths;
 mod tauri_commands;
 
-use ovrley_core::encode::video::RenderController;
+use ovrley_core::encode::progress::RenderController;
 use std::sync::Arc;
 use tauri::Manager;
 

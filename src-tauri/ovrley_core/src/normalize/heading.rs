@@ -236,4 +236,3 @@ fn require_indicator_placement(v: &str, field: &str) -> CoreResult<String> {
         ))),
     }
 }
-

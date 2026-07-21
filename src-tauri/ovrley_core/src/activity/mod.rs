@@ -20,7 +20,7 @@ pub mod trim;
 /// Native Racelogic VBOX extraction into canonical activity columns.
 pub mod vbo;
 
-use crate::activity::interpolate::densify_activity;
+use crate::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::error::{CoreError, CoreResult};
@@ -60,5 +60,57 @@ pub fn build_dense_activity_report_validated(
         config.scene.end,
         &requirements,
     )?;
-    Ok(densify_activity(&trimmed, config.scene.fps, &requirements))
+    let duration = trimmed
+        .sample_elapsed_seconds
+        .last()
+        .copied()
+        .ok_or_else(|| CoreError::Activity("Trimmed activity has no timeline".to_string()))?;
+    let frame_elapsed_seconds = frame_timeline_for_fps(duration, config.scene.fps)?;
+    Ok(densify_activity(
+        &trimmed,
+        frame_elapsed_seconds,
+        &requirements,
+    ))
+}
+
+/// Trims activity through the validated scene window and densifies it on an
+/// exact caller-owned frame timeline.
+pub fn build_dense_activity_report_for_timeline(
+    activity: &ParsedActivity,
+    config: &ValidatedRenderConfig,
+    frame_elapsed_seconds: Vec<f64>,
+) -> CoreResult<DenseActivityReport> {
+    if frame_elapsed_seconds.is_empty() {
+        return Err(CoreError::Activity(
+            "Dense frame timeline must contain at least one timestamp".to_string(),
+        ));
+    }
+    let requirements = config.render_data_requirements()?;
+    let trimmed = trim_activity(
+        activity,
+        config.scene.start,
+        config.scene.end,
+        &requirements,
+    )?;
+    let duration = *trimmed
+        .sample_elapsed_seconds
+        .last()
+        .ok_or_else(|| CoreError::Activity("Trimmed activity has no timeline".to_string()))?;
+    if frame_elapsed_seconds[0] != 0.0
+        || frame_elapsed_seconds
+            .iter()
+            .any(|timestamp| !timestamp.is_finite() || *timestamp < 0.0 || *timestamp >= duration)
+        || frame_elapsed_seconds
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+    {
+        return Err(CoreError::Activity(format!(
+            "Dense frame timeline must start at zero, increase strictly, and remain below duration {duration}"
+        )));
+    }
+    Ok(densify_activity(
+        &trimmed,
+        frame_elapsed_seconds,
+        &requirements,
+    ))
 }

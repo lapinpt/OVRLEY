@@ -5,10 +5,11 @@
 //! across phases without coupling the main render loop to reporting details.
 
 use crate::debug::TimingBucket;
-use crate::encode::ffmpeg::configure_ffmpeg_command;
+use crate::encode::debug::round3;
+use crate::encode::ffmpeg::binary::configure_ffmpeg_command;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
-use crate::render::LabelCacheStatus;
+use crate::render::{FrameSize, LabelCacheStatus};
 use chrono::Local;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -21,11 +22,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 static LAST_TIMESTAMP_NANOS: AtomicU64 = AtomicU64::new(0);
 pub(crate) const DEBUG_TIMING_RETENTION_LIMIT: usize = 20;
+const TRANSPARENT_DEBUG_PHASE: &str = "phase_6";
 
 #[derive(Serialize)]
 /// Timing summary for one video render phase.
 struct TimingSummary {
-    phase: String,
+    phase: &'static str,
     timestamp: String,
     overlay_filename: String,
     fps: f64,
@@ -46,24 +48,20 @@ struct TimingSummary {
 struct PrepareTimingSummary {
     total_ms: f64,
     timings: BTreeMap<String, TimingBucket>,
-    label_cache_status: String,
+    label_cache_status: LabelCacheStatus,
 }
 
 /// Writes preparation timing data for one render.
 pub(crate) fn write_prepare_summary(
     debug_dir: &Path,
     total_ms: f64,
-    timings: &BTreeMap<String, TimingBucket>,
+    timings: BTreeMap<String, TimingBucket>,
     label_cache_status: LabelCacheStatus,
 ) -> CoreResult<()> {
     let summary = PrepareTimingSummary {
         total_ms,
-        timings: timings.clone(),
-        label_cache_status: match label_cache_status {
-            LabelCacheStatus::None => "none".to_string(),
-            LabelCacheStatus::Hit => "hit".to_string(),
-            LabelCacheStatus::Miss => "miss".to_string(),
-        },
+        timings,
+        label_cache_status,
     };
     write_json(
         debug_dir.join("prepare_render_assets_timing.json"),
@@ -73,11 +71,10 @@ pub(crate) fn write_prepare_summary(
 
 /// Writes aggregate timing data for one render phase.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn write_timing_summary_with_phase(
+pub(crate) fn write_timing_summary(
     debug_dir: &Path,
     scene: &crate::normalize::ValidatedSceneConfig,
     output_path: &Path,
-    phase: &str,
     total_frames: u32,
     layout_total_frames: u32,
     rendered_frames: u32,
@@ -85,10 +82,10 @@ pub(crate) fn write_timing_summary_with_phase(
     sample_frame_indices: Vec<usize>,
     timings: BTreeMap<String, TimingBucket>,
 ) -> CoreResult<()> {
-    let update_rate = scene.update_rate.max(1);
+    let update_rate = scene.update_rate.get();
     let summary = TimingSummary {
-        phase: phase.to_string(),
-        timestamp: iso_timestamp_now(),
+        phase: TRANSPARENT_DEBUG_PHASE,
+        timestamp: Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
         overlay_filename: output_path.to_string_lossy().to_string(),
         fps: scene.fps / f64::from(update_rate),
         layout_fps: scene.fps,
@@ -114,9 +111,9 @@ pub(crate) fn write_timing_summary_with_phase(
 }
 
 /// Creates a timestamped debug directory for a render phase.
-pub(crate) fn create_debug_dir(paths: &AppPaths, phase: &str) -> CoreResult<PathBuf> {
-    let phase_dir = paths.debug_render_dir.join(phase);
-    let dir = phase_dir.join(timestamp_slug()?);
+pub(crate) fn create_debug_dir(paths: &AppPaths) -> CoreResult<PathBuf> {
+    let phase_dir = paths.debug_render_dir.join(TRANSPARENT_DEBUG_PHASE);
+    let dir = phase_dir.join(timestamp_nanos()?.to_string());
     fs::create_dir_all(&dir).map_err(|error| CoreError::Io {
         path: dir.clone(),
         source: error,
@@ -187,9 +184,7 @@ pub(crate) fn timestamp_nanos() -> CoreResult<u128> {
 
 /// Selects representative frame indexes for optional sample PNG export.
 pub(crate) fn sample_frame_indices(total_frames: usize) -> Vec<usize> {
-    if total_frames == 0 {
-        return Vec::new();
-    }
+    assert!(total_frames > 0, "sample frame count must be non-zero");
     let mut indices = vec![
         0,
         total_frames / 4,
@@ -206,8 +201,8 @@ pub(crate) fn sample_frame_indices(total_frames: usize) -> Vec<usize> {
 pub(crate) fn render_sample_frames_enabled() -> CoreResult<bool> {
     match std::env::var("OVRLEY_SAMPLE_FRAMES") {
         Ok(value) => match value.as_str() {
-            "1" | "true" | "TRUE" | "yes" | "YES" => Ok(true),
-            "0" | "false" | "FALSE" | "no" | "NO" => Ok(false),
+            "true" => Ok(true),
+            "false" => Ok(false),
             _ => Err(CoreError::Encode(format!(
                 "OVRLEY_SAMPLE_FRAMES must be a boolean value; received {value:?}"
             ))),
@@ -224,8 +219,7 @@ pub(crate) fn render_sample_frames_enabled() -> CoreResult<bool> {
 pub(crate) fn write_sample_frame(
     ffmpeg_bin: &Path,
     debug_dir: &Path,
-    width: u32,
-    height: u32,
+    frame_size: FrameSize,
     rgba: &[u8],
     frame_index: usize,
     input_pix_fmt: &str,
@@ -241,7 +235,7 @@ pub(crate) fn write_sample_frame(
         .arg("-pix_fmt")
         .arg(input_pix_fmt)
         .arg("-s")
-        .arg(format!("{width}x{height}"))
+        .arg(format!("{}x{}", frame_size.width, frame_size.height))
         .arg("-i")
         .arg("-")
         .arg("-frames:v")
@@ -274,16 +268,6 @@ pub(crate) fn write_sample_frame(
     Ok(())
 }
 
-// Formats the current local timestamp for debug summaries.
-fn iso_timestamp_now() -> String {
-    Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()
-}
-
-// Rounds a floating-point value to three decimal places.
-fn round3(value: f64) -> f64 {
-    (value * 1000.0).round() / 1000.0
-}
-
 // Serializes a payload as pretty JSON and writes it to disk.
 fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> CoreResult<()> {
     let json = serde_json::to_string_pretty(payload)?;
@@ -291,9 +275,4 @@ fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> CoreResult<()> {
         path: path.clone(),
         source: error,
     })
-}
-
-// Builds a filesystem-safe timestamp slug for debug directories/files.
-fn timestamp_slug() -> CoreResult<String> {
-    Ok(timestamp_nanos()?.to_string())
 }

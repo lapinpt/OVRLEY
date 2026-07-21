@@ -52,8 +52,12 @@ pub struct ProgressEstimator {
 
 impl ProgressEstimator {
     pub fn new(eta_smoothing: f64) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&eta_smoothing),
+            "ETA smoothing must be in the inclusive range 0..=1"
+        );
         Self {
-            eta_smoothing: eta_smoothing.clamp(0.0, 1.0),
+            eta_smoothing,
             warmup_counter: 0,
             elapsed_at_warmup_end: 0.0,
             current_at_warmup_end: 0,
@@ -132,7 +136,10 @@ impl ProgressEstimator {
             return None;
         }
         let mut samples: Vec<f64> = self.intervals.iter().copied().collect();
-        samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        samples.sort_by(|a, b| {
+            a.partial_cmp(b)
+                .expect("recorded frame intervals must be finite")
+        });
         let mid = samples.len() / 2;
         let median = if samples.len() % 2 == 0 {
             (samples[mid - 1] + samples[mid]) / 2.0
@@ -211,14 +218,14 @@ pub struct RenderController {
 }
 
 impl Default for RenderController {
-/// Idle-state controller with a `NullSink`.
+    /// Idle-state controller with a `NullSink`.
     fn default() -> Self {
         Self::with_sink(Arc::new(NullSink))
     }
 }
 
 impl RenderController {
-/// Wired to a concrete `ProgressSink`. [`default`] installs [`NullSink`].
+    /// Wired to a concrete `ProgressSink`. [`default`] installs [`NullSink`].
     pub fn with_sink(progress_sink: Arc<dyn ProgressSink>) -> Self {
         Self {
             progress: Arc::new(Mutex::new(RenderProgress::default())),
@@ -235,21 +242,23 @@ impl RenderController {
     pub fn progress(&self) -> RenderProgress {
         self.progress
             .lock()
-            .map(|value| value.clone())
-            .unwrap_or_default()
+            .expect("render progress mutex poisoned")
+            .clone()
     }
 
     /// Requests cancellation. Returns whether a render was active.
     #[must_use = "the return value indicates whether a render was in progress"]
     pub fn cancel(&self) -> bool {
         self.cancel_flag.store(true, Ordering::SeqCst);
-        if let Ok(mut progress) = self.progress.lock() {
-            progress.status = "cancelled".to_string();
-            progress.message = "Cancelling render...".to_string();
-            let snapshot = progress.clone();
-            drop(progress);
-            self.progress_sink.emit_progress(&snapshot);
-        }
+        let mut progress = self
+            .progress
+            .lock()
+            .expect("render progress mutex poisoned");
+        progress.status = "cancelled".to_string();
+        progress.message = "Cancelling render...".to_string();
+        let snapshot = progress.clone();
+        drop(progress);
+        self.progress_sink.emit_progress(&snapshot);
         self.running.load(Ordering::SeqCst)
     }
 
@@ -266,26 +275,29 @@ impl RenderController {
         }
         self.cancel_flag.store(false, Ordering::SeqCst);
         let render_id = self.next_render_id.fetch_add(1, Ordering::SeqCst) as u64 + 1;
-        if let Ok(mut progress) = self.progress.lock() {
-            *progress = RenderProgress {
-                render_id,
-                current: 0,
-                total: total_frames,
-                encoded: 0,
-                status: "rendering".to_string(),
-                message: message.to_string(),
-                estimated_seconds_remaining: None,
-                rendering_fps: None,
-                filename: None,
-            };
-            let snapshot = progress.clone();
-            drop(progress);
-            self.progress_sink.emit_progress(&snapshot);
-        }
+        let mut progress = self
+            .progress
+            .lock()
+            .expect("render progress mutex poisoned");
+        *progress = RenderProgress {
+            render_id,
+            current: 0,
+            total: total_frames,
+            encoded: 0,
+            status: "rendering".to_string(),
+            message: message.to_string(),
+            estimated_seconds_remaining: None,
+            rendering_fps: None,
+            filename: None,
+        };
+        let snapshot = progress.clone();
+        drop(progress);
+        self.progress_sink.emit_progress(&snapshot);
         // Reset FPS throttle from any prior render.
-        if let Ok(mut last) = self.last_fps_emit_at.lock() {
-            *last = None;
-        }
+        *self
+            .last_fps_emit_at
+            .lock()
+            .expect("render FPS throttle mutex poisoned") = None;
         Ok(render_id)
     }
 
@@ -298,85 +310,89 @@ impl RenderController {
         estimate: Option<u64>,
         rendering_fps: Option<f64>,
     ) {
-        let due = match self.last_fps_emit_at.lock() {
-            Ok(mut last) => {
-                let now = Instant::now();
-                let due = match *last {
-                    None => true,
-                    Some(prev) => now.duration_since(prev) >= PROGRESS_EMIT_MIN_INTERVAL,
-                };
-                if due {
-                    *last = Some(now);
-                }
-                due
-            }
-            Err(_) => true,
+        let mut last = self
+            .last_fps_emit_at
+            .lock()
+            .expect("render FPS throttle mutex poisoned");
+        let now = Instant::now();
+        let due = match *last {
+            None => true,
+            Some(prev) => now.duration_since(prev) >= PROGRESS_EMIT_MIN_INTERVAL,
         };
+        if due {
+            *last = Some(now);
+        }
+        drop(last);
 
-        if let Ok(mut progress) = self.progress.lock() {
-            progress.current = current;
-            progress.total = total;
-            progress.encoded = encoded;
-            progress.estimated_seconds_remaining = estimate;
-            if due {
-                progress.rendering_fps = rendering_fps;
-            }
-            progress.message = if current >= total {
-                "Encoding output file...".to_string()
-            } else {
-                "Rendering frames...".to_string()
-            };
-            let snapshot = progress.clone();
-            drop(progress);
-            if due {
-                self.progress_sink.emit_progress(&snapshot);
-            }
+        let mut progress = self
+            .progress
+            .lock()
+            .expect("render progress mutex poisoned");
+        progress.current = current;
+        progress.total = total;
+        progress.encoded = encoded;
+        progress.estimated_seconds_remaining = estimate;
+        if due {
+            progress.rendering_fps = rendering_fps;
+        }
+        progress.message = if current >= total {
+            "Encoding output file...".to_string()
+        } else {
+            "Rendering frames...".to_string()
+        };
+        let snapshot = progress.clone();
+        drop(progress);
+        if due {
+            self.progress_sink.emit_progress(&snapshot);
         }
     }
 
     pub fn finish_success(&self, filename: String) {
-        if let Ok(mut progress) = self.progress.lock() {
-            progress.current = progress.total;
-            progress.encoded = progress.total;
-            progress.status = "complete".to_string();
-            progress.message = "Video rendered successfully".to_string();
-            progress.estimated_seconds_remaining = Some(0);
-            progress.rendering_fps = None;
-            progress.filename = Some(filename);
-            let snapshot = progress.clone();
-            drop(progress);
-            self.progress_sink.emit_progress(&snapshot);
-        }
+        let mut progress = self
+            .progress
+            .lock()
+            .expect("render progress mutex poisoned");
+        progress.current = progress.total;
+        progress.encoded = progress.total;
+        progress.status = "complete".to_string();
+        progress.message = "Video rendered successfully".to_string();
+        progress.estimated_seconds_remaining = Some(0);
+        progress.rendering_fps = None;
+        progress.filename = Some(filename);
+        let snapshot = progress.clone();
+        drop(progress);
+        self.progress_sink.emit_progress(&snapshot);
         self.running.store(false, Ordering::SeqCst);
         self.cancel_flag.store(false, Ordering::SeqCst);
     }
 
     pub fn finish_error(&self, error: String, cancelled: bool) {
-        if let Ok(mut progress) = self.progress.lock() {
-            progress.status = if cancelled {
-                "cancelled".to_string()
-            } else {
-                "error".to_string()
-            };
-            progress.message = if cancelled {
-                "Rendering cancelled".to_string()
-            } else {
-                error
-            };
-            progress.estimated_seconds_remaining = None;
-            progress.rendering_fps = None;
-            progress.filename = None;
-            let snapshot = progress.clone();
-            drop(progress);
-            self.progress_sink.emit_progress(&snapshot);
-        }
+        let mut progress = self
+            .progress
+            .lock()
+            .expect("render progress mutex poisoned");
+        progress.status = if cancelled {
+            "cancelled".to_string()
+        } else {
+            "error".to_string()
+        };
+        progress.message = if cancelled {
+            "Rendering cancelled".to_string()
+        } else {
+            error
+        };
+        progress.estimated_seconds_remaining = None;
+        progress.rendering_fps = None;
+        progress.filename = None;
+        let snapshot = progress.clone();
+        drop(progress);
+        self.progress_sink.emit_progress(&snapshot);
         self.running.store(false, Ordering::SeqCst);
         self.cancel_flag.store(false, Ordering::SeqCst);
     }
 
     /// Returns the shared cancellation flag for internal worker coordination.
     pub fn cancel_flag(&self) -> Arc<AtomicBool> {
-        // test seam
         self.cancel_flag.clone()
     }
 }

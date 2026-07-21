@@ -4,26 +4,12 @@
 //! nearly pure: progress math, output verification, stderr trimming, and
 //! broken-pipe diagnostic formatting. The composite render loop, ffmpeg
 //! process lifecycle, and render-plan orchestration remain in
-//! `video_composite_pipeline.rs`.
+//! `composite.rs`.
 
 use std::path::Path;
 
-use crate::encode::video_composite_pipeline::CompositePipelinePlan;
+use crate::encode::pipeline::composite_plan::CompositePipelinePlan;
 use crate::error::{CoreError, CoreResult};
-
-/// Converts one overlay timestamp into user-facing output-frame progress.
-///
-/// Composite renders may write fewer overlay frames than final video frames, so
-/// progress is based on the source/output FPS rather than the overlay pipe FPS.
-pub fn output_progress_for_overlay_time(
-    video_local_time: f64,
-    plan: &CompositePipelinePlan,
-) -> u32 {
-    (video_local_time * plan.output_fps.as_f64())
-        .round()
-        .max(0.0)
-        .min(plan.output_frame_count as f64) as u32
-}
 
 /// Confirms that FFmpeg finalized a usable output file on success.
 ///
@@ -69,11 +55,12 @@ pub fn format_pipe_write_failure(
 ) -> String {
     let mut message = format!(
         "{error}. FFmpeg terminated before all overlay frames were written (status {status}) for profile {}.",
-        plan.ffmpeg_settings.selected_profile_name
+        plan.ffmpeg_settings.codec_id.metadata().profile_name
     );
-    if let Some(fallback) = &plan.ffmpeg_settings.fallback_profile_name {
+    if let Some(fallback) = plan.ffmpeg_settings.codec_id.metadata().fallback_profile {
         message.push_str(&format!(
-            "\nSafe fallback profile available: {fallback}. This explicit experimental render was not silently retried."
+            "\nSafe fallback profile available: {}. This explicit experimental render was not silently retried.",
+            fallback.metadata().profile_name
         ));
     }
     message.push_str("\nFilter graph:\n");

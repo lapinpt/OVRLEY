@@ -15,22 +15,26 @@
 //! - Unknown codecs panicking instead of returning errors
 //! - Custom container overrides ignored
 
-use ovrley_core::encode::ffmpeg_settings::build_ffmpeg_settings;
-use ovrley_core::encode::ffmpeg_transparent_profiles::PRORES_KS_VULKAN_FILTER;
+use ovrley_core::encode::ffmpeg::settings::{build_ffmpeg_settings, FfmpegSettings};
+use ovrley_core::encode::ffmpeg::transparent_profiles::PRORES_KS_VULKAN_FILTER;
 use ovrley_core::error::CoreResult;
-use serde_json::json;
+use serde_json::{json, Value};
 
 mod common;
 
 use common::composite::{assert_argument_pair, has_argument_pair};
 
+fn build_settings(value: Value) -> CoreResult<FfmpegSettings> {
+    let config = common::seam::validate_scene_ffmpeg(value)?;
+    build_ffmpeg_settings(&config)
+}
+
 #[test]
 fn prores_ks_defaults() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks",
         "loglevel": "info"
     }))?;
-    assert_eq!(settings.codec, "prores_ks");
     assert_eq!(settings.extension, "mov");
     assert_argument_pair(&settings.output_args, "-pix_fmt", "yuva444p10le");
     Ok(())
@@ -38,11 +42,10 @@ fn prores_ks_defaults() -> CoreResult<()> {
 
 #[test]
 fn prores_ks_vulkan_defaults() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks_vulkan",
         "loglevel": "info"
     }))?;
-    assert_eq!(settings.codec, "prores_ks_vulkan");
     assert_eq!(settings.extension, "mov");
     assert_eq!(settings.input_args.len(), 4);
     assert_eq!(
@@ -59,11 +62,10 @@ fn prores_ks_vulkan_defaults() -> CoreResult<()> {
 
 #[test]
 fn prores_videotoolbox_defaults() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_videotoolbox",
         "loglevel": "info"
     }))?;
-    assert_eq!(settings.codec, "prores_videotoolbox");
     assert_eq!(settings.extension, "mov");
     assert_argument_pair(&settings.output_args, "-pix_fmt", "yuva444p10le");
     Ok(())
@@ -71,11 +73,10 @@ fn prores_videotoolbox_defaults() -> CoreResult<()> {
 
 #[test]
 fn qtrle_settings() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "qtrle",
         "loglevel": "error"
     }))?;
-    assert_eq!(settings.codec, "qtrle");
     assert_eq!(settings.extension, "mov");
     assert_argument_pair(&settings.output_args, "-pix_fmt", "argb");
     Ok(())
@@ -83,7 +84,7 @@ fn qtrle_settings() -> CoreResult<()> {
 
 #[test]
 fn unknown_codec_errors() {
-    let result = build_ffmpeg_settings(&json!({
+    let result = build_settings(json!({
         "codec": "nonexistent_codec",
         "loglevel": "info"
     }));
@@ -91,8 +92,42 @@ fn unknown_codec_errors() {
 }
 
 #[test]
+fn present_ffmpeg_config_must_be_an_object() {
+    let error = common::seam::validate_scene_ffmpeg(json!("prores_ks")).unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "Invalid configuration: scene.ffmpeg must be an object"
+    );
+}
+
+#[test]
+fn present_ffmpeg_fields_are_not_coerced() {
+    let error = common::seam::validate_scene_ffmpeg(json!({ "codec": 42 })).unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "Invalid configuration: scene.ffmpeg.codec must be a string"
+    );
+}
+
+#[test]
+fn present_ffmpeg_argument_arrays_are_strict() {
+    let error = common::seam::validate_scene_ffmpeg(json!({
+        "codec": "prores_ks",
+        "output_args": ["-color_range", 2]
+    }))
+    .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "Invalid configuration: scene.ffmpeg.output_args[1] must be a string"
+    );
+}
+
+#[test]
 fn output_args_passthrough() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks",
         "loglevel": "info",
         "output_args": ["-color_range", "2"]
@@ -103,16 +138,16 @@ fn output_args_passthrough() -> CoreResult<()> {
 
 #[test]
 fn default_codec_is_prores_ks() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "loglevel": "info"
     }))?;
-    assert_eq!(settings.codec, "prores_ks");
+    assert_argument_pair(&settings.output_args, "-c:v", "prores_ks");
     Ok(())
 }
 
 #[test]
 fn custom_container_override() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks",
         "loglevel": "info",
         "container": "mkv"
@@ -124,7 +159,7 @@ fn custom_container_override() -> CoreResult<()> {
 
 #[test]
 fn prores_ks_defaults_are_applied_once() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks",
         "loglevel": "info"
     }))?;
@@ -137,7 +172,7 @@ fn prores_ks_defaults_are_applied_once() -> CoreResult<()> {
 
 #[test]
 fn pix_fmt_override_rewrites_output_arg_when_allowed() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks",
         "loglevel": "info",
         "pix_fmt": "yuva444p12le"
@@ -153,7 +188,7 @@ fn pix_fmt_override_rewrites_output_arg_when_allowed() -> CoreResult<()> {
 
 #[test]
 fn vulkan_pix_fmt_override_is_ignored() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks_vulkan",
         "loglevel": "info",
         "pix_fmt": "yuva444p10le"
@@ -169,7 +204,7 @@ fn vulkan_pix_fmt_override_is_ignored() -> CoreResult<()> {
 
 #[test]
 fn profile_specific_json_knobs_do_not_override_catalog_defaults() -> CoreResult<()> {
-    let settings = build_ffmpeg_settings(&json!({
+    let settings = build_settings(json!({
         "codec": "prores_ks",
         "loglevel": "info",
         "threads": 3,

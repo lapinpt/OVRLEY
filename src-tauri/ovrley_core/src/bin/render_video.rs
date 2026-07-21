@@ -14,7 +14,8 @@
 
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::validate_config_value;
-use ovrley_core::encode::video::{render_video, RenderController};
+use ovrley_core::encode::pipeline::transparent::render_video;
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::paths::AppPaths;
 use serde_json::{Map, Value};
 use std::fs;

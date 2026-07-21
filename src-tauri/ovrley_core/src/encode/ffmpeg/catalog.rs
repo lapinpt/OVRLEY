@@ -1,15 +1,14 @@
 //! Canonical codec and profile catalog for encoder-facing FFmpeg choices.
 //!
-//! Owns: typed codec/profile identifiers, alias tables, overlay/filter-stack
+//! Owns: typed codec/profile identifiers, external names, overlay/filter-stack
 //!       classification, and availability-rule metadata shared by detection and
 //!       FFmpeg-setting builders.
 //! Does not own: subprocess probing, frontend wire serialization, or final
 //!       FFmpeg argument assembly.
 //!
 //! The catalog is intentionally data-shaped. Each entry describes one canonical
-//! transparent codec or composite profile, while callers keep their existing
-//! public data models and only consult this module for normalization and
-//! capability rules.
+//! transparent codec or composite profile used throughout normalization,
+//! capability detection, and FFmpeg command construction.
 
 /// Canonical identifiers for unique FFmpeg encoders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -35,7 +34,7 @@ pub enum EncoderId {
 impl EncoderId {
     /// Returns the catalog metadata for this encoder.
     pub fn metadata(self) -> &'static EncoderMetadata {
-        encoders()
+        ENCODERS
             .iter()
             .find(|metadata| metadata.id == self)
             .expect("encoder catalog is exhaustive")
@@ -70,15 +69,18 @@ pub enum TransparentCodecId {
 impl TransparentCodecId {
     /// Returns the catalog metadata for this transparent codec.
     pub fn metadata(self) -> &'static TransparentCodecMetadata {
-        transparent_codecs()
+        TRANSPARENT_CODECS
             .iter()
             .find(|metadata| metadata.id == self)
             .expect("transparent codec catalog is exhaustive")
     }
 
-    /// Resolves a transparent codec from any accepted alias.
-    pub fn from_alias(alias: &str) -> Option<Self> {
-        transparent_codec(alias).map(|metadata| metadata.id)
+    /// Resolves the canonical external codec name at config ingress.
+    pub fn from_external_name(name: &str) -> Option<Self> {
+        TRANSPARENT_CODECS
+            .iter()
+            .find(|metadata| metadata.external_name == name)
+            .map(|metadata| metadata.id)
     }
 }
 
@@ -95,8 +97,9 @@ pub enum TransparentAvailabilityRule {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TransparentCodecMetadata {
     pub id: TransparentCodecId,
+    pub profile_name: &'static str,
     pub encoder_id: EncoderId,
-    pub accepted_aliases: &'static [&'static str],
+    pub external_name: &'static str,
     pub availability_rule: TransparentAvailabilityRule,
 }
 
@@ -121,18 +124,37 @@ pub enum CompositeCodecId {
     AmfHevc,
 }
 
+/// Canonical codec selection produced once from the external scene config.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CodecSelection {
+    Transparent(TransparentCodecId),
+    Composite(CompositeCodecId),
+}
+
+impl CodecSelection {
+    /// Translates one canonical external codec name into the internal typed model.
+    pub fn from_external_name(name: &str) -> Option<Self> {
+        TransparentCodecId::from_external_name(name)
+            .map(Self::Transparent)
+            .or_else(|| CompositeCodecId::from_external_name(name).map(Self::Composite))
+    }
+}
+
 impl CompositeCodecId {
     /// Returns the catalog metadata for this composite profile.
     pub fn metadata(self) -> &'static CompositeCodecMetadata {
-        composite_codecs()
+        COMPOSITE_CODECS
             .iter()
             .find(|metadata| metadata.id == self)
             .expect("composite codec catalog is exhaustive")
     }
 
-    /// Resolves a composite profile from any accepted alias.
-    pub fn from_alias(alias: &str) -> Option<Self> {
-        composite_codec(alias).map(|metadata| metadata.id)
+    /// Resolves the canonical external profile name at config ingress.
+    pub fn from_external_name(name: &str) -> Option<Self> {
+        COMPOSITE_CODECS
+            .iter()
+            .find(|metadata| metadata.external_name == name)
+            .map(|metadata| metadata.id)
     }
 }
 
@@ -172,29 +194,13 @@ pub struct CompositeCodecMetadata {
     pub id: CompositeCodecId,
     pub profile_name: &'static str,
     pub encoder_id: EncoderId,
-    pub accepted_aliases: &'static [&'static str],
+    pub external_name: &'static str,
     pub filter_stack_kind: CompositeFilterStackKind,
+    pub fallback_profile: Option<CompositeCodecId>,
     pub availability_rule: CompositeAvailabilityRule,
 }
 
-const SOFTWARE_H264_ALIASES: &[&str] = &["software_h264", "auto", "auto_h264", "libx264"];
-const SOFTWARE_HEVC_ALIASES: &[&str] = &["software_hevc", "auto_hevc", "auto_h265", "libx265"];
-const NVGPU_H264_ALIASES: &[&str] = &["nvgpu_h264", "h264_nvenc"];
-const NVGPU_HEVC_ALIASES: &[&str] = &["nvgpu_hevc", "hevc_nvenc"];
-const NNVGPU_H264_ALIASES: &[&str] = &["nnvgpu_h264"];
-const NNVGPU_HEVC_ALIASES: &[&str] = &["nnvgpu_hevc"];
-const QSV_H264_ALIASES: &[&str] = &["qsv_h264", "h264_qsv"];
-const QSV_HEVC_ALIASES: &[&str] = &["qsv_hevc", "hevc_qsv"];
-const QSV_FULL_H264_ALIASES: &[&str] = &["qsv_full_h264"];
-const QSV_FULL_HEVC_ALIASES: &[&str] = &["qsv_full_hevc"];
-const MAC_H264_ALIASES: &[&str] = &["mac_h264", "h264_videotoolbox"];
-const MAC_HEVC_ALIASES: &[&str] = &["mac_hevc", "hevc_videotoolbox"];
-const VAAPI_H264_ALIASES: &[&str] = &["vaapi_h264", "h264_vaapi"];
-const VAAPI_HEVC_ALIASES: &[&str] = &["vaapi_hevc", "hevc_vaapi"];
-const AMF_H264_ALIASES: &[&str] = &["amf_h264", "h264_amf"];
-const AMF_HEVC_ALIASES: &[&str] = &["amf_hevc", "hevc_amf"];
-
-const ENCODERS: &[EncoderMetadata] = &[
+pub const ENCODERS: &[EncoderMetadata] = &[
     EncoderMetadata {
         id: EncoderId::ProresKs,
         ffmpeg_name: "prores_ks",
@@ -277,197 +283,183 @@ const ENCODERS: &[EncoderMetadata] = &[
     },
 ];
 
-const TRANSPARENT_CODECS: &[TransparentCodecMetadata] = &[
+pub const TRANSPARENT_CODECS: &[TransparentCodecMetadata] = &[
     TransparentCodecMetadata {
         id: TransparentCodecId::ProresKs,
+        profile_name: "prores_ks",
         encoder_id: EncoderId::ProresKs,
-        accepted_aliases: &["prores_ks"],
+        external_name: "prores_ks",
         availability_rule: TransparentAvailabilityRule::ProresKs,
     },
     TransparentCodecMetadata {
         id: TransparentCodecId::ProresKsVulkan,
+        profile_name: "prores_ks_vulkan",
         encoder_id: EncoderId::ProresKsVulkan,
-        accepted_aliases: &["prores_ks_vulkan"],
+        external_name: "prores_ks_vulkan",
         availability_rule: TransparentAvailabilityRule::ProresKsVulkan,
     },
     TransparentCodecMetadata {
         id: TransparentCodecId::ProresVideotoolbox,
+        profile_name: "prores_videotoolbox",
         encoder_id: EncoderId::ProresVideotoolbox,
-        accepted_aliases: &["prores_videotoolbox"],
+        external_name: "prores_videotoolbox",
         availability_rule: TransparentAvailabilityRule::ProresVideotoolbox,
     },
     TransparentCodecMetadata {
         id: TransparentCodecId::Qtrle,
+        profile_name: "qtrle",
         encoder_id: EncoderId::Qtrle,
-        accepted_aliases: &["qtrle"],
+        external_name: "qtrle",
         availability_rule: TransparentAvailabilityRule::Qtrle,
     },
 ];
 
-const COMPOSITE_CODECS: &[CompositeCodecMetadata] = &[
+pub const COMPOSITE_CODECS: &[CompositeCodecMetadata] = &[
     CompositeCodecMetadata {
         id: CompositeCodecId::SoftwareH264,
         profile_name: "software_h264",
         encoder_id: EncoderId::Libx264,
-        accepted_aliases: SOFTWARE_H264_ALIASES,
+        external_name: "libx264",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::Always,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::SoftwareHevc,
         profile_name: "software_hevc",
         encoder_id: EncoderId::Libx265,
-        accepted_aliases: SOFTWARE_HEVC_ALIASES,
+        external_name: "libx265",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::Always,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::NvgpuH264,
         profile_name: "nvgpu_h264",
         encoder_id: EncoderId::H264Nvenc,
-        accepted_aliases: NVGPU_H264_ALIASES,
+        external_name: "h264_nvenc",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::H264Nvenc,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::NvgpuHevc,
         profile_name: "nvgpu_hevc",
         encoder_id: EncoderId::HevcNvenc,
-        accepted_aliases: NVGPU_HEVC_ALIASES,
+        external_name: "hevc_nvenc",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::HevcNvenc,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::NnvgpuH264,
         profile_name: "nnvgpu_h264",
         encoder_id: EncoderId::H264Nvenc,
-        accepted_aliases: NNVGPU_H264_ALIASES,
+        external_name: "nnvgpu_h264",
         filter_stack_kind: CompositeFilterStackKind::CudaOverlay,
+        fallback_profile: Some(CompositeCodecId::NvgpuH264),
         availability_rule: CompositeAvailabilityRule::H264NvencWithCudaFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::NnvgpuHevc,
         profile_name: "nnvgpu_hevc",
         encoder_id: EncoderId::HevcNvenc,
-        accepted_aliases: NNVGPU_HEVC_ALIASES,
+        external_name: "nnvgpu_hevc",
         filter_stack_kind: CompositeFilterStackKind::CudaOverlay,
+        fallback_profile: Some(CompositeCodecId::NvgpuHevc),
         availability_rule: CompositeAvailabilityRule::HevcNvencWithCudaFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::QsvH264,
         profile_name: "qsv_h264",
         encoder_id: EncoderId::H264Qsv,
-        accepted_aliases: QSV_H264_ALIASES,
+        external_name: "h264_qsv",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::H264Qsv,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::QsvHevc,
         profile_name: "qsv_hevc",
         encoder_id: EncoderId::HevcQsv,
-        accepted_aliases: QSV_HEVC_ALIASES,
+        external_name: "hevc_qsv",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::HevcQsv,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::QsvFullH264,
         profile_name: "qsv_full_h264",
         encoder_id: EncoderId::H264Qsv,
-        accepted_aliases: QSV_FULL_H264_ALIASES,
+        external_name: "qsv_full_h264",
         filter_stack_kind: CompositeFilterStackKind::QsvFullOverlay,
+        fallback_profile: Some(CompositeCodecId::QsvH264),
         availability_rule: CompositeAvailabilityRule::H264QsvWithFullFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::QsvFullHevc,
         profile_name: "qsv_full_hevc",
         encoder_id: EncoderId::HevcQsv,
-        accepted_aliases: QSV_FULL_HEVC_ALIASES,
+        external_name: "qsv_full_hevc",
         filter_stack_kind: CompositeFilterStackKind::QsvFullOverlay,
+        fallback_profile: Some(CompositeCodecId::QsvHevc),
         availability_rule: CompositeAvailabilityRule::HevcQsvWithFullFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::MacH264,
         profile_name: "mac_h264",
         encoder_id: EncoderId::H264Videotoolbox,
-        accepted_aliases: MAC_H264_ALIASES,
+        external_name: "h264_videotoolbox",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::H264Videotoolbox,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::MacHevc,
         profile_name: "mac_hevc",
         encoder_id: EncoderId::HevcVideotoolbox,
-        accepted_aliases: MAC_HEVC_ALIASES,
+        external_name: "hevc_videotoolbox",
         filter_stack_kind: CompositeFilterStackKind::SoftwareOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::HevcVideotoolbox,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::VaapiH264,
         profile_name: "vaapi_h264",
         encoder_id: EncoderId::H264Vaapi,
-        accepted_aliases: VAAPI_H264_ALIASES,
+        external_name: "h264_vaapi",
         filter_stack_kind: CompositeFilterStackKind::VaapiOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::H264VaapiWithFullFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::VaapiHevc,
         profile_name: "vaapi_hevc",
         encoder_id: EncoderId::HevcVaapi,
-        accepted_aliases: VAAPI_HEVC_ALIASES,
+        external_name: "hevc_vaapi",
         filter_stack_kind: CompositeFilterStackKind::VaapiOverlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::HevcVaapiWithFullFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::AmfH264,
         profile_name: "amf_h264",
         encoder_id: EncoderId::H264Amf,
-        accepted_aliases: AMF_H264_ALIASES,
+        external_name: "h264_amf",
         filter_stack_kind: CompositeFilterStackKind::AmfD3d11Overlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::H264Amf,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::AmfHevc,
         profile_name: "amf_hevc",
         encoder_id: EncoderId::HevcAmf,
-        accepted_aliases: AMF_HEVC_ALIASES,
+        external_name: "hevc_amf",
         filter_stack_kind: CompositeFilterStackKind::AmfD3d11Overlay,
+        fallback_profile: None,
         availability_rule: CompositeAvailabilityRule::HevcAmf,
     },
 ];
-
-/// Returns the full transparent codec catalog.
-pub fn transparent_codecs() -> &'static [TransparentCodecMetadata] {
-    TRANSPARENT_CODECS
-}
-
-/// Returns the unique encoder catalog used by capability detection.
-pub fn encoders() -> &'static [EncoderMetadata] {
-    ENCODERS
-}
-
-/// Resolves a transparent codec entry from any accepted alias.
-pub fn transparent_codec(alias: &str) -> Option<&'static TransparentCodecMetadata> {
-    transparent_codecs()
-        .iter()
-        .find(|metadata| alias_matches(metadata.accepted_aliases, alias))
-}
-
-/// Returns the full composite profile catalog.
-pub fn composite_codecs() -> &'static [CompositeCodecMetadata] {
-    COMPOSITE_CODECS
-}
-
-/// Resolves a composite profile entry from any accepted alias.
-pub fn composite_codec(alias: &str) -> Option<&'static CompositeCodecMetadata> {
-    composite_codecs()
-        .iter()
-        .find(|metadata| alias_matches(metadata.accepted_aliases, alias))
-}
-
-/// Checks whether a normalized alias is present in a catalog entry.
-fn alias_matches(accepted_aliases: &[&str], candidate: &str) -> bool {
-    accepted_aliases.iter().any(|alias| *alias == candidate)
-}
 
 #[cfg(test)]
 mod tests {
@@ -476,27 +468,27 @@ mod tests {
 
     #[test]
     fn encoder_catalog_has_unique_ids_and_ffmpeg_names() {
-        let ids = encoders()
+        let ids = ENCODERS
             .iter()
             .map(|encoder| encoder.id)
             .collect::<BTreeSet<_>>();
-        let names = encoders()
+        let names = ENCODERS
             .iter()
             .map(|encoder| encoder.ffmpeg_name)
             .collect::<BTreeSet<_>>();
 
-        assert_eq!(ids.len(), encoders().len());
-        assert_eq!(names.len(), encoders().len());
+        assert_eq!(ids.len(), ENCODERS.len());
+        assert_eq!(names.len(), ENCODERS.len());
     }
 
     #[test]
     fn every_profile_references_a_catalog_encoder() {
-        for encoder_id in transparent_codecs()
+        for encoder_id in TRANSPARENT_CODECS
             .iter()
             .map(|profile| profile.encoder_id)
-            .chain(composite_codecs().iter().map(|profile| profile.encoder_id))
+            .chain(COMPOSITE_CODECS.iter().map(|profile| profile.encoder_id))
         {
-            assert!(encoders().iter().any(|encoder| encoder.id == encoder_id));
+            assert!(ENCODERS.iter().any(|encoder| encoder.id == encoder_id));
         }
     }
 }

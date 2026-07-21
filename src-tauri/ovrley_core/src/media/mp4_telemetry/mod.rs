@@ -396,8 +396,11 @@ pub fn extract_activity(
 
 /// Converts floating FPS metadata into the shared rational representation.
 pub fn rational_fps_parts(fps: f64) -> (Option<u32>, Option<u32>) {
-    match Fps::from_f64_fallback(fps) {
-        Ok(fps) => (Some(fps.num), Some(fps.den)),
+    match Fps::from_f64_metadata(fps) {
+        Ok(fps) => {
+            let (numerator, denominator) = fps.components();
+            (Some(numerator), Some(denominator))
+        }
         Err(_) => (None, None),
     }
 }

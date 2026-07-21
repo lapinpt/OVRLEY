@@ -125,4 +125,3 @@ pub(crate) fn resolve_bar_style_geometry(
         }
     }
 }
-

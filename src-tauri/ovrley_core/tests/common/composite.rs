@@ -20,18 +20,13 @@ use std::thread;
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::debug::RenderProfiler;
-use ovrley_core::encode::ffmpeg_composite::{
-    build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, HwAccelInfo,
-};
+use ovrley_core::encode::debug::composite::write_composite_timing_summary;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::video::RenderController;
-use ovrley_core::encode::video_composite_debug::{
-    write_composite_timing_summary, CompositeTimingSummaryInput,
+use ovrley_core::encode::pipeline::composite::render_composite_video;
+use ovrley_core::encode::pipeline::composite_plan::{
+    derive_composite_pipeline_plan, derive_composite_render_plan, CompositePipelinePlan,
 };
-use ovrley_core::encode::video_composite_pipeline::{
-    derive_composite_pipeline_plan, render_composite_video_with_frame_workers,
-    CompositePipelinePlan,
-};
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::paths::AppPaths;
@@ -68,7 +63,7 @@ pub fn derive_fixture_composite_plan(
     trim_start: f64,
     update_rate: u32,
 ) -> CompositePipelinePlan {
-    let config = parse_config_json(&format!(
+    let mut config = parse_config_json(&format!(
         r##"{{
             "scene":{{
                 "fps":30,
@@ -95,21 +90,17 @@ pub fn derive_fixture_composite_plan(
     .unwrap();
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
 
-    let scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    derive_composite_pipeline_plan(
-        &paths,
-        &scene,
-        "input.mp4",
-        "60M",
-        fps_num,
-        fps_den,
-        video_duration,
-        render_duration,
-        trim_start,
-        update_rate,
-        true,
-    )
-    .unwrap()
+    config.scene.composite_video_path = Some("input.mp4".to_string());
+    config.scene.composite_bitrate = Some("60M".to_string());
+    config.scene.composite_video_fps_num = Some(fps_num);
+    config.scene.composite_video_fps_den = Some(fps_den);
+    config.scene.composite_video_duration = Some(video_duration);
+    config.scene.composite_render_duration = Some(render_duration);
+    config.scene.composite_video_trim_start = Some(trim_start);
+    config.scene.composite_widget_update_rate = Some(update_rate);
+    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene).unwrap();
+    let render = derive_composite_render_plan(&mut scene, None).unwrap();
+    derive_composite_pipeline_plan(&paths, &scene, render, true, None).unwrap()
 }
 
 /// Renders the shared composite fixture and returns the output details.
@@ -213,7 +204,9 @@ pub fn render_fixture_composite_with_paths(
 
     // ── Phase 2: compute FPS hierarchy from source → overlay pipe ──
     let source_fps = Fps::new(fps_num, fps_den).unwrap();
-    let overlay_fps = source_fps.divided_by(update_rate).unwrap();
+    let overlay_fps = source_fps
+        .divided_by(std::num::NonZeroU32::new(update_rate).unwrap())
+        .unwrap();
 
     // ── Phase 3: apply composite scene timing and metadata ───────────
     config.scene.start = sync_offset;
@@ -230,25 +223,18 @@ pub fn render_fixture_composite_with_paths(
     config.scene.composite_widget_update_rate = Some(update_rate);
 
     let activity = fixture_activity();
-    let validated = validate_render_config(config).unwrap();
+    let mut validated = validate_render_config(config).unwrap();
+    let render_plan = derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense_activity = build_dense_activity_report_validated(&activity, &validated).unwrap();
 
     // ── Phase 4: execute canonical frame-worker composite render ────
-    let filename = render_composite_video_with_frame_workers(
+    let filename = render_composite_video(
         &paths,
         &validated,
         &activity,
         &dense_activity,
         &controller,
-        &absolute_video_path,
-        "20M",
-        sync_offset,
-        fps_num,
-        fps_den,
-        render_duration.max(20.0),
-        render_duration,
-        0.0,
-        update_rate,
+        render_plan,
         true,
     )
     .map_err(|error| error.to_string())?;
@@ -313,53 +299,34 @@ pub fn composite_debug_timing_summary(paths: &AppPaths) -> Value {
 pub fn write_fixture_composite_debug_summary(path_name: &str) -> AppPaths {
     let paths = test_paths_named(path_name);
     let _ = fs::remove_dir_all(paths.debug_render_dir.join("composite"));
-    let source_fps = Fps::new(60000, 1001).unwrap();
-    let overlay_pipe_fps = Fps::new(30000, 1001).unwrap();
-    let ffmpeg_settings = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "libx264",
-        bitrate: "20M",
-        video_path: PathBuf::from("input.mp4").as_path(),
-        video_trim_start: 0.0,
-        render_duration: 0.2,
-        width: 1920,
-        height: 1080,
-        source_fps,
-        overlay_pipe_fps,
-        include_audio: true,
-        hwaccel_available: &HwAccelInfo::default(),
-    })
-    .unwrap();
+    let mut plan = derive_fixture_composite_plan(
+        r#""width":1920,"height":1080,"ffmpeg":{"codec":"libx264"}"#,
+        60000,
+        1001,
+        0.2,
+        0.2,
+        0.0,
+        2,
+    );
     let output_path = paths
         .downloads_dir
         .join("video_composited_1778853729503903000.mp4");
+    plan.output_path = output_path;
     let mut profiler = RenderProfiler::default();
     profiler.record_ms("frame.total", 1.0);
     profiler.record_ms("frame.draw", 0.8);
     profiler.record_ms("ffmpeg.write", 0.5);
 
-    write_composite_timing_summary(CompositeTimingSummaryInput {
-        debug_render_dir: &paths.debug_render_dir,
-        ffmpeg_settings: &ffmpeg_settings,
-        output_path: &output_path,
-        source_fps,
-        overlay_pipe_fps,
-        widget_update_rate: 2,
-        render_duration: 0.2,
-        overlay_frame_count: 6,
-        output_frame_count: 12,
-        total_ms: 123.4,
-        render_loop_ms: 100.0,
-        ffmpeg_finalize_wait_ms: 23.4,
-        timings: profiler.summary(),
-        codec: "libx264",
-        bitrate: "20M",
-        input_width: 1920,
-        input_height: 1080,
-        trim_start: 0.0,
-        sync_offset: 600.0,
-        frame_render_mode: "serial",
-        frame_render_workers: 0,
-    })
+    write_composite_timing_summary(
+        &paths,
+        &plan,
+        123.4,
+        100.0,
+        23.4,
+        profiler.summary(),
+        0,
+        u32::try_from(plan.render.overlay_frame_count).unwrap(),
+    )
     .unwrap();
     paths
 }
@@ -383,8 +350,19 @@ pub fn mutable_recent_template_config(width: u32, height: u32) -> RenderConfig {
 }
 
 /// Builds a minimal end-to-end composite render config.
-pub fn composite_test_config(render_duration: f64) -> ValidatedRenderConfig {
-    let config = mutable_composite_test_config(render_duration);
+pub fn composite_test_config(
+    render_duration: f64,
+    video_path: &str,
+    trim_start: f64,
+) -> ValidatedRenderConfig {
+    let mut config = mutable_composite_test_config(render_duration);
+    config.scene.composite_video_path = Some(video_path.to_string());
+    config.scene.composite_bitrate = Some("10M".to_string());
+    config.scene.composite_video_fps_num = Some(30000);
+    config.scene.composite_video_fps_den = Some(1001);
+    config.scene.composite_video_duration = Some(35.0);
+    config.scene.composite_render_duration = Some(render_duration);
+    config.scene.composite_video_trim_start = Some(trim_start);
     validate_render_config(config).unwrap()
 }
 

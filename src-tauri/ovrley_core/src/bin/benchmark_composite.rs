@@ -12,10 +12,10 @@
 
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
-use ovrley_core::encode::codec_detect::detect_codecs;
-use ovrley_core::encode::video::{
-    render_composite_video, CompositeRenderRequest, RenderController,
-};
+use ovrley_core::encode::ffmpeg::detect::detect_codecs;
+use ovrley_core::encode::pipeline::composite::render_composite_video;
+use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::video_probe::probe_video;
 use ovrley_core::paths::AppPaths;
 use serde::Serialize;
@@ -257,7 +257,7 @@ fn main() -> Result<(), String> {
     let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
     let res_width = base_validated.scene.width;
     let res_height = base_validated.scene.height;
-    let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate);
+    let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate.get());
 
     let mut results = BTreeMap::new();
 
@@ -265,7 +265,7 @@ fn main() -> Result<(), String> {
     for (codec_index, &(display_name, codec_key)) in COMPOSITE_CODECS.iter().enumerate() {
         println!("\n=== Codec: {display_name} ===");
 
-        if !is_composite_codec_available(&available, display_name) {
+        if !is_composite_codec_available(&available, codec_key) {
             println!("  → NOT AVAILABLE on this system");
             results.insert(
                 display_name.to_string(),
@@ -305,7 +305,7 @@ fn main() -> Result<(), String> {
             }
             run_config_value["scene"]["ffmpeg"] = ffmpeg_config;
 
-            let config = validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
+            let mut config = validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
             let dense = build_dense_activity_report_validated(&activity, &config)
                 .map_err(|e| e.to_string())?;
 
@@ -338,22 +338,17 @@ fn main() -> Result<(), String> {
             }
 
             let started = Instant::now();
-            let render_result = render_composite_video(&CompositeRenderRequest {
-                paths: &paths,
-                config: &config,
-                activity: &activity,
-                dense_activity: &dense,
-                controller: &controller,
-                composite_video_path: &resolved_video.to_string_lossy(),
-                composite_bitrate: "40M",
-                composite_sync_offset: 0.0,
-                composite_video_fps_num: fps_num,
-                composite_video_fps_den: fps_den,
-                composite_video_duration: video_duration,
-                composite_render_duration: render_duration,
-                composite_video_trim_start: trim_start,
-                composite_widget_update_rate: update_rate,
-            });
+            let render_plan = derive_composite_render_plan(&mut config.scene, None)
+                .expect("validated benchmark composite plan");
+            let render_result = render_composite_video(
+                &paths,
+                &config,
+                &activity,
+                &dense,
+                &controller,
+                render_plan,
+                true,
+            );
             let elapsed_secs = started.elapsed().as_secs_f64();
 
             match render_result {
@@ -371,7 +366,7 @@ fn main() -> Result<(), String> {
                         run: run_num,
                         success: true,
                         resolution: Some(format!("{res_width}x{res_height}")),
-                        widget_update_rate: Some(update_rate),
+                        widget_update_rate: Some(update_rate.get()),
                         total_frames: Some(output_frame_count),
                         overlay_duration_seconds: Some(overlay_duration),
                         job_time: Some(format_mmss(elapsed_secs)),
