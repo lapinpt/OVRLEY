@@ -61,8 +61,8 @@ impl PipelineShutdown {
     /// cancellation (no error recorded) from pipeline failure.
     pub(crate) fn check(&self) -> CoreResult<()> {
         if self.flag.load(Ordering::SeqCst) {
-            if self.has_error() {
-                return Err(CoreError::Encode("Encoder writer failed".to_string()));
+            if let Some(err) = self.take_error() {
+                return Err(err);
             }
             return Err(CoreError::Cancelled);
         }
