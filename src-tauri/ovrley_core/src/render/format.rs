@@ -5,6 +5,7 @@
 //! icon selection, and missing-value fallbacks so drawing code can stay focused
 //! on layout.
 
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::DenseActivityReport;
 use crate::normalize::{
     ValidatedGradientWidget, ValidatedTimeFormatting, ValidatedTimeValue, ValidatedValueFormatting,
@@ -259,12 +260,13 @@ fn raw_value(
             .get(frame_index)
             .copied()
             .flatten(),
-        MetricKind::Altitude => dense_activity
-            .series
-            .elevation
-            .get(frame_index)
-            .copied()
-            .flatten(),
+        MetricKind::Altitude => preferred_elevation_series(
+            &dense_activity.series.barometric_altitude,
+            &dense_activity.series.elevation,
+        )
+        .get(frame_index)
+        .copied()
+        .flatten(),
         MetricKind::Iso => dense_activity
             .series
             .iso
@@ -767,7 +769,7 @@ fn format_coordinate_line(
                 minutes = 0;
                 degrees += 1;
             }
-            format!("{degrees}°{minutes}′{seconds}″")
+            format!("{degrees}\u{00B0}{minutes:02}\u{2032}{seconds:02}\u{2033}")
         }
         "ddm" => {
             let mut decimal_minutes = minutes_total;
@@ -775,7 +777,7 @@ fn format_coordinate_line(
                 decimal_minutes = 0.0;
                 degrees += 1;
             }
-            format!("{degrees}°{decimal_minutes:.3}′")
+            format!("{degrees}\u{00B0}{decimal_minutes:05.3}\u{2032}")
         }
         _ => unreachable!("gps_coordinates coordinate_format was validated at ingress"),
     };

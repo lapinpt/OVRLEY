@@ -110,6 +110,21 @@ describe('total ascent and GPS coordinate formatting', () => {
     expect(model?.unitText).toBe('M')
   })
 
+  test('shows the ascent placeholder before an activity is loaded', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('total_ascent', {
+        display_unit: 'm',
+        show_full_ascent: true,
+        show_units: true,
+      }),
+      activity: null,
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('--')
+    expect(model?.unitText).toBe('M')
+  })
+
   test('formats DMS and DDM coordinates for both hemispheres', () => {
     expect(formatCoordinates([40.446111, -73.987222], 'both', 'dms', '#fff')).toEqual({
       type: 'coordinates',

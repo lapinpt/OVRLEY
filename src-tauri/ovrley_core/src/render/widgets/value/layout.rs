@@ -15,9 +15,11 @@ use std::path::PathBuf;
 const METRIC_WIDGET_LINE_HEIGHT: f32 = 0.92;
 const METRIC_WIDGET_OUTER_GAP_PX: f32 = 8.0;
 const METRIC_WIDGET_UNITS_GAP_PX: f32 = 8.0;
+const COORDINATE_DIRECTION_GAP_PX: f32 = 8.0;
 const MIN_UNITS_FONT_SIZE: f32 = 12.0;
 
 pub const NUMERIC_VERTICAL_METRICS_TEXT: &str = "0123456789-:.%";
+const COORDINATE_VERTICAL_METRICS_TEXT: &str = "NSEW88\u{00B0}88.888\u{2032}88\u{2033}";
 
 /// Draws the icon, value text, and optional unit text for a metric widget.
 ///
@@ -181,7 +183,7 @@ fn draw_coordinate_parts(
     };
     let total_height = (line_height * coordinate.lines.len() as f32)
         + (line_gap * coordinate.lines.len().saturating_sub(1) as f32);
-    let direction_gap = coordinate_font_size * 0.08;
+    let direction_gap = (coordinate_font_size * 0.08).max(COORDINATE_DIRECTION_GAP_PX * scale);
     let mut line_measurements = Vec::with_capacity(coordinate.lines.len());
     let mut value_style = base_style.clone();
     value_style.font_size = coordinate_font_size;
@@ -237,6 +239,7 @@ fn draw_coordinate_parts(
         let line_y = text_top + index as f32 * (line_height + line_gap);
         let (_, value_width) = line_measurements[index];
         let line_x = base_style.x + text_group_left;
+        let line_vertical_metrics_text = super::metric_vertical_metrics_text(&line.value_text);
         if let Some(direction) = line.direction.as_deref() {
             let mut direction_style = value_style.clone();
             direction_style.x = line_x;
@@ -245,7 +248,7 @@ fn draw_coordinate_parts(
             draw_text_with_vertical_metrics_text(
                 canvas,
                 direction,
-                direction,
+                line_vertical_metrics_text,
                 &direction_style,
                 font_dirs,
             )?;
@@ -262,7 +265,7 @@ fn draw_coordinate_parts(
         draw_text_with_vertical_metrics_text(
             canvas,
             &line.value_text,
-            super::metric_vertical_metrics_text(&line.value_text),
+            line_vertical_metrics_text,
             &number_style,
             font_dirs,
         )?;
@@ -366,10 +369,13 @@ pub(crate) fn draw_static_metric_icon_for_value_validated(
 ///
 /// Numeric metrics (digits, `:`, `.`, `%`, `+`, `-`) use a stable reference
 /// string (`"888:88"`) so vertical layout does not jump when the displayed
-/// value changes. Neutral gear uses the same reference; other text passes
-/// through unchanged.
+/// value changes. Coordinate values use a stable reference containing the
+/// direction letters and DMS/DDM symbols. Neutral gear uses the numeric
+/// reference; other text passes through unchanged.
 pub fn metric_vertical_metrics_text(text: &str) -> &str {
-    if text == "N"
+    if text.contains('\u{00B0}') && (text.contains('\u{2032}') || text.contains('\u{2033}')) {
+        COORDINATE_VERTICAL_METRICS_TEXT
+    } else if text == "N"
         || (!text.is_empty()
             && text
                 .chars()

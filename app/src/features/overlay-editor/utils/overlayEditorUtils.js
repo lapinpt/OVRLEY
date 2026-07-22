@@ -202,7 +202,7 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const activityKey = getStandardMetricDefinition(key)?.dataSource ?? key
-  const series = activity?.[activityKey]
+  const series = key === 'altitude' ? getPreferredElevationSeries(activity) : activity?.[activityKey]
 
   if (!Array.isArray(series) || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
@@ -218,6 +218,15 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const interpolatedValue = getInterpolatedSeriesValue(elapsedSeries, series, elapsedSecond)
 
   return interpolatedValue ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+}
+
+function getPreferredElevationSeries(activity) {
+  const barometricSeries = activity?.barometric_altitude
+  if (Array.isArray(barometricSeries) && barometricSeries.some((value) => value !== null && value !== undefined)) {
+    return barometricSeries
+  }
+
+  return activity?.elevation
 }
 
 /**

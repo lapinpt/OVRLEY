@@ -5,6 +5,7 @@
 //! fill quantization and boundary-label formatting identical across arc and
 //! linear renderers.
 
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::DenseSeriesReport;
 use crate::types::MetricKind;
 
@@ -69,7 +70,9 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
         MetricKind::StrokeRate => &series.stroke_rate,
         MetricKind::Torque => &series.torque,
         MetricKind::VerticalSpeed => &series.vertical_speed,
-        MetricKind::Altitude => &series.elevation,
+        MetricKind::Altitude => {
+            preferred_elevation_series(&series.barometric_altitude, &series.elevation)
+        }
         MetricKind::Iso => &series.iso,
         MetricKind::Aperture => &series.aperture,
         MetricKind::ShutterSpeed => &series.shutter_speed,

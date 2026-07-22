@@ -21,6 +21,7 @@ import {
   getMetricWidgetVisualBounds,
   getPreviewFontFamily,
   getPreviewTextBaseline,
+  getPreviewVerticalMetrics,
   measureArcPreviewText,
   measurePreviewText,
 } from '../../shared/textMeasurement'
@@ -31,6 +32,8 @@ import {
   NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
 } from '@/features/overlay-editor'
 import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
+
+const COORDINATE_DIRECTION_GAP_PX = 8
 
 function getInterpolatedCoordinateValue(activity, componentIndex, previewSecond) {
   if (activity === null) return null
@@ -64,7 +67,7 @@ function getLastFiniteValue(series) {
 export function formatDistancePreviewDisplay(activity, previewSecond, widgetData) {
   const currentDistance = getInterpolatedActivityValue(activity, 'distance', previewSecond)
   const current = formatStandardMetricDisplay('distance', currentDistance, widgetData)
-  if (!widgetData.show_full_distance) return current
+  if (!widgetData.show_full_distance || activity === null) return current
 
   const totalDistance = getLastFiniteValue(activity.distance)
   if (totalDistance === null) return current
@@ -90,7 +93,7 @@ export function formatDistancePreviewDisplay(activity, previewSecond, widgetData
 export function formatTotalAscentPreviewDisplay(activity, previewSecond, widgetData) {
   const currentAscent = getInterpolatedActivityValue(activity, 'total_ascent', previewSecond)
   const current = formatStandardMetricDisplay('total_ascent', currentAscent, widgetData)
-  if (!widgetData.show_full_ascent) return current
+  if (!widgetData.show_full_ascent || activity === null) return current
 
   const totalAscent = getLastFiniteValue(activity.total_ascent)
   if (totalAscent === null) return current
@@ -109,16 +112,17 @@ function buildCoordinateLayout({ widget, formatted, fontFamily }) {
   const lineFontSize = formatted.lines.length === 2 ? widget.data.font_size * 0.4 : widget.data.font_size
   const lineHeight = lineFontSize * 0.92
   const lineGap = formatted.lines.length === 2 ? lineFontSize * 0.08 : 0
-  const directionGap = lineFontSize * 0.08
+  const directionGap = Math.max(lineFontSize * 0.08, COORDINATE_DIRECTION_GAP_PX)
   const lines = []
   for (const line of formatted.lines) {
     const valueText = `${widget.data.prefix}${line.valueText}${widget.data.suffix}`
     const directionMeasure = measurePreviewText(line.direction, lineFontSize, fontFamily)
     const valueMeasure = measurePreviewText(valueText, lineFontSize, fontFamily)
+    const valueVerticalMetrics = getPreviewVerticalMetrics(valueText, lineFontSize, fontFamily)
     const baseline = getPreviewTextBaseline({
       lineHeight,
-      ascent: valueMeasure.ascent,
-      glyphHeight: valueMeasure.glyphHeight,
+      ascent: valueVerticalMetrics.ascent,
+      glyphHeight: valueVerticalMetrics.glyphHeight,
     })
     lines.push({
       ...line,

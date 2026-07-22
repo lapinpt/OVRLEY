@@ -43,7 +43,8 @@
             "coordinate_format": "dms"
           },
           "total_ascent": {
-            "show_full_ascent": false
+            "decimals": 1,
+            "show_full_ascent": true
           },
           "left_right_balance": {
             "balance_format": "percent_label"
@@ -270,20 +271,20 @@
     {
       "type": "gps_coordinates",
       "current": true,
-      "label": "GPS Coordinates",
+      "label": "Location",
       "defaultDisplayUnit": "both",
       "supportedDisplayUnits": [
         {
           "value": "latitude",
-          "label": "Lat"
+          "label": "Latitude"
         },
         {
           "value": "longitude",
-          "label": "Lon"
+          "label": "Longitude"
         },
         {
           "value": "both",
-          "label": "Lat/Lon"
+          "label": "Both"
         }
       ],
       "showUnitsByDefault": false,
@@ -299,7 +300,7 @@
     {
       "type": "distance_to_home",
       "current": true,
-      "label": "Distance to Home",
+      "label": "Home",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
         {
@@ -331,7 +332,7 @@
     {
       "type": "total_ascent",
       "current": true,
-      "label": "Total Ascent",
+      "label": "Ascent",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
         {
@@ -1033,7 +1034,7 @@
         }
       ],
       "showUnitsByDefault": true,
-      "formatter": "decimal",
+      "formatter": "integer",
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
@@ -1054,7 +1055,7 @@
         }
       ],
       "showUnitsByDefault": true,
-      "formatter": "decimal",
+      "formatter": "integer",
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
@@ -1075,7 +1076,7 @@
         }
       ],
       "showUnitsByDefault": true,
-      "formatter": "decimal",
+      "formatter": "integer",
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {

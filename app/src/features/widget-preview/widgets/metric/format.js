@@ -279,7 +279,7 @@ function formatDmsCoordinate(absolute) {
     minutes = 0
     degrees += 1
   }
-  return `${degrees}°${minutes}′${seconds}″`
+  return `${degrees}\u00B0${String(minutes).padStart(2, '0')}\u2032${String(seconds).padStart(2, '0')}\u2033`
 }
 
 function formatDdmCoordinate(absolute) {
@@ -289,7 +289,7 @@ function formatDdmCoordinate(absolute) {
     decimalMinutes = 0
     degrees += 1
   }
-  return `${degrees}°${decimalMinutes.toFixed(3)}′`
+  return `${degrees}\u00B0${decimalMinutes.toFixed(3).padStart(6, '0')}\u2032`
 }
 
 function formatCoordinateLine(coordinate, isLatitude, coordinateFormat, directionColor) {

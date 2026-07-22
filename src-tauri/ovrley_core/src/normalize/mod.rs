@@ -248,7 +248,10 @@ impl ValidatedRenderConfig {
                 MetricKind::StrokeRate => requirements.stroke_rate = true,
                 MetricKind::Torque => requirements.torque = true,
                 MetricKind::VerticalSpeed => requirements.vertical_speed = true,
-                MetricKind::Altitude => requirements.elevation = true,
+                MetricKind::Altitude => {
+                    requirements.elevation = true;
+                    requirements.barometric_altitude = true;
+                }
                 MetricKind::Iso => requirements.iso = true,
                 MetricKind::Aperture => requirements.aperture = true,
                 MetricKind::ShutterSpeed => requirements.shutter_speed = true,

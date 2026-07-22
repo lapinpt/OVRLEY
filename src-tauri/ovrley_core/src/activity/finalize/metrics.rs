@@ -411,6 +411,53 @@ fn derive_pace_series(speed_series: &NumericSeries) -> NumericSeries {
         .collect()
 }
 
+/// Derives cumulative calories from power samples and their elapsed times.
+///
+/// Power is mechanical work per second, so each interval contributes the
+/// trapezoidal average of its endpoint powers multiplied by the elapsed-time
+/// delta. The estimate assumes 22% cycling efficiency: mechanical work is
+/// converted from joules to metabolic kilocalories using 4,184 J per kcal and
+/// that efficiency. Missing or non-increasing intervals do not invent work;
+/// the last cumulative value is carried through once power has produced an
+/// estimate.
+pub fn derive_calories_from_power(
+    power_series: &NumericSeries,
+    elapsed_series: &[f64],
+) -> NumericSeries {
+    const CYCLING_EFFICIENCY: f64 = 0.22;
+
+    let mut cumulative_joules = 0.0;
+    let mut previous_sample: Option<(f64, f64)> = None;
+    let mut has_estimate = false;
+    let mut calories = Vec::with_capacity(power_series.len());
+
+    for (index, power) in power_series.iter().enumerate() {
+        let current_power = power.and_then(finite_f64).map(|value| value.max(0.0));
+        let current_elapsed = elapsed_series.get(index).copied().and_then(finite_f64);
+
+        if let (Some(power), Some(elapsed)) = (current_power, current_elapsed) {
+            if let Some((previous_power, previous_elapsed)) = previous_sample {
+                let elapsed_delta = elapsed - previous_elapsed;
+                if elapsed_delta > 0.0 {
+                    cumulative_joules += ((previous_power + power) / 2.0) * elapsed_delta;
+                }
+            }
+            previous_sample = Some((power, elapsed));
+            has_estimate = true;
+        } else {
+            previous_sample = None;
+        }
+
+        calories.push(if has_estimate {
+            round_f64(cumulative_joules / (4_184.0 * CYCLING_EFFICIENCY), 3)
+        } else {
+            None
+        });
+    }
+
+    calories
+}
+
 /// Derives crank torque from power and cadence.
 ///
 /// The angular-velocity formula requires positive cadence; nulling invalid
@@ -541,7 +588,11 @@ pub fn derive_activity_metric_series(
     insert_metric!("barometric_altitude", &null_series);
     insert_metric!("cadence", &null_series);
     insert_metric!("core_temperature", &null_series);
-    insert_metric!("calories", &null_series);
+    let derived_calories = derive_calories_from_power(&direct["power"], elapsed_series);
+    map.insert(
+        "calories".to_string(),
+        select_series(&direct["calories"], &derived_calories),
+    );
     map.insert(
         "distance".to_string(),
         MetricDescriptor {
