@@ -47,27 +47,47 @@ pub enum MetricSource {
 pub struct MetricCoverage {
     source: MetricSource,
     available_count: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    nonzero_count: usize,
     total_samples: usize,
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
 }
 
 impl MetricCoverage {
     fn from_series<T>(series: &[Option<T>], source: MetricSource) -> Self {
+        let available_count = series.iter().filter(|value| value.is_some()).count();
         Self {
             source,
-            available_count: series.iter().filter(|value| value.is_some()).count(),
+            available_count,
+            nonzero_count: available_count,
             total_samples: series.len(),
         }
     }
 
     fn from_descriptor(descriptor: &MetricDescriptor) -> Self {
         match &descriptor.series {
-            MetricSeries::Numeric(series) => Self::from_series(series, descriptor.source),
+            MetricSeries::Numeric(series) => {
+                let available_count = series.iter().filter(|v| v.is_some()).count();
+                let nonzero_count = series
+                    .iter()
+                    .filter(|v| v.is_some_and(|x| x != 0.0))
+                    .count();
+                Self {
+                    source: descriptor.source,
+                    available_count,
+                    nonzero_count,
+                    total_samples: series.len(),
+                }
+            }
             MetricSeries::Gear(series) => Self::from_series(series, descriptor.source),
         }
     }
 
     pub fn is_available(&self) -> bool {
-        self.available_count > 0
+        self.nonzero_count > 0
     }
 }
 

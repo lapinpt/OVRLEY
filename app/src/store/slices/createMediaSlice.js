@@ -177,6 +177,7 @@ export function createMediaSlice(set, get) {
           state.stashedVideoTelemetry = null
           state.activityFilename = null
           state.videoSyncOffsetSeconds = 0
+          state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
           applyParsedDataToScene(state, activity)
         })
@@ -201,6 +202,7 @@ export function createMediaSlice(set, get) {
           state.parsedActivitySource = 'video-telemetry'
           state.stashedVideoTelemetry = null
           state.videoSyncOffsetSeconds = 0
+          state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
           applyParsedDataToScene(state, stashedVideoTelemetry)
         })
@@ -240,6 +242,7 @@ export function createMediaSlice(set, get) {
       } else {
         set((state) => {
           state.videoSyncOffsetSeconds = 0
+          state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
         })
       }

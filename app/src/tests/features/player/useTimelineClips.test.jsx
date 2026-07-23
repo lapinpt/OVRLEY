@@ -12,6 +12,7 @@ function renderClips(overrides = {}) {
         fileName: 'activity.fit',
       },
       exportHighlightRange: { fromSecond: 10, toSecond: 20 },
+      getLaneDragProps: () => ({}),
       hasActivity: true,
       hasVideo: true,
       importedVideoDuration: 20,

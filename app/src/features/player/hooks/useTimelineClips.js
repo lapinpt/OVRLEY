@@ -6,6 +6,7 @@ import { useCallback, useId, useMemo, useState } from 'react'
 import { Video } from 'lucide-react'
 import { formatTimelineTime } from '../utils/playerTiming'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
+import { TYPE_LABELS } from '@/lib/widget/widget-icons'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
@@ -31,6 +32,7 @@ function getBasename(path) {
  * @param {string|null} options.activityFilename Imported activity filename.
  * @param {object|null} options.activitySummary Imported activity summary metadata.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
+ * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the activity lane should be present.
  * @param {boolean} options.hasVideo Whether the video lane should be present.
  * @param {number|null} options.importedVideoDuration Imported video duration.
@@ -45,6 +47,7 @@ export default function useTimelineClips({
   activityFilename,
   activitySummary,
   exportHighlightRange,
+  getLaneDragProps,
   hasActivity,
   hasVideo,
   importedVideoDuration,
@@ -84,8 +87,12 @@ export default function useTimelineClips({
 
     // Activity lane - always starts at zero and uses activity metadata for label/duration.
     if (hasActivity) {
+      const allAvailable = [...(activitySummary?.validAttributes || []), ...(activitySummary?.extendedAttributes || [])]
+      const availableMetrics = allAvailable.filter((type) => type in TYPE_LABELS).map((type) => TYPE_LABELS[type] || type)
+
       laneInputs.push({
         ariaLabel: 'Activity clip lane',
+        availableMetrics,
         durationSeconds: activityDurationSeconds,
         formatLabel: activitySummary?.fileFormat === 'mp4_telemetry' ? 'MP4' : activitySummary?.fileFormat?.toUpperCase() || 'DATA',
         icon: null,
@@ -130,8 +137,7 @@ export default function useTimelineClips({
           onDoubleClick: stopClipEvent,
           onMouseEnter: () => setHoveredLaneId(lane.id),
           onMouseLeave: () => setHoveredLaneId(null),
-          onPointerDown: stopClipEvent,
-          onPointerUp: stopClipEvent,
+          ...getLaneDragProps(lane.id),
         },
         clipStyle: {
           left: widthPx > 0 ? `${(geometry.x / widthPx) * 100}%` : '0%',
@@ -162,6 +168,7 @@ export default function useTimelineClips({
     activityFilename,
     activitySummary,
     exportHighlightRange,
+    getLaneDragProps,
     hasActivity,
     hasVideo,
     hoveredLaneId,

@@ -29,11 +29,13 @@ export function useVideoPreview(videoRef, isActive = true) {
   const importedVideoCodecName = useStore((state) => state.importedVideoCodecName)
   const platformOs = useStore((state) => state.platformOs)
   const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
+  const videoSyncOffsetPreviewSeconds = useStore((state) => state.videoSyncOffsetPreviewSeconds)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
+  const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
 
   // Derived state - determines whether the video should play and which source URL to load.
   const isVideoPlaybackMode = isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video'
@@ -67,6 +69,24 @@ export function useVideoPreview(videoRef, isActive = true) {
     videoSyncOffsetSeconds,
     onPreviewSecond: setSelectedSecond,
   })
+
+  // Drag preview - seek the video directly from the transient offset without committing global sync state.
+  useEffect(() => {
+    if (videoSyncOffsetPreviewSeconds === null) {
+      return
+    }
+
+    const video = videoRef.current
+    if (!video || !videoSrc) {
+      return
+    }
+
+    if (!video.paused) {
+      video.pause()
+    }
+
+    syncVideoCurrentTime(video, selectedSecond - videoSyncOffsetPreviewSeconds)
+  }, [selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds])
 
   // Video sync - keeps play/pause/scrub ownership focused on the active video element.
   useEffect(() => {
@@ -137,9 +157,9 @@ export function useVideoPreview(videoRef, isActive = true) {
   const isOutOfRange = isVideoPreviewOutOfRange({
     selectedSecond,
     videoDuration,
-    videoSyncOffsetSeconds,
+    videoSyncOffsetSeconds: effectiveVideoSyncOffsetSeconds,
   })
-  const videoEndSecond = videoSyncOffsetSeconds + videoDuration
+  const videoEndSecond = effectiveVideoSyncOffsetSeconds + videoDuration
   const frozenFrameSecond = videoSrc && videoDuration > 0 && selectedSecond >= videoEndSecond ? videoDuration : null
   const videoPreviewHelpAvailable = Boolean(hevcPlaybackWarning) && platformOs === 'windows'
   const videoPreviewMessages = [hevcPlaybackWarning, ...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(

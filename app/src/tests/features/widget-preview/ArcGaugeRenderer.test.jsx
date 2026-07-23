@@ -78,7 +78,9 @@ describe('OverlayArcGaugeWidget', () => {
   })
 
   test('uses filled ring paths for a full arc while keeping labels separate', () => {
-    render(<OverlayArcGaugeWidget widget={makeWidget({ arc_angle: 360 })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />)
+    render(
+      <OverlayArcGaugeWidget widget={makeWidget({ arc_angle: 360 })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />,
+    )
 
     const border = screen.getByTestId('arc-gauge-border')
     expect(border.tagName).toBe('path')
@@ -90,14 +92,36 @@ describe('OverlayArcGaugeWidget', () => {
 
   test('changes the filled outline continuously as the configured corner radius changes', () => {
     const { rerender } = render(
-      <OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 0 })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />,
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ track_corner_radius: 0 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
     )
     const flatPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
 
-    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 3 })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />)
+    rerender(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ track_corner_radius: 3 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
+    )
     const partialPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
 
-    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 6 })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />)
+    rerender(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ track_corner_radius: 6 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
+    )
     const fullPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
 
     expect(partialPath).not.toBe(flatPath)
@@ -105,17 +129,35 @@ describe('OverlayArcGaugeWidget', () => {
   })
 
   test('uses the reveal clip to flatten the advancing fill end while retaining its configured source caps', () => {
-    const { rerender } = render(<OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />)
+    const { rerender } = render(
+      <OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />,
+    )
     const roundedFillPath = screen.getByTestId('arc-gauge-filled-track').getAttribute('d')
     const roundedFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
     const roundedTrackPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
 
-    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_fill_flat: true })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />)
+    rerender(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ track_fill_flat: true })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
+    )
     const flatFillPath = screen.getByTestId('arc-gauge-filled-track').getAttribute('d')
     const flatFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
     const flatTrackPath = screen.getByTestId('arc-gauge-empty-track').getAttribute('d')
 
-    rerender(<OverlayArcGaugeWidget widget={makeWidget({ track_corner_radius: 0 })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />)
+    rerender(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ track_corner_radius: 0 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
+    )
     const fullyFlatFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
 
     expect(roundedFillPath).toBe(roundedTrackPath)
@@ -127,7 +169,9 @@ describe('OverlayArcGaugeWidget', () => {
   })
 
   test('grows a low fill through its reveal clip instead of redrawing a fixed cap', () => {
-    const { rerender } = render(<OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.001} globalOpacity={1} globalScale={1} />)
+    const { rerender } = render(
+      <OverlayArcGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.001} globalOpacity={1} globalScale={1} />,
+    )
     const lowFillSourcePath = screen.getByTestId('arc-gauge-filled-track').getAttribute('d')
     const lowFillClipPath = screen.getByTestId('arc-gauge-fill-clip').getAttribute('d')
 
@@ -140,7 +184,15 @@ describe('OverlayArcGaugeWidget', () => {
   })
 
   test('renders no icon even when an inherited text-widget icon flag is present', () => {
-    render(<OverlayArcGaugeWidget widget={makeWidget({ show_icon: true, icon_size: 45 })} activity={activity} previewSecond={0.5} globalOpacity={1} globalScale={1} />)
+    render(
+      <OverlayArcGaugeWidget
+        widget={makeWidget({ show_icon: true, icon_size: 45 })}
+        activity={activity}
+        previewSecond={0.5}
+        globalOpacity={1}
+        globalScale={1}
+      />,
+    )
 
     const svg = screen.getByTestId('arc-gauge-preview')
     expect(svg.querySelector('g[color]')).toBeNull()
@@ -179,7 +231,7 @@ describe('OverlayArcGaugeWidget', () => {
     expect(screen.getByTestId('corner-gauge-fill-clip').getAttribute('d')).toContain('C')
   })
 
-  test('does not render a track shadow without a border', () => {
+  test('keeps the inner text shadow without rendering a track shadow when there is no border', () => {
     render(
       <OverlayArcGaugeWidget
         widget={makeWidget({ track_border_thickness: 0 })}
@@ -193,7 +245,8 @@ describe('OverlayArcGaugeWidget', () => {
 
     const svg = screen.getByTestId('arc-gauge-preview')
     expect(svg.querySelector('g[filter]')).toBeNull()
-    expect(svg.querySelector('filter')).toBeNull()
+    expect(svg.querySelector('text[filter]')).toBeTruthy()
+    expect(svg.querySelector('filter')).toBeTruthy()
   })
 
   test('renders discrete arc segments without a continuous empty arc', () => {

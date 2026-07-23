@@ -37,6 +37,11 @@ function getSceneResolutionKey(scene) {
   return `${Number(scene.width)}x${Number(scene.height)}`
 }
 
+function formatOffsetInput(seconds) {
+  const rounded = Math.round(seconds * 10) / 10
+  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
+}
+
 export default function useSceneSettingsState({ config, onConfigChange }) {
   const {
     activitySummary,
@@ -116,10 +121,10 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
 
   const updateRateOptions = useMemo(() => getUpdateRateOptions(scene?.fps), [scene?.fps])
 
-  const [offsetInput, setOffsetInput] = useState(videoSyncOffsetSeconds?.toString() || '0')
+  const [offsetInput, setOffsetInput] = useState(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
 
   useEffect(() => {
-    setOffsetInput(videoSyncOffsetSeconds?.toString() || '0')
+    setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
   }, [videoSyncOffsetSeconds])
 
   useEffect(() => {
@@ -174,6 +179,10 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
   }
 
+  const handleComputeVideoSync = useCallback(() => {
+    computeVideoSync(activitySummary)
+  }, [activitySummary, computeVideoSync])
+
   const handlers = {
     handleAspectRatioChange,
     handleCustomFpsChange: handleCustomFpsChangeEvent,
@@ -199,7 +208,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     },
     videoSyncSettings: {
       activitySummary,
-      computeVideoSync,
+      computeVideoSync: handleComputeVideoSync,
       importedVideoBitRate,
       importedVideoCameraType,
       importedVideoCameraModel,

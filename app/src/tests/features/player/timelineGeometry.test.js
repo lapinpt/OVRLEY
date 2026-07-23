@@ -6,6 +6,7 @@ import {
   pointerToSecond,
   roundToDevicePixel,
   secondsToViewPx,
+  snapClipOffset,
 } from '@/features/player/utils/timelineGeometry'
 
 describe('timelineGeometry utilities', () => {
@@ -55,5 +56,29 @@ describe('timelineGeometry utilities', () => {
 
   test('rounds to the active device pixel grid', () => {
     expect(roundToDevicePixel(10.26, 2)).toBe(10.5)
+  })
+
+  test('snaps clip edges using a screen-pixel threshold', () => {
+    expect(
+      snapClipOffset({
+        activityDuration: 100,
+        proposedOffset: 1.5,
+        videoDuration: 20,
+        viewEnd: 100,
+        viewStart: 0,
+        widthPx: 500,
+      }),
+    ).toEqual({ guidelineSecond: 0, offset: 0 })
+
+    expect(
+      snapClipOffset({
+        activityDuration: 100,
+        proposedOffset: 2,
+        videoDuration: 20,
+        viewEnd: 100,
+        viewStart: 0,
+        widthPx: 500,
+      }),
+    ).toEqual({ guidelineSecond: null, offset: 2 })
   })
 })

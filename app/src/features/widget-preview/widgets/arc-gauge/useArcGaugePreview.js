@@ -80,6 +80,7 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
       : null
     const minLabel = `${layout.min}`
     const maxLabel = `${layout.max}`
+    const shadow = getTextShadowParts(sceneStyle)
 
     return {
       trackGeometry,
@@ -95,7 +96,8 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
         ? getLabelLayout(layout, minLabel, maxLabel, labelFontFamily, widget.data.min_max_label_font_size)
         : null,
       labelFontFamily,
-      shadow: widget.data.track_border_thickness > 0 ? getTextShadowParts(sceneStyle) : undefined,
+      shadow,
+      trackShadow: widget.data.track_border_thickness > 0 ? shadow : undefined,
       maskPadding: layout.outerStrokeWidth + 1,
     }
   }, [activity, globalOpacity, labelFontFamily, previewSecond, sceneStyle, widget])
