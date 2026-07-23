@@ -13,7 +13,7 @@ export default function TimelineLane({ lane }) {
           <div
             aria-describedby={lane.tooltip.isVisible ? lane.tooltip.id : undefined}
             aria-label={lane.label || 'clip'}
-            className={`absolute bottom-1 h-6 cursor-default overflow-visible ${lane.clipClassName}`}
+            className={`absolute bottom-1 h-6 cursor-grab touch-none overflow-visible active:cursor-grabbing ${lane.clipClassName}`}
             style={lane.clipStyle}
             {...lane.clipProps}
           >

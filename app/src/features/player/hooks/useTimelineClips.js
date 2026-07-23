@@ -31,6 +31,7 @@ function getBasename(path) {
  * @param {string|null} options.activityFilename Imported activity filename.
  * @param {object|null} options.activitySummary Imported activity summary metadata.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
+ * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the activity lane should be present.
  * @param {boolean} options.hasVideo Whether the video lane should be present.
  * @param {number|null} options.importedVideoDuration Imported video duration.
@@ -45,6 +46,7 @@ export default function useTimelineClips({
   activityFilename,
   activitySummary,
   exportHighlightRange,
+  getLaneDragProps,
   hasActivity,
   hasVideo,
   importedVideoDuration,
@@ -130,8 +132,7 @@ export default function useTimelineClips({
           onDoubleClick: stopClipEvent,
           onMouseEnter: () => setHoveredLaneId(lane.id),
           onMouseLeave: () => setHoveredLaneId(null),
-          onPointerDown: stopClipEvent,
-          onPointerUp: stopClipEvent,
+          ...getLaneDragProps(lane.id),
         },
         clipStyle: {
           left: widthPx > 0 ? `${(geometry.x / widthPx) * 100}%` : '0%',
@@ -162,6 +163,7 @@ export default function useTimelineClips({
     activityFilename,
     activitySummary,
     exportHighlightRange,
+    getLaneDragProps,
     hasActivity,
     hasVideo,
     hoveredLaneId,

@@ -140,8 +140,8 @@ export const createVideoImportSlice = (set, get) => ({
   },
 
   setVideoSyncOffset: (seconds) => {
-    if (!Number.isFinite(seconds) || seconds < 0) {
-      throw new Error('Video sync offset must be a non-negative number')
+    if (!Number.isFinite(seconds)) {
+      throw new Error('Video sync offset must be a finite number')
     }
     set({
       videoSyncOffsetSeconds: seconds,

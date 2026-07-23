@@ -30,6 +30,13 @@ export default function TimelineSurface({ timeline }) {
         role="group"
         {...timeline.panSurfaceProps}
       >
+        {timeline.snapGuidelineStyle && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-success shadow-[0_0_6px_hsl(var(--success))]"
+            style={timeline.snapGuidelineStyle}
+          />
+        )}
         {timeline.lanes.map((lane) => (
           <TimelineLane key={lane.id} lane={lane} />
         ))}

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { roundToDevicePixel } from '../utils/timelineGeometry'
 import {
   buildFitTargets,
+  clampToView,
   computeTimelineTicks,
   fitToFull,
   followPlayhead,
@@ -56,6 +57,8 @@ export default function useTimelineViewport({
   const [containerElement, setContainerElement] = useState(null)
   const [widthPx, setWidthPx] = useState(0)
   const [viewport, setViewport] = useState(() => fitToFull(totalDuration))
+  const viewportRef = useRef(viewport)
+  viewportRef.current = viewport
 
   // Callback ref - measurement starts when the timeline actually mounts, including after hidden initial renders.
   const containerRef = useCallback((element) => {
@@ -64,9 +67,7 @@ export default function useTimelineViewport({
 
   // Media identity - any structural media change should reset stale zoom/pan state to the full range.
   const mediaIdentity = [
-    totalDuration,
     hasVideo,
-    videoSyncOffsetSeconds,
     importedVideoDuration,
     hasActivityData,
     activityDurationSeconds,
@@ -79,8 +80,14 @@ export default function useTimelineViewport({
 
   // Full-range reset - loading different media should never leave the user stranded in an old viewport.
   useEffect(() => {
-    setViewport(fitToFull(totalDuration))
-  }, [mediaIdentity, totalDuration])
+    setViewport(fitToFull(totalDurationRef.current))
+  }, [mediaIdentity])
+
+  // Sync-offset changes can extend or shorten the playable range without changing the loaded media.
+  useEffect(() => {
+    if (isDragging) return
+    setViewport((previousViewport) => clampToView(previousViewport.viewStart, previousViewport.viewEnd, totalDuration))
+  }, [isDragging, totalDuration])
 
   // Width measurement - immediate rect reads avoid invisible geometry before ResizeObserver fires.
   useEffect(() => {
@@ -161,6 +168,26 @@ export default function useTimelineViewport({
   // Reset command - toolbar reset always returns to the latest full timeline duration.
   const resetView = useCallback(() => {
     setViewport(fitToFull(totalDurationRef.current))
+  }, [])
+
+  // Follow command - reuses playhead-follow behavior for active edge scrolling during a drag.
+  const followSecond = useCallback((second) => {
+    const previousViewport = viewportRef.current
+    const nextViewport = followPlayhead({
+      playheadSecond: second,
+      viewStart: previousViewport.viewStart,
+      viewEnd: previousViewport.viewEnd,
+      totalDuration: totalDurationRef.current,
+    })
+
+    if (nextViewport.viewStart === previousViewport.viewStart && nextViewport.viewEnd === previousViewport.viewEnd) return null
+
+    viewportRef.current = nextViewport
+    setViewport(nextViewport)
+    return {
+      deltaStart: nextViewport.viewStart - previousViewport.viewStart,
+      viewport: nextViewport,
+    }
   }, [])
 
   // Zoom command - pivots around the playhead or wheel pointer while preserving timeline bounds.
@@ -246,6 +273,7 @@ export default function useTimelineViewport({
     displayedFitTargetId,
     fitTarget,
     fitTargets,
+    followSecond,
     handleWheel,
     isFullTimelineVisible,
     panBy,

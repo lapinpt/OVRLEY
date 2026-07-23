@@ -1,9 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import {
-  buildResizeUpdate,
-  buildScaleDraft,
-  captureResizeOrigin,
-} from '@/features/overlay-editor/utils/widgetResizeScaling'
+import { buildResizeUpdate, buildScaleDraft, captureResizeOrigin } from '@/features/overlay-editor/utils/widgetResizeScaling'
 
 function makeGaugeWidget(displayType = 'arc') {
   return {

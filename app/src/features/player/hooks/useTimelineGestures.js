@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
-import { pointerToSecond } from '../utils/timelineGeometry'
+import { pointerToSecond, viewPxToSeconds } from '../utils/timelineGeometry'
 
 function isPrimaryButton(event) {
   return event.button === undefined || event.button === 0
@@ -124,12 +124,15 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
       const metrics = metricsRef.current
       if (drag?.type !== 'pan') return
 
-      const pxPerSecond = metrics.widthPx > 0 && metrics.viewEnd > metrics.viewStart ? metrics.widthPx / (metrics.viewEnd - metrics.viewStart) : 0
-      if (pxPerSecond <= 0) return
-
-      const deltaSeconds = (drag.lastClientX - event.clientX) / pxPerSecond
+      const deltaSeconds = viewPxToSeconds({
+        deltaPx: drag.lastClientX - event.clientX,
+        viewStart: metrics.viewStart,
+        viewEnd: metrics.viewEnd,
+        widthPx: metrics.widthPx,
+      })
+      if (deltaSeconds === 0) return
       drag.lastClientX = event.clientX
-      if (deltaSeconds !== 0) metrics.panBy?.(deltaSeconds)
+      metrics.panBy?.(deltaSeconds)
     }, []),
     onPointerUp: useCallback(
       (event) => {

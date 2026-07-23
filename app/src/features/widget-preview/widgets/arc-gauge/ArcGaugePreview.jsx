@@ -106,17 +106,9 @@ function ArcGaugeTrack({ data, trackGeometry, barLayout, filledBarCount, fillRev
         </defs>
       ) : null}
       {shadow ? (
-        <g
-          transform={`translate(${shadow.distance} ${shadow.distance})`}
-          filter={`url(#${data.display_type}-gauge-${widgetId}-shadow)`}
-        >
+        <g transform={`translate(${shadow.distance} ${shadow.distance})`} filter={`url(#${data.display_type}-gauge-${widgetId}-shadow)`}>
           <g mask={data.track_border_thickness > 0 ? `url(#${maskId})` : undefined}>
-            <ArcSegmentPaths
-              geometries={geometries}
-              cornerRadius={data.track_corner_radius}
-              fill={shadow.color}
-              fillOpacity={opacity}
-            />
+            <ArcSegmentPaths geometries={geometries} cornerRadius={data.track_corner_radius} fill={shadow.color} fillOpacity={opacity} />
           </g>
         </g>
       ) : null}

@@ -5,6 +5,7 @@
 import { clamp } from '@/lib/utils'
 
 export const EXPORT_RANGE_MIN_GAP_SECONDS = 1
+export const SNAP_THRESHOLD_PX = 5
 
 /**
  * Rounds a pixel value to the active device pixel grid.
@@ -43,6 +44,18 @@ export function secondsToViewPx({ second, viewStart, viewEnd, widthPx }) {
   const span = viewEnd - viewStart
   if (span <= 0 || widthPx <= 0) return 0
   return ((second - viewStart) / span) * widthPx
+}
+
+/**
+ * Converts a horizontal pixel delta to a second delta in the current viewport.
+ *
+ * @param {{ deltaPx: number, viewStart: number, viewEnd: number, widthPx: number }} options
+ * @returns {number} Second delta.
+ */
+export function viewPxToSeconds({ deltaPx, viewStart, viewEnd, widthPx }) {
+  const span = viewEnd - viewStart
+  if (span <= 0 || widthPx <= 0) return 0
+  return (deltaPx / widthPx) * span
 }
 
 /**
@@ -85,6 +98,44 @@ export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSec
  * @param {{ startSecond: number, durationSeconds: number, exportFromSecond: number, exportToSecond: number }} options
  * @returns {{ isVisible: boolean, leftPercent: number, widthPercent: number }}
  */
+/**
+ * Snaps a proposed sync offset to alignment points between two clips.
+ *
+ * Candidates: video‑start → activity‑start (0), video‑start → activity‑end,
+ * video‑end → activity‑start, video‑end → activity‑end.
+ *
+ * The threshold is expressed in pixels, matching react-moveable's default
+ * snapThreshold, and converted to timeline seconds for the current viewport.
+ *
+ * @param {{ proposedOffset: number, activityDuration: number, videoDuration: number, viewStart: number, viewEnd: number, widthPx: number, thresholdPx?: number }} options Snap inputs.
+ * @returns {{ offset: number, guidelineSecond: number|null }} Snapped offset and active guideline.
+ */
+export function snapClipOffset({ proposedOffset, activityDuration, videoDuration, viewStart, viewEnd, widthPx, thresholdPx = SNAP_THRESHOLD_PX }) {
+  const candidates = [
+    { guidelineSecond: 0, value: 0 },
+    { guidelineSecond: activityDuration, value: activityDuration },
+    { guidelineSecond: 0, value: -videoDuration },
+    { guidelineSecond: activityDuration, value: activityDuration - videoDuration },
+  ]
+  const span = viewEnd - viewStart
+  const thresholdSeconds = span > 0 && widthPx > 0 ? (thresholdPx / widthPx) * span : 0
+
+  let bestDelta = Infinity
+  let bestValue = proposedOffset
+  let guidelineSecond = null
+
+  for (const candidate of candidates) {
+    const delta = Math.abs(proposedOffset - candidate.value)
+    if (delta <= thresholdSeconds && delta < bestDelta) {
+      bestDelta = delta
+      bestValue = candidate.value
+      guidelineSecond = candidate.guidelineSecond
+    }
+  }
+
+  return { guidelineSecond, offset: bestValue }
+}
+
 export function getExportRangeHighlightGeometry({ startSecond, durationSeconds, exportFromSecond, exportToSecond }) {
   if (durationSeconds <= 0) return { isVisible: false, leftPercent: 0, widthPercent: 0 }
 
