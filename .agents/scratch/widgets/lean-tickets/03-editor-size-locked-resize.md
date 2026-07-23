@@ -1,5 +1,7 @@
 # 03 — Lean Angle editor single Size control and aspect-ratio-locked resize
 
+**Master spec:** lean-spec.md
+
 **What to build:**
 
 In the editor, a lean-angle widget resizes as a single locked aspect ratio, and the property panel exposes one "Size" control instead of separate Width and Height inputs. All geometric content scales uniformly with the frame.
@@ -7,6 +9,7 @@ In the editor, a lean-angle widget resizes as a single locked aspect ratio, and 
 Add the `lean_angle` display type to the existing uniform-resize policy set in the editor's resize/scale framework (alongside the existing `arc` and `corner` gauge policies). The widget's default frame ratio is 180:140; when the user drags a moveable resize handle, the frame must stay in that ratio. The resize interaction can use corner handles only so the aspect ratio is naturally preserved, matching the existing gauge pattern.
 
 When the frame is resized, scale the following fields by the same uniform factor:
+
 - `track_thickness`
 - `track_border_thickness`
 - `font_size`

@@ -7,8 +7,8 @@
 
 use crate::normalize::{
     ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGradientWidget,
-    ValidatedHeading, ValidatedLabel, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
-    ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
+    ValidatedHeading, ValidatedLabel, ValidatedLeanAngleWidget, ValidatedLinearGaugeOrientation,
+    ValidatedLinearGaugeWidget, ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
 };
 use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 use skia_safe::Image;
@@ -59,6 +59,7 @@ pub struct MetricPresentationReport {
 #[derive(Clone, Debug)]
 pub enum PresentationCache {
     HeadingTape(HeadingWidgetCache),
+    LeanAngle(LeanAngleCache),
     LinearGauge(LinearGaugeCache),
     ArcGauge(ArcGaugeCache),
 }
@@ -70,6 +71,7 @@ pub enum PreparedValue {
     TimeText(ValidatedTimeValue),
     Gradient(ValidatedGradientWidget),
     HeadingTape(ValidatedHeading),
+    LeanAngle(ValidatedLeanAngleWidget),
     LinearGauge(ValidatedLinearGaugeWidget),
     ArcGauge(ValidatedArcGaugeWidget),
 }
@@ -81,6 +83,7 @@ impl PreparedValue {
             Self::TimeText(_) => MetricKind::Time,
             Self::Gradient(_) => MetricKind::Gradient,
             Self::HeadingTape(_) => MetricKind::Heading,
+            Self::LeanAngle(_) => MetricKind::LeanAngle,
             Self::LinearGauge(value) => value.metric,
             Self::ArcGauge(value) => value.metric,
         }
@@ -92,6 +95,7 @@ impl PreparedValue {
             Self::TimeText(value) => value.base.display_type,
             Self::Gradient(_) => DisplayType::Text,
             Self::HeadingTape(_) => DisplayType::Tape,
+            Self::LeanAngle(_) => DisplayType::LeanAngle,
             Self::LinearGauge(_) => DisplayType::Linear,
             Self::ArcGauge(value) => value.display_type,
         }
@@ -103,6 +107,7 @@ impl PreparedValue {
             Self::TimeText(value) => value.base.x,
             Self::Gradient(value) => value.x,
             Self::HeadingTape(value) => value.x,
+            Self::LeanAngle(value) => value.x,
             Self::LinearGauge(value) => value.x,
             Self::ArcGauge(value) => value.x,
         }
@@ -114,6 +119,7 @@ impl PreparedValue {
             Self::TimeText(value) => value.base.y,
             Self::Gradient(value) => value.y,
             Self::HeadingTape(value) => value.y,
+            Self::LeanAngle(value) => value.y,
             Self::LinearGauge(value) => value.y,
             Self::ArcGauge(value) => value.y,
         }
@@ -254,6 +260,40 @@ pub struct HeadingWidgetCache {
     pub indicator_shadow: Option<ShadowStyle>,
     /// Visual representation mode. When `Text`, the tape is not drawn.
     pub display_type: DisplayType,
+}
+
+/// Cached static empty track and border for a lean-angle sector.
+#[derive(Clone, Debug)]
+pub struct LeanAngleCache {
+    pub static_image: Image,
+    pub static_image_x: f32,
+    pub static_image_y: f32,
+    pub x: f32,
+    pub y: f32,
+    pub width: u32,
+    pub height: u32,
+    pub rotation: f32,
+    pub center_x: f32,
+    pub center_y: f32,
+    pub start_angle: f32,
+    pub sweep_angle: f32,
+    pub outer_radius: f32,
+    pub inner_radius: f32,
+    pub track_thickness: f32,
+    pub track_border_thickness: f32,
+    pub shadow: Option<ShadowStyle>,
+    pub opacity: f32,
+    pub track_filled_color: String,
+    pub track_filled_opacity: f32,
+    pub font: String,
+    pub font_size: f32,
+    pub color: String,
+    pub unit_color: String,
+    pub text_border_color: String,
+    pub text_border_thickness: f32,
+    pub show_units: bool,
+    pub value_offset_x: f32,
+    pub value_offset_y: f32,
 }
 
 /// Prepared linear gauge widget cache — holds the pre-rendered static track image

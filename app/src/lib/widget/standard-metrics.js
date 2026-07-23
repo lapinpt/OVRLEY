@@ -14,7 +14,10 @@ import {
   DISPLAY_TYPE_LABELS,
   DISPLAY_TYPE_OVERRIDES,
   DEFAULT_DISPLAY_TYPES,
+  TEXT_DEFAULTS,
 } from './standard-widgets'
+
+const METRIC_SHARED_DEFAULT_KEYS = new Set(Object.keys(TEXT_DEFAULTS))
 
 // ---------------------------------------------------------------------------
 // Display type helpers
@@ -153,7 +156,7 @@ export function getStandardMetricUnitLabel(type, displayUnit) {
 export function getDisplayTypeConfigDefaults(displayType) {
   const definition = DISPLAY_TYPE_DEFINITIONS[displayType]
   if (!definition?.defaults || definition.layoutMode === 'intrinsic') return null
-  return definition.defaults
+  return Object.fromEntries(Object.entries(definition.defaults).filter(([key]) => !METRIC_SHARED_DEFAULT_KEYS.has(key)))
 }
 
 /**
@@ -165,7 +168,7 @@ export function getDisplayTypeConfigDefaults(displayType) {
  * @returns {number|null} configured default font size, or null
  */
 export function getDisplayTypeDefaultFontSize(displayType) {
-  const fontSize = DISPLAY_TYPE_DEFINITIONS[displayType]?.defaultFontSize
+  const fontSize = DISPLAY_TYPE_DEFINITIONS[displayType]?.defaults?.font_size
   return Number.isFinite(fontSize) ? fontSize : null
 }
 

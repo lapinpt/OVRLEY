@@ -24,6 +24,7 @@ use ovrley_core::MetricKind;
 const LINEAR_FRAME: (u32, u32) = (200, 24);
 const ARC_FRAME: (u32, u32) = (220, 220);
 const CORNER_FRAME: (u32, u32) = (162, 162);
+const LEAN_ANGLE_FRAME: (u32, u32) = (180, 140);
 
 #[test]
 fn display_type_definitions_load_from_manifest() {
@@ -50,6 +51,12 @@ fn display_type_definitions_load_from_manifest() {
     assert_eq!(heading_tape.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(heading_tape.default_frame_width, Some(600));
     assert_eq!(heading_tape.default_frame_height, Some(100));
+
+    let lean_angle = display_type_definition("lean_angle").expect("lean_angle must exist");
+    assert_eq!(lean_angle.label, "Lean Angle");
+    assert_eq!(lean_angle.layout_mode, DisplayTypeLayoutMode::Boxed);
+    assert_eq!(lean_angle.default_frame_width, Some(LEAN_ANGLE_FRAME.0));
+    assert_eq!(lean_angle.default_frame_height, Some(LEAN_ANGLE_FRAME.1));
 }
 
 #[test]
@@ -67,6 +74,7 @@ fn is_boxed_display_type_correct() {
     assert!(is_boxed_display_type("arc"));
     assert!(is_boxed_display_type("corner"));
     assert!(is_boxed_display_type("heading_tape"));
+    assert!(is_boxed_display_type("lean_angle"));
     assert!(!is_boxed_display_type("nonexistent"));
 }
 
@@ -77,6 +85,10 @@ fn default_frame_dimensions_for_boxed_types() {
     assert_eq!(default_frame_dimensions("arc"), Some(ARC_FRAME));
     assert_eq!(default_frame_dimensions("corner"), Some(CORNER_FRAME));
     assert_eq!(default_frame_dimensions("heading_tape"), Some((600, 100)));
+    assert_eq!(
+        default_frame_dimensions("lean_angle"),
+        Some(LEAN_ANGLE_FRAME)
+    );
     assert_eq!(default_frame_dimensions("nonexistent"), None);
 }
 
@@ -103,6 +115,9 @@ fn supported_display_types_per_metric() {
     let time = supported_display_types(MetricKind::Time);
     assert_eq!(time.len(), 1);
     assert!(time.iter().any(|dt| dt == "text"));
+
+    let lean_angle = supported_display_types(MetricKind::LeanAngle);
+    assert_eq!(lean_angle, ["text", "lean_angle"]);
 }
 
 #[test]

@@ -16,7 +16,22 @@ function scaleNumber(value, scaleFactor, { min = -Infinity, max = Infinity, roun
   return clamp(roundedValue, min, max)
 }
 
-const GAUGE_DISPLAY_TYPES = new Set(['arc', 'corner'])
+const GAUGE_DISPLAY_TYPES = new Set(['arc', 'corner', 'lean_angle'])
+const LEAN_ANGLE_FRAME_HEIGHT_RATIO = 140 / 180
+
+function isLeanAngleDisplayType(displayType) {
+  return displayType === 'lean_angle'
+}
+
+/**
+ * Returns whether a display type uses the uniform content-resize policy.
+ *
+ * @param {string} displayType - Persisted display type.
+ * @returns {boolean} Whether the display type scales its dimensional content with the frame.
+ */
+export function isUniformResizeDisplayType(displayType) {
+  return GAUGE_DISPLAY_TYPES.has(displayType)
+}
 
 function isGauge(widget) {
   return GAUGE_DISPLAY_TYPES.has(widget?.data?.display_type)
@@ -57,12 +72,40 @@ function buildGaugeResizeContentDraft(origin, scaleFactor, { round = true } = {}
   }
 }
 
+function buildLeanAngleResizeContentDraft(origin, scaleFactor, { round = true } = {}) {
+  const { data } = origin
+
+  return {
+    font_size: scaleNumber(data.font_size, scaleFactor, { min: 8, max: 400, round }),
+    display_variants: {
+      [origin.displayType]: {
+        ...origin.variant,
+        track_thickness: scaleNumber(data.track_thickness, scaleFactor, { min: 1, max: 100, round }),
+        track_border_thickness: scaleNumber(data.track_border_thickness, scaleFactor, { min: 0, max: 24, round }),
+        value_offset_x: scaleNumber(data.value_offset_x, scaleFactor, { min: -10_000, max: 10_000, round }),
+        value_offset_y: scaleNumber(data.value_offset_y, scaleFactor, { min: -10_000, max: 10_000, round }),
+      },
+    },
+  }
+}
+
 function getResizeScaleFactor(origin, width, height) {
+  if (isLeanAngleDisplayType(origin.displayType)) return width / origin.width
   return (width / origin.width + height / origin.height) * 0.5
 }
 
 function buildResizeContentDraft(origin, scaleFactor, options) {
+  if (isLeanAngleDisplayType(origin.displayType)) return buildLeanAngleResizeContentDraft(origin, scaleFactor, options)
   return GAUGE_DISPLAY_TYPES.has(origin.displayType) ? buildGaugeResizeContentDraft(origin, scaleFactor, options) : {}
+}
+
+function lockResizeFrame(origin, framePatch, { round = false } = {}) {
+  if (!isLeanAngleDisplayType(origin.displayType)) return framePatch
+
+  return {
+    ...framePatch,
+    height: round ? Math.round(framePatch.width * LEAN_ANGLE_FRAME_HEIGHT_RATIO) : framePatch.width * LEAN_ANGLE_FRAME_HEIGHT_RATIO,
+  }
 }
 
 /**
@@ -141,10 +184,11 @@ function mergeResizeUpdate(widgetData, framePatch, contentDraft = {}) {
  * @returns {object} Commit-ready widget update patch.
  */
 export function buildResizeUpdate(origin, framePatch, { round = false } = {}) {
-  const scaleFactor = getResizeScaleFactor(origin, framePatch.width, framePatch.height)
+  const lockedFramePatch = lockResizeFrame(origin, framePatch, { round })
+  const scaleFactor = getResizeScaleFactor(origin, lockedFramePatch.width, lockedFramePatch.height)
   const contentDraft = buildResizeContentDraft(origin, scaleFactor, { round })
 
-  return mergeResizeUpdate(origin.widgetData, framePatch, contentDraft)
+  return mergeResizeUpdate(origin.widgetData, lockedFramePatch, contentDraft)
 }
 
 /**
@@ -172,7 +216,9 @@ export function buildUniformResizeUpdate(widget, size) {
 
   const framePatch = {
     width: Math.round(nextWidth),
-    height: Math.round(origin.height * (nextWidth / origin.width)),
+    height: isLeanAngleDisplayType(origin.displayType)
+      ? Math.round(nextWidth * LEAN_ANGLE_FRAME_HEIGHT_RATIO)
+      : Math.round(origin.height * (nextWidth / origin.width)),
   }
 
   return buildResizeUpdate(origin, framePatch, { round: true })

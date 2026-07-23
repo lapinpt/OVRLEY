@@ -12,6 +12,7 @@ mod gradient;
 mod heading;
 mod helpers;
 mod label;
+mod lean_angle;
 mod linear_gauge;
 pub mod raw;
 mod route;
@@ -46,6 +47,8 @@ pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
+pub(crate) use lean_angle::lean_angle_outer_radius;
+pub use lean_angle::{validate_lean_angle, ValidatedLeanAngleWidget};
 pub use linear_gauge::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
     ValidatedLinearGaugeWidget,
@@ -132,6 +135,11 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
         .map(|(idx, value)| {
             if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
                 return validate_heading(&value, idx, &scene).map(PreparedValue::HeadingTape);
+            }
+            if value.value == MetricKind::LeanAngle && value.display_type == DisplayType::LeanAngle
+            {
+                let value = value.with_promoted_display_variant("lean_angle")?;
+                return validate_lean_angle(value, idx).map(PreparedValue::LeanAngle);
             }
             if value.value == MetricKind::Gradient {
                 return validate_gradient_widget(value, idx).map(PreparedValue::Gradient);

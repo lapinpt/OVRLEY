@@ -41,6 +41,7 @@ import caloriesIconSvg from '../../../../assets/widget-icons/widget-calories.svg
 import displayTypeTextSvg from '../../../../assets/widget-icons/display-type-text.svg?raw'
 import displayTypeLinearSvg from '../../../../assets/widget-icons/display-type-linear.svg?raw'
 import displayTypeHeadingTapeSvg from '../../../../assets/widget-icons/display-type-heading-tape.svg?raw'
+import displayTypeLeanAngleSvg from '../../../../assets/widget-icons/display-type-lean-angle.svg?raw'
 import displayTypeArcSvg from '../../../../assets/widget-icons/display-type-arc.svg?raw'
 import displayTypeCornerSvg from '../../../../assets/widget-icons/display-type-corner.svg?raw'
 import displayTypeCircleSvg from '../../../../assets/widget-icons/display-type-circle.svg?raw'
@@ -111,6 +112,7 @@ export const DISPLAY_TYPE_ICON_SVGS = {
   text: parseMetricIconSvg(displayTypeTextSvg),
   linear: parseMetricIconSvg(displayTypeLinearSvg),
   heading_tape: parseMetricIconSvg(displayTypeHeadingTapeSvg),
+  lean_angle: parseMetricIconSvg(displayTypeLeanAngleSvg),
   arc: parseMetricIconSvg(displayTypeArcSvg),
   corner: parseMetricIconSvg(displayTypeCornerSvg),
   circle: parseMetricIconSvg(displayTypeCircleSvg),

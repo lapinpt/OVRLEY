@@ -74,7 +74,6 @@ Add a new **`lean_angle` display type** for the existing `lean_angle` metric. It
     "layoutMode": "boxed",
     "defaultFrameWidth": 180,
     "defaultFrameHeight": 140,
-    "defaultFontSize": 60,
     "defaults": {
       "display_type": "lean_angle",
       "show_icon": false,

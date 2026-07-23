@@ -422,6 +422,19 @@ pub fn format_validated_metric_parts(
     })
 }
 
+/// Formats the signed lean-angle sample as the absolute integer shown by the
+/// dedicated lean-angle presentation.
+pub fn format_lean_angle_value(raw: Option<f64>) -> String {
+    let Some(raw) = raw else {
+        return "--".to_string();
+    };
+
+    match standard_metric_formatter(MetricKind::LeanAngle) {
+        Some(StandardMetricFormatterKind::Integer) => format_number(raw.abs(), 0),
+        _ => unreachable!("lean_angle must use the integer standard metric formatter"),
+    }
+}
+
 /// Formats a gradient widget value using the validated contract.
 ///
 /// All output-affecting fields are already explicit — no backend-owned defaults

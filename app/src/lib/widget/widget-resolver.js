@@ -26,6 +26,10 @@ const BACKDROP_GEOMETRY_KEYS_BY_TYPE = {
   rectangle: ['width', 'height', 'corner_radius', 'round_top_left', 'round_top_right', 'round_bottom_left', 'round_bottom_right'],
 }
 
+function stripMetricSharedFields(variantConfig) {
+  return Object.fromEntries(Object.entries(variantConfig || {}).filter(([key]) => !Object.hasOwn(TEXT_DEFAULTS, key)))
+}
+
 // ---------------------------------------------------------------------------
 // Metric helpers (private)
 // ---------------------------------------------------------------------------
@@ -177,7 +181,7 @@ export function initDisplayVariant(widgetData, displayType) {
   if (!widgetData || displayType === 'text') return widgetData
 
   const variants = widgetData.display_variants || {}
-  const currentVariant = variants[displayType]
+  const currentVariant = stripMetricSharedFields(variants[displayType])
   const frameDefaults = getDefaultFrameDimensions(displayType)
   const nonGeometryDefaults = getDisplayTypeConfigDefaults(displayType)
 

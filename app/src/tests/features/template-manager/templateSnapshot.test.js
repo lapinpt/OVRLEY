@@ -28,6 +28,41 @@ describe('template snapshot standard metric schema', () => {
     expect(speedDefaults.display_variants.arc).not.toHaveProperty('font_size')
   })
 
+  test('partitions lean-angle shared defaults from variant geometry', () => {
+    const leanAngleDefaults = createMetricValueDefaults('lean_angle', undefined, 'lean_angle')
+    const themedLeanAngleDefaults = createMetricValueDefaults(
+      'lean_angle',
+      {
+        font_values: 'Roboto.ttf',
+        color_values: '#123456',
+        color_units: '#abcdef',
+      },
+      'lean_angle',
+    )
+
+    expect(leanAngleDefaults).toMatchObject({
+      font: 'Arial.ttf',
+      font_size: 30,
+      color: '#ffffff',
+      unit_color: '#ffffff',
+      show_units: true,
+    })
+    expect(leanAngleDefaults.display_variants.lean_angle).toMatchObject({
+      width: 180,
+      height: 140,
+      track_thickness: 40,
+      value_offset_x: 0,
+      value_offset_y: 0,
+    })
+    for (const sharedKey of ['display_type', 'show_icon', 'font', 'font_size', 'color', 'unit_color', 'show_units']) {
+      expect(leanAngleDefaults.display_variants.lean_angle).not.toHaveProperty(sharedKey)
+    }
+    expect(themedLeanAngleDefaults.font).toBe('Roboto.ttf')
+    expect(themedLeanAngleDefaults.color).toBe('#123456')
+    expect(themedLeanAngleDefaults.unit_color).toBe('#abcdef')
+    expect(themedLeanAngleDefaults.display_variants.lean_angle).not.toHaveProperty('font')
+  })
+
   test('normalizes standard metric widgets with display_unit and strips legacy unit fields', () => {
     const normalized = normalizeTemplateConfig({
       scene: {},

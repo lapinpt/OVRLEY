@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeAll } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
 
@@ -406,5 +406,61 @@ describe('MetricWidgetEditor corner gauge controls', () => {
     expect(screen.queryByText('Arc Angle')).not.toBeInTheDocument()
 
     expect(screen.getByText('Bottom Left')).toBeInTheDocument()
+  })
+})
+
+describe('MetricWidgetEditor lean-angle controls', () => {
+  test('shows Size without separate Width or Height controls and updates both frame dimensions', async () => {
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('lean_angle', {
+          display_type: 'lean_angle',
+          width: 180,
+          height: 140,
+          font: 'Arial.ttf',
+          font_size: 60,
+          color: '#ffffff',
+          unit_color: '#ffffff',
+          show_units: true,
+          display_variants: {
+            lean_angle: {
+              width: 180,
+              height: 140,
+              track_thickness: 24,
+              track_border_thickness: 2,
+              value_offset_x: 0,
+              value_offset_y: 0,
+              track_empty_color: '#222222',
+              track_empty_opacity: 0.5,
+              track_filled_color: '#40e0d0',
+              track_filled_opacity: 1,
+              track_border_color: '#ffffff',
+            },
+          },
+        })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Size')).toBeInTheDocument()
+    expect(screen.queryByText('Width')).not.toBeInTheDocument()
+    expect(screen.queryByText('Height')).not.toBeInTheDocument()
+
+    const sizeSlider = screen.getAllByRole('slider')[0]
+    fireEvent.keyDown(sizeSlider, { key: 'End', code: 'End' })
+
+    expect(updateWidgetData).toHaveBeenLastCalledWith(
+      'value-0',
+      expect.objectContaining({
+        width: 600,
+        height: 467,
+        display_variants: expect.objectContaining({
+          lean_angle: expect.objectContaining({ width: 600, height: 467 }),
+        }),
+      }),
+    )
+    expect(updateWidgetData.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('font_size')
   })
 })

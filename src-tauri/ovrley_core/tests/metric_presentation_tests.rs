@@ -85,6 +85,8 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         corner_orientation: None,
         inner_widget_offset_x: None,
         inner_widget_offset_y: None,
+        value_offset_x: None,
+        value_offset_y: None,
         track_thickness: None,
         track_corner_radius: None,
         track_border_thickness: None,
@@ -340,7 +342,12 @@ fn future_boxed_display_types_return_none() {
     let mut profiler = RenderProfiler::default();
     let caches = empty_caches();
 
-    for display_type in [DisplayType::Linear, DisplayType::Arc, DisplayType::Corner] {
+    for display_type in [
+        DisplayType::Linear,
+        DisplayType::Arc,
+        DisplayType::Corner,
+        DisplayType::LeanAngle,
+    ] {
         let value = default_value_config(display_type);
         let result = draw_metric_presentation(
             surface.canvas(),

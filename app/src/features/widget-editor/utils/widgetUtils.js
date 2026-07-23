@@ -5,7 +5,11 @@
 
 import { createFontSelection } from '@/lib/fonts'
 import { initBackdropVariant } from '@/lib/widget/widget-resolver'
-import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults, getDisplayTypeDefaultFontSize } from '@/lib/widget/standard-metrics'
+import {
+  getDefaultFrameDimensions,
+  getDisplayTypeConfigDefaults,
+  getDisplayTypeDefaultFontSize,
+} from '@/lib/widget/standard-metrics'
 import {
   BACKDROP_DEFAULT_DISPLAY_TYPES,
   BACKDROP_CIRCLE_DEFAULTS,
@@ -149,9 +153,9 @@ export function createBackdropDefaults(displayType) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createMetricValueDefaults(type, globalDefaults, displayType) {
+  const resolvedDisplayType = displayType || 'text'
   const font = globalDefaults?.font_values || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
-  const resolvedDisplayType = displayType || 'text'
   const sharedDefaults = {
     ...TEXT_DEFAULTS,
     value: type,

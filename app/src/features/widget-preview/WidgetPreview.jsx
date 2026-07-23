@@ -33,6 +33,7 @@ import { OverlayElevationWidget } from './widgets/elevation/ElevationPreview'
 import { OverlayHeadingWidget } from './widgets/heading/HeadingPreview'
 import { OverlayLinearGaugeWidget } from './widgets/linear-gauge/LinearGaugePreview'
 import { OverlayArcGaugeWidget } from './widgets/arc-gauge/ArcGaugePreview'
+import { OverlayLeanAngleWidget } from './widgets/lean-angle/LeanAnglePreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
@@ -108,6 +109,19 @@ function WidgetPreview({
         sceneStyle={sceneStyle}
         valueFont={valueFont}
         exportRange={exportRange}
+      />
+    )
+  }
+
+  if (widget.data.display_type === 'lean_angle') {
+    return (
+      <OverlayLeanAngleWidget
+        widget={widget}
+        activity={activity}
+        previewSecond={previewSecond}
+        globalOpacity={globalOpacity}
+        globalScale={globalScale}
+        sceneStyle={sceneStyle}
       />
     )
   }

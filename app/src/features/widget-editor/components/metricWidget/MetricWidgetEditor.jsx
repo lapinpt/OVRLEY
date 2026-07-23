@@ -6,7 +6,7 @@
  * creating a new section component and registering it below.
  */
 
-import { getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
+import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
 import { SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 import { initDisplayVariant } from '@/lib/widget/widget-resolver'
@@ -15,6 +15,7 @@ import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
 import ArcDisplaySection from './ArcDisplaySection'
 import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
+import LeanAngleDisplaySection from './LeanAngleDisplaySection'
 
 /**
  * Registry mapping display_type values to their editor section components.
@@ -26,6 +27,7 @@ const DISPLAY_SECTION = {
   linear: LinearDisplaySection,
   arc: ArcDisplaySection,
   corner: ArcDisplaySection,
+  lean_angle: LeanAngleDisplaySection,
 }
 
 /**
@@ -43,7 +45,10 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
   const handleDisplayTypeChange = useCallback(
     (value) => {
       const nextData = initDisplayVariant(widget.data, value)
-      updateWidgetData(widget.id, { display_type: value, display_variants: nextData.display_variants })
+      const patch = { display_type: value, display_variants: nextData.display_variants }
+      const defaultFontSize = getDisplayTypeDefaultFontSize(value)
+      if (defaultFontSize !== null) patch.font_size = defaultFontSize
+      updateWidgetData(widget.id, patch)
     },
     [widget.id, widget.data, updateWidgetData],
   )

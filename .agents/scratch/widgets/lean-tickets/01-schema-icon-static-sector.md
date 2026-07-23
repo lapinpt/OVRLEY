@@ -1,10 +1,12 @@
 # 01 — Lean Angle display type, icon, and static sector render end-to-end
 
+**Master spec:** lean-spec.md
+
 **What to build:**
 
 The `lean_angle` display type is discoverable in the widget drawer for the `lean_angle` metric, and selecting it renders a correct static 120° top-frown annular sector with border in both the frontend preview and the Rust renderer. The empty track+border are cached once in Rust; the frontend preview renders the equivalent static SVG path.
 
-Add the `lean_angle` display-type definition under `displayTypes.definitions` in `assets/standard-metrics.json`, with the full config block from the spec: `layoutMode: "boxed"`, `defaultFrameWidth: 180`, `defaultFrameHeight: 140`, `defaultFontSize: 60`, and defaults for `display_type`, `show_icon`, `track_empty_color`, `track_empty_opacity`, `track_filled_color`, `track_filled_opacity`, `track_border_thickness`, `track_border_color`, `track_thickness`, `font`, `font_size`, `color`, `unit_color`, `show_units`, `value_offset_x`, `value_offset_y`. Update the `lean_angle` metric override to `["text", "lean_angle"]` so the display type is only available for that metric.
+Add the `lean_angle` display-type definition under `displayTypes.definitions` in `assets/standard-metrics.json`, with the full config block from the spec: `layoutMode: "boxed"`, `defaultFrameWidth: 180`, `defaultFrameHeight: 140`, and defaults for `display_type`, `show_icon`, `track_empty_color`, `track_empty_opacity`, `track_filled_color`, `track_filled_opacity`, `track_border_thickness`, `font_size`, `track_border_color`, `track_thickness`, `font`, `color`, `unit_color`, `show_units`, `value_offset_x`, `value_offset_y`. Update the `lean_angle` metric override to `["text", "lean_angle"]` so the display type is only available for that metric.
 
 Create `assets/widget-icons/display-type-lean-angle.svg` depicting only an annular sector, and register it in the frontend display-type icon map alongside the existing `arc`, `corner`, `linear`, and `heading_tape` icons.
 
@@ -22,7 +24,7 @@ Demoable in the running dev app: `pnpm dev:frontend`, add a `lean_angle` metric 
 
 **Status:** ready-for-agent
 
-- [ ] `lean_angle` display-type definition added to `assets/standard-metrics.json` with the full defaults block and `defaultFrameWidth: 180`, `defaultFrameHeight: 140`, `defaultFontSize: 60`
+- [ ] `lean_angle` display-type definition added to `assets/standard-metrics.json` with the full defaults block and `defaultFrameWidth: 180`, `defaultFrameHeight: 140`
 - [ ] `lean_angle` metric override updated to `["text", "lean_angle"]`
 - [ ] `display-type-lean-angle.svg` icon asset created and registered in the frontend display-type icon map
 - [ ] Rust `DisplayType::LeanAngle` variant added and returns `Boxed` layout mode

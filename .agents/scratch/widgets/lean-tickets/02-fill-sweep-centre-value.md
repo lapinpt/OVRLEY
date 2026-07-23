@@ -1,5 +1,7 @@
 # 02 — Lean Angle bidirectional fill sweep and centre value text
 
+**Master spec:** lean-spec.md
+
 **What to build:**
 
 The lean-angle gauge animates: the fill sector sweeps left or right from the upward vertical centre according to the sign of the signed `lean_angle` value, with sweep magnitude equal to `abs(lean_angle)` clamped to 60°. The absolute integer lean angle, followed by the degree unit when `show_units` is true, is rendered at the circle centre. Missing data renders `--` with zero fill.

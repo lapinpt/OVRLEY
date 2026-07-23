@@ -19,6 +19,7 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
         (r#""arc""#, DisplayType::Arc),
         (r#""corner""#, DisplayType::Corner),
         (r#""heading_tape""#, DisplayType::Tape),
+        (r#""lean_angle""#, DisplayType::LeanAngle),
     ];
 
     for (json_value, expected) in cases {
@@ -53,6 +54,7 @@ fn display_type_round_trips_each_variant() {
         (DisplayType::Arc, r#""arc""#),
         (DisplayType::Corner, r#""corner""#),
         (DisplayType::Tape, r#""heading_tape""#),
+        (DisplayType::LeanAngle, r#""lean_angle""#),
     ];
 
     for (variant, expected_json) in cases {
@@ -194,6 +196,10 @@ fn display_type_is_intrinsic_only_for_text() {
     );
     assert_eq!(
         display_type_layout_mode(DisplayType::Tape),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::LeanAngle),
         DisplayTypeLayoutMode::Boxed
     );
 }

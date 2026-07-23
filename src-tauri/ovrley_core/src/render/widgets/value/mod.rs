@@ -34,6 +34,11 @@ pub use layout::{
 };
 
 pub(crate) use layout::{
+    METRIC_WIDGET_LINE_HEIGHT, METRIC_WIDGET_UNITS_GAP_PX, METRIC_WIDGET_UNIT_RATIO,
+    MIN_UNITS_FONT_SIZE,
+};
+
+pub(crate) use layout::{
     draw_metric_parts, draw_static_metric_icon_for_value_validated,
     has_static_metric_icon_validated,
 };
@@ -213,9 +218,10 @@ mod tests {
         };
         let mut surface = create_surface(400, 200).unwrap();
 
-        for dt_str in ["heading_tape", "linear", "arc", "corner"] {
+        for dt_str in ["heading_tape", "lean_angle", "linear", "arc", "corner"] {
             let display_type = match dt_str {
                 "heading_tape" => DisplayType::Tape,
+                "lean_angle" => DisplayType::LeanAngle,
                 "linear" => DisplayType::Linear,
                 "arc" => DisplayType::Arc,
                 "corner" => DisplayType::Corner,

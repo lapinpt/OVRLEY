@@ -12,11 +12,12 @@ use crate::types::DisplayType;
 use skia_safe::Canvas;
 use std::path::PathBuf;
 
-const METRIC_WIDGET_LINE_HEIGHT: f32 = 0.92;
+pub(crate) const METRIC_WIDGET_LINE_HEIGHT: f32 = 0.92;
 const METRIC_WIDGET_OUTER_GAP_PX: f32 = 8.0;
-const METRIC_WIDGET_UNITS_GAP_PX: f32 = 8.0;
+pub(crate) const METRIC_WIDGET_UNITS_GAP_PX: f32 = 8.0;
 const COORDINATE_DIRECTION_GAP_PX: f32 = 8.0;
-const MIN_UNITS_FONT_SIZE: f32 = 12.0;
+pub(crate) const MIN_UNITS_FONT_SIZE: f32 = 12.0;
+pub(crate) const METRIC_WIDGET_UNIT_RATIO: f32 = 0.28;
 
 pub const NUMERIC_VERTICAL_METRICS_TEXT: &str = "0123456789-:.%";
 const COORDINATE_VERTICAL_METRICS_TEXT: &str = "NSEW88\u{00B0}88.888\u{2032}88\u{2033}";
@@ -62,7 +63,8 @@ pub(crate) fn draw_metric_parts(
     let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
 
     let mut units_style = base_style.clone();
-    units_style.font_size = (base_style.font_size * 0.28).max(MIN_UNITS_FONT_SIZE * scale);
+    units_style.font_size =
+        (base_style.font_size * METRIC_WIDGET_UNIT_RATIO).max(MIN_UNITS_FONT_SIZE * scale);
     units_style.line_height = units_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
     let units_measure = unit_text
         .map(|unit_text| measure_text(unit_text, &units_style, font_dirs))

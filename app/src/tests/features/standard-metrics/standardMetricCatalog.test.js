@@ -237,6 +237,7 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.arc).toMatchObject({ label: 'Arc Gauge', layoutMode: 'boxed' })
     expect(DISPLAY_TYPE_DEFINITIONS.corner).toMatchObject({ label: 'Corner Gauge', layoutMode: 'boxed' })
     expect(DISPLAY_TYPE_DEFINITIONS.heading_tape).toMatchObject({ label: 'Heading Tape', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).toMatchObject({ label: 'Lean Angle', layoutMode: 'boxed' })
   })
 
   test('boxed display types include default frame dimensions', () => {
@@ -246,6 +247,31 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(220)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(162)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(162)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameWidth).toBe(180)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameHeight).toBe(140)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFontSize')
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.font_size).toBe(30)
+  })
+
+  test('lean-angle display type exposes the complete static-sector contract', () => {
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults).toEqual({
+      display_type: 'lean_angle',
+      show_icon: false,
+      track_empty_color: '#222222',
+      track_empty_opacity: 0.5,
+      track_filled_color: '#dce2e8',
+      track_filled_opacity: 1,
+      track_border_thickness: 0,
+      track_border_color: '#ffffff',
+      track_thickness: 40,
+      font: 'Arial.ttf',
+      font_size: 30,
+      color: '#ffffff',
+      unit_color: '#ffffff',
+      show_units: true,
+      value_offset_x: 0,
+      value_offset_y: 0,
+    })
   })
 
   test('gauge defaults select continuous fill without fixed segmented geometry', () => {
@@ -283,6 +309,7 @@ describe('display type definitions', () => {
     expect(isBoxedDisplayType('arc')).toBe(true)
     expect(isBoxedDisplayType('corner')).toBe(true)
     expect(isBoxedDisplayType('heading_tape')).toBe(true)
+    expect(isBoxedDisplayType('lean_angle')).toBe(true)
     expect(isBoxedDisplayType('nonexistent')).toBe(false)
   })
 
@@ -291,12 +318,14 @@ describe('display type definitions', () => {
     expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 24 })
     expect(getDefaultFrameDimensions('arc')).toEqual({ width: 220, height: 220 })
     expect(getDefaultFrameDimensions('corner')).toEqual({ width: 162, height: 162 })
+    expect(getDefaultFrameDimensions('lean_angle')).toEqual({ width: 180, height: 140 })
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
 
   test('getSupportedDisplayTypes respects per-metric overrides', () => {
     expect(getSupportedDisplayTypes('heading')).toEqual(['text', 'heading_tape'])
     expect(getSupportedDisplayTypes('core_temperature')).toEqual(['text'])
+    expect(getSupportedDisplayTypes('lean_angle')).toEqual(['text', 'lean_angle'])
     expect(getSupportedDisplayTypes('speed')).toContain('text')
   })
 

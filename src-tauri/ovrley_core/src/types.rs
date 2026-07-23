@@ -127,6 +127,8 @@ pub enum DisplayType {
     Corner,
     #[serde(rename = "heading_tape")]
     Tape,
+    #[serde(rename = "lean_angle")]
+    LeanAngle,
 }
 
 impl DisplayType {
@@ -138,6 +140,7 @@ impl DisplayType {
             DisplayType::Arc => "arc",
             DisplayType::Corner => "corner",
             DisplayType::Tape => "heading_tape",
+            DisplayType::LeanAngle => "lean_angle",
         }
     }
 }
@@ -178,6 +181,7 @@ impl<'de> Deserialize<'de> for DisplayType {
                 "arc" => Ok(DisplayType::Arc),
                 "corner" => Ok(DisplayType::Corner),
                 "heading_tape" => Ok(DisplayType::Tape),
+                "lean_angle" => Ok(DisplayType::LeanAngle),
                 _ => Ok(DisplayType::default()),
             },
             _ => Ok(DisplayType::default()),

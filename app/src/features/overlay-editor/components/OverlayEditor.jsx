@@ -25,6 +25,7 @@ import { useScaleHandlers } from '../hooks/useScaleHandlers'
 import { useRotateHandlers } from '../hooks/useRotateHandlers'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { buildRenderedGeometrySignature, resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
+import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 
 function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgetPreviews, widgets }) {
   const visibleWidgets = useMemo(() => {
@@ -305,13 +306,14 @@ function OverlayEditor({
   const selectedDisplayType = selectedWidget?.data?.display_type
 
   const canResizeSelected = hasSingleSelection && isFramedSelected
-  const showEdgeResizeHandles = canResizeSelected && selectedWidget?.type === 'elevation'
+  const showEdgeResizeHandles = canResizeSelected && selectedWidget?.type === 'elevation' && !isUniformResizeDisplayType(selectedDisplayType)
   const canScaleSelected = hasSingleSelection && !isFramedSelected
   const canRotateSelected = hasSingleSelection && selectedWidget?.type === 'course'
   const maintainAspectRatio =
     hasSingleSelection &&
     (selectedDisplayType === 'arc' ||
       selectedDisplayType === 'corner' ||
+      selectedDisplayType === 'lean_angle' ||
       (isBackdropSelected && selectedDisplayType === 'circle') ||
       selectedWidget?.type === 'course' ||
       !isFramedSelected)
