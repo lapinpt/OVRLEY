@@ -109,14 +109,15 @@ function ArcGaugeTrack({ data, trackGeometry, barLayout, filledBarCount, fillRev
         <g
           transform={`translate(${shadow.distance} ${shadow.distance})`}
           filter={`url(#${data.display_type}-gauge-${widgetId}-shadow)`}
-          mask={data.track_border_thickness > 0 ? `url(#${maskId})` : undefined}
         >
-          <ArcSegmentPaths
-            geometries={geometries}
-            cornerRadius={data.track_corner_radius}
-            fill={shadow.color}
-            fillOpacity={opacity}
-          />
+          <g mask={data.track_border_thickness > 0 ? `url(#${maskId})` : undefined}>
+            <ArcSegmentPaths
+              geometries={geometries}
+              cornerRadius={data.track_corner_radius}
+              fill={shadow.color}
+              fillOpacity={opacity}
+            />
+          </g>
         </g>
       ) : null}
       <ArcSegmentPaths
@@ -180,6 +181,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
     labels,
     labelFontFamily,
     shadow,
+    trackShadow,
     maskPadding,
   } = presentation
 
@@ -191,7 +193,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
       className="block overflow-visible"
       data-testid={`${widget.data.display_type}-gauge-preview`}
     >
-      {shadow ? <PreviewSvgShadowBlurFilter id={`${widget.data.display_type}-gauge-${widget.id}-shadow`} shadow={shadow} /> : null}
+      {trackShadow ? <PreviewSvgShadowBlurFilter id={`${widget.data.display_type}-gauge-${widget.id}-shadow`} shadow={trackShadow} /> : null}
       <ArcGaugeTrack
         data={widget.data}
         trackGeometry={trackGeometry}
@@ -199,7 +201,7 @@ export function OverlayArcGaugeWidget({ widget, activity, previewSecond, globalO
         filledBarCount={filledBarCount}
         fillReveal={fillReveal}
         opacity={opacity}
-        shadow={shadow}
+        shadow={trackShadow}
         maskPadding={maskPadding}
         widgetId={widget.id}
       />

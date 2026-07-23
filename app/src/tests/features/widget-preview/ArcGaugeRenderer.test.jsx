@@ -179,7 +179,7 @@ describe('OverlayArcGaugeWidget', () => {
     expect(screen.getByTestId('corner-gauge-fill-clip').getAttribute('d')).toContain('C')
   })
 
-  test('does not render a track shadow without a border', () => {
+  test('keeps the inner text shadow without rendering a track shadow when there is no border', () => {
     render(
       <OverlayArcGaugeWidget
         widget={makeWidget({ track_border_thickness: 0 })}
@@ -193,7 +193,8 @@ describe('OverlayArcGaugeWidget', () => {
 
     const svg = screen.getByTestId('arc-gauge-preview')
     expect(svg.querySelector('g[filter]')).toBeNull()
-    expect(svg.querySelector('filter')).toBeNull()
+    expect(svg.querySelector('text[filter]')).toBeTruthy()
+    expect(svg.querySelector('filter')).toBeTruthy()
   })
 
   test('renders discrete arc segments without a continuous empty arc', () => {

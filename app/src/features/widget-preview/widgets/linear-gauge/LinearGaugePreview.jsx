@@ -46,14 +46,15 @@ function LinearGaugeTrack({ data, presentation, continuousFill }) {
         <g
           transform={`translate(${presentation.trackShadow.distance} ${presentation.trackShadow.distance})`}
           filter={`url(#${presentation.shadowFilterId})`}
-          mask={data.track_border_thickness > 0 ? `url(#${presentation.maskId})` : undefined}
         >
-          <SegmentRects
-            segments={presentation.segments}
-            layer="outer"
-            fill={presentation.shadowColor.color}
-            opacity={presentation.shadowColor.opacity}
-          />
+          <g mask={data.track_border_thickness > 0 ? `url(#${presentation.maskId})` : undefined}>
+            <SegmentRects
+              segments={presentation.segments}
+              layer="outer"
+              fill={presentation.shadowColor.color}
+              opacity={presentation.shadowColor.opacity}
+            />
+          </g>
         </g>
       ) : null}
       {data.track_border_thickness > 0 ? (
