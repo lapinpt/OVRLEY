@@ -2,7 +2,7 @@
  * WidgetDrawer — collapsible left-side panel for widgets.
  */
 
-import { useLayoutStore } from '@/hooks/useAppStoreSelectors'
+import { useLayoutStore, useActivityStore } from '@/hooks/useAppStoreSelectors'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { WidgetButtonGrid } from './WidgetButtonGrid'
 import { useEffect } from 'react'
@@ -13,6 +13,7 @@ import { useEffect } from 'react'
  */
 export function WidgetDrawer() {
   const { closeWidgetDrawer, widgetDrawerOpen, toggleWidgetDrawer } = useLayoutStore()
+  const { activitySummary } = useActivityStore()
   const { addWidget } = useWidgetManager()
 
   const handleAddWidget = (type, displayType) => {
@@ -44,7 +45,11 @@ export function WidgetDrawer() {
           }}
         >
           <div className="w-60 h-full bg-card rounded-r-sm flex flex-col overflow-hidden border border-border/60 shadow-lg shadow-black/80">
-            <WidgetButtonGrid onAddWidget={handleAddWidget} />
+            <WidgetButtonGrid
+              onAddWidget={handleAddWidget}
+              validAttributes={activitySummary?.validAttributes}
+              extendedAttributes={activitySummary?.extendedAttributes}
+            />
           </div>
           <div className="flex flex-col h-full">
             <div style={{ height: '15%' }} />

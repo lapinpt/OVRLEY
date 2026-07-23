@@ -189,6 +189,10 @@ export function initDisplayVariant(widgetData, displayType) {
     ...resolveFrameGeometry(currentVariant, widgetData, frameDefaults),
   }
 
+  if (!variantDefaults.min_max_label_font && widgetData.font) {
+    variantDefaults.min_max_label_font = widgetData.font
+  }
+
   return {
     ...widgetData,
     display_variants: {

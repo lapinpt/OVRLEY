@@ -45,7 +45,7 @@ export default function TimelineLane({ lane }) {
         <div
           id={lane.tooltip.id}
           role="tooltip"
-          className="pointer-events-none absolute bottom-full z-1000 mb-2 min-w-40 -translate-x-1/2 whitespace-nowrap rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
+          className="pointer-events-none absolute bottom-full z-1000 mb-2 max-w-56 -translate-x-1/2 rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
           style={lane.tooltip.style}
         >
           <div className="text-[0.72rem] font-semibold leading-snug">{lane.label}</div>
@@ -53,6 +53,11 @@ export default function TimelineLane({ lane }) {
             <span className="font-medium">Duration</span>
             <span className="tabular-nums text-foreground">{lane.durationLabel}</span>
           </div>
+          {lane.availableMetrics?.length > 0 && (
+            <p className="mt-1 border-t border-border/40 pt-1 text-[0.6rem] leading-relaxed text-foreground font-medium">
+              {lane.availableMetrics.join(', ')}
+            </p>
+          )}
           <div className="absolute left-1/2 top-full -mt-px -translate-x-1/2 border-4 border-transparent border-t-surface-tooltip" />
         </div>
       )}
