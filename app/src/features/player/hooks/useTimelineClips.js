@@ -6,6 +6,7 @@ import { useCallback, useId, useMemo, useState } from 'react'
 import { Video } from 'lucide-react'
 import { formatTimelineTime } from '../utils/playerTiming'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
+import { TYPE_LABELS } from '@/lib/widget/widget-icons'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
@@ -84,8 +85,12 @@ export default function useTimelineClips({
 
     // Activity lane - always starts at zero and uses activity metadata for label/duration.
     if (hasActivity) {
+      const allAvailable = [...(activitySummary?.validAttributes || []), ...(activitySummary?.extendedAttributes || [])]
+      const availableMetrics = allAvailable.filter((type) => type in TYPE_LABELS).map((type) => TYPE_LABELS[type] || type)
+
       laneInputs.push({
         ariaLabel: 'Activity clip lane',
+        availableMetrics,
         durationSeconds: activityDurationSeconds,
         formatLabel: activitySummary?.fileFormat === 'mp4_telemetry' ? 'MP4' : activitySummary?.fileFormat?.toUpperCase() || 'DATA',
         icon: null,
