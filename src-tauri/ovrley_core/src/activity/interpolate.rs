@@ -74,25 +74,24 @@ pub fn interpolate_time_series_value(
 }
 
 // Builds the per-frame time axis for a scene duration and frame rate.
-fn build_target_x_values(duration: f64, fps: f64) -> Vec<f64> {
+pub fn frame_timeline_for_fps(duration: f64, fps: f64) -> crate::error::CoreResult<Vec<f64>> {
     // A frame exists at t=0, then every 1/fps seconds strictly before duration.
     // This mirrors video frame timing and avoids generating a duplicate final
     // frame exactly at the scene end.
-    let safe_fps = fps.max(1.0);
-    let mut values = Vec::new();
-    let mut frame_index = 0usize;
-    loop {
-        let target = frame_index as f64 / safe_fps;
-        if target + 1e-9 >= duration && frame_index > 0 {
-            break;
-        }
-        values.push(target.min(duration));
-        frame_index += 1;
-        if frame_index > 10_000_000 {
-            break;
-        }
+    if !duration.is_finite() || duration <= 0.0 {
+        return Err(crate::error::CoreError::Activity(format!(
+            "Dense timeline duration must be finite and positive: {duration}"
+        )));
     }
-    values
+    if !fps.is_finite() || fps <= 0.0 {
+        return Err(crate::error::CoreError::Activity(format!(
+            "Dense timeline FPS must be finite and positive: {fps}"
+        )));
+    }
+    let frame_count = (duration * fps).ceil() as usize;
+    Ok((0..frame_count)
+        .map(|frame_index| frame_index as f64 / fps)
+        .collect())
 }
 
 // Interpolates a numeric series over all target frame times.
@@ -108,29 +107,31 @@ fn interpolate_numeric_series(
         .collect()
 }
 
-// Densifies a numeric series with hold (step) interpolation.
+// Densifies a series with hold (step) interpolation.
 // Each frame takes the value of the last sample at or before that frame time.
-fn densify_hold_series(
+pub(super) fn densify_hold_series<T: Clone>(
     x_values: &[f64],
-    y_values: &NumericSeries,
+    y_values: &[Option<T>],
     target_x_values: &[f64],
-) -> Vec<Option<f64>> {
+) -> Vec<Option<T>> {
     if y_values.is_empty() {
         return Vec::new();
     }
-    // Build (x, y) pairs from valid samples
-    let points = collect_valid_numeric_points(x_values, y_values);
-    let mut last_value: Option<f64> = None;
-    let mut point_idx = 0;
+    let points = x_values
+        .iter()
+        .zip(y_values)
+        .filter_map(|(x, value)| value.clone().map(|value| (*x, value)))
+        .collect::<Vec<_>>();
+    let mut last_value = None;
+    let mut point_index = 0;
     target_x_values
         .iter()
         .map(|target| {
-            // Advance past all points before this target
-            while point_idx < points.len() && points[point_idx].0 <= *target + 1e-9 {
-                last_value = Some(points[point_idx].1);
-                point_idx += 1;
+            while point_index < points.len() && points[point_index].0 <= *target + 1e-9 {
+                last_value = Some(points[point_index].1.clone());
+                point_index += 1;
             }
-            last_value
+            last_value.clone()
         })
         .collect()
 }
@@ -219,19 +220,12 @@ fn interpolate_time_series(
 /// 3. Densify every requested numeric telemetry series into per-frame vectors.
 pub fn densify_activity(
     trimmed: &TrimmedActivity,
-    fps: f64,
+    frame_elapsed_seconds: Vec<f64>,
     requirements: &RenderDataRequirements,
 ) -> DenseActivityReport {
     // ── Phase 1: build the canonical frame timeline ──────────────────────
     // Every enabled series uses this same target vector so all rendered
     // values and widgets stay frame-aligned.
-    let duration = trimmed
-        .sample_elapsed_seconds
-        .last()
-        .copied()
-        .unwrap_or_default();
-    let frame_elapsed_seconds = build_target_x_values(duration, fps);
-
     // ── Phase 2: interpolate distance progress, course, timestamps ───────
     // Distance progress is absolute (not trim-relative) so route/elevation
     // widgets can use it without additional normalization.
@@ -362,6 +356,34 @@ pub fn densify_activity(
                 requirements.g_force,
                 crate::MetricKind::GForce,
             ),
+            rpm: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.rpm,
+                &frame_elapsed_seconds,
+                requirements.rpm,
+                crate::MetricKind::Rpm,
+            ),
+            throttle_position: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.throttle_position,
+                &frame_elapsed_seconds,
+                requirements.throttle_position,
+                crate::MetricKind::ThrottlePosition,
+            ),
+            brake_position: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.brake_position,
+                &frame_elapsed_seconds,
+                requirements.brake_position,
+                crate::MetricKind::BrakePosition,
+            ),
+            lean_angle: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.lean_angle,
+                &frame_elapsed_seconds,
+                requirements.lean_angle,
+                crate::MetricKind::LeanAngle,
+            ),
             air_pressure: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.air_pressure,
@@ -460,13 +482,15 @@ pub fn densify_activity(
                 requirements.color_temperature,
                 crate::MetricKind::ColorTemperature,
             ),
-            gear_position: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.gear_position,
-                &frame_elapsed_seconds,
-                requirements.gear_position,
-                crate::MetricKind::GearPosition,
-            ),
+            gear_position: if requirements.gear_position {
+                densify_hold_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.gear_position,
+                    &frame_elapsed_seconds,
+                )
+            } else {
+                Vec::new()
+            },
             vertical_ratio: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.vertical_ratio,

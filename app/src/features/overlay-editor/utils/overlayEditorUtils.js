@@ -143,7 +143,7 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
  * @param {number[]} xValues - X-axis sample values (monotonic).
  * @param {number[]} yValues - Y-axis sample values aligned with xValues.
  * @param {number} targetX - Requested X value.
- * @returns {number|null} Held Y value, or null if no valid sample exists before targetX.
+ * @returns {number|string|null} Held value, or null if no valid sample exists before targetX.
  */
 export function getHoldSeriesValue(xValues, yValues, targetX) {
   if (!Array.isArray(xValues) || !Array.isArray(yValues) || !xValues.length) {
@@ -172,8 +172,8 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
 
   if (bestIndex === -1) {
     for (let i = 0; i < xValues.length && i < yValues.length; i += 1) {
-      if (isValidInterpolatedSample(xValues, yValues, i)) {
-        return Number(yValues[i])
+      if (Number.isFinite(xValues[i]) && yValues[i] !== null && yValues[i] !== undefined) {
+        return yValues[i]
       }
     }
 
@@ -182,8 +182,8 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
 
   // Walk backward from bestIndex to find the first non-null Y value
   for (let i = bestIndex; i >= 0; i -= 1) {
-    if (Number.isFinite(yValues[i])) {
-      return Number(yValues[i])
+    if (yValues[i] !== null && yValues[i] !== undefined) {
+      return yValues[i]
     }
   }
 
@@ -197,7 +197,7 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
  * @param {object|null} activity - Parsed activity data.
  * @param {string} key - Activity series key (e.g. 'speed', 'heartrate').
  * @param {number} elapsedSecond - Target elapsed second.
- * @returns {number|null} Interpolated value or preview default.
+ * @returns {number|string|null} Interpolated value or preview default.
  */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []

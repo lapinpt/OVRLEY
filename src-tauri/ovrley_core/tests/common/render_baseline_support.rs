@@ -16,11 +16,11 @@ use anyhow::{anyhow, bail, Context, Result};
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::validate_config_value;
-use ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary;
-use ovrley_core::encode::video::{
-    render_composite_video, render_video, rendered_frame_count, CompositeRenderRequest,
-    RenderController,
-};
+use ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use ovrley_core::encode::pipeline::composite::render_composite_video;
+use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
+use ovrley_core::encode::pipeline::transparent::{render_video, rendered_frame_count};
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::{video_probe::probe_video, SourceVideoMetadata};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::render_preview_to_path;
@@ -244,13 +244,10 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
 
     let validated =
         validate_config_value(&config_value).context("failed to validate transparent config")?;
-    let scene = validated.scene.clone();
     let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for transparent case")?;
-    let total_frames = rendered_frame_count(
-        dense_activity.frame_count,
-        validated.widget_update_rate() as usize,
-    ) as u32;
+    let total_frames =
+        rendered_frame_count(dense_activity.frame_count, validated.widget_update_rate())? as u32;
     let controller = RenderController::default();
     controller
         .try_start(total_frames, &format!("transparent baseline {}", case.name))
@@ -271,8 +268,8 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         .context("failed to probe transparent output")?;
     assert_video_metadata(
         &metadata,
-        scene.width,
-        scene.height,
+        validated.scene.width,
+        validated.scene.height,
         validated.container_fps().round() as u32,
         1,
         &case.expected_codec_name,
@@ -351,9 +348,10 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     scene.insert("composite_widget_update_rate".to_string(), json!(1));
 
     // ── Phase 4: build dense activity and prepare render controller ──
-    let validated =
+    let mut validated =
         validate_config_value(&config_value).context("failed to validate composite config")?;
-    let scene = validated.scene.clone();
+    let render_plan = derive_composite_render_plan(&mut validated.scene, None)
+        .context("failed to derive composite render plan")?;
     let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for composite case")?;
     let total_frames = (case.duration_seconds * f64::from(source_fps_num)
@@ -366,30 +364,15 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         .context("failed to start composite render controller")?;
 
     // ── Phase 5: dispatch composite render through public entry point ──
-    let filename = render_composite_video(&CompositeRenderRequest {
-        paths: &runtime.app_paths,
-        config: &validated,
-        activity: &activity,
-        dense_activity: &dense_activity,
-        controller: &controller,
-        composite_video_path: validated
-            .scene
-            .composite_video_path
-            .as_deref()
-            .ok_or_else(|| anyhow!("missing composite video path"))?,
-        composite_bitrate: validated
-            .scene
-            .composite_bitrate
-            .as_deref()
-            .ok_or_else(|| anyhow!("missing composite bitrate"))?,
-        composite_sync_offset: case.sync_offset,
-        composite_video_fps_num: source_fps_num,
-        composite_video_fps_den: source_fps_den,
-        composite_video_duration: source_duration,
-        composite_render_duration: case.duration_seconds,
-        composite_video_trim_start: case.trim_start_seconds,
-        composite_widget_update_rate: 1,
-    })
+    let filename = render_composite_video(
+        &runtime.app_paths,
+        &validated,
+        &activity,
+        &dense_activity,
+        &controller,
+        render_plan,
+        true,
+    )
     .context("composite render failed")?;
     let output_path = runtime.app_paths.downloads_dir.join(filename);
     assert_nonempty_output(&output_path)?;
@@ -404,8 +387,8 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     };
     assert_video_metadata(
         &output_metadata,
-        scene.width,
-        scene.height,
+        validated.scene.width,
+        validated.scene.height,
         source_fps_num,
         source_fps_den,
         &case.expected_codec_name,

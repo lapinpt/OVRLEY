@@ -6,7 +6,7 @@ import { useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { isInteractiveElement } from '@/lib/utils'
 import useStore from '@/store/useStore'
-import { formatTimelineTime } from '../utils/playerTiming'
+import { formatTimelineTime, snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
 import useExportRangeTimeline from './useExportRangeTimeline'
 import usePlaybackEngine from './usePlaybackEngine'
@@ -42,6 +42,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
       commitPreviewScrub: state.commitPreviewScrub,
       fallbackDurationSeconds: state.fallbackDurationSeconds,
       importedVideoDuration: state.importedVideoDuration,
+      importedVideoFps: state.importedVideoFps,
       importedVideoPath: state.importedVideoPath,
       pausePreviewPlayback: state.pausePreviewPlayback,
       toggleVideoMute: state.toggleVideoMute,
@@ -60,7 +61,13 @@ export default function useOverlayPlayer({ backgroundMode }) {
 
   // Durable domains - each hook owns behavior for one player concern, while this hook wires them together.
   const playback = usePlaybackEngine({ ...playerStore, backgroundMode })
-  const exportTimeline = useExportRangeTimeline({ totalDuration: playback.totalDuration })
+  const exportBoundarySecond = playback.importedVideoPath
+    ? snapTimelineSecondToFrame(playback.displayedPlayhead, playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
+    : playback.displayedPlayhead
+  const exportTimeline = useExportRangeTimeline({
+    defaultEndSecond: playback.importedVideoPath ? playback.videoSyncOffsetSeconds + playback.importedVideoDuration : playback.totalDuration,
+    totalDuration: playback.totalDuration,
+  })
   const gestures = useTimelineGestures({
     cancelMarkerPreview: exportTimeline.cancelMarkerPreview,
     commitMarker: exportTimeline.commitMarker,
@@ -236,6 +243,14 @@ export default function useOverlayPlayer({ backgroundMode }) {
       widthPx: viewport.widthPx,
     },
     toolbar: {
+      exportRange: {
+        clear: exportTimeline.clear,
+        isCustom: exportTimeline.isCustom,
+        isDisabled: !hasActivityData && !hasVideo,
+        label: exportTimeline.rangeLabel,
+        setEnd: () => exportTimeline.setBoundary('to', exportBoundarySecond),
+        setStart: () => exportTimeline.setBoundary('from', exportBoundarySecond),
+      },
       fitTargets,
       resetView: {
         disabled: viewport.isFullTimelineVisible,

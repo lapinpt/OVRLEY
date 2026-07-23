@@ -9,7 +9,7 @@
 //! Phase 0 intentionally uses the standard gradient derivation for every format;
 //! the legacy GPX path is not ported.
 
-use crate::activity::schema::{ActivityColumns, NumericSeries};
+use crate::activity::schema::{ActivityColumns, GearSeries, NumericSeries};
 use crate::media::telemetry_math::{bearing_degrees, finite_f64, round_f64};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -17,9 +17,15 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug)]
 pub struct MetricDescriptor {
     /// Final metric values aligned with raw sample order.
-    pub series: NumericSeries,
+    pub series: MetricSeries,
     /// Provenance summary used by parser coverage diagnostics.
     pub source: MetricSource,
+}
+
+#[derive(Clone, Debug)]
+pub enum MetricSeries {
+    Numeric(NumericSeries),
+    Gear(GearSeries),
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -35,6 +41,35 @@ pub enum MetricSource {
     Missing,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetricCoverage {
+    source: MetricSource,
+    available_count: usize,
+    total_samples: usize,
+}
+
+impl MetricCoverage {
+    fn from_series<T>(series: &[Option<T>], source: MetricSource) -> Self {
+        Self {
+            source,
+            available_count: series.iter().filter(|value| value.is_some()).count(),
+            total_samples: series.len(),
+        }
+    }
+
+    fn from_descriptor(descriptor: &MetricDescriptor) -> Self {
+        match &descriptor.series {
+            MetricSeries::Numeric(series) => Self::from_series(series, descriptor.source),
+            MetricSeries::Gear(series) => Self::from_series(series, descriptor.source),
+        }
+    }
+
+    pub fn is_available(&self) -> bool {
+        self.available_count > 0
+    }
+}
+
 /// Builds frontend-compatible coverage JSON from finalized descriptors.
 ///
 /// Coverage is calculated after direct/derived combination so it reports what
@@ -42,24 +77,12 @@ pub enum MetricSource {
 /// include.
 pub fn build_metric_coverage(
     metric_series_map: &BTreeMap<String, MetricDescriptor>,
-) -> serde_json::Value {
-    let mut coverage = serde_json::Map::new();
+) -> BTreeMap<String, MetricCoverage> {
+    let mut coverage = BTreeMap::new();
     for (metric, descriptor) in metric_series_map {
-        let available_count = descriptor
-            .series
-            .iter()
-            .filter(|value| value.is_some())
-            .count();
-        coverage.insert(
-            metric.clone(),
-            serde_json::json!({
-                "source": descriptor.source,
-                "availableCount": available_count,
-                "totalSamples": descriptor.series.len(),
-            }),
-        );
+        coverage.insert(metric.clone(), MetricCoverage::from_descriptor(descriptor));
     }
-    serde_json::Value::Object(coverage)
+    coverage
 }
 
 /// Smooths elevation locally before gradient derivation.
@@ -368,7 +391,26 @@ fn combine_series(
     };
 
     MetricDescriptor {
-        series: combined,
+        series: MetricSeries::Numeric(combined),
+        source,
+    }
+}
+
+/// Selects one complete source series without repairing holes in direct data.
+fn select_series(primary: &NumericSeries, fallback: &NumericSeries) -> MetricDescriptor {
+    if primary.iter().any(Option::is_some) {
+        return MetricDescriptor {
+            series: MetricSeries::Numeric(primary.clone()),
+            source: MetricSource::Direct,
+        };
+    }
+    let source = if fallback.iter().any(Option::is_some) {
+        MetricSource::Derived
+    } else {
+        MetricSource::Missing
+    };
+    MetricDescriptor {
+        series: MetricSeries::Numeric(fallback.clone()),
         source,
     }
 }
@@ -417,33 +459,61 @@ pub fn derive_activity_metric_series(
     map.insert(
         "distance".to_string(),
         MetricDescriptor {
-            series: direct["distance"].clone(),
+            series: MetricSeries::Numeric(direct["distance"].clone()),
             source: MetricSource::Direct,
         },
     );
     insert_metric!("elevation", &null_series);
+    insert_metric!("brake_position", &null_series);
     insert_metric!("g_force", &null_series);
-    insert_metric!("gear_position", &null_series);
+    insert_metric!("g_force_x", &null_series);
+    insert_metric!("g_force_y", &null_series);
+    insert_metric!("g_force_z", &null_series);
+    map.insert(
+        "gear_position".to_string(),
+        MetricDescriptor {
+            series: MetricSeries::Gear(columns.gear_position.clone()),
+            source: if columns.gear_position.iter().any(Option::is_some) {
+                MetricSource::Direct
+            } else {
+                MetricSource::Missing
+            },
+        },
+    );
     map.insert(
         "gradient".to_string(),
         combine_series(&derived_gradient, &direct["gradient"], true),
     );
     insert_metric!("ground_contact_time", &null_series);
-    insert_metric!("heading", &derived_heading);
+    map.insert(
+        "heading".to_string(),
+        if columns.preserve_direct_metric_gaps.heading {
+            select_series(&direct["heading"], &derived_heading)
+        } else {
+            combine_series(&direct["heading"], &derived_heading, false)
+        },
+    );
     insert_metric!("heartrate", &null_series);
     insert_metric!("left_right_balance", &null_series);
+    insert_metric!("lean_angle", &null_series);
     map.insert(
         "pace".to_string(),
         combine_series(&direct["pace"], &derived_pace, false),
     );
     insert_metric!("power", &null_series);
+    insert_metric!("rpm", &null_series);
     map.insert(
         "speed".to_string(),
-        combine_series(&direct["speed"], &derived_speed, false),
+        if columns.preserve_direct_metric_gaps.speed {
+            select_series(&direct["speed"], &derived_speed)
+        } else {
+            combine_series(&direct["speed"], &derived_speed, false)
+        },
     );
     insert_metric!("stride_length", &null_series);
     insert_metric!("stroke_rate", &null_series);
     insert_metric!("temperature", &null_series);
+    insert_metric!("throttle_position", &null_series);
     map.insert(
         "torque".to_string(),
         combine_series(&direct["torque"], &derived_torque, false),
@@ -491,19 +561,25 @@ fn direct_metrics(
     collect!("core_temperature", core_temperature);
     direct.insert("distance", distance_series.clone());
     direct.insert("elevation", elevation_base_series.clone());
+    collect!("brake_position", brake_position);
     collect!("g_force", g_force);
-    collect!("gear_position", gear_position);
+    collect!("g_force_x", g_force_x);
+    collect!("g_force_y", g_force_y);
+    collect!("g_force_z", g_force_z);
     collect!("gradient", gradient);
     collect!("ground_contact_time", ground_contact_time);
     collect!("heading", heading);
     collect!("heartrate", heartrate);
     collect!("left_right_balance", left_right_balance);
+    collect!("lean_angle", lean_angle);
     collect!("pace", pace);
     collect!("power", power);
+    collect!("rpm", rpm);
     collect!("speed", speed);
     collect!("stride_length", stride_length);
     collect!("stroke_rate", stroke_rate);
     collect!("temperature", temperature);
+    collect!("throttle_position", throttle_position);
     collect!("torque", torque);
     collect!("vertical_oscillation", vertical_oscillation);
     collect!("vertical_speed", vertical_speed);

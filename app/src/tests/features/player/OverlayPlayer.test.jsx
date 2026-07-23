@@ -47,7 +47,7 @@ describe('OverlayPlayer', () => {
 
     expect(screen.getByRole('group', { name: 'Timeline' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Activity' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByLabelText('ride.fit')).toBeInTheDocument()
   })
 

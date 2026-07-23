@@ -2,7 +2,7 @@
  * GPX parser - extracts browser-parsed track points into RawActivity.
  */
 
-import { safeNumber } from './raw-sample-utils.js'
+import { safeGearValue, safeNumber } from './raw-sample-utils.js'
 
 function normalizeExtensionKey(value) {
   return String(value || '')
@@ -25,18 +25,22 @@ function collectLeafExtensionValues(element, target) {
   childElements.forEach((child) => collectLeafExtensionValues(child, target))
 }
 
-function readTrackPointMetric(extensionValues, aliases) {
+function readTrackPointValue(extensionValues, aliases, parseValue) {
   for (const alias of aliases) {
     const normalizedAlias = normalizeExtensionKey(alias)
     if (!(normalizedAlias in extensionValues)) continue
 
-    const numericValue = safeNumber(extensionValues[normalizedAlias])
-    if (numericValue !== null) {
-      return numericValue
+    const value = parseValue(extensionValues[normalizedAlias])
+    if (value !== null) {
+      return value
     }
   }
 
   return null
+}
+
+function readTrackPointMetric(extensionValues, aliases) {
+  return readTrackPointValue(extensionValues, aliases, safeNumber)
 }
 
 export function parseGpxActivityFile(file, textContent) {
@@ -80,7 +84,7 @@ export function parseGpxActivityFile(file, textContent) {
       distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),
       elevation,
       g_force: readTrackPointMetric(extensionValues, ['g_force', 'gforce']),
-      gear_position: readTrackPointMetric(extensionValues, ['gear_position', 'gear', 'gear_ratio']),
+      gear_position: readTrackPointValue(extensionValues, ['gear_position', 'gear', 'gear_ratio'], safeGearValue),
       gradient: readTrackPointMetric(extensionValues, ['gradient', 'grade', 'slope']),
       ground_contact_time: readTrackPointMetric(extensionValues, ['ground_contact_time', 'groundcontacttime', 'stance_time']),
       heading: readTrackPointMetric(extensionValues, ['heading', 'course', 'bearing', 'gps_heading']),

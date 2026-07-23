@@ -16,9 +16,12 @@ use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata
 use crate::runtime_paths;
 use crate::video_server::VideoServerHandle;
 use crate::BackendState;
+use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
 use std::path::PathBuf;
 use tauri::AppHandle;
+
+const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
 
 /// Serializes a `Serialize` value into a JSON string or maps an error to a
 /// `String`, consolidating the repeated `.map_err(|e| e.to_string())?;
@@ -45,6 +48,12 @@ pub(crate) async fn backend_health(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub(crate) async fn backend_current_os() -> Result<String, String> {
     serialize_command_result(&commands::backend_current_os())
+}
+
+/// Opens the official Microsoft Store page for Windows HEVC playback support.
+#[tauri::command]
+pub(crate) async fn backend_open_hevc_support() -> Result<(), String> {
+    open::that(WINDOWS_HEVC_EXTENSION_URL).map_err(|error| error.to_string())
 }
 
 /// Lists bundled and system fonts available to the backend renderer.
@@ -88,6 +97,24 @@ pub(crate) async fn backend_finalize_activity(
         &runtime_paths::app_paths(&app)?,
         &raw_activity_json,
     ))
+}
+
+/// Parses a native CSV path through the core columnar activity pipeline.
+#[tauri::command]
+pub(crate) async fn backend_parse_csv_activity(
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    commands::backend_parse_csv_activity(&path).map_err(|error| error.to_string())
+}
+
+/// Parses a native VBO path through the core columnar activity pipeline.
+#[tauri::command]
+pub(crate) async fn backend_parse_vbo_activity(
+    app: AppHandle,
+    path: String,
+) -> Result<FinalizeActivityResponse, String> {
+    commands::backend_parse_vbo_activity(&runtime_paths::app_paths(&app)?, &path)
+        .map_err(|error| error.to_string())
 }
 
 /// Renders one transparent preview PNG for the requested second.
@@ -245,11 +272,9 @@ pub(crate) async fn backend_import_preview_video(
 pub(crate) async fn backend_extract_video_telemetry(
     app: AppHandle,
     file_path: String,
-) -> Result<String, String> {
-    call_and_serialize(commands::backend_extract_video_telemetry(
-        &runtime_paths::app_paths(&app)?,
-        &file_path,
-    ))
+) -> Result<Option<FinalizeActivityResponse>, String> {
+    commands::backend_extract_video_telemetry(&runtime_paths::app_paths(&app)?, &file_path)
+        .map_err(|error| error.to_string())
 }
 
 /// Clears the currently registered local HTTP preview video.

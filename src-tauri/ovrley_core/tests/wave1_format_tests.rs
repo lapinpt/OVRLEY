@@ -39,6 +39,16 @@ fn value_config_json(value_type: &str, overrides: &[(&str, &str)]) -> String {
 
 fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
     let mut s = common::builders::empty_dense_series();
+    if series_key == "gear_position" {
+        s.gear_position = vec![raw.map(|value| value.to_string())];
+        return DenseActivityReport {
+            series: s,
+            frame_count: 1,
+            frame_elapsed_seconds: vec![0.0],
+            frame_distance_progress: vec![],
+            full_activity_distance: None,
+        };
+    }
     let series = vec![raw];
     match series_key {
         "pace" => s.pace = series,
@@ -50,7 +60,6 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         "stroke_rate" => s.stroke_rate = series,
         "torque" => s.torque = series,
         "vertical_speed" => s.vertical_speed = series,
-        "gear_position" => s.gear_position = series,
         "vertical_oscillation" => s.vertical_oscillation = series,
         "altitude" => s.altitude = series,
         "iso" => s.iso = series,
@@ -76,6 +85,14 @@ fn format_parts(
     raw: Option<f64>,
     overrides: &[(&str, &str)],
 ) -> (String, Option<String>) {
+    format_parts_for_activity(kind, activity_for(series_key, raw), overrides)
+}
+
+fn format_parts_for_activity(
+    kind: &str,
+    report: DenseActivityReport,
+    overrides: &[(&str, &str)],
+) -> (String, Option<String>) {
     let mut defaults: Vec<(&str, &str)> = overrides.to_vec();
     if !overrides.iter().any(|(k, _)| *k == "show_units") {
         defaults.push(("show_units", "false"));
@@ -90,7 +107,6 @@ fn format_parts(
     let config = config_json(&format!("[{}]", vc_json));
     let validated =
         common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
-    let report = activity_for(series_key, raw);
     let parts = format_validated_metric_parts(&validated, &report, 0);
     match parts {
         Some(p) => (p.value_text, p.unit_text),
@@ -335,6 +351,26 @@ fn gear_position_formats_as_integer_no_units_by_default() {
     );
     assert_eq!(value, "5");
     assert_eq!(unit, None);
+}
+
+#[test]
+fn gear_position_formats_zero_as_neutral() {
+    let (value, _) = format_parts(
+        "gear_position",
+        "gear_position",
+        Some(0.0),
+        &[("display_unit", r#""gear""#)],
+    );
+    assert_eq!(value, "N");
+}
+
+#[test]
+fn gear_position_preserves_drivetrain_label() {
+    let mut report = activity_for("gear_position", None);
+    report.series.gear_position = vec![Some("52-34".to_string())];
+    let (value, _) =
+        format_parts_for_activity("gear_position", report, &[("display_unit", r#""gear""#)]);
+    assert_eq!(value, "52-34");
 }
 
 #[test]

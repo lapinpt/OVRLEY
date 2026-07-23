@@ -16,12 +16,11 @@ function applyParsedDataToScene(state, activity) {
     return
   }
 
-  const wholeSeconds = Math.floor(durationSeconds)
-  state.fallbackDurationSeconds = wholeSeconds
+  state.fallbackDurationSeconds = durationSeconds
   state.startSecond = 0
-  state.endSecond = wholeSeconds
+  state.endSecond = durationSeconds
   state.selectedSecond = 0
-  syncSceneTimingToConfig(state, { startSecond: 0, endSecond: wholeSeconds })
+  syncSceneTimingToConfig(state, { startSecond: 0, endSecond: durationSeconds })
 
   if (state.config?.plots) {
     const coursePoints = activity?.sample_course_points
@@ -120,7 +119,7 @@ export function createMediaSlice(set, get) {
       let summary = null
       if (activity) {
         summary = {
-          durationSeconds: activity.metadata?.duration_seconds ?? 0,
+          durationSeconds: getDurationSeconds(activity),
           endTime: activity.metadata?.end_time ?? null,
           extendedAttributes: activity.extended_attributes || [],
           fileFormat: activity.file_format || null,

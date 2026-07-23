@@ -68,12 +68,18 @@ fn missing_data_shows_placeholder() {
 
 #[test]
 fn sign_hidden_when_show_sign_false() {
-    assert_eq!(format_gradient(Some(5.0), &[("show_sign", "false")]), "5.0%");
+    assert_eq!(
+        format_gradient(Some(5.0), &[("show_sign", "false")]),
+        "5.0%"
+    );
 }
 
 #[test]
 fn negative_hidden_when_show_sign_false() {
-    assert_eq!(format_gradient(Some(-3.0), &[("show_sign", "false")]), "3.0%");
+    assert_eq!(
+        format_gradient(Some(-3.0), &[("show_sign", "false")]),
+        "3.0%"
+    );
 }
 
 #[test]

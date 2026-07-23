@@ -175,8 +175,16 @@
     "overrides": {
       "heading": ["text", "heading_tape"],
       "core_temperature": ["text"],
+      "gear_position": ["text"],
       "left_right_balance": ["text"],
-      "time": ["text"]
+      "time": ["text"],
+      "lean_angle": ["text"],
+      "iso": ["text"],
+      "aperture": ["text"],
+      "shutter_speed": ["text"],
+      "focal_length": ["text"],
+      "ev": ["text"],
+      "color_temperature": ["text"]
     }
   },
   "definitions": [
@@ -608,14 +616,14 @@
         }
       ],
       "showUnitsByDefault": false,
-      "formatter": "integer",
-      "interpolation": "linear",
+      "formatter": "gear",
+      "interpolation": "hold",
       "unitsMode": "selectable",
       "icon": {
         "source": "custom",
         "assetFile": "widget-gear-position.svg"
       },
-      "category": "cycling"
+      "category": "motosports"
     },
     {
       "type": "vertical_ratio",
@@ -869,6 +877,91 @@
         "assetFile": "widget-color-temperature.svg"
       },
       "category": "camera"
+    },
+    {
+      "type": "rpm",
+      "current": true,
+      "label": "RPM",
+      "defaultDisplayUnit": "rpm",
+      "supportedDisplayUnits": [
+        {
+          "value": "rpm",
+          "label": "RPM"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "lucide",
+        "name": "CircleGauge",
+        "assetFile": "widget-rpm.svg"
+      },
+      "category": "motosports"
+    },
+    {
+      "type": "throttle_position",
+      "current": true,
+      "label": "Throttle Position",
+      "defaultDisplayUnit": "percent",
+      "supportedDisplayUnits": [
+        {
+          "value": "percent",
+          "label": "%"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-throttle-position.svg"
+      },
+      "category": "motosports"
+    },
+    {
+      "type": "brake_position",
+      "current": true,
+      "label": "Brake Position",
+      "defaultDisplayUnit": "percent",
+      "supportedDisplayUnits": [
+        {
+          "value": "percent",
+          "label": "%"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-brake-position.svg"
+      },
+      "category": "motosports"
+    },
+    {
+      "type": "lean_angle",
+      "current": true,
+      "label": "Lean Angle",
+      "defaultDisplayUnit": "degrees",
+      "supportedDisplayUnits": [
+        {
+          "value": "degrees",
+          "label": "°"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-lean-angle.svg"
+      },
+      "category": "motosports"
     }
   ]
 }

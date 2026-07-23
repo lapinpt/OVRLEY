@@ -64,14 +64,18 @@ fn render_data_requirements_heading_derived_from_metric_kind() {
 
 #[test]
 fn heading_trimmed_and_densified_with_forward_fill() {
-    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 
     let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 0.5, 1.0]);
     trimmed.heading = vec![Some(90.0), None, Some(180.0)];
     let mut requirements = RenderDataRequirements::default();
     requirements.heading = true;
 
-    let report = densify_activity(&trimmed, 30.0, &requirements);
+    let report = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 30.0).unwrap(),
+        &requirements,
+    );
 
     assert_eq!(report.frame_count, 30);
     assert_eq!(report.series.heading.len(), 30);
@@ -87,13 +91,17 @@ fn heading_trimmed_and_densified_with_forward_fill() {
 
 #[test]
 fn heading_not_densified_when_not_required() {
-    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 
     let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
     trimmed.heading = vec![Some(90.0), Some(180.0)];
     let requirements = RenderDataRequirements::default();
 
-    let report = densify_activity(&trimmed, 30.0, &requirements);
+    let report = densify_activity(
+        &trimmed,
+        frame_timeline_for_fps(1.0, 30.0).unwrap(),
+        &requirements,
+    );
     assert!(report.series.heading.is_empty());
 }
 

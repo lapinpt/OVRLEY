@@ -58,7 +58,7 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
         </div>
         <div>
           <h2 className="text-xl font-bold text-foreground">{isFinalizing ? 'Finalizing Video' : 'Exporting Overlay'}</h2>
-          <p className="text-sm text-muted-foreground">{subMessage}</p>
+          <p className="text-sm tabular-nums text-muted-foreground">{subMessage}</p>
           {renderSummaryItems.length > 0 && (
             <p className="pt-8 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-[0.65rem] text-muted-foreground/55">
               {renderSummaryItems.map((item, index) => (
@@ -73,7 +73,7 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
       </div>
 
       <div className="space-y-3 pt-6">
-        <div className="flex justify-between text-xs font-medium">
+        <div className="flex justify-between text-xs font-medium tabular-nums">
           <span className="text-primary">{percent}% Complete</span>
           <span className="text-muted-foreground">
             {current.toLocaleString()} / {total.toLocaleString()} frames
@@ -89,14 +89,14 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
               <Activity className="h-3.5 w-3.5" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Render FPS</span>
             </div>
-            <span className="text-lg font-mono font-bold text-foreground">{formatFps(renderingFps)}</span>
+            <span className="text-lg font-mono font-bold tabular-nums text-foreground">{formatFps(renderingFps)}</span>
           </div>
           <div className="flex flex-col items-center">
             <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
               <Timer className="h-3.5 w-3.5" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Est. Remaining</span>
             </div>
-            <span className="text-lg font-mono font-bold text-foreground">{formatTime(estimatedSecondsRemaining)}</span>
+            <span className="text-lg font-mono font-bold tabular-nums text-foreground">{formatTime(estimatedSecondsRemaining)}</span>
           </div>
         </div>
       )}

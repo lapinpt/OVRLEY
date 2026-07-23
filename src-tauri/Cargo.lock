@@ -99,6 +99,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "log",
+ "open",
  "ovrley_core",
  "serde",
  "serde_json",
@@ -2604,6 +2605,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "csv",
  "log",
  "open",
  "serde",

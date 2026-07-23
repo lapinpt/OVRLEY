@@ -32,10 +32,12 @@ mod video_server_tests;
 
 mod file_ops;
 mod preview_import;
+mod progress_sink;
 mod runtime_paths;
 mod tauri_commands;
 
-use ovrley_core::encode::video::RenderController;
+use ovrley_core::encode::progress::RenderController;
+use std::sync::Arc;
 use tauri::Manager;
 
 pub(crate) struct BackendState {
@@ -44,24 +46,27 @@ pub(crate) struct BackendState {
 
 /// Builds and runs the Tauri application.
 ///
-/// The setup hook installs development logging when appropriate and starts the
-/// loopback preview video server before the frontend can invoke commands.
+/// The setup hook installs development logging when appropriate, starts the
+/// loopback preview video server, and constructs the `RenderController` with a
+/// `TauriProgressSink` wired to the `AppHandle` so live progress flows to the
+/// frontend as `render-progress` events (no polling). All of this happens
+/// before the frontend can invoke commands.
 pub fn run() {
     let video_server = video_server::VideoServerHandle::new();
 
     tauri::Builder::default()
-        .manage(BackendState {
-            render_controller: RenderController::default(),
-        })
         .manage(video_server)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             tauri_commands::backend_health,
             tauri_commands::backend_current_os,
+            tauri_commands::backend_open_hevc_support,
             tauri_commands::backend_list_system_fonts,
             tauri_commands::backend_render,
             tauri_commands::backend_finalize_activity,
+            tauri_commands::backend_parse_csv_activity,
+            tauri_commands::backend_parse_vbo_activity,
             tauri_commands::backend_render_preview_frame,
             tauri_commands::backend_progress,
             tauri_commands::backend_cancel,
@@ -92,6 +97,16 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Wire the render controller to a Tauri event-emitting sink before
+            // any command can be invoked: the frontend subscribes to
+            // `render-progress` events instead of polling `backend_progress`.
+            app.manage(BackendState {
+                render_controller: RenderController::with_sink(Arc::new(
+                    progress_sink::TauriProgressSink::new(app.handle().clone()),
+                )),
+            });
+
             app.state::<video_server::VideoServerHandle>().start()?;
 
             #[cfg(not(target_os = "macos"))]

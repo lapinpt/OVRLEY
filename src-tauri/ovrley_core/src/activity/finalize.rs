@@ -18,12 +18,15 @@ use crate::activity::finalize::gap::{
     build_distance_series, build_progress_series, insert_idle_gap_samples, skipped_gap_debug,
 };
 use crate::activity::finalize::metrics::{
-    build_metric_coverage, derive_activity_metric_series, MetricDescriptor,
+    build_metric_coverage, derive_activity_metric_series, MetricCoverage, MetricDescriptor,
+    MetricSeries,
 };
 use crate::activity::finalize::smoothing::{
     circular_ema, smoothing_window_for_seconds, zero_phase_smooth,
 };
-use crate::activity::schema::{ActivityColumns, ParsedActivity, RawActivity, RawSample};
+use crate::activity::schema::{
+    ActivityColumns, GearSeries, ParsedActivity, RawActivity, RawSample,
+};
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{finite_f64, round_f64};
 use chrono::{DateTime, Utc};
@@ -52,17 +55,24 @@ const EXTENDED_ACTIVITY_ATTRIBUTES: &[&str] = &[
     "distance",
     "ev",
     "focal_length",
+    "brake_position",
     "g_force",
+    "g_force_x",
+    "g_force_y",
+    "g_force_z",
     "gear_position",
     "ground_contact_time",
     "heading",
     "iso",
     "left_right_balance",
+    "lean_angle",
     "pace",
+    "rpm",
     "shutter_speed",
     "stroke_rate",
     "stride_length",
     "torque",
+    "throttle_position",
     "vertical_oscillation",
     "vertical_speed",
 ];
@@ -193,13 +203,14 @@ fn finalize_columns_with_debug(
 
     let time_series = build_time_series(columns);
     let course_series = build_course_series(columns);
+    let elapsed_series = build_elapsed_series(columns, &time_series);
     let direct_distance_series: Vec<Option<f64>> = columns
         .distance
         .iter()
         .map(|value| value.and_then(finite_f64))
         .collect();
-    let distance_series = build_distance_series(&course_series, &direct_distance_series);
-    let elapsed_series = build_elapsed_series(columns, &time_series);
+    let distance_series =
+        build_distance_series(&course_series, &direct_distance_series, &elapsed_series);
     let elevation_base_series: Vec<Option<f64>> = columns
         .elevation
         .iter()
@@ -218,8 +229,9 @@ fn finalize_columns_with_debug(
         &columns.options.smoothing,
     );
 
-    let valid_attributes = build_valid_attributes(&metric_series_map, &course_series, &time_series);
-    let extended_attributes = build_extended_attributes(&metric_series_map);
+    let coverage = build_metric_coverage(&metric_series_map);
+    let valid_attributes = build_valid_attributes(&coverage, &course_series, &time_series);
+    let extended_attributes = build_extended_attributes(&coverage);
     let duration_seconds = elapsed_series.last().copied().unwrap_or(0.0);
     let total_distance_meters = distance_series.last().copied().flatten().unwrap_or(0.0);
     let first_sample_time = time_series.iter().find_map(Clone::clone);
@@ -231,7 +243,6 @@ fn finalize_columns_with_debug(
         .map(ToOwned::to_owned)
         .or(first_sample_time);
     let end_time = time_series.iter().rev().find_map(Clone::clone);
-    let coverage = build_metric_coverage(&metric_series_map);
     let distance_progress_series = build_progress_series(&distance_series);
 
     let mut metadata = columns.metadata.clone();
@@ -251,10 +262,14 @@ fn finalize_columns_with_debug(
             json!(round_f64(total_distance_meters, 3).unwrap_or(0.0)),
         );
         object.insert("sample_count".to_string(), json!(columns.len()));
-        object.insert(
-            "original_sample_count".to_string(),
-            json!(columns.original_sample_count),
-        );
+        if columns.include_original_sample_count_metadata {
+            object.insert(
+                "original_sample_count".to_string(),
+                json!(columns.original_sample_count),
+            );
+        } else {
+            object.remove("original_sample_count");
+        }
         object.insert(
             "inserted_idle_sample_count".to_string(),
             json!(gap_debug.inserted_sample_count),
@@ -263,7 +278,7 @@ fn finalize_columns_with_debug(
 
     let mut extra = BTreeMap::new();
     extra.insert("metric_units".to_string(), metric_units());
-    extra.insert("coverage".to_string(), coverage);
+    extra.insert("coverage".to_string(), json!(coverage));
     extra.insert("valid_attributes".to_string(), json!(valid_attributes));
     extra.insert(
         "extended_attributes".to_string(),
@@ -294,6 +309,13 @@ fn finalize_columns_with_debug(
         temperature: metric(&metric_series_map, "temperature"),
         pace: metric(&metric_series_map, "pace"),
         g_force: metric(&metric_series_map, "g_force"),
+        g_force_x: metric(&metric_series_map, "g_force_x"),
+        g_force_y: metric(&metric_series_map, "g_force_y"),
+        g_force_z: metric(&metric_series_map, "g_force_z"),
+        rpm: metric(&metric_series_map, "rpm"),
+        throttle_position: metric(&metric_series_map, "throttle_position"),
+        brake_position: metric(&metric_series_map, "brake_position"),
+        lean_angle: metric(&metric_series_map, "lean_angle"),
         air_pressure: metric(&metric_series_map, "air_pressure"),
         ground_contact_time: metric(&metric_series_map, "ground_contact_time"),
         left_right_balance: metric(&metric_series_map, "left_right_balance"),
@@ -308,7 +330,7 @@ fn finalize_columns_with_debug(
         focal_length: metric(&metric_series_map, "focal_length"),
         ev: metric(&metric_series_map, "ev"),
         color_temperature: metric(&metric_series_map, "color_temperature"),
-        gear_position: metric(&metric_series_map, "gear_position"),
+        gear_position: gear_metric(&metric_series_map),
         vertical_ratio: Vec::new(),
         vertical_oscillation: metric(&metric_series_map, "vertical_oscillation"),
         core_temperature: metric(&metric_series_map, "core_temperature"),
@@ -343,6 +365,7 @@ fn activity_columns_from_samples(
         file_format: raw_activity.file_format.clone(),
         metadata: raw_activity.metadata.clone(),
         options: raw_activity.options.clone(),
+        preserve_direct_metric_gaps: Default::default(),
         timestamp: raw_samples
             .iter()
             .map(|sample| sample.timestamp.clone())
@@ -362,6 +385,13 @@ fn activity_columns_from_samples(
         pace: collect!(pace),
         distance: collect!(distance),
         g_force: collect!(g_force),
+        g_force_x: raw_samples.iter().map(|_| None).collect(),
+        g_force_y: raw_samples.iter().map(|_| None).collect(),
+        g_force_z: raw_samples.iter().map(|_| None).collect(),
+        rpm: raw_samples.iter().map(|_| None).collect(),
+        throttle_position: raw_samples.iter().map(|_| None).collect(),
+        brake_position: raw_samples.iter().map(|_| None).collect(),
+        lean_angle: raw_samples.iter().map(|_| None).collect(),
         vertical_speed: collect!(vertical_speed),
         torque: collect!(torque),
         stroke_rate: collect!(stroke_rate),
@@ -371,7 +401,10 @@ fn activity_columns_from_samples(
         left_right_balance: collect!(left_right_balance),
         core_temperature: collect!(core_temperature),
         air_pressure: collect!(air_pressure),
-        gear_position: collect!(gear_position),
+        gear_position: raw_samples
+            .iter()
+            .map(|sample| sample.gear_position.clone())
+            .collect(),
         iso: collect!(iso),
         aperture: collect!(aperture),
         shutter_speed: collect!(shutter_speed),
@@ -379,6 +412,7 @@ fn activity_columns_from_samples(
         ev: collect!(ev),
         color_temperature: collect!(color_temperature),
         original_sample_count,
+        include_original_sample_count_metadata: true,
     }
 }
 
@@ -406,6 +440,13 @@ fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
         ("pace", columns.pace.len()),
         ("distance", columns.distance.len()),
         ("g_force", columns.g_force.len()),
+        ("g_force_x", columns.g_force_x.len()),
+        ("g_force_y", columns.g_force_y.len()),
+        ("g_force_z", columns.g_force_z.len()),
+        ("rpm", columns.rpm.len()),
+        ("throttle_position", columns.throttle_position.len()),
+        ("brake_position", columns.brake_position.len()),
+        ("lean_angle", columns.lean_angle.len()),
         ("vertical_speed", columns.vertical_speed.len()),
         ("torque", columns.torque.len()),
         ("stroke_rate", columns.stroke_rate.len()),
@@ -558,7 +599,7 @@ fn build_elapsed_series(columns: &ActivityColumns, time_series: &[Option<String>
 /// are checked directly; numeric attributes use the derived metric map to reflect
 /// both direct and fallback-derived availability.
 fn build_valid_attributes(
-    metric_series_map: &BTreeMap<String, MetricDescriptor>,
+    coverage: &BTreeMap<String, MetricCoverage>,
     course_series: &[(Option<f64>, Option<f64>)],
     time_series: &[Option<String>],
 ) -> Vec<String> {
@@ -574,9 +615,7 @@ fn build_valid_attributes(
             if key == "time" {
                 return time_series.iter().any(Option::is_some);
             }
-            metric_series_map
-                .get(key)
-                .is_some_and(|descriptor| descriptor.series.iter().any(Option::is_some))
+            coverage[key].is_available()
         })
         .map(|value| (*value).to_string())
         .collect()
@@ -586,15 +625,10 @@ fn build_valid_attributes(
 ///
 /// This is intentionally derived after metric combination so an attribute is
 /// advertised only when the renderer can actually read a non-null value.
-fn build_extended_attributes(
-    metric_series_map: &BTreeMap<String, MetricDescriptor>,
-) -> Vec<String> {
+fn build_extended_attributes(coverage: &BTreeMap<String, MetricCoverage>) -> Vec<String> {
     EXTENDED_ACTIVITY_ATTRIBUTES
         .iter()
-        .filter(|attribute| {
-            let key = **attribute;
-            metric_series_map[key].series.iter().any(Option::is_some)
-        })
+        .filter(|attribute| coverage[**attribute].is_available())
         .map(|value| (*value).to_string())
         .collect()
 }
@@ -605,11 +639,17 @@ fn build_extended_attributes(
 /// over a map for uniform combination/coverage logic; this helper keeps that
 /// impedance match local to final assembly.
 fn metric(metric_series_map: &BTreeMap<String, MetricDescriptor>, name: &str) -> Vec<Option<f64>> {
-    let series = metric_series_map
-        .get(name)
-        .map(|descriptor| descriptor.series.clone())
-        .unwrap_or_default();
-    strip_all_none(series)
+    let MetricSeries::Numeric(series) = &metric_series_map[name].series else {
+        unreachable!("numeric activity field mapped to gear series")
+    };
+    strip_all_none(series.clone())
+}
+
+fn gear_metric(metric_series_map: &BTreeMap<String, MetricDescriptor>) -> GearSeries {
+    let MetricSeries::Gear(series) = &metric_series_map["gear_position"].series else {
+        unreachable!("gear_position mapped to numeric series")
+    };
+    strip_all_none(series.clone())
 }
 
 /// Applies parser-requested smoothing after all direct/derived metrics exist.
@@ -630,7 +670,6 @@ fn apply_metric_smoothing(
         "color_temperature",
         "ev",
         "focal_length",
-        "gear_position",
         "iso",
         "left_right_balance",
         "shutter_speed",
@@ -656,15 +695,18 @@ fn apply_metric_smoothing(
         let Some(descriptor) = metric_series_map.get_mut(metric_name) else {
             continue;
         };
+        let MetricSeries::Numeric(series) = &mut descriptor.series else {
+            continue;
+        };
 
         match option.method.as_str() {
             "circular_ema" if metric_name == "heading" => {
-                descriptor.series = circular_ema(&descriptor.series);
+                *series = circular_ema(series);
             }
             "zero_phase_ma" if zero_phase_metrics.contains(metric_name.as_str()) => {
                 let window =
                     smoothing_window_for_seconds(&sample_timestamps_ms, option.window_seconds);
-                descriptor.series = zero_phase_smooth(&descriptor.series, window);
+                *series = zero_phase_smooth(series, window);
             }
             _ => {}
         }
@@ -687,7 +729,11 @@ fn metric_units() -> Value {
         "elevation": "m",
         "ev": "ev",
         "focal_length": "mm",
+        "brake_position": "percent",
         "g_force": "g",
+        "g_force_x": "g",
+        "g_force_y": "g",
+        "g_force_z": "g",
         "gear_position": "raw",
         "gradient": "percent",
         "ground_contact_time": "ms",
@@ -695,13 +741,16 @@ fn metric_units() -> Value {
         "heartrate": "bpm",
         "iso": "iso",
         "left_right_balance": "raw",
+        "lean_angle": "degrees",
         "pace": "seconds_per_km",
         "power": "watts",
+        "rpm": "rpm",
         "shutter_speed": "seconds",
         "speed": "mps",
         "stride_length": "raw",
         "stroke_rate": "strokes_per_minute",
         "temperature": "celsius",
+        "throttle_position": "percent",
         "torque": "nm",
         "vertical_oscillation": "raw",
         "vertical_speed": "mps",
@@ -729,7 +778,7 @@ pub fn write_activity_debug_file(
 
 /// Replaces an all-`None` series with an empty `Vec` to avoid shipping
 /// useless null-filled arrays to the frontend.
-fn strip_all_none(series: Vec<Option<f64>>) -> Vec<Option<f64>> {
+fn strip_all_none<T>(series: Vec<Option<T>>) -> Vec<Option<T>> {
     if series.iter().all(Option::is_none) {
         Vec::new()
     } else {

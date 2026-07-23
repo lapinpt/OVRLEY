@@ -1,5 +1,5 @@
 /**
- * Activity file import pipeline — orchestrates GPX/FIT parsing,
+ * Activity file import pipeline — orchestrates browser and native activity parsing,
  * cache update, and store synchronization.
  */
 
@@ -64,41 +64,17 @@ async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
   }
 }
 
-/**
- * Handles ensure file object.
- *
- * @param {*} fileOrPath - File object or path pointing to an activity file.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-async function ensureFileObject(fileOrPath) {
-  if (fileOrPath instanceof File) return fileOrPath
-
-  throw new Error('Activity import now requires a browser File object. Path-based imports are not supported in this phase.')
+function filenameFromNativePath(path) {
+  const filename = path.split(/[\\/]/).at(-1)
+  if (!filename) throw new Error(`Invalid activity path: ${path}`)
+  return filename
 }
 
-/**
- * Handles save file.
- *
- * @param {*} fileOrPath - File object or path pointing to an activity file.
- * @param {object} storeActions - Injected store actions.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-export default async function importActivityFile(fileOrPath, storeActions) {
-  const file = await ensureFileObject(fileOrPath)
-  const filename = file.name
-  const store = storeActions
-
+async function importAndActivateActivity(filename, loadParsedActivity, store) {
   try {
     store.clearActivitySummary()
-
-    const parsedActivity = await parseActivityFile(file)
-
-    await loadActivityIntoStore({
-      filename,
-      parsedActivity,
-      storeState: store,
-    })
-
+    const parsedActivity = await loadParsedActivity()
+    await loadActivityIntoStore({ filename, parsedActivity, storeState: store })
     return parsedActivity
   } catch (error) {
     console.error('Activity parse error:', {
@@ -107,4 +83,40 @@ export default async function importActivityFile(fileOrPath, storeActions) {
     })
     throw error
   }
+}
+
+/**
+ * Imports a native CSV activity path through the Rust columnar pipeline.
+ *
+ * @param {string} path - Native path returned by the desktop file picker.
+ * @param {object} storeActions - Injected store actions.
+ * @returns {Promise<object>} Promise resolving to the activated parsed activity.
+ */
+export async function importCsvActivityPath(path, storeActions) {
+  const filename = filenameFromNativePath(path)
+  return importAndActivateActivity(filename, async () => (await backend.parseCsvActivity(path)).parsed_activity, storeActions)
+}
+
+/**
+ * Imports a native VBO activity path through the Rust columnar pipeline.
+ *
+ * @param {string} path - Native path returned by the desktop file picker.
+ * @param {object} storeActions - Injected store actions.
+ * @returns {Promise<object>} Promise resolving to the activated parsed activity.
+ */
+export async function importVboActivityPath(path, storeActions) {
+  const filename = filenameFromNativePath(path)
+  return importAndActivateActivity(filename, async () => (await backend.parseVboActivity(path)).parsed_activity, storeActions)
+}
+
+/**
+ * Handles save file.
+ *
+ * @param {File} file - Browser File containing a GPX, FIT, SRT, or IGC activity.
+ * @param {object} storeActions - Injected store actions.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
+export default async function importActivityFile(file, storeActions) {
+  if (!(file instanceof File)) throw new Error('Activity import requires a browser File object.')
+  return importAndActivateActivity(file.name, () => parseActivityFile(file), storeActions)
 }

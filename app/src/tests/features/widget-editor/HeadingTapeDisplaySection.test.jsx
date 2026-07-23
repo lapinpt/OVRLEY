@@ -160,7 +160,7 @@ describe('HeadingTapeDisplaySection', () => {
     expect(HEADING_TAPE_DEFAULTS.show_minor_ticks).toBe(true)
     expect(HEADING_TAPE_DEFAULTS.major_tick_thickness).toBe(2)
     expect(HEADING_TAPE_DEFAULTS.minor_tick_thickness).toBe(2)
-    expect(HEADING_TAPE_DEFAULTS.label_font).toBe('Arial.ttf')
+    expect(HEADING_TAPE_DEFAULTS.label_font_size).toBe(12)
     expect(HEADING_TAPE_DEFAULTS.tick_alignment).toBe('below')
     expect(HEADING_TAPE_DEFAULTS.indicator_style).toBe('chevron')
     expect(HEADING_TAPE_DEFAULTS.show_indicator).toBe(true)

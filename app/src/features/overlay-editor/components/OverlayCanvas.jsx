@@ -4,7 +4,6 @@
 
 import { memo, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
@@ -15,6 +14,7 @@ import { useVideoPreview } from '@/features/video-preview'
 import { syncVideoCurrentTime } from '@/features/video-preview/utils/videoPreviewPlayback'
 import useStore from '@/store/useStore'
 import { resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
+import HevcPlaybackPlaceholder from './HevcPlaybackPlaceholder'
 
 /**
  * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
@@ -241,7 +241,10 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const videoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
-  const { videoSrc, importId, frozenFrameSecond, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
+  const platformOs = useStore((state) => state.platformOs)
+  const { videoSrc, importId, frozenFrameSecond, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } =
+    useVideoPreview(videoRef, backgroundMode === 'video')
+  const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
   const videoBackgroundClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
@@ -267,7 +270,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           }}
         />
       ) : null}
-      {backgroundMode === 'video' && videoSrc && (
+      {backgroundMode === 'video' && videoSrc && !hasHevcPlaybackError ? (
         <video
           key={importId ?? 'no-video'}
           ref={videoRef}
@@ -278,25 +281,12 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           muted={isVideoMuted}
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
-      )}
-      {backgroundMode === 'video' && videoSrc && frozenFrameSecond !== null ? (
+      ) : null}
+      {backgroundMode === 'video' && videoSrc && frozenFrameSecond !== null && !hasHevcPlaybackError ? (
         <FrozenVideoFrame className={videoBackgroundClassName} importId={importId} second={frozenFrameSecond} src={videoSrc} />
       ) : null}
       {backgroundMode === 'image' && backgroundImageSrc ? (
         <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />
-      ) : null}
-      {backgroundMode === 'video' && videoPreviewMessages.length > 0 ? (
-        <div
-          className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex max-w-xl items-start gap-2 rounded-sm border border-amber-400/40 bg-black/75 px-3 py-2 text-xs leading-snug text-amber-100 shadow-lg"
-          aria-live="polite"
-        >
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <div className="space-y-1">
-            {videoPreviewMessages.slice(0, 2).map((message) => (
-              <p key={message}>{message}</p>
-            ))}
-          </div>
-        </div>
       ) : null}
       {gridVisible ? <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} /> : null}
       <div data-testid="widget-layer" className="absolute inset-0 overflow-visible">
@@ -322,6 +312,15 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           )
         })}
       </div>
+      {backgroundMode === 'video' && videoSrc && hasHevcPlaybackError ? (
+        <HevcPlaybackPlaceholder
+          displayScale={displayScale}
+          importId={importId}
+          openVideoPreviewHelp={openVideoPreviewHelp}
+          platformOs={platformOs}
+          videoPreviewHelpAvailable={videoPreviewHelpAvailable}
+        />
+      ) : null}
     </div>
   )
 }

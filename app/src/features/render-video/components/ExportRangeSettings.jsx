@@ -7,7 +7,12 @@ import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Switch } from '@/components/ui/switch'
 import useStore from '@/store/useStore'
-import { getActivityDurationSeconds, getCustomExportRangeDefault } from '@/features/overlay-editor/utils/exportRange'
+import {
+  formatExportRangeTime,
+  getActivityDurationSeconds,
+  getCustomExportRangeDefault,
+  setExportRangeBoundaryFromTimeInput,
+} from '@/features/overlay-editor/utils/exportRange'
 
 function sanitizeTimeInput(value) {
   return String(value)
@@ -62,13 +67,10 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange, 
           <div className="space-y-1.5">
             <Label className="text-[10px] text-muted-foreground uppercase font-bold">From</Label>
             <BlurInput
-              value={exportRange.fromTime}
+              value={formatExportRangeTime(exportRange.from)}
               onKeyDown={preventDecimalInput}
               onChange={(event) =>
-                onExportRangeChange({
-                  ...exportRange,
-                  fromTime: sanitizeTimeInput(event.target.value),
-                })
+                onExportRangeChange(setExportRangeBoundaryFromTimeInput(exportRange, 'from', sanitizeTimeInput(event.target.value)))
               }
               className="h-9 text-xs font-mono"
               placeholder="00:00:00 or 800"
@@ -78,14 +80,9 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange, 
           <div className="space-y-1.5">
             <Label className="text-[10px] text-muted-foreground uppercase font-bold">To</Label>
             <BlurInput
-              value={exportRange.toTime}
+              value={formatExportRangeTime(exportRange.to)}
               onKeyDown={preventDecimalInput}
-              onChange={(event) =>
-                onExportRangeChange({
-                  ...exportRange,
-                  toTime: sanitizeTimeInput(event.target.value),
-                })
-              }
+              onChange={(event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(exportRange, 'to', sanitizeTimeInput(event.target.value)))}
               className="h-9 text-xs font-mono"
               placeholder="00:00:00 or 900"
             />

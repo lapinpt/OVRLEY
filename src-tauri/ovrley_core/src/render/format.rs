@@ -47,6 +47,10 @@ pub enum MetricIconKind {
     FocalLength,
     Ev,
     ColorTemperature,
+    Rpm,
+    ThrottlePosition,
+    BrakePosition,
+    LeanAngle,
 }
 
 /// Split metric text used by icon+value+unit widgets.
@@ -60,6 +64,11 @@ pub struct MetricDisplayParts {
     pub show_icon: bool,
     /// Icon kind matching the metric, if supported.
     pub icon_kind: Option<MetricIconKind>,
+}
+
+enum MetricValue<'a> {
+    Numeric(Option<f64>),
+    Gear(Option<&'a str>),
 }
 
 /// Returns the dense frame index corresponding to an absolute preview second.
@@ -186,12 +195,7 @@ fn raw_value(
             .get(frame_index)
             .copied()
             .flatten(),
-        MetricKind::GearPosition => dense_activity
-            .series
-            .gear_position
-            .get(frame_index)
-            .copied()
-            .flatten(),
+        MetricKind::GearPosition => None,
         MetricKind::VerticalRatio => dense_activity
             .series
             .vertical_ratio
@@ -253,6 +257,30 @@ fn raw_value(
             .get(frame_index)
             .copied()
             .flatten(),
+        MetricKind::Rpm => dense_activity
+            .series
+            .rpm
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::ThrottlePosition => dense_activity
+            .series
+            .throttle_position
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::BrakePosition => dense_activity
+            .series
+            .brake_position
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::LeanAngle => dense_activity
+            .series
+            .lean_angle
+            .get(frame_index)
+            .copied()
+            .flatten(),
         MetricKind::Time => None,
     }
 }
@@ -267,10 +295,18 @@ pub fn format_validated_metric_parts(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> Option<MetricDisplayParts> {
-    let raw = raw_value(validated.metric, dense_activity, frame_index);
-
+    let value = match validated.metric {
+        MetricKind::GearPosition => MetricValue::Gear(
+            dense_activity
+                .series
+                .gear_position
+                .get(frame_index)
+                .and_then(Option::as_deref),
+        ),
+        metric => MetricValue::Numeric(raw_value(metric, dense_activity, frame_index)),
+    };
     let (mut value_text, unit_text, icon_kind) =
-        format_validated_standard_metric_parts(validated, dense_activity, raw);
+        format_validated_standard_metric_parts(validated, dense_activity, value);
 
     if !validated.prefix.is_empty() {
         value_text = format!("{}{value_text}", validated.prefix);
@@ -337,11 +373,15 @@ pub fn format_validated_time_parts(
     }
 }
 
-fn format_validated_standard_metric_parts(
+fn format_validated_standard_metric_parts<'a>(
     validated: &ValidatedValueWidget,
     dense_activity: &DenseActivityReport,
-    raw: Option<f64>,
+    value: MetricValue<'a>,
 ) -> (String, Option<String>, Option<MetricIconKind>) {
+    let (raw, gear) = match value {
+        MetricValue::Numeric(raw) => (raw, None),
+        MetricValue::Gear(gear) => (None, gear),
+    };
     let kind = validated.metric;
     let display_unit = Some(validated.display_unit.as_str());
     let decimals = validated_decimals(&validated.formatting);
@@ -441,6 +481,11 @@ fn format_validated_standard_metric_parts(
                 }
             })
             .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Gear) => match gear {
+            Some("0") => "N".to_string(),
+            Some(value) => value.to_string(),
+            None => "--".to_string(),
+        },
         None => "--".to_string(),
     };
 
@@ -536,11 +581,17 @@ where
 // preview PNGs match the editor canvas' metric formatting.
 fn format_number(value: f64, decimals: usize) -> String {
     if decimals == 0 {
-        return value.round().to_string();
+        let rounded = value.round();
+        return if rounded == 0.0 {
+            "0".to_string()
+        } else {
+            rounded.to_string()
+        };
     }
 
     let factor = 10_f64.powi(decimals as i32);
     let rounded = (value * factor).round() / factor;
+    let rounded = if rounded == 0.0 { 0.0 } else { rounded };
     format!("{rounded:.decimals$}")
 }
 

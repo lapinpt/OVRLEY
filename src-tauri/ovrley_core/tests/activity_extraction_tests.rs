@@ -5,6 +5,7 @@ use std::path::Path;
 use ovrley_core::media::mp4_telemetry;
 
 #[test]
+#[ignore = "requires video fixtures under tests/fixtures/video/"]
 fn extract_activity_from_telemetry_fixtures() {
     let known_sync_times: HashMap<&str, &str> = [
         ("DJI-telemetry.MP4", "2026-03-15T23:58:14+00:00"),
@@ -88,12 +89,7 @@ fn extract_activity_from_telemetry_fixtures() {
         assert_aligned_or_stripped(&activity.shutter_speed, n, stem, "shutter_speed");
         assert_aligned_or_stripped(&activity.focal_length, n, stem, "focal_length");
         assert_aligned_or_stripped(&activity.ev, n, stem, "ev");
-        assert_aligned_or_stripped(
-            &activity.color_temperature,
-            n,
-            stem,
-            "color_temperature",
-        );
+        assert_aligned_or_stripped(&activity.color_temperature, n, stem, "color_temperature");
 
         let has_usable_gps = fixture_has_usable_gps(filename);
 
@@ -221,7 +217,7 @@ fn extract_activity_from_telemetry_fixtures() {
     }
 }
 
-fn assert_absent_metric(series: &[Option<f64>], stem: &str, metric: &str) {
+fn assert_absent_metric<T>(series: &[Option<T>], stem: &str, metric: &str) {
     assert!(
         series.iter().all(Option::is_none),
         "{stem}: {metric} must contain no values"

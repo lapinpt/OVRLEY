@@ -31,7 +31,7 @@ build/
 # App specific
 app/dist/
 app/dist-ssr/
-debug/
+/debug/
 app/*.local
 app/public/preview*.png
 next/
@@ -42,7 +42,7 @@ src-tauri/gen/schemas/
 src-tauri/binaries/
 
 # External / Vendor
-ffmpeg/
+/ffmpeg/
 .ffmpeg/
 vendor/ffmpeg/*
 !vendor/ffmpeg/.gitkeep

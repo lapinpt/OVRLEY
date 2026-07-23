@@ -20,7 +20,7 @@ use std::process::Command;
 
 use serde_json::Value;
 
-use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
+use crate::encode::ffmpeg::binary::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::error::{CoreError, CoreResult};
 
 pub use parser::parse_raw_metadata;

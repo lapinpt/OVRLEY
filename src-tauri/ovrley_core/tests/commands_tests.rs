@@ -1,7 +1,7 @@
 //! Command orchestration integration tests.
 //!
-//! Exercises `backend_render`, `derive_composite_render_plan`,
-//! `apply_composite_scene_timing`, and `is_composite_render` — the
+//! Exercises `backend_render`, `derive_composite_render_plan`, and
+//! composite timing normalization — the
 //! main Tauri-command dispatch layer. Verifies transparent vs composite
 //! branch routing, missing-field validation, sync-offset timing, overlay
 //! update-rate calculations, and default render duration derivation.
@@ -33,13 +33,10 @@ use serde_json::Value;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::{backend_render, is_composite_render};
+use ovrley_core::commands::backend_render;
 use ovrley_core::debug::RenderProgress;
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::video::RenderController;
-use ovrley_core::encode::video_composite_pipeline::{
-    apply_composite_scene_timing, derive_composite_render_plan,
-};
+use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::raw::parse_config_json;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
@@ -55,7 +52,7 @@ fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     let activity = synthetic_activity();
 
     let validated = validate_render_config(config.clone()).unwrap();
-    assert!(!is_composite_render(&validated));
+    assert!(validated.scene.composite_video_path.is_none());
     let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
 
     assert_eq!(dense.frame_count, 300);
@@ -63,7 +60,7 @@ fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     assert_eq!(dense.frame_elapsed_seconds.first().copied(), Some(0.0));
 }
 
-/// Verifies `is_composite_render` gates correctly: `backend_render` must
+/// Verifies the composite branch gate: `backend_render` must
 /// activate the composite branch only when `composite_video_path` is set.
 /// Uses a synthetic activity and validates the render starts (controller
 /// reports `total > 0`).
@@ -136,6 +133,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
 ///
 /// Regressions guarded: composite branch silently falling back to transparent
 /// path, progress never reaching `complete`, encoded frame count mismatch.
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_4_3_composite_branch_reaches_pipeline_shell() {
     let ws_root = common::test_config::workspace_root();
     let paths = test_paths(ws_root.clone());
@@ -178,7 +176,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
 /// Plan derivation must reject composite configs that omit `composite_bitrate`.
 #[test]
 fn test_3_3_missing_bitrate_validation() {
-    let error = derive_composite_render_plan(&composite_validated_scene(
+    let mut scene = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
             "composite_sync_offset": 0.0,
@@ -188,8 +186,8 @@ fn test_3_3_missing_bitrate_validation() {
             "composite_video_trim_start": 0.0,
             "composite_widget_update_rate": 1
             "#,
-    ))
-    .unwrap_err();
+    );
+    let error = derive_composite_render_plan(&mut scene, None).unwrap_err();
 
     assert_eq!(
         error.to_string(),
@@ -201,7 +199,7 @@ fn test_3_3_missing_bitrate_validation() {
 /// (numerator or denominator), giving a field-specific error for each.
 #[test]
 fn test_3_4_missing_fps_validation() {
-    let missing_num = composite_validated_scene(
+    let mut missing_num = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
@@ -212,7 +210,7 @@ fn test_3_4_missing_fps_validation() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let missing_den = composite_validated_scene(
+    let mut missing_den = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
@@ -225,13 +223,13 @@ fn test_3_4_missing_fps_validation() {
     );
 
     assert_eq!(
-        derive_composite_render_plan(&missing_num)
+        derive_composite_render_plan(&mut missing_num, None)
             .unwrap_err()
             .to_string(),
         "Invalid configuration: scene.composite_video_fps_num required for composite render"
     );
     assert_eq!(
-        derive_composite_render_plan(&missing_den)
+        derive_composite_render_plan(&mut missing_den, None)
             .unwrap_err()
             .to_string(),
         "Invalid configuration: scene.composite_video_fps_den required for composite render"
@@ -250,7 +248,7 @@ fn test_3_4_missing_fps_validation() {
 /// Regressions guarded: sync offset not propagated to scene timing,
 /// dense activity report using wrong time base after trim.
 fn test_3_5_dense_report_timing_for_sync_offset() {
-    let mut config = composite_config(
+    let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
@@ -263,15 +261,8 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    let plan = derive_composite_render_plan(&scene).unwrap();
-    apply_composite_scene_timing(&mut scene, &plan);
-    config.scene.start = scene.start;
-    config.scene.end = scene.end;
-    config.scene.fps = scene.fps;
-    config.scene.update_rate = Some(scene.update_rate);
-
-    let validated = validate_render_config(config).unwrap();
+    let mut validated = validate_render_config(config).unwrap();
+    derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&synthetic_activity(), &validated).unwrap();
 
     assert_eq!(validated.scene.start, 300.0);
@@ -292,7 +283,7 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
 /// Regressions guarded: update rate applied as a multiplier instead of
 /// divisor, output FPS incorrectly overridden by overlay pipe FPS.
 fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
-    let mut config = composite_config(
+    let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
@@ -305,20 +296,12 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
             "composite_widget_update_rate": 2
             "#,
     );
-    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    let plan = derive_composite_render_plan(&scene).unwrap();
-    apply_composite_scene_timing(&mut scene, &plan);
-    config.scene.start = scene.start;
-    config.scene.end = scene.end;
-    config.scene.fps = scene.fps;
-    config.scene.update_rate = Some(scene.update_rate);
-
-    let validated = validate_render_config(config).unwrap();
+    let mut validated = validate_render_config(config).unwrap();
+    derive_composite_render_plan(&mut validated.scene, None).unwrap();
     let dense = build_dense_activity_report_validated(&synthetic_activity(), &validated).unwrap();
 
-    assert_eq!(plan.overlay_pipe_fps, Fps::new(30000, 1001).unwrap());
     assert!((validated.scene.fps - (30000.0 / 1001.0)).abs() < 1e-9);
-    assert_eq!(validated.scene.update_rate, 1);
+    assert_eq!(validated.scene.update_rate.get(), 1);
     assert_eq!(dense.frame_count, 300);
 }
 
@@ -339,10 +322,10 @@ fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
             "#,
     );
 
-    let scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    let plan = derive_composite_render_plan(&scene).unwrap();
+    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    derive_composite_render_plan(&mut scene, None).unwrap();
 
-    assert_eq!(plan.render_duration, 50.0);
+    assert_eq!(scene.end - scene.start, 50.0);
 }
 
 /// Trim start >= video duration is an immediate plan-derivation error,
@@ -362,8 +345,8 @@ fn test_3_8_rejects_impossible_trim() {
             "#,
     );
 
-    let scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
-    let error = derive_composite_render_plan(&scene).unwrap_err();
+    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let error = derive_composite_render_plan(&mut scene, None).unwrap_err();
 
     assert_eq!(
         error.to_string(),

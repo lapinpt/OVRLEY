@@ -65,11 +65,11 @@ describe('createTemplateSlice — pure state actions', () => {
   })
 
   test('setExportRange is pure — merges into exportRange', () => {
-    useStore.getState().setExportRange({ fromTime: '00:00:05', toTime: '00:01:00' })
+    useStore.getState().setExportRange({ from: 5.25, to: 60.75 })
 
     expect(useStore.getState().exportRange.type).toBe(DEFAULT_EXPORT_RANGE.type)
-    expect(useStore.getState().exportRange.fromTime).toBe('00:00:05')
-    expect(useStore.getState().exportRange.toTime).toBe('00:01:00')
+    expect(useStore.getState().exportRange.from).toBe(5.25)
+    expect(useStore.getState().exportRange.to).toBe(60.75)
   })
 
   test('setExportCodec is pure — updates exportCodec and normalizes', () => {

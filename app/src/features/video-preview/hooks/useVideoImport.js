@@ -30,7 +30,6 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const setImportedBackgroundImage = useStore((state) => state.setImportedBackgroundImage)
   const clearImportedVideo = useStore((state) => state.clearImportedVideo)
   const setImportingVideo = useStore((state) => state.setImportingVideo)
-  const config = useStore((state) => state.config)
   const setConfig = useStore((state) => state.setConfig)
   const clearVideoTelemetry = useStore((state) => state.clearVideoTelemetry)
 
@@ -72,15 +71,22 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         importId: response.importId,
         previewUrl: response.previewUrl,
         previewWarnings: response.warnings ?? [],
-        previewError: null,
       }
-      setImportedVideo(metadata)
-      if (metadata.fps && config?.scene) {
-        setConfig({
-          ...config,
-          scene: { ...config.scene, fps: Math.round(metadata.fps) },
-        })
+      const currentConfig = useStore.getState().config
+      if (!currentConfig?.scene) {
+        throw new Error('Cannot import video without an active template scene')
       }
+
+      const importedVideoResolution = setImportedVideo(metadata)
+      setConfig({
+        ...currentConfig,
+        scene: {
+          ...currentConfig.scene,
+          ...(metadata.fps ? { fps: Math.round(metadata.fps) } : {}),
+          width: importedVideoResolution.width,
+          height: importedVideoResolution.height,
+        },
+      })
       onSetBackgroundMode?.('video')
 
       void extractAndStoreVideoTelemetry(selected)

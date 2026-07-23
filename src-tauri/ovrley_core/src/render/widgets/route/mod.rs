@@ -6,12 +6,14 @@
 //! for each frame.
 //!
 //! Module ownership:
+//! - `curve` — Catmull-Rom reconstruction and adaptive curve flattening.
 //! - `normalize` — plot option normalization and default resolution.
 //! - `prepare` — sample building, geometry fitting, static-layer caching.
 //! - `frame_state` — per-frame marker position and polyline prefix computation.
 //! - `simplify` — RDP and LTTB point decimation helpers.
 //! - `draw` — per-frame canvas composition of layers, polyline, and marker.
 
+mod curve;
 mod draw;
 mod frame_state;
 pub(crate) mod normalize;

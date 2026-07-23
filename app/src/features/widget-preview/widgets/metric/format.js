@@ -95,9 +95,10 @@ function formatRoundedMetric(value, units, decimals) {
   }
 
   const roundedValue = decimals > 0 ? value.toFixed(decimals) : Math.round(value).toString()
+  const normalizedValue = Number(roundedValue) === 0 ? (0).toFixed(decimals) : roundedValue
 
   return {
-    value: roundedValue,
+    value: normalizedValue,
     units,
   }
 }
@@ -250,6 +251,12 @@ function formatEv(value, decimals) {
   return { value: `${prefix}${formatted}`, units: '' }
 }
 
+function formatGearPosition(value, units) {
+  if (value === null || value === undefined) return { value: '--', units }
+  if (value === '0') return { value: 'N', units }
+  return { value, units }
+}
+
 export function formatStandardMetricDisplay(type, value, widgetData) {
   const definition = getStandardMetricDefinition(type)
   if (!definition) throw new Error(`Unknown standard metric type: ${type}`)
@@ -286,6 +293,10 @@ export function formatStandardMetricDisplay(type, value, widgetData) {
 
   if (definition.formatter === 'ev') {
     return formatEv(value, widgetData.decimals)
+  }
+
+  if (definition.formatter === 'gear') {
+    return formatGearPosition(value, effectiveUnitLabel)
   }
 
   if (type === 'distance') {

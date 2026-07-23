@@ -18,7 +18,6 @@
  * @param {number[]} props.updateRateOptions - Available update rate divisors.
  * @param {function} props.onUpdateRateChange - Callback for update rate change.
  * @param {object} props.activitySummary - Activity summary data (or null).
- * @param {string} props.importedVideoPath - Imported video path (or null).
  * @param {object} props.exportRange - Export range state.
  * @param {function} props.onExportRangeChange - Callback for export range change.
  * @returns {JSX.Element} Rendered overlay settings section.
@@ -48,7 +47,6 @@ export default function OverlaySettingsSection({
   updateRateOptions,
   onUpdateRateChange,
   activitySummary,
-  importedVideoPath,
   exportRange,
   onExportRangeChange,
 }) {
@@ -173,7 +171,7 @@ export default function OverlaySettingsSection({
         </Tabs>
       </div>
 
-      {activitySummary && !importedVideoPath ? (
+      {activitySummary ? (
         <div className="space-y-3 rounded-xs border-none bg-surface-accent-soft/70 p-4">
           <ExportRangeSettings exportRange={exportRange} onExportRangeChange={onExportRangeChange} />
         </div>

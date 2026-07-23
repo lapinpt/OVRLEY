@@ -1,71 +1,71 @@
 {
-  "artifacts": {
-    "canvas": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas.png",
-    "diff": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas-parity.png",
-    "skia": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\skia.png"
+  "ssim": {
+    "combined": 0.978778,
+    "y": 0.980631,
+    "u": 0.977929,
+    "v": 0.977773,
+    "threshold": 0.98,
+    "pass": false
+  },
+  "pixel_mismatch": {
+    "full_frame": {
+      "count": 336127,
+      "total": 8363664,
+      "percent": "4.02"
+    },
+    "overlay": {
+      "count": 309560,
+      "total": 935826,
+      "percent": "33.08"
+    },
+    "threshold_applied": {
+      "count": 139908,
+      "total": 935826,
+      "percent": "14.95"
+    },
+    "premultiplied_rgb_both_translucent": {
+      "mismatch": 31163,
+      "compared": 519956,
+      "percent": "5.99"
+    },
+    "alpha_mask_overlap": {
+      "canvas": 897831,
+      "skia": 921463,
+      "intersection": 883468,
+      "union": 935826,
+      "iou": "0.9441",
+      "dice": "0.9712"
+    },
+    "edge_chamfer_distance": {
+      "canvas_edge_pixels": 34714,
+      "skia_edge_pixels": 50467,
+      "canvas_to_skia_mean_px": "1.0129",
+      "skia_to_canvas_mean_px": "1.3268",
+      "symmetric_mean_px": "1.1989",
+      "symmetric_p95_px": "3.0000"
+    },
+    "clean_aa_excluded": {
+      "mismatch": 9392,
+      "compared": 701026,
+      "ignored": 234800,
+      "percent": "1.34"
+    }
   },
   "orphaned_pixels": {
     "canvas_exclusive": {
-      "count": 21916,
-      "percent": "2.42",
-      "total": 906657
+      "count": 25715,
+      "total": 935826,
+      "percent": "2.75"
     },
     "skia_exclusive": {
-      "count": 14969,
-      "percent": "1.65",
-      "total": 906657
+      "count": 18795,
+      "total": 935826,
+      "percent": "2.01"
     }
   },
-  "pixel_mismatch": {
-    "alpha_mask_overlap": {
-      "canvas": 874351,
-      "dice": "0.9745",
-      "intersection": 861651,
-      "iou": "0.9504",
-      "skia": 893957,
-      "union": 906657
-    },
-    "clean_aa_excluded": {
-      "compared": 675613,
-      "ignored": 231044,
-      "mismatch": 7471,
-      "percent": "1.11"
-    },
-    "edge_chamfer_distance": {
-      "canvas_edge_pixels": 34228,
-      "canvas_to_skia_mean_px": "0.8868",
-      "skia_edge_pixels": 47977,
-      "skia_to_canvas_mean_px": "1.1470",
-      "symmetric_mean_px": "1.0387",
-      "symmetric_p95_px": "3.0000"
-    },
-    "full_frame": {
-      "count": 322707,
-      "percent": "3.97",
-      "total": 8118463
-    },
-    "overlay": {
-      "count": 295389,
-      "percent": "32.58",
-      "total": 906657
-    },
-    "premultiplied_rgb_both_translucent": {
-      "compared": 511711,
-      "mismatch": 35535,
-      "percent": "6.94"
-    },
-    "threshold_applied": {
-      "count": 132112,
-      "percent": "14.57",
-      "total": 906657
-    }
-  },
-  "ssim": {
-    "combined": 0.980898,
-    "pass": true,
-    "threshold": 0.98,
-    "u": 0.979048,
-    "v": 0.98092,
-    "y": 0.982725
+  "artifacts": {
+    "skia": "E:\\Github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\skia.png",
+    "canvas": "E:\\Github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas.png",
+    "diff": "E:\\Github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas-parity.png"
   }
 }

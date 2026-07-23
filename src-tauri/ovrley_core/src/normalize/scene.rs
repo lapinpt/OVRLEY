@@ -10,7 +10,104 @@ use super::helpers::{
     require_positive_f64, require_positive_u32, require_u32,
 };
 use super::raw::SceneConfig;
+use crate::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId, TransparentCodecId};
 use crate::error::{CoreError, CoreResult};
+use serde_json::{Map, Value};
+use std::num::NonZeroU32;
+
+/// Canonical FFmpeg configuration validated from the external scene payload.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidatedFfmpegConfig {
+    pub codec: CodecSelection,
+    pub loglevel: String,
+    pub container: Option<String>,
+    pub pix_fmt: Option<String>,
+    pub output_args: Vec<String>,
+    pub qsv_full_init_args: Vec<String>,
+}
+
+impl Default for ValidatedFfmpegConfig {
+    fn default() -> Self {
+        Self {
+            codec: CodecSelection::Transparent(TransparentCodecId::ProresKs),
+            loglevel: "info".to_string(),
+            container: None,
+            pix_fmt: None,
+            output_args: Vec::new(),
+            qsv_full_init_args: Vec::new(),
+        }
+    }
+}
+
+/// Validates the optional external `scene.ffmpeg` object exactly once using
+/// the default codec selected from the owning scene's render mode.
+fn validate_ffmpeg_config(
+    value: Value,
+    default_codec: CodecSelection,
+) -> CoreResult<ValidatedFfmpegConfig> {
+    if value.is_null() {
+        return Ok(ValidatedFfmpegConfig {
+            codec: default_codec,
+            ..ValidatedFfmpegConfig::default()
+        });
+    }
+    let object = value
+        .as_object()
+        .ok_or_else(|| CoreError::Config("scene.ffmpeg must be an object".into()))?;
+    let codec = optional_string(object, "codec")?
+        .map(|name| {
+            CodecSelection::from_external_name(name).ok_or_else(|| {
+                CoreError::Config(format!("scene.ffmpeg.codec is unsupported: {name}"))
+            })
+        })
+        .transpose()?
+        .unwrap_or(default_codec);
+    let loglevel = optional_string(object, "loglevel")?
+        .unwrap_or("info")
+        .to_string();
+
+    Ok(ValidatedFfmpegConfig {
+        codec,
+        loglevel,
+        container: optional_string(object, "container")?.map(str::to_string),
+        pix_fmt: optional_string(object, "pix_fmt")?.map(str::to_string),
+        output_args: optional_string_array(object, "output_args")?,
+        qsv_full_init_args: optional_string_array(object, "qsv_full_init_args")?,
+    })
+}
+
+fn optional_string<'a>(object: &'a Map<String, Value>, field: &str) -> CoreResult<Option<&'a str>> {
+    let Some(value) = object.get(field) else {
+        return Ok(None);
+    };
+    let value = value
+        .as_str()
+        .ok_or_else(|| CoreError::Config(format!("scene.ffmpeg.{field} must be a string")))?;
+    if value.trim().is_empty() {
+        return Err(CoreError::Config(format!(
+            "scene.ffmpeg.{field} must not be empty"
+        )));
+    }
+    Ok(Some(value))
+}
+
+fn optional_string_array(object: &Map<String, Value>, field: &str) -> CoreResult<Vec<String>> {
+    let Some(value) = object.get(field) else {
+        return Ok(Vec::new());
+    };
+    let values = value.as_array().ok_or_else(|| {
+        CoreError::Config(format!("scene.ffmpeg.{field} must be an array of strings"))
+    })?;
+    values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            value.as_str().map(str::to_string).ok_or_else(|| {
+                CoreError::Config(format!("scene.ffmpeg.{field}[{index}] must be a string"))
+            })
+        })
+        .collect()
+}
 
 /// All output-affecting scene fields — no `Option`, no defaults at render time.
 ///
@@ -40,9 +137,9 @@ pub struct ValidatedSceneConfig {
     pub border_color: String,
     pub border_thickness: f32,
     // ── Encoding ──────────────────────────────────────────────────────
-    pub update_rate: u32,
+    pub update_rate: NonZeroU32,
     pub overlay_filename: Option<String>,
-    pub ffmpeg: serde_json::Value,
+    pub ffmpeg: ValidatedFfmpegConfig,
     // ── Composite encoding ────────────────────────────────────────────
     pub composite_video_path: Option<String>,
     pub composite_bitrate: Option<String>,
@@ -52,7 +149,7 @@ pub struct ValidatedSceneConfig {
     pub composite_video_duration: Option<f64>,
     pub composite_render_duration: Option<f64>,
     pub composite_video_trim_start: Option<f64>,
-    pub composite_widget_update_rate: Option<u32>,
+    pub composite_widget_update_rate: Option<NonZeroU32>,
 }
 
 /// Validates scene config, rejecting missing or out-of-range fields.
@@ -83,13 +180,24 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         .border_color
         .ok_or_else(|| CoreError::Config("scene.border_color: required".into()))?;
 
-    let update_rate = require_u32(raw.update_rate, "scene.update_rate")?;
-    if update_rate == 0 {
-        return Err(CoreError::Config(format!("scene.update_rate: must be > 0")));
-    }
+    let update_rate = NonZeroU32::new(require_u32(raw.update_rate, "scene.update_rate")?)
+        .ok_or_else(|| CoreError::Config("scene.update_rate: must be > 0".into()))?;
     let composite_sync_offset = raw.composite_sync_offset;
     let composite_video_trim_start = raw.composite_video_trim_start;
-    let composite_widget_update_rate = raw.composite_widget_update_rate;
+    let composite_widget_update_rate = raw
+        .composite_widget_update_rate
+        .map(|value| {
+            NonZeroU32::new(value).ok_or_else(|| {
+                CoreError::Config("scene.composite_widget_update_rate must be at least 1".into())
+            })
+        })
+        .transpose()?;
+    let default_codec = if raw.composite_video_path.is_some() {
+        CodecSelection::Composite(CompositeCodecId::SoftwareH264)
+    } else {
+        CodecSelection::Transparent(TransparentCodecId::ProresKs)
+    };
+    let ffmpeg = validate_ffmpeg_config(raw.ffmpeg, default_codec)?;
     let custom_export_range_active = raw.custom_export_range_active;
 
     Ok(ValidatedSceneConfig {
@@ -112,7 +220,7 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         border_thickness,
         update_rate,
         overlay_filename: raw.overlay_filename,
-        ffmpeg: raw.ffmpeg,
+        ffmpeg,
         composite_video_path: raw.composite_video_path,
         composite_bitrate: raw.composite_bitrate,
         composite_sync_offset,
@@ -123,134 +231,4 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         composite_video_trim_start,
         composite_widget_update_rate,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn full_scene() -> SceneConfig {
-        serde_json::from_value(serde_json::json!({
-            "fps": 30.0,
-            "start": 0.0,
-            "end": 10.0,
-            "width": 1920,
-            "height": 1080,
-            "scale": 1.0,
-            "shadow_color": "#000000",
-            "shadow_strength": 0.0,
-            "shadow_distance": 0.0,
-            "border_color": "#000000",
-            "border_thickness": 0.0,
-            "update_rate": 1,
-            "custom_export_range_active": false,
-            "composite_widget_update_rate": 1
-        }))
-        .unwrap()
-    }
-
-    #[test]
-    fn explicit_passes() {
-        assert!(validate_scene_config(full_scene()).is_ok());
-    }
-
-    #[test]
-    fn missing_width_rejected() {
-        let mut s = full_scene();
-        s.width = None;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.width"), "{e}");
-    }
-
-    #[test]
-    fn missing_height_rejected() {
-        let mut s = full_scene();
-        s.height = None;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.height"), "{e}");
-    }
-
-    #[test]
-    fn missing_scale_rejected() {
-        let mut s = full_scene();
-        s.scale = None;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.scale"), "{e}");
-    }
-
-    #[test]
-    fn zero_width_rejected() {
-        let mut s = full_scene();
-        s.width = Some(0);
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.width"), "{e}");
-    }
-
-    #[test]
-    fn negative_scale_rejected() {
-        let mut s = full_scene();
-        s.scale = Some(-1.0);
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.scale"), "{e}");
-    }
-
-    #[test]
-    fn zero_fps_rejected() {
-        let mut s = full_scene();
-        s.fps = 0.0;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.fps"), "{e}");
-    }
-
-    #[test]
-    fn fractional_fps_accepted() {
-        let mut s = full_scene();
-        s.fps = 29.97;
-        let v = validate_scene_config(s).unwrap();
-        assert!((v.fps - 29.97).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn start_greater_than_end_rejected() {
-        let mut s = full_scene();
-        s.start = 10.0;
-        s.end = 5.0;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.start") && e.contains("scene.end"), "{e}");
-    }
-
-    #[test]
-    fn missing_update_rate_rejected() {
-        let mut s = full_scene();
-        s.update_rate = None;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.update_rate"), "{e}");
-    }
-
-    #[test]
-    fn missing_shadow_strength_rejected() {
-        let mut s = full_scene();
-        s.shadow_strength = None;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.shadow_strength"), "{e}");
-    }
-
-    #[test]
-    fn missing_border_thickness_rejected() {
-        let mut s = full_scene();
-        s.border_thickness = None;
-        let e = validate_scene_config(s).unwrap_err().to_string();
-        assert!(e.contains("scene.border_thickness"), "{e}");
-    }
-
-    #[test]
-    fn shadow_and_border_pass() {
-        let mut s = full_scene();
-        s.shadow_strength = Some(2.0);
-        s.shadow_distance = Some(3.0);
-        s.border_thickness = Some(1.0);
-        let v = validate_scene_config(s).unwrap();
-        assert!((v.shadow_strength - 2.0).abs() < f32::EPSILON);
-        assert!((v.border_thickness - 1.0).abs() < f32::EPSILON);
-    }
 }

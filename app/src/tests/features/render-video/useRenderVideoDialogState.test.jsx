@@ -130,16 +130,16 @@ describe('useRenderVideoDialogState', () => {
     expect(result.current.settings.exportRange).toEqual({
       ...DEFAULT_EXPORT_RANGE,
       type: 'custom',
-      fromTime: '00:00:05',
-      toTime: '00:00:17',
+      from: 5,
+      to: 17,
     })
 
     act(() => {
       result.current.onSettingsChange({
         exportRange: {
           ...result.current.settings.exportRange,
-          fromTime: '00:00:06',
-          toTime: '00:00:15',
+          from: 6.25,
+          to: 15.75,
         },
       })
     })
@@ -163,8 +163,8 @@ describe('useRenderVideoDialogState', () => {
     expect(result.current.settings.exportRange).toEqual({
       ...DEFAULT_EXPORT_RANGE,
       type: 'custom',
-      fromTime: '00:00:06',
-      toTime: '00:00:15',
+      from: 6.25,
+      to: 15.75,
     })
 
     act(() => {
@@ -174,8 +174,8 @@ describe('useRenderVideoDialogState', () => {
     expect(result.current.settings.exportRange).toEqual({
       ...DEFAULT_EXPORT_RANGE,
       type: 'custom',
-      fromTime: '00:00:05',
-      toTime: '00:00:17',
+      from: 5,
+      to: 17,
     })
   })
 })

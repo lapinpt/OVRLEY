@@ -69,7 +69,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
     const fps = importedVideoPath && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : templateFps
     const defaultCodec = importedVideoPath ? 'libx264' : exportCodec || 'prores_ks'
-    const draftExportRange = importedVideoPath ? DEFAULT_EXPORT_RANGE : { ...DEFAULT_EXPORT_RANGE, ...(exportRange || {}) }
+    const draftExportRange = { ...DEFAULT_EXPORT_RANGE, ...(exportRange || {}) }
 
     return {
       fps,
@@ -107,37 +107,64 @@ export default function useRenderWorkflow({ backendStatus }) {
       renderStatus,
     })
 
-  // Progress polling — polls backend for render progress at 500ms intervals while rendering is active
+  // Progress streaming — subscribes to backend `render-progress` events for
+  // live render updates. Each event carries the full RenderProgress payload
+  // (current/total/encoded/status/message/eta/fps/filename) at the natural
+  // frame-production cadence, replacing the previous 500 ms polling loop.
+  // An initial one-shot `getRenderProgress` fetch seeds the bar before the
+  // first batch wraps through the coordinator's reorder window.
   useEffect(() => {
     if (!renderingVideo) return
 
-    const pollProgress = async () => {
-      try {
-        const data = await backend.getRenderProgress()
-        const expectedRenderId = useStore.getState().activeRenderId
-        if (expectedRenderId === null || expectedRenderId === undefined || data.render_id !== expectedRenderId) {
-          return
-        }
+    let unlisten = null
+    let cancelled = false
 
-        setRenderProgress({
-          renderId: data.render_id ?? null,
-          current: data.current || 0,
-          total: data.total || 0,
-          encoded: data.encoded || 0,
-          status: data.status || 'rendering',
-          message: data.message || '',
-          estimatedSecondsRemaining: data.estimated_seconds_remaining,
-          renderingFps: data.rendering_fps ?? null,
-          filename: data.filename || null,
-        })
-      } catch (error) {
-        console.error('Error polling render progress:', error)
+    const applyProgress = (data) => {
+      if (cancelled) return
+      const expectedRenderId = useStore.getState().activeRenderId
+      if (expectedRenderId === null || expectedRenderId === undefined || data.render_id !== expectedRenderId) {
+        return
       }
+
+      setRenderProgress({
+        renderId: data.render_id ?? null,
+        current: data.current || 0,
+        total: data.total || 0,
+        encoded: data.encoded || 0,
+        status: data.status || 'rendering',
+        message: data.message || '',
+        estimatedSecondsRemaining: data.estimated_seconds_remaining,
+        renderingFps: data.rendering_fps ?? null,
+        filename: data.filename || null,
+      })
     }
 
-    const interval = setInterval(pollProgress, 500)
-    pollProgress()
-    return () => clearInterval(interval)
+    backend
+      .subscribeRenderProgress(applyProgress)
+      .then((un) => {
+        if (cancelled) {
+          un()
+        } else {
+          unlisten = un
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to subscribe to render-progress events:', error)
+      })
+
+    // Seed an initial snapshot so the UI reflects the just-started render
+    // immediately, before the first batch produces the first streamed event.
+    backend
+      .getRenderProgress()
+      .then(applyProgress)
+      .catch((error) => {
+        console.error('Error fetching initial render progress:', error)
+      })
+
+    return () => {
+      cancelled = true
+      if (unlisten) unlisten()
+    }
   }, [renderingVideo, setRenderProgress])
 
   // Render completion handler — subscribes to render progress store to handle completion, cancellation, and errors
@@ -194,12 +221,10 @@ export default function useRenderWorkflow({ backendStatus }) {
     // provides the default when a draft does not yet carry an explicit mode.
     const exportMode = renderSettingsDraft.exportMode || (useStore.getState().importedVideoPath ? 'composite' : 'transparent')
     const shouldComposite = exportMode === 'composite'
-    const nextExportRange = shouldComposite
-      ? DEFAULT_EXPORT_RANGE
-      : {
-          ...DEFAULT_EXPORT_RANGE,
-          ...(renderSettingsDraft.exportRange || {}),
-        }
+    const nextExportRange = {
+      ...DEFAULT_EXPORT_RANGE,
+      ...(renderSettingsDraft.exportRange || {}),
+    }
     const nextFps = sanitizeIntegerFps(renderSettingsDraft.fps || 30)
     const nextUpdateRate = normalizeUpdateRateForFps(nextFps, renderSettingsDraft.updateRate)
     const nextConfig = {
@@ -214,8 +239,8 @@ export default function useRenderWorkflow({ backendStatus }) {
     setUpdateRate(nextUpdateRate)
     if (!shouldComposite) {
       setExportCodec(renderSettingsDraft.exportCodec)
-      setExportRange(nextExportRange)
     }
+    setExportRange(nextExportRange)
     setActiveRenderId(null)
     setRenderProgress({
       ...DEFAULT_RENDER_PROGRESS,

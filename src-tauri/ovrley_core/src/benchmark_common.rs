@@ -16,8 +16,8 @@
 
 #![allow(dead_code)]
 
-use crate::encode::codec_catalog::{CompositeCodecId, TransparentCodecId};
-use crate::encode::codec_detect::AvailableCodecs;
+use crate::encode::ffmpeg::catalog::{CompositeCodecId, TransparentCodecId};
+use crate::encode::ffmpeg::detect::AvailableCodecs;
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
@@ -143,14 +143,15 @@ pub fn file_size_mb(path: &Path) -> f64 {
 
 /// Checks whether a composite codec profile is available, using the shared
 /// codec catalog for alias resolution rather than repeating field-name matches.
-pub fn is_composite_codec_available(codecs: &AvailableCodecs, display_name: &str) -> bool {
-    CompositeCodecId::from_alias(display_name).is_some_and(|id| codecs.has_composite_codec(id))
+pub fn is_composite_codec_available(codecs: &AvailableCodecs, external_name: &str) -> bool {
+    CompositeCodecId::from_external_name(external_name)
+        .is_some_and(|id| codecs.has_composite_codec(id))
 }
 
 /// Checks whether a transparent codec is available, using the shared codec
 /// catalog for alias resolution.
 pub fn is_transparent_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
-    TransparentCodecId::from_alias(name).is_some_and(|id| codecs.has_transparent_codec(id))
+    TransparentCodecId::from_external_name(name).is_some_and(|id| codecs.has_transparent_codec(id))
 }
 
 // ---------------------------------------------------------------------------

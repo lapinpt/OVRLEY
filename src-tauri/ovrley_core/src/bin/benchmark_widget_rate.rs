@@ -11,10 +11,10 @@
 
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
-use ovrley_core::encode::codec_detect::detect_codecs;
-use ovrley_core::encode::video::{
-    render_composite_video, CompositeRenderRequest, RenderController,
-};
+use ovrley_core::encode::ffmpeg::detect::detect_codecs;
+use ovrley_core::encode::pipeline::composite::render_composite_video;
+use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
+use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::video_probe::probe_video;
 use ovrley_core::paths::AppPaths;
 use serde::Serialize;
@@ -264,7 +264,7 @@ fn main() -> Result<(), String> {
     for (codec_index, &(display_name, codec_key)) in CODECS.iter().enumerate() {
         println!("\n=== Codec: {display_name} ===");
 
-        if !is_composite_codec_available(&available, display_name) {
+        if !is_composite_codec_available(&available, codec_key) {
             println!("  → NOT AVAILABLE on this system");
             results.insert(
                 display_name.to_string(),
@@ -323,7 +323,8 @@ fn main() -> Result<(), String> {
                 }
                 run_config_value["scene"]["ffmpeg"] = ffmpeg_config;
 
-                let config = validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
+                let mut config =
+                    validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
                 let dense = build_dense_activity_report_validated(&activity, &config)
                     .map_err(|e| e.to_string())?;
 
@@ -356,22 +357,17 @@ fn main() -> Result<(), String> {
                 }
 
                 let started = Instant::now();
-                let render_result = render_composite_video(&CompositeRenderRequest {
-                    paths: &paths,
-                    config: &config,
-                    activity: &activity,
-                    dense_activity: &dense,
-                    controller: &controller,
-                    composite_video_path: &resolved_video.to_string_lossy(),
-                    composite_bitrate: "40M",
-                    composite_sync_offset: 0.0,
-                    composite_video_fps_num: fps_num,
-                    composite_video_fps_den: fps_den,
-                    composite_video_duration: video_duration,
-                    composite_render_duration: render_duration,
-                    composite_video_trim_start: trim_start,
-                    composite_widget_update_rate: update_rate,
-                });
+                let render_plan = derive_composite_render_plan(&mut config.scene, None)
+                    .expect("validated benchmark composite plan");
+                let render_result = render_composite_video(
+                    &paths,
+                    &config,
+                    &activity,
+                    &dense,
+                    &controller,
+                    render_plan,
+                    true,
+                );
                 let elapsed_secs = started.elapsed().as_secs_f64();
 
                 match render_result {

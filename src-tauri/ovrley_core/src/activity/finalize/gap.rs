@@ -344,6 +344,7 @@ pub fn insert_idle_gap_samples(raw_samples: &[RawSample]) -> (Vec<RawSample>, Ga
 pub fn build_distance_series(
     course_points: &[(Option<f64>, Option<f64>)],
     direct_distance_series: &[Option<f64>],
+    elapsed_seconds: &[f64],
 ) -> Vec<Option<f64>> {
     let has_direct_distance = direct_distance_series.iter().any(|value| value.is_some());
     let has_course = course_points
@@ -353,10 +354,12 @@ pub fn build_distance_series(
         return course_points.iter().map(|_| None).collect();
     }
 
-    let mut distance_series = Vec::with_capacity(course_points.len());
+    let mut sparse_distance_series = Vec::with_capacity(course_points.len());
     let mut total_distance_meters: f64 = 0.0;
+    let mut previous_course = None;
 
     for index in 0..course_points.len() {
+        let current_course = course_points[index].0.zip(course_points[index].1);
         if let Some(direct_distance) = direct_distance_series
             .get(index)
             .copied()
@@ -364,24 +367,36 @@ pub fn build_distance_series(
             .and_then(finite_f64)
         {
             total_distance_meters = total_distance_meters.max(direct_distance);
-            distance_series.push(round_f64(total_distance_meters, 3));
+            sparse_distance_series.push(round_f64(total_distance_meters, 3));
+            if current_course.is_some() {
+                previous_course = current_course;
+            }
             continue;
         }
 
-        if index > 0 {
-            if let (Some(lat1), Some(lon1), Some(lat2), Some(lon2)) = (
-                course_points[index - 1].0,
-                course_points[index - 1].1,
-                course_points[index].0,
-                course_points[index].1,
-            ) {
-                total_distance_meters += haversine_distance(lat1, lon1, lat2, lon2);
-            }
+        let Some((latitude, longitude)) = current_course else {
+            sparse_distance_series.push(None);
+            continue;
+        };
+        if let Some((previous_latitude, previous_longitude)) = previous_course {
+            total_distance_meters +=
+                haversine_distance(previous_latitude, previous_longitude, latitude, longitude);
         }
-        distance_series.push(round_f64(total_distance_meters, 3));
+        previous_course = current_course;
+        sparse_distance_series.push(round_f64(total_distance_meters, 3));
     }
 
-    distance_series
+    let points = crate::interpolation::collect_valid_numeric_points(
+        elapsed_seconds,
+        &sparse_distance_series,
+    );
+    elapsed_seconds
+        .iter()
+        .map(|elapsed| {
+            crate::interpolation::interpolate_points(&points, *elapsed)
+                .and_then(|distance| round_f64(distance, 3))
+        })
+        .collect()
 }
 
 /// Builds a monotonic elapsed-time series for every sample.

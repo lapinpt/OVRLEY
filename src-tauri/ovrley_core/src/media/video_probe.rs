@@ -4,7 +4,7 @@
 //!       codec, audio, container, rotation, and timestamp fallback metadata
 //!       from an imported source video using ffprobe.
 //! Does not own: ffmpeg binary discovery (see [`crate::encode::ffmpeg`]), codec
-//!       availability detection (see [`crate::encode::codec_detect`]).
+//!       availability detection (see [`crate::encode::ffmpeg::detect`]).
 //!
 //! Allowed dependencies: `crate::encode::ffmpeg`, `crate::error`.
 //! Forbidden dependencies: `crate::commands`, `crate::render`.
@@ -19,7 +19,7 @@
 //! Not a hot path — called once per imported video. Subprocess overhead
 //! dominates; ffprobe typically completes in < 1 second for 1080p files.
 
-use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
+use crate::encode::ffmpeg::binary::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::error::{CoreError, CoreResult};
 use crate::media::{Resolution, SourceVideoMetadata};
 use serde_json::Value;

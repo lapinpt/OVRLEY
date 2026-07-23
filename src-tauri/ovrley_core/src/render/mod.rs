@@ -46,7 +46,8 @@ use std::time::Instant;
 pub use self::static_layer::prepare_base_rgba;
 
 /// Indicates whether the static label layer was not needed, reused, or rebuilt.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum LabelCacheStatus {
     /// No static labels or static icons were present.
     None,
@@ -70,7 +71,7 @@ pub struct PreviewRenderReport {
     pub png_write_ms: f64,
     pub value_count: usize,
     pub label_count: usize,
-    pub label_cache_status: String,
+    pub label_cache_status: LabelCacheStatus,
     pub route_widget: Option<WidgetRenderReport>,
     pub elevation_widget: Option<WidgetRenderReport>,
     pub metric_presentations: Vec<MetricPresentationReport>,
@@ -104,14 +105,120 @@ impl PreparedPreviewAssets {
     }
 }
 
-/// Mutable raw-pixel render target used by the video encoder pipeline.
-pub struct RenderTarget<'a> {
-    /// RGBA pixel buffer that Skia will draw into.
-    pub pixels: &'a mut [u8],
-    /// Target width in pixels.
+/// Canonical dimensions for a rendered video frame.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FrameSize {
     pub width: u32,
-    /// Target height in pixels.
     pub height: u32,
+}
+
+impl FrameSize {
+    pub fn rgba_len(self) -> CoreResult<usize> {
+        let pixel_count = usize::try_from(self.width)
+            .ok()
+            .and_then(|width| {
+                usize::try_from(self.height)
+                    .ok()
+                    .and_then(|height| width.checked_mul(height))
+            })
+            .ok_or_else(|| {
+                CoreError::Render(format!(
+                    "RGBA frame dimensions overflow: {}x{}",
+                    self.width, self.height
+                ))
+            })?;
+        pixel_count.checked_mul(4).ok_or_else(|| {
+            CoreError::Render(format!(
+                "RGBA frame byte length overflow: {}x{}",
+                self.width, self.height
+            ))
+        })
+    }
+}
+
+/// Prepared, immutable context shared by video frame-render workers.
+///
+/// Construction resolves the preview-owned asset bundle into the video
+/// renderer's strict contract once. Per-frame callers then provide only the
+/// activity-frame index, destination pixels, and profiler.
+#[derive(Clone, Copy)]
+pub struct VideoFrameRenderer<'a> {
+    paths: &'a AppPaths,
+    dense_activity: &'a DenseActivityReport,
+    prepared_assets: &'a PreparedRenderAssets,
+    frame_size: FrameSize,
+    scale: f32,
+    base_rgba: &'a [u8],
+}
+
+impl<'a> VideoFrameRenderer<'a> {
+    pub fn new(
+        paths: &'a AppPaths,
+        dense_activity: &'a DenseActivityReport,
+        prepared_preview_assets: &'a PreparedPreviewAssets,
+        frame_size: FrameSize,
+    ) -> CoreResult<Self> {
+        let expected_len = frame_size.rgba_len()?;
+        let base_rgba = prepared_preview_assets
+            .prepared_assets
+            .base_rgba
+            .as_deref()
+            .ok_or_else(|| {
+                CoreError::Render("Prepared video assets have no RGBA base layer".into())
+            })?;
+        if base_rgba.len() != expected_len {
+            return Err(CoreError::Render(format!(
+                "Prepared RGBA base layer has {} bytes; expected {expected_len} for {}x{} video frames",
+                base_rgba.len(), frame_size.width, frame_size.height
+            )));
+        }
+
+        Ok(Self {
+            paths,
+            dense_activity,
+            prepared_assets: &prepared_preview_assets.prepared_assets,
+            frame_size,
+            scale: prepared_preview_assets.scene().scale,
+            base_rgba,
+        })
+    }
+
+    pub fn render_rgba(
+        &self,
+        frame_index: usize,
+        pixels: &mut [u8],
+        frame_profiler: &mut RenderProfiler,
+    ) -> CoreResult<()> {
+        if pixels.len() != self.base_rgba.len() {
+            return Err(CoreError::Render(format!(
+                "Video frame buffer has {} bytes; expected {}",
+                pixels.len(),
+                self.base_rgba.len()
+            )));
+        }
+
+        let started = Instant::now();
+        pixels.copy_from_slice(self.base_rgba);
+        let restore_ms = started.elapsed().as_secs_f64() * 1000.0;
+        frame_profiler.record_ms("base.restore", restore_ms);
+        frame_profiler.record_ms("surface.restore", restore_ms);
+
+        let mut surface = frame_profiler.measure("surface.create", || {
+            wrap_native_surface(self.frame_size.width, self.frame_size.height, pixels)
+        })?;
+        let _ = render_frame_to_surface(
+            surface.canvas(),
+            self.paths,
+            self.dense_activity,
+            self.prepared_assets,
+            frame_index,
+            self.scale,
+            None,
+            true,
+            frame_profiler,
+        )?;
+        Ok(())
+    }
 }
 
 /// Prepares all reusable assets needed to render preview or video frames.
@@ -219,18 +326,6 @@ pub struct PreviewRenderRequest<'a> {
     pub out_path: &'a Path,
 }
 
-/// Bundled parameters for rendering a single frame to RGBA.
-pub struct FrameRenderRequest<'a> {
-    pub paths: &'a AppPaths,
-    pub dense_activity: &'a DenseActivityReport,
-    pub prepared_assets: &'a PreparedRenderAssets,
-    pub frame_index: usize,
-    pub scale: f32,
-    pub labels_image: Option<&'a Image>,
-    pub target: RenderTarget<'a>,
-    pub frame_profiler: &'a mut RenderProfiler,
-}
-
 /// Renders a preview using already-prepared assets.
 ///
 /// # Phases
@@ -315,11 +410,7 @@ pub fn render_preview_with_prepared_assets(
         png_write_ms,
         value_count: request.prepared_preview_assets.prepared_assets.values.len(),
         label_count: request.prepared_preview_assets.prepared_assets.labels.len(),
-        label_cache_status: match request.label_cache_status {
-            LabelCacheStatus::None => "none".to_string(),
-            LabelCacheStatus::Hit => "hit".to_string(),
-            LabelCacheStatus::Miss => "miss".to_string(),
-        },
+        label_cache_status: request.label_cache_status,
         route_widget,
         elevation_widget,
         metric_presentations,
@@ -329,53 +420,6 @@ pub fn render_preview_with_prepared_assets(
     };
 
     Ok(report)
-}
-
-/// Renders one frame directly into an existing RGBA buffer.
-///
-/// This is the hot path used by video encoding. If prepared base pixels match
-/// the target buffer length, they are copied before dynamic content is drawn.
-pub fn render_frame_rgba(request: FrameRenderRequest<'_>) -> CoreResult<()> {
-    let width = request.target.width;
-    let height = request.target.height;
-    let mut labels_image = request.labels_image;
-    let mut base_layer_restored = false;
-    if let Some(base_rgba) = request
-        .prepared_assets
-        .base_rgba
-        .as_ref()
-        .filter(|base_rgba| base_rgba.len() == request.target.pixels.len())
-    {
-        let started = Instant::now();
-        request.target.pixels.copy_from_slice(base_rgba);
-        let restore_ms = started.elapsed().as_secs_f64() * 1000.0;
-        request.frame_profiler.record_ms("base.restore", restore_ms);
-        request
-            .frame_profiler
-            .record_ms("surface.restore", restore_ms);
-        labels_image = None;
-        base_layer_restored = true;
-    } else {
-        request.frame_profiler.measure("surface.clear", || {
-            request.target.pixels.fill(0);
-        });
-    }
-
-    let mut surface = request.frame_profiler.measure("surface.create", || {
-        wrap_native_surface(width, height, request.target.pixels)
-    })?;
-    let _ = render_frame_to_surface(
-        surface.canvas(),
-        request.paths,
-        request.dense_activity,
-        request.prepared_assets,
-        request.frame_index,
-        request.scale,
-        labels_image,
-        base_layer_restored,
-        request.frame_profiler,
-    )?;
-    Ok(())
 }
 
 // Creates an owned Skia surface and renders one preview frame onto it.

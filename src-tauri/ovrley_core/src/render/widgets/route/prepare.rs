@@ -11,6 +11,7 @@ use super::super::polyline::draw_polyline_with_shadow;
 use super::super::types::{
     NormalizedRoutePlot, RouteSample, RouteWidgetCache, StaticLayer, WidgetGeometry,
 };
+use super::curve::curve_route_samples;
 use super::simplify::{downsample_route_samples, simplify_route_samples};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
@@ -20,6 +21,8 @@ use crate::normalize::RenderDataRequirements;
 use crate::normalize::ValidatedRoutePlot;
 use crate::render::surface::create_surface;
 use std::time::Instant;
+
+const ROUTE_CURVE_FLATNESS_PX: f64 = 0.35;
 
 /// Prepares cached geometry, static layers, and frame states for a route plot.
 pub(crate) fn prepare_route_cache(
@@ -69,10 +72,7 @@ pub(crate) fn prepare_route_cache(
     })
 }
 
-/// Builds simplified widget-space geometry for the route path.
-///
-/// Downsample before RDP simplification to cap work for long activities while
-/// preserving visually important points.
+/// Builds widget-space geometry for the route path.
 pub(crate) fn build_route_geometry(
     plot: &NormalizedRoutePlot,
     validated: &ValidatedRoutePlot,
@@ -110,8 +110,10 @@ pub(crate) fn build_route_geometry(
         .max(2.0) as usize;
     let downsampled =
         downsample_route_samples(&fitted_samples, target_count.min(fitted_samples.len()));
-    let simplified = simplify_route_samples(&downsampled, plot.simplify_tolerance_px.max(0.05));
-    let scaled_points = simplified
+    let geometry_samples =
+        simplify_route_samples(&downsampled, plot.simplify_tolerance_px.max(0.05));
+    let curved_samples = curve_route_samples(&geometry_samples, ROUTE_CURVE_FLATNESS_PX);
+    let scaled_points = curved_samples
         .iter()
         .map(|sample| {
             (
@@ -123,13 +125,16 @@ pub(crate) fn build_route_geometry(
 
     Ok(WidgetGeometry {
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
-        progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
+        progress_values: curved_samples
+            .iter()
+            .map(|sample| sample.progress01)
+            .collect(),
         elapsed_fractions: Vec::new(),
         elevation_data_range: None,
         points: scaled_points,
         source_point_count: route_samples.len(),
         simplification: format!(
-            "lttb_density_{:.2}_rdp_px_{:.2}",
+            "lttb_density_{:.2}_rdp_px_{:.2}_catmull_rom_flatness_px_{ROUTE_CURVE_FLATNESS_PX:.2}",
             plot.target_density, plot.simplify_tolerance_px
         ),
     })

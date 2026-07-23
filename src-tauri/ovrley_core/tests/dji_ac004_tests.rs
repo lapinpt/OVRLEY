@@ -3,6 +3,7 @@ use ovrley_core::media::mp4_telemetry;
 use std::path::Path;
 
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/DJI-telemetry.MP4"]
 fn extract_from_video_reads_dji_fixture() {
     let (repo_root, fixture) = dji_fixture();
 
@@ -23,6 +24,7 @@ fn extract_from_video_reads_dji_fixture() {
 }
 
 #[test]
+#[ignore = "requires video fixture tests/fixtures/video/DJI-telemetry.MP4"]
 fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
     let (repo_root, fixture) = dji_fixture();
 

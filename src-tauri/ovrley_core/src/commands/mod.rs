@@ -9,17 +9,18 @@
 pub mod elevation_geometry;
 pub mod route_geometry;
 
+use crate::activity::finalize::FinalizeActivityResponse;
 use crate::activity::schema::ParsedActivity;
-use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
+use crate::activity::{
+    build_dense_activity_report_for_timeline, build_dense_activity_report_validated,
+    parse_activity_json,
+};
 use crate::debug::RenderProgress;
-use crate::encode::ffmpeg::resolve_ffmpeg_binary;
-use crate::encode::video::{
-    render_composite_video, render_video, CompositeRenderRequest, RenderController,
-};
-use crate::encode::video_composite_pipeline::{
-    apply_composite_scene_timing, derive_composite_render_plan,
-};
-use crate::encode::video_pipeline::rendered_frame_count;
+use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use crate::encode::pipeline::composite::render_composite_video;
+use crate::encode::pipeline::composite_plan::derive_composite_render_plan;
+use crate::encode::pipeline::transparent::{render_video, rendered_frame_count};
+use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{parse_config_json, parse_template_json};
 use serde::Serialize;
@@ -32,8 +33,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::paths::AppPaths;
 use crate::render::render_preview_to_path;
-
-const COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS: f64 = 0.25;
 
 /// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
@@ -78,6 +77,24 @@ pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> C
         Some(&paths.repo_root),
     )?)
     .map_err(CoreError::Serialization)
+}
+
+/// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
+pub fn backend_parse_csv_activity(path: &str) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::csv::parse_csv_activity_path(Path::new(path))?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
+/// Parses and finalizes a native VBO activity without a frontend RawActivity hop.
+pub fn backend_parse_vbo_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response =
+        crate::activity::vbo::parse_vbo_activity_path(Path::new(path), Some(&paths.repo_root))?;
+    response.debug_payload = None;
+    Ok(response)
 }
 
 /// Lists bundled font filenames plus system font family names visible to Skia.
@@ -137,17 +154,17 @@ pub fn backend_render(
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let validated = crate::normalize::validate_render_config(config)?;
-    if is_composite_render(&validated) {
+    if validated.scene.composite_video_path.is_some() {
         return start_composite_render(paths, controller, validated, parsed_activity);
     }
 
     let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
-    let output_frame_count = rendered_frame_count(
-        dense_activity.frame_count,
-        validated.widget_update_rate() as usize,
-    );
-    let render_id =
-        controller.try_start(output_frame_count as u32, "Preparing render assets...")?;
+    let output_frame_count =
+        rendered_frame_count(dense_activity.frame_count, validated.widget_update_rate())?;
+    let output_frame_count = u32::try_from(output_frame_count).map_err(|_| {
+        CoreError::Encode("Transparent progress frame count exceeds u32".to_string())
+    })?;
+    let render_id = controller.try_start(output_frame_count, "Preparing render assets...")?;
 
     let controller_clone = controller.clone();
     let paths = paths.clone();
@@ -210,14 +227,6 @@ pub fn backend_render_preview_frame(
     }))
 }
 
-/// Returns whether the render config requests MP4 compositing mode.
-///
-/// Composite mode is intentionally gated only by `composite_video_path` so
-/// transparent exports continue through their existing path unchanged.
-pub fn is_composite_render(config: &crate::normalize::ValidatedRenderConfig) -> bool {
-    config.scene.composite_video_path.is_some()
-}
-
 /// Starts the composite render branch after deriving composite timing.
 ///
 /// This branch validates inputs, builds the adjusted dense report, starts
@@ -228,11 +237,6 @@ fn start_composite_render(
     mut validated: crate::normalize::ValidatedRenderConfig,
     parsed_activity: ParsedActivity,
 ) -> CoreResult<Value> {
-    let mut plan = derive_composite_render_plan(&validated.scene)?;
-
-    // Composite timing is derived from video metadata, while overlay telemetry
-    // is bounded by the activity. Accept tiny container/parser duration drift
-    // by trimming the composite tail; larger mismatches still fail below.
     let activity_end = parsed_activity.trim_end_seconds.max(
         parsed_activity
             .sample_elapsed_seconds
@@ -240,42 +244,28 @@ fn start_composite_render(
             .copied()
             .unwrap_or_default(),
     );
-    let max_render_duration = activity_end - plan.sync_offset;
-    let overrun = plan.render_duration - max_render_duration;
-    if max_render_duration > 0.0
-        && overrun > 0.0
-        && overrun <= COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS
-    {
-        plan.render_duration = max_render_duration;
-    }
+    let plan = derive_composite_render_plan(&mut validated.scene, Some(activity_end))?;
+    let dense_activity = build_dense_activity_report_for_timeline(
+        &parsed_activity,
+        &validated,
+        plan.overlay_pipe_fps
+            .timeline_for_duration(plan.render_duration)?,
+    )?;
 
-    apply_composite_scene_timing(&mut validated.scene, &plan);
-    let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
-
-    let output_frame_count = (plan.render_duration * plan.source_fps.as_f64())
-        .ceil()
-        .max(1.0) as u32;
-    let render_id = controller.try_start(output_frame_count, "Compositing video...")?;
+    let render_id = controller.try_start(plan.output_frame_count, "Compositing video...")?;
 
     let controller_clone = controller.clone();
     let paths = paths.clone();
     std::thread::spawn(move || {
-        match render_composite_video(&CompositeRenderRequest {
-            paths: &paths,
-            config: &validated,
-            activity: &parsed_activity,
-            dense_activity: &dense_activity,
-            controller: &controller_clone,
-            composite_video_path: &plan.video_path,
-            composite_bitrate: &plan.bitrate,
-            composite_sync_offset: plan.sync_offset,
-            composite_video_fps_num: plan.source_fps.num,
-            composite_video_fps_den: plan.source_fps.den,
-            composite_video_duration: plan.video_duration,
-            composite_render_duration: plan.render_duration,
-            composite_video_trim_start: plan.trim_start,
-            composite_widget_update_rate: plan.update_rate,
-        }) {
+        match render_composite_video(
+            &paths,
+            &validated,
+            &parsed_activity,
+            &dense_activity,
+            &controller_clone,
+            plan,
+            true,
+        ) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
                 let cancelled = matches!(error, CoreError::Cancelled);
@@ -544,20 +534,24 @@ fn probe_video_metadata(
 /// This command is kept as frontend wiring for video imports. It deliberately
 /// returns the same [`ParsedActivity`] shape used by the rest of the import
 /// pipeline, not the old debug-only columnar telemetry JSON.
-pub fn backend_extract_video_telemetry(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
+pub fn backend_extract_video_telemetry(
+    paths: &AppPaths,
+    file_path: &str,
+) -> CoreResult<Option<FinalizeActivityResponse>> {
     let metadata = probe_video_metadata(paths, file_path)?;
     let fps = metadata.fps.unwrap_or(30.0);
     let duration_s = metadata.duration.unwrap_or(0.0);
 
-    match crate::media::mp4_telemetry::extract_activity(
+    let mut response = crate::media::mp4_telemetry::extract_activity(
         &paths.repo_root,
         file_path,
         fps,
         duration_s,
-    )? {
-        Some(response) => serde_json::to_value(response).map_err(CoreError::Serialization),
-        None => Ok(Value::Null),
+    )?;
+    if let Some(response) = &mut response {
+        response.debug_payload = None;
     }
+    Ok(response)
 }
 
 fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
@@ -645,7 +639,7 @@ fn merge_ffprobe_metadata(
 
 /// Detects ffmpeg encoders and hardware acceleration methods available locally.
 pub fn backend_detect_codecs(paths: &AppPaths) -> CoreResult<Value> {
-    use crate::encode::codec_detect::detect_codecs;
+    use crate::encode::ffmpeg::detect::detect_codecs;
     let codecs = detect_codecs(&paths.repo_root)?;
     serde_json::to_value(&codecs).map_err(CoreError::Serialization)
 }

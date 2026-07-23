@@ -51,7 +51,7 @@ pub use linear_gauge::{
     ValidatedLinearGaugeWidget,
 };
 pub use route::{validate_route_plot, ValidatedRoutePlot};
-pub use scene::{validate_scene_config, ValidatedSceneConfig};
+pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig};
 pub use time::{validate_time_value, ValidatedTimeFormatting, ValidatedTimeValue};
 pub use value::{validate_value_widget, ValidatedValueFormatting, ValidatedValueWidget};
 
@@ -71,6 +71,10 @@ pub struct RenderDataRequirements {
     pub temperature: bool,
     pub pace: bool,
     pub g_force: bool,
+    pub rpm: bool,
+    pub throttle_position: bool,
+    pub brake_position: bool,
+    pub lean_angle: bool,
     pub air_pressure: bool,
     pub ground_contact_time: bool,
     pub left_right_balance: bool,
@@ -185,13 +189,13 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
 
 impl ValidatedRenderConfig {
     /// Returns the frame decimation factor used for the encoded video stream.
-    pub fn widget_update_rate(&self) -> u32 {
-        self.scene.update_rate.max(1)
+    pub fn widget_update_rate(&self) -> std::num::NonZeroU32 {
+        self.scene.update_rate
     }
 
     /// Returns the ffmpeg container FPS after applying update_rate.
     pub fn container_fps(&self) -> f64 {
-        self.scene.fps / f64::from(self.widget_update_rate())
+        self.scene.fps / f64::from(self.widget_update_rate().get())
     }
 
     /// Returns whether any value entry is a heading metric using the tape display.
@@ -220,6 +224,10 @@ impl ValidatedRenderConfig {
                 MetricKind::Temperature => requirements.temperature = true,
                 MetricKind::Pace => requirements.pace = true,
                 MetricKind::GForce => requirements.g_force = true,
+                MetricKind::Rpm => requirements.rpm = true,
+                MetricKind::ThrottlePosition => requirements.throttle_position = true,
+                MetricKind::BrakePosition => requirements.brake_position = true,
+                MetricKind::LeanAngle => requirements.lean_angle = true,
                 MetricKind::AirPressure => requirements.air_pressure = true,
                 MetricKind::GroundContactTime => requirements.ground_contact_time = true,
                 MetricKind::LeftRightBalance => requirements.left_right_balance = true,

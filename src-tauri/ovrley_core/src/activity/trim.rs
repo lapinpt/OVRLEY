@@ -7,7 +7,8 @@
 //! active template needs.
 
 use super::interpolate::{
-    interpolate_course_value, interpolate_numeric_series_value, interpolate_time_series_value,
+    densify_hold_series, interpolate_course_value, interpolate_numeric_series_value,
+    interpolate_time_series_value,
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
@@ -67,6 +68,22 @@ fn trim_numeric_series(
     // the middle of a source sampling interval.
     let start_value = interpolate_numeric_series_value(elapsed, data, start);
     let end_value = interpolate_numeric_series_value(elapsed, data, end);
+    trim_series(
+        data,
+        start_inner_index,
+        end_inner_index,
+        start_value,
+        end_value,
+    )
+}
+
+fn trim_series<T: Clone>(
+    data: &[Option<T>],
+    start_inner_index: usize,
+    end_inner_index: usize,
+    start_value: Option<T>,
+    end_value: Option<T>,
+) -> Vec<Option<T>> {
     let mut trimmed = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
     trimmed.push(start_value);
     trimmed.extend_from_slice(&data[start_inner_index..end_inner_index]);
@@ -316,6 +333,54 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        rpm: if requirements.rpm {
+            trim_numeric_series(
+                elapsed,
+                &activity.rpm,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        throttle_position: if requirements.throttle_position {
+            trim_numeric_series(
+                elapsed,
+                &activity.throttle_position,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        brake_position: if requirements.brake_position {
+            trim_numeric_series(
+                elapsed,
+                &activity.brake_position,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        lean_angle: if requirements.lean_angle {
+            trim_numeric_series(
+                elapsed,
+                &activity.lean_angle,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
         air_pressure: if requirements.air_pressure {
             trim_numeric_series(
                 elapsed,
@@ -484,14 +549,15 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
-        gear_position: if requirements.gear_position {
-            trim_numeric_series(
-                elapsed,
+        gear_position: if requirements.gear_position && !activity.gear_position.is_empty() {
+            let boundary_values =
+                densify_hold_series(elapsed, &activity.gear_position, &[start, end]);
+            trim_series(
                 &activity.gear_position,
-                start,
-                end,
                 start_inner_index,
                 end_inner_index,
+                boundary_values[0].clone(),
+                boundary_values[1].clone(),
             )
         } else {
             Vec::new()

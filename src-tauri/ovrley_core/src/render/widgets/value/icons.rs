@@ -110,6 +110,14 @@ pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconK
         crate::standard_metrics::MetricIconAssetKey::ColorTemperature => {
             Some(MetricIconKind::ColorTemperature)
         }
+        crate::standard_metrics::MetricIconAssetKey::Rpm => Some(MetricIconKind::Rpm),
+        crate::standard_metrics::MetricIconAssetKey::ThrottlePosition => {
+            Some(MetricIconKind::ThrottlePosition)
+        }
+        crate::standard_metrics::MetricIconAssetKey::BrakePosition => {
+            Some(MetricIconKind::BrakePosition)
+        }
+        crate::standard_metrics::MetricIconAssetKey::LeanAngle => Some(MetricIconKind::LeanAngle),
     }
 }
 
@@ -165,6 +173,14 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
         MetricIconKind::ColorTemperature => {
             parsed_metric_icon_cached(icon_kind, &COLOR_TEMPERATURE_ICON_CACHE)
         }
+        MetricIconKind::Rpm => parsed_metric_icon_cached(icon_kind, &RPM_ICON_CACHE),
+        MetricIconKind::ThrottlePosition => {
+            parsed_metric_icon_cached(icon_kind, &THROTTLE_POSITION_ICON_CACHE)
+        }
+        MetricIconKind::BrakePosition => {
+            parsed_metric_icon_cached(icon_kind, &BRAKE_POSITION_ICON_CACHE)
+        }
+        MetricIconKind::LeanAngle => parsed_metric_icon_cached(icon_kind, &LEAN_ANGLE_ICON_CACHE),
     }
 }
 
@@ -196,6 +212,10 @@ static SHUTTER_SPEED_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new
 static FOCAL_LENGTH_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static EV_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static COLOR_TEMPERATURE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static RPM_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static THROTTLE_POSITION_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static BRAKE_POSITION_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static LEAN_ANGLE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 
 fn parsed_metric_icon_cached(
     icon_kind: MetricIconKind,
@@ -323,6 +343,22 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
         MetricIconKind::ColorTemperature => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/widget-icons/widget-color-temperature.svg"
+        )),
+        MetricIconKind::Rpm => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-rpm.svg"
+        )),
+        MetricIconKind::ThrottlePosition => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-throttle-position.svg"
+        )),
+        MetricIconKind::BrakePosition => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-brake-position.svg"
+        )),
+        MetricIconKind::LeanAngle => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-lean-angle.svg"
         )),
     }
 }

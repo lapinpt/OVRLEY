@@ -32,8 +32,8 @@ describe('render config preparation', () => {
       exportRange: {
         ...DEFAULT_EXPORT_RANGE,
         type: 'custom',
-        fromTime: '00:00:05',
-        toTime: '00:00:15',
+        from: 5.25,
+        to: 15.75,
       },
       exportCodec: 'prores_ks',
       importedVideoPath: null,
@@ -42,8 +42,8 @@ describe('render config preparation', () => {
 
     expect(renderConfig.scene.update_rate).toBe(6)
     expect(renderConfig.scene.ffmpeg.codec).toBe('prores_ks')
-    expect(renderConfig.scene.start).toBe(5)
-    expect(renderConfig.scene.end).toBe(15)
+    expect(renderConfig.scene.start).toBe(5.25)
+    expect(renderConfig.scene.end).toBe(15.75)
     expect(renderConfig.scene.custom_export_range_active).toBe(true)
     expect(renderConfig.values[0].color).toBe('#ffffff')
   })
@@ -74,6 +74,7 @@ describe('render config preparation', () => {
       importedVideoResolution: { width: 1920, height: 1080 },
       timelineStart: 3,
       timelineEnd: 21,
+      videoSyncOffsetSeconds: 0,
       availableCodecs: null,
     })
 
@@ -101,8 +102,8 @@ describe('render config preparation', () => {
       exportRange: {
         ...DEFAULT_EXPORT_RANGE,
         type: 'custom',
-        fromTime: '00:00:05',
-        toTime: '00:00:15',
+        from: 5.25,
+        to: 15.75,
       },
       exportMode: 'transparent',
       exportCodec: 'prores_ks',
@@ -118,8 +119,8 @@ describe('render config preparation', () => {
     })
 
     expect(renderConfig.scene.ffmpeg.codec).toBe('prores_ks')
-    expect(renderConfig.scene.start).toBe(5)
-    expect(renderConfig.scene.end).toBe(15)
+    expect(renderConfig.scene.start).toBe(5.25)
+    expect(renderConfig.scene.end).toBe(15.75)
     expect(renderConfig.scene.custom_export_range_active).toBe(true)
     expect(renderConfig.scene).not.toHaveProperty('composite_video_path')
     expect(renderConfig.scene).not.toHaveProperty('composite_render_duration')

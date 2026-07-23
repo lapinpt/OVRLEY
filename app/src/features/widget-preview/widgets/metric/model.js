@@ -83,7 +83,7 @@ export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond 
   const unitText = widget.data.show_units ? formatted.units : ''
   const valueMeasure = measureArcPreviewText(valueText, widget.data.font_size, fontFamily)
   const valueVerticalMeasure = measureArcPreviewText(
-    /^[0-9:.%+-]+$/.test(valueText) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : valueText,
+    valueText === 'N' || /^[0-9:.%+-]+$/.test(valueText) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : valueText,
     widget.data.font_size,
     fontFamily,
   )

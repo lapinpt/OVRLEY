@@ -24,6 +24,7 @@ describe('renderVideo', () => {
         sample_elapsed_seconds: [0, 10, 20],
       },
     })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.mocked(backend.renderVideo).mockResolvedValue({
       started: true,
       render_id: 'render-1',
@@ -50,10 +51,8 @@ describe('renderVideo', () => {
       exportCodec: 'prores_ks',
       exportRange: {
         type: 'custom',
-        from: 0,
-        to: 0,
-        fromTime: '00:00:05',
-        toTime: '00:00:15',
+        from: 5.25,
+        to: 15.75,
       },
     })
 
@@ -63,8 +62,8 @@ describe('renderVideo', () => {
     expect(backend.renderVideo).toHaveBeenCalledWith(
       expect.objectContaining({
         scene: expect.objectContaining({
-          start: 5,
-          end: 15,
+          start: 5.25,
+          end: 15.75,
           fps: 60,
           update_rate: 6,
           custom_export_range_active: true,
@@ -104,8 +103,6 @@ describe('renderVideo', () => {
         type: 'full',
         from: 0,
         to: 0,
-        fromTime: '00:00:00',
-        toTime: '00:00:00',
       },
     })
 
@@ -120,5 +117,50 @@ describe('renderVideo', () => {
       }),
       expect.any(Object),
     )
+  })
+
+  test('clamps a composite custom range to the imported video when submitting the job', async () => {
+    const state = useStore.getState()
+    const compositeOverrides = {
+      ...state,
+      exportMode: 'composite',
+      exportCodec: 'libx264',
+      exportRange: {
+        type: 'custom',
+        from: 5.25,
+        to: 39.75,
+      },
+      importedVideoPath: 'C:\\clip.mp4',
+      importedVideoDuration: 30,
+      importedVideoFps: 30,
+      importedVideoFpsNum: 30,
+      importedVideoFpsDen: 1,
+      importedVideoResolution: { width: 1920, height: 1080 },
+      videoSyncOffsetSeconds: 10,
+    }
+
+    await renderVideo(compositeOverrides)
+
+    expect(backend.renderVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scene: expect.objectContaining({
+          start: 10,
+          end: 39.75,
+          composite_sync_offset: 10,
+          composite_video_trim_start: 0,
+          composite_render_duration: 29.75,
+        }),
+      }),
+      expect.any(Object),
+    )
+
+    const submittedJobs = vi.mocked(backend.renderVideo).mock.calls.length
+    await expect(
+      renderVideo({
+        ...compositeOverrides,
+        exportRange: { type: 'custom', from: 0, to: 5 },
+      }),
+    ).rejects.toThrow('Custom export range must overlap the imported video range')
+    expect(backend.renderVideo).toHaveBeenCalledTimes(submittedJobs)
   })
 })

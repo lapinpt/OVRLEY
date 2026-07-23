@@ -63,6 +63,9 @@ vi.mock('@/features/overlay-editor/hooks/useEditorViewport', () => ({
     viewportRef: { current: null },
     viewportSize: { width: 1920, height: 1080 },
     fitScale: 1,
+    displayScale: 1,
+    handleWheel: vi.fn(),
+    scrollViewportRef: { current: null },
   }),
 }))
 

@@ -13,7 +13,7 @@ describe('backend extractVideoTelemetry', () => {
   })
 
   test('invokes backend_extract_video_telemetry with filePath', async () => {
-    const invoke = vi.fn().mockResolvedValue(JSON.stringify({ metadata: {}, file_format: 'mp4-telemetry' }))
+    const invoke = vi.fn().mockResolvedValue({ metadata: {}, file_format: 'mp4-telemetry' })
     vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
 
     const backend = await import('@/api/backend')
@@ -25,7 +25,7 @@ describe('backend extractVideoTelemetry', () => {
   })
 
   test('returns null when backend returns null', async () => {
-    const invoke = vi.fn().mockResolvedValue(JSON.stringify(null))
+    const invoke = vi.fn().mockResolvedValue(null)
     vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
 
     const backend = await import('@/api/backend')

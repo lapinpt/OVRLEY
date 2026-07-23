@@ -19,7 +19,7 @@ import {
   getDisplayTypeOptions,
 } from '@/lib/widget/standard-metrics'
 import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { TYPE_LABELS } from '@/lib/widget/widget-icons'
+import { METRIC_ICON_SVGS, TYPE_LABELS } from '@/lib/widget/widget-icons'
 
 describe('standard metric widget catalog', () => {
   test('covers the existing and Wave 1 shared standard metric widgets', () => {
@@ -51,6 +51,10 @@ describe('standard metric widget catalog', () => {
       'focal_length',
       'ev',
       'color_temperature',
+      'rpm',
+      'throttle_position',
+      'brake_position',
+      'lean_angle',
     ])
     expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
 
@@ -149,6 +153,26 @@ describe('standard metric widget catalog', () => {
     expect(getStandardMetricUnitsMode('color_temperature')).toBe('selectable')
   })
 
+  test('registers vehicle metrics and their shared preview icons', () => {
+    const vehicleTypes = ['rpm', 'throttle_position', 'brake_position', 'lean_angle']
+    for (const type of vehicleTypes) {
+      expect(isStandardMetricWidgetType(type)).toBe(true)
+      expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')
+      expect(getStandardMetricInterpolation(type)).toBe('linear')
+      expect(getStandardMetricUnitsMode(type)).toBe('selectable')
+    }
+
+    expect(getStandardMetricDefinition('rpm').icon).toEqual({
+      source: 'lucide',
+      name: 'CircleGauge',
+      assetFile: 'widget-rpm.svg',
+    })
+    expect(METRIC_ICON_SVGS.brake_position).toMatchObject({
+      fill: 'currentColor',
+      stroke: 'none',
+    })
+  })
+
   test('existing metrics carry interpolation and unitsMode defaults', () => {
     const existingTypes = ['speed', 'distance', 'heartrate', 'cadence', 'power', 'temperature', 'pace', 'heading']
     for (const type of existingTypes) {
@@ -180,8 +204,8 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(24)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(220)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(220)
-    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(110)
-    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(110)
+    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(162)
+    expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(162)
   })
 
   test('gauge defaults select continuous fill without fixed segmented geometry', () => {
@@ -226,7 +250,7 @@ describe('display type definitions', () => {
     expect(getDefaultFrameDimensions('text')).toBeNull()
     expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 24 })
     expect(getDefaultFrameDimensions('arc')).toEqual({ width: 220, height: 220 })
-    expect(getDefaultFrameDimensions('corner')).toEqual({ width: 110, height: 110 })
+    expect(getDefaultFrameDimensions('corner')).toEqual({ width: 162, height: 162 })
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
 

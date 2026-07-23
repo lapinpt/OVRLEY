@@ -41,7 +41,8 @@ const hideEditorChromeCss = showEditorChrome
       .moveable-control,
       .moveable-area,
       [data-testid="widget-badge-layer"],
-      [data-testid="canvas-status-badges"] {
+      [data-testid="canvas-status-badges"],
+      [data-testid="canvas-editor-toolbar"] {
         display: none !important;
         opacity: 0 !important;
         visibility: hidden !important;
@@ -226,6 +227,7 @@ async function main() {
         '.moveable-area',
         '[data-testid="widget-badge-layer"]',
         '[data-testid="canvas-status-badges"]',
+        '[data-testid="canvas-editor-toolbar"]',
       ]
       for (const selector of editorChromeSelectors) {
         for (const el of document.querySelectorAll(selector)) {

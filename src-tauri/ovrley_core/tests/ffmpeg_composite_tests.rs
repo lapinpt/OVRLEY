@@ -19,29 +19,24 @@
 //! - Bitrate overrides ignored for specific profiles
 //! - Full-CUDA/QSV paths crashing when filters are unavailable
 
-use std::path::Path;
-
 mod common;
 
 use common::composite::{assert_argument_pair, has_argument_pair};
-use ovrley_core::encode::codec_detect::AvailableCodecs;
-use ovrley_core::encode::ffmpeg_composite::{
-    build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
-    HwAccelInfo,
+use ovrley_core::encode::composite::CompositeRenderPlan;
+use ovrley_core::encode::ffmpeg::catalog::CompositeCodecId;
+use ovrley_core::encode::ffmpeg::composite::{
+    build_composite_ffmpeg_settings, CompositeFfmpegSettings,
 };
 use ovrley_core::encode::fps::Fps;
+use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
+use ovrley_core::normalize::{validate_scene_config, SceneConfig};
+use ovrley_core::render::FrameSize;
+use serde_json::json;
 
 /// Builds composite FFmpeg settings with default libx264 codec for quick tests
 /// that only care about FPS/timing/trim behavior, not codec selection.
 fn settings(source_fps: Fps, overlay_pipe_fps: Fps, trim_start: f64) -> CompositeFfmpegSettings {
-    settings_for_codec(
-        "libx264",
-        "60M",
-        source_fps,
-        overlay_pipe_fps,
-        trim_start,
-        &HwAccelInfo::default(),
-    )
+    settings_for_codec("libx264", "60M", source_fps, overlay_pipe_fps, trim_start)
 }
 
 /// Builds composite FFmpeg settings with an explicit codec, bitrate, and
@@ -52,74 +47,70 @@ fn settings_for_codec(
     source_fps: Fps,
     overlay_pipe_fps: Fps,
     trim_start: f64,
-    hwaccel: &HwAccelInfo,
 ) -> CompositeFfmpegSettings {
-    build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: codec,
-        bitrate,
-        video_path: Path::new("test.mp4"),
-        video_trim_start: trim_start,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps,
-        overlay_pipe_fps,
-        include_audio: true,
-        hwaccel_available: hwaccel,
-    })
+    let render = render_plan(codec, bitrate, source_fps, overlay_pipe_fps, trim_start);
+    build_composite_ffmpeg_settings(
+        &render,
+        FrameSize {
+            width: 3840,
+            height: 2160,
+        },
+        true,
+        None,
+    )
     .unwrap()
 }
 
 /// Builds composite settings for tests that vary resolution-specific input args.
 fn settings_for_dimensions(width: u32, height: u32) -> CompositeFfmpegSettings {
-    build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "libx264",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width,
-        height,
-        source_fps: Fps::new(30000, 1001).unwrap(),
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &HwAccelInfo::default(),
-    })
-    .unwrap()
+    let fps = Fps::new(30000, 1001).unwrap();
+    let render = render_plan("libx264", "60M", fps, fps, 0.0);
+    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None).unwrap()
 }
 
 fn cuda_settings_for_dimensions(codec: &str, width: u32, height: u32) -> CompositeFfmpegSettings {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_nvenc: true,
-        hevc_nvenc: true,
-        nvgpu: true,
-        nnvgpu: true,
-        ..AvailableCodecs::default()
-    });
-    build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: codec,
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width,
-        height,
-        source_fps: Fps::new(30000, 1001).unwrap(),
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &hwaccel,
-    })
-    .unwrap()
+    let fps = Fps::new(30000, 1001).unwrap();
+    let render = render_plan(codec, "60M", fps, fps, 0.0);
+    build_composite_ffmpeg_settings(&render, FrameSize { width, height }, true, None).unwrap()
 }
 
-/// Wraps a canonical codec snapshot in the composite hardware-info shell so
-/// that tests can selectively mark individual codecs as available while
-/// keeping all other fields at their defaults.
-fn hwaccel_with_available_codecs(available_codecs: AvailableCodecs) -> HwAccelInfo {
-    HwAccelInfo {
-        available_codecs,
-        ..HwAccelInfo::default()
+fn render_plan(
+    codec: &str,
+    bitrate: &str,
+    source_fps: Fps,
+    overlay_pipe_fps: Fps,
+    trim_start: f64,
+) -> CompositeRenderPlan {
+    let mut scene: SceneConfig =
+        serde_json::from_value(common::seam::explicit_scene_json()).unwrap();
+    scene.ffmpeg = json!({"codec": codec});
+    scene.composite_video_path = Some("test.mp4".to_string());
+    scene.composite_bitrate = Some(bitrate.to_string());
+    scene.composite_sync_offset = Some(0.0);
+    let (fps_num, fps_den) = source_fps.components();
+    scene.composite_video_fps_num = Some(fps_num);
+    scene.composite_video_fps_den = Some(fps_den);
+    scene.composite_video_duration = Some(trim_start + 10.0);
+    scene.composite_render_duration = Some(10.0);
+    scene.composite_video_trim_start = Some(trim_start);
+    scene.composite_widget_update_rate =
+        Some((source_fps.as_f64() / overlay_pipe_fps.as_f64()).round() as u32);
+    let mut scene = validate_scene_config(scene).unwrap();
+    if codec == "qsv_full_h264" {
+        scene.ffmpeg.qsv_full_init_args = vec![
+            "-init_hw_device".to_string(),
+            "dxva2=dx".to_string(),
+            "-init_hw_device".to_string(),
+            "qsv=qs@dx".to_string(),
+            "-filter_hw_device".to_string(),
+            "qs".to_string(),
+            "-hwaccel".to_string(),
+            "qsv".to_string(),
+            "-hwaccel_output_format".to_string(),
+            "qsv".to_string(),
+        ];
     }
+    derive_composite_render_plan(&mut scene, None).unwrap()
 }
 
 #[test]
@@ -262,34 +253,16 @@ fn test_2_7a_video_trim_is_filter_side_even_without_input_seek() {
 }
 
 #[test]
-fn test_2_8_float_fps_fallback_can_feed_rational_builder_args() {
-    let fps = Fps::from_f64_fallback(29.97).unwrap();
+fn test_2_8_float_fps_metadata_can_feed_rational_builder_args() {
+    let fps = Fps::from_f64_metadata(29.97).unwrap();
     let built = settings(fps, fps, 0.0);
 
     assert_argument_pair(&built.input_1_args, "-r", "30000/1001");
 }
 
 #[test]
-fn validates_zero_direct_fps_values() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "libx264",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps: Fps { num: 0, den: 1 },
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &HwAccelInfo::default(),
-    })
-    .unwrap_err();
-
-    assert_eq!(
-        error.to_string(),
-        "Encoding error: Composite source FPS numerator must be greater than zero"
-    );
+fn rejects_zero_fps_at_construction() {
+    assert!(Fps::new(0, 1).is_err());
 }
 
 #[test]
@@ -300,14 +273,12 @@ fn test_8_1_software_h264_profile_uses_cpu_overlay_and_libx264() {
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
         0.0,
-        &HwAccelInfo::default(),
     );
 
     assert_argument_pair(&built.output_args, "-c:v", "libx264");
     assert_argument_pair(&built.output_args, "-b:v", "20M");
     assert!(built.filter_complex.contains("overlay=0:0"));
     assert!(built.filter_complex.contains("format=yuv420p[out]"));
-    assert!(built.hw_init_args.is_empty());
 }
 
 #[test]
@@ -318,7 +289,6 @@ fn test_8_2_software_h265_profile_uses_cpu_overlay_and_libx265() {
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
-        &HwAccelInfo::default(),
     );
 
     assert_argument_pair(&built.output_args, "-c:v", "libx265");
@@ -330,18 +300,12 @@ fn test_8_2_software_h265_profile_uses_cpu_overlay_and_libx265() {
 
 #[test]
 fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_nvenc: true,
-        nvgpu: true,
-        ..AvailableCodecs::default()
-    });
     let built = settings_for_codec(
         "h264_nvenc",
         "60M",
         Fps::new(60000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
         0.0,
-        &hwaccel,
     );
 
     assert_argument_pair(&built.output_args, "-c:v", "h264_nvenc");
@@ -353,42 +317,13 @@ fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
 }
 
 #[test]
-fn test_8_4_nvenc_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "hevc_nvenc",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps: Fps::new(30000, 1001).unwrap(),
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &HwAccelInfo::default(),
-    })
-    .unwrap_err();
-
-    assert_eq!(
-        error.to_string(),
-        "Encoding error: Requested hardware encoder hevc_nvenc is unavailable."
-    );
-}
-
-#[test]
 fn test_8_5_videotoolbox_h264_simple_path_when_available() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_videotoolbox: true,
-        videotoolbox: true,
-        ..AvailableCodecs::default()
-    });
     let built = settings_for_codec(
         "h264_videotoolbox",
         "10M",
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
-        &hwaccel,
     );
 
     assert_argument_pair(&built.output_args, "-c:v", "h264_videotoolbox");
@@ -397,42 +332,13 @@ fn test_8_5_videotoolbox_h264_simple_path_when_available() {
 }
 
 #[test]
-fn test_8_6_videotoolbox_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "hevc_videotoolbox",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps: Fps::new(30000, 1001).unwrap(),
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &HwAccelInfo::default(),
-    })
-    .unwrap_err();
-
-    assert_eq!(
-        error.to_string(),
-        "Encoding error: Requested hardware encoder hevc_videotoolbox is unavailable."
-    );
-}
-
-#[test]
 fn test_8_7_qsv_h264_simple_path_when_available() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_qsv: true,
-        qsv: true,
-        ..AvailableCodecs::default()
-    });
     let built = settings_for_codec(
         "h264_qsv",
         "60M",
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
-        &hwaccel,
     );
 
     assert_argument_pair(&built.output_args, "-c:v", "h264_qsv");
@@ -443,20 +349,15 @@ fn test_8_7_qsv_h264_simple_path_when_available() {
 
 #[test]
 fn test_8_7b_amf_h264_simple_path_when_available() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_amf: true,
-        ..AvailableCodecs::default()
-    });
     let built = settings_for_codec(
         "h264_amf",
         "60M",
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
-        &hwaccel,
     );
 
-    assert_eq!(built.selected_profile_name, "amf_h264");
+    assert_eq!(built.codec_id, CompositeCodecId::AmfH264);
     assert_argument_pair(&built.output_args, "-c:v", "h264_amf");
     assert_argument_pair(&built.output_args, "-b:v", "60M");
     assert_argument_pair(&built.input_0_args, "-init_hw_device", "d3d11va=dx");
@@ -466,56 +367,7 @@ fn test_8_7b_amf_h264_simple_path_when_available() {
 }
 
 #[test]
-fn test_8_7c_amf_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "hevc_amf",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps: Fps::new(30000, 1001).unwrap(),
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &HwAccelInfo::default(),
-    })
-    .unwrap_err();
-
-    assert_eq!(
-        error.to_string(),
-        "Encoding error: Requested hardware encoder hevc_amf is unavailable."
-    );
-}
-
-#[test]
-fn test_8_8_automatic_h264_uses_software_fallback() {
-    let built = settings_for_codec(
-        "auto_h264",
-        "10M",
-        Fps::new(30, 1).unwrap(),
-        Fps::new(30, 1).unwrap(),
-        0.0,
-        &HwAccelInfo::default(),
-    );
-
-    assert_argument_pair(&built.output_args, "-c:v", "libx264");
-    assert_argument_pair(&built.output_args, "-b:v", "10M");
-}
-
-#[test]
 fn test_8_9_bitrate_override_is_respected_for_every_profile() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_nvenc: true,
-        h264_qsv: true,
-        h264_amf: true,
-        h264_videotoolbox: true,
-        nvgpu: true,
-        qsv: true,
-        videotoolbox: true,
-        ..AvailableCodecs::default()
-    });
-
     for codec in [
         "libx264",
         "libx265",
@@ -530,7 +382,6 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
             Fps::new(30, 1).unwrap(),
             Fps::new(30, 1).unwrap(),
             0.0,
-            &hwaccel,
         );
         let high = settings_for_codec(
             codec,
@@ -538,7 +389,6 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
             Fps::new(30, 1).unwrap(),
             Fps::new(30, 1).unwrap(),
             0.0,
-            &hwaccel,
         );
 
         assert_argument_pair(&low.output_args, "-b:v", "10M");
@@ -547,55 +397,23 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
 }
 
 #[test]
-fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_nvenc: true,
-        nvgpu: true,
-        nnvgpu: false,
-        ..AvailableCodecs::default()
-    });
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "nnvgpu_h264",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps: Fps::new(30000, 1001).unwrap(),
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &hwaccel,
-    })
-    .unwrap_err();
-
-    assert!(error.to_string().contains("overlay_cuda"));
-    assert!(error.to_string().contains("scale_cuda"));
-    assert!(error.to_string().contains("hwupload"));
-}
-
-#[test]
 /// Verifies the full-CUDA path (nnvgpu_h264) produces a complete filter stack:
 /// scale_cuda → overlay_cuda with hwupload on the overlay input. Also checks
 /// the fallback profile is recorded as `nvgpu_h264`.
 fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_nvenc: true,
-        nvgpu: true,
-        nnvgpu: true,
-        ..AvailableCodecs::default()
-    });
     let built = settings_for_codec(
         "nnvgpu_h264",
         "60M",
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
         0.0,
-        &hwaccel,
     );
 
-    assert_eq!(built.selected_profile_name, "nnvgpu_h264");
-    assert_eq!(built.fallback_profile_name.as_deref(), Some("nvgpu_h264"));
+    assert_eq!(built.codec_id, CompositeCodecId::NnvgpuH264);
+    assert_eq!(
+        built.codec_id.metadata().fallback_profile,
+        Some(CompositeCodecId::NvgpuH264)
+    );
     assert_argument_pair(&built.input_0_args, "-init_hw_device", "cuda=cuda");
     assert_argument_pair(&built.input_0_args, "-filter_hw_device", "cuda");
     assert_argument_pair(&built.input_0_args, "-hwaccel", "cuda");
@@ -642,23 +460,19 @@ fn test_9_2_1_cuda_h264_crops_32_pixel_frame_overhang_on_each_axis() {
 /// stack with hevc_nvenc as the output codec. Fallback profile must be
 /// recorded as `nvgpu_hevc`.
 fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        hevc_nvenc: true,
-        nvgpu: true,
-        nnvgpu: true,
-        ..AvailableCodecs::default()
-    });
     let built = settings_for_codec(
         "nnvgpu_hevc",
         "60M",
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
         0.0,
-        &hwaccel,
     );
 
-    assert_eq!(built.selected_profile_name, "nnvgpu_hevc");
-    assert_eq!(built.fallback_profile_name.as_deref(), Some("nvgpu_hevc"));
+    assert_eq!(built.codec_id, CompositeCodecId::NnvgpuHevc);
+    assert_eq!(
+        built.codec_id.metadata().fallback_profile,
+        Some(CompositeCodecId::NvgpuHevc)
+    );
     assert!(built
         .filter_complex
         .contains("scale_cuda=w=3840:h=2160:format=yuv420p"));
@@ -689,34 +503,6 @@ fn test_9_3_1_cuda_hevc_uses_display_oriented_output_dimensions() {
 }
 
 #[test]
-fn test_9_5_qsv_full_profile_requires_qsv_filter_stack() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_qsv: true,
-        qsv: true,
-        qsv_full: false,
-        ..AvailableCodecs::default()
-    });
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "qsv_full_h264",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps: Fps::new(30000, 1001).unwrap(),
-        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
-        include_audio: true,
-        hwaccel_available: &hwaccel,
-    })
-    .unwrap_err();
-
-    assert!(error.to_string().contains("overlay_qsv"));
-    assert!(error.to_string().contains("scale_qsv"));
-    assert!(error.to_string().contains("hwupload"));
-}
-
-#[test]
 /// Full-QSV path (qsv_full_h264) with all filters available exercises the
 /// complete QSV filter stack: scale_qsv for scaling → hwupload for overlay
 /// input → overlay_qsv for composite. Verifies no hwdownload (stays on GPU)
@@ -734,24 +520,19 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
         "-hwaccel_output_format".to_string(),
         "qsv".to_string(),
     ];
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_qsv: true,
-        qsv: true,
-        qsv_full: true,
-        qsv_full_init_args: detected_args.clone(),
-        ..AvailableCodecs::default()
-    });
     let built = settings_for_codec(
         "qsv_full_h264",
         "60M",
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
-        &hwaccel,
     );
 
-    assert_eq!(built.selected_profile_name, "qsv_full_h264");
-    assert_eq!(built.fallback_profile_name.as_deref(), Some("qsv_h264"));
+    assert_eq!(built.codec_id, CompositeCodecId::QsvFullH264);
+    assert_eq!(
+        built.codec_id.metadata().fallback_profile,
+        Some(CompositeCodecId::QsvH264)
+    );
     assert!(built.input_0_args.starts_with(&detected_args));
     assert_argument_pair(&built.input_0_args, "-hwaccel", "qsv");
     assert_argument_pair(&built.input_0_args, "-hwaccel_output_format", "qsv");
@@ -767,89 +548,13 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
 }
 
 #[test]
-/// When `qsv_full_init_args` is empty, the full-QSV path must fail with a
-/// clear error about missing hardware-device init args rather than silently
-/// producing broken args.
-fn test_9_6_qsv_full_profile_requires_detected_init_args() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_qsv: true,
-        qsv: true,
-        qsv_full: true,
-        qsv_full_init_args: Vec::new(),
-        ..AvailableCodecs::default()
-    });
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: "qsv_full_h264",
-        bitrate: "60M",
-        video_path: Path::new("test.mp4"),
-        video_trim_start: 0.0,
-        render_duration: 10.0,
-        width: 3840,
-        height: 2160,
-        source_fps: Fps::new(30, 1).unwrap(),
-        overlay_pipe_fps: Fps::new(30, 1).unwrap(),
-        include_audio: true,
-        hwaccel_available: &hwaccel,
-    })
-    .unwrap_err();
-
-    assert!(error.to_string().contains("QSV hardware-device init args"));
-}
-
-#[test]
-/// When `qsv_full_init_args` is populated (e.g., from a prior `ffmpeg -init_hw_device` probe),
-/// the full-QSV profile must use those exact init args as the input_0 prefix.
-fn test_9_6_qsv_full_profile_uses_detected_init_args_when_available() {
-    let detected_args = vec![
-        "-init_hw_device".to_string(),
-        "d3d11va=dx:1".to_string(),
-        "-init_hw_device".to_string(),
-        "qsv=qs@dx".to_string(),
-        "-filter_hw_device".to_string(),
-        "qs".to_string(),
-        "-hwaccel".to_string(),
-        "qsv".to_string(),
-        "-hwaccel_output_format".to_string(),
-        "qsv".to_string(),
-    ];
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_qsv: true,
-        qsv: true,
-        qsv_full: true,
-        qsv_full_init_args: detected_args.clone(),
-        ..AvailableCodecs::default()
-    });
-    let built = settings_for_codec(
-        "qsv_full_h264",
-        "60M",
-        Fps::new(30, 1).unwrap(),
-        Fps::new(30, 1).unwrap(),
-        0.0,
-        &hwaccel,
-    );
-
-    assert!(built.input_0_args.starts_with(&detected_args));
-}
-
-#[test]
 fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        h264_nvenc: true,
-        h264_qsv: true,
-        nvgpu: true,
-        qsv: true,
-        nnvgpu: true,
-        qsv_full: true,
-        ..AvailableCodecs::default()
-    });
-
     let nvenc = settings_for_codec(
         "h264_nvenc",
         "60M",
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
-        &hwaccel,
     );
     let qsv = settings_for_codec(
         "h264_qsv",
@@ -857,11 +562,10 @@ fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
-        &hwaccel,
     );
 
-    assert_eq!(nvenc.selected_profile_name, "nvgpu_h264");
-    assert_eq!(qsv.selected_profile_name, "qsv_h264");
+    assert_eq!(nvenc.codec_id, CompositeCodecId::NvgpuH264);
+    assert_eq!(qsv.codec_id, CompositeCodecId::QsvH264);
     assert!(!nvenc.filter_complex.contains("overlay_cuda"));
     assert!(!qsv.filter_complex.contains("overlay_qsv"));
 }

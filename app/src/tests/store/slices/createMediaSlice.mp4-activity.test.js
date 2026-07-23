@@ -14,7 +14,7 @@ const activityFile = {
 }
 
 const shortMp4Telemetry = {
-  metadata: { duration_seconds: 2.509, sample_count: 45 },
+  metadata: { sample_count: 45 },
   trim_end_seconds: 2.509,
   file_format: 'mp4-telemetry',
   valid_attributes: ['speed'],
@@ -77,12 +77,13 @@ describe('MP4 activity — store actions', () => {
       useStore.getState().loadVideoTelemetry(shortMp4Telemetry)
 
       const state = useStore.getState()
-      expect(state.fallbackDurationSeconds).toBe(2)
+      expect(state.activitySummary.durationSeconds).toBe(2.509)
+      expect(state.fallbackDurationSeconds).toBe(2.509)
       expect(state.startSecond).toBe(0)
-      expect(state.endSecond).toBe(2)
+      expect(state.endSecond).toBe(2.509)
       expect(state.selectedSecond).toBe(0)
       expect(state.config.scene.start).toBe(0)
-      expect(state.config.scene.end).toBe(2)
+      expect(state.config.scene.end).toBe(2.509)
     })
   })
 
@@ -152,10 +153,10 @@ describe('MP4 activity — store actions', () => {
       const state = useStore.getState()
       expect(state.parsedActivity).toEqual(shortMp4Telemetry)
       expect(state.parsedActivitySource).toBe('video-telemetry')
-      expect(state.fallbackDurationSeconds).toBe(2)
-      expect(state.endSecond).toBe(2)
+      expect(state.fallbackDurationSeconds).toBe(2.509)
+      expect(state.endSecond).toBe(2.509)
       expect(state.selectedSecond).toBe(0)
-      expect(state.config.scene.end).toBe(2)
+      expect(state.config.scene.end).toBe(2.509)
     })
 
     test('clears everything when no hidden video telemetry exists', () => {

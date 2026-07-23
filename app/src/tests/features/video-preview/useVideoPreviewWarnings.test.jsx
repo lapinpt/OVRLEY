@@ -35,13 +35,13 @@ describe('useVideoPreviewWarnings', () => {
     vi.restoreAllMocks()
   })
 
-  test('shows the metadata loading warning until metadata arrives and resets preview errors on source changes', () => {
-    const setImportedVideoPreviewError = vi.fn()
+  test('shows the metadata loading warning until metadata arrives and resets warnings on source changes', () => {
     const video = createVideoStub()
     const { result, rerender } = renderHook(
       ({ videoSrc }) =>
         useVideoPreviewWarnings({
-          setImportedVideoPreviewError,
+          codecName: null,
+          isActive: true,
           videoRef: { current: video },
           videoSrc,
         }),
@@ -68,7 +68,6 @@ describe('useVideoPreviewWarnings', () => {
       videoSrc: 'preview-b.mp4',
     })
 
-    expect(setImportedVideoPreviewError).toHaveBeenLastCalledWith(null)
     expect(result.current.metadataStatusMessage).toBe('')
     expect(result.current.seekWarning).toBe('')
     expect(result.current.nativeVideoError).toBe('')
@@ -78,12 +77,11 @@ describe('useVideoPreviewWarnings', () => {
     let nowMs = 0
     const nowSpy = vi.spyOn(performance, 'now')
     nowSpy.mockImplementation(() => nowMs)
-    const setImportedVideoPreviewError = vi.fn()
-
     const video = createVideoStub()
     const { result } = renderHook(() =>
       useVideoPreviewWarnings({
-        setImportedVideoPreviewError,
+        codecName: null,
+        isActive: true,
         videoRef: { current: video },
         videoSrc: 'preview.mp4',
       }),

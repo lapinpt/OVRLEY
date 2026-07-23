@@ -24,6 +24,9 @@ export const SLOW_SEEK_WARNING_MS = 1_200
 /** Number of consecutive slow seeks before the slow-seek warning is shown. */
 export const SLOW_SEEK_WARNING_COUNT = 2
 
+/** Time allowed for an HEVC frame to reach the webview compositor after metadata loads. */
+export const HEVC_FRAME_TIMEOUT_MS = 3_000
+
 /**
  * When true, the preview URL is served via the local HTTP preview server.
  * Set VITE_USE_LOCAL_HTTP_VIDEO_PREVIEW=false to use `convertFileSrc` (direct file:// asset) instead.

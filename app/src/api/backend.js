@@ -158,6 +158,26 @@ export async function finalizeActivity(rawActivity) {
 }
 
 /**
+ * Parses a native CSV activity path through the Rust columnar pipeline.
+ *
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Promise resolving to the native finalized activity response.
+ */
+export async function parseCsvActivity(path) {
+  return invokeCommand('backend_parse_csv_activity', { path })
+}
+
+/**
+ * Parses a native VBO activity path through the Rust columnar pipeline.
+ *
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<object>} Promise resolving to the native finalized activity response.
+ */
+export async function parseVboActivity(path) {
+  return invokeCommand('backend_parse_vbo_activity', { path })
+}
+
+/**
  * Renders a transparent PNG for a single preview second.
  *
  * @param {*} config - Overlay template configuration data.
@@ -182,6 +202,14 @@ export async function renderPreviewFrame(config, parsedActivity, second) {
 export async function getPlatformInfo() {
   const payload = await invokeCommand('backend_current_os')
   return typeof payload === 'string' ? JSON.parse(payload) : payload
+}
+
+/**
+ * Opens the official Windows HEVC playback support page.
+ * @returns {Promise<void>} Promise resolving when the system opener has been invoked.
+ */
+export async function openHevcSupport() {
+  await invokeCommand('backend_open_hevc_support')
 }
 
 /**
@@ -271,6 +299,27 @@ export async function listAvailableFonts() {
  */
 export async function getRenderProgress() {
   return apiCall('backend_progress', {})
+}
+
+/**
+ * Subscribes to streamed `render-progress` events emitted by the backend
+ * `RenderController`. Each event carries a `RenderProgress` payload identical
+ * to what `getRenderProgress` would return as a snapshot — the streaming
+ * subscription replaces the previous 500 ms polling loop and delivers updates
+ * at the true frame-production rate (per in-order frame-front advancement).
+ *
+ * The returned `UnlistenFn` must be invoked to release the subscription when
+ * the consumer unmounts or the render session ends.
+ *
+ * @param {(progress: object) => void} handler - Called with each `RenderProgress` payload.
+ * @returns {Promise<() => void>} Resolves to an unlisten function.
+ */
+export async function subscribeRenderProgress(handler) {
+  if (!hasTauriRuntime()) {
+    return () => {}
+  }
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen('render-progress', (event) => handler(event.payload))
 }
 
 /**
@@ -441,8 +490,8 @@ export async function buildRouteGeometry(config, parsedActivity) {
  * Extracts MP4 telemetry from a video file.
  *
  * @param {string} filePath - Absolute path to the video file.
- * @returns {Promise<object|null>} Promise resolving to ParsedActivity or null if no telemetry found.
+ * @returns {Promise<object|null>} Promise resolving to the native finalized activity response or null if no telemetry is found.
  */
 export async function extractVideoTelemetry(filePath) {
-  return apiCall('backend_extract_video_telemetry', { filePath })
+  return invokeCommand('backend_extract_video_telemetry', { filePath })
 }

@@ -3,7 +3,8 @@
  * scheduling, and playback synchronization around the active <video> element.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { openHevcSupport } from '@/api/backend'
 import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
@@ -17,7 +18,7 @@ import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/vi
  *
  * @param {React.RefObject<HTMLVideoElement>} videoRef - Ref to the video element.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ videoSrc: string, importId: string|null, frozenFrameSecond: number|null, isOutOfRange: boolean, videoPreviewMessages: string[] }}
+ * @returns {{ videoSrc: string, importId: string|null, frozenFrameSecond: number|null, isOutOfRange: boolean, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
  */
 export function useVideoPreview(videoRef, isActive = true) {
   // Store selectors - subscribes to video import state, playhead position, playback mode, and sync offset.
@@ -25,12 +26,13 @@ export function useVideoPreview(videoRef, isActive = true) {
   const importedVideoImportId = useStore((state) => state.importedVideoImportId)
   const importedVideoPreviewUrl = useStore((state) => state.importedVideoPreviewUrl)
   const importedVideoPreviewWarnings = useStore((state) => state.importedVideoPreviewWarnings)
+  const importedVideoCodecName = useStore((state) => state.importedVideoCodecName)
+  const platformOs = useStore((state) => state.platformOs)
   const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
-  const setImportedVideoPreviewError = useStore((state) => state.setImportedVideoPreviewError)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
 
   // Derived state - determines whether the video should play and which source URL to load.
@@ -45,11 +47,18 @@ export function useVideoPreview(videoRef, isActive = true) {
   )
 
   // Warning lifecycle - tracks metadata, native-player, and slow-seek messages separately from playback sync.
-  const { metadataStatusMessage, nativeVideoError, seekWarning } = useVideoPreviewWarnings({
-    setImportedVideoPreviewError,
+  const { hevcPlaybackWarning, metadataStatusMessage, nativeVideoError, seekWarning } = useVideoPreviewWarnings({
+    codecName: importedVideoCodecName,
+    isActive,
     videoRef,
     videoSrc,
   })
+
+  const openVideoPreviewHelp = useCallback(() => {
+    openHevcSupport().catch((error) => {
+      console.error('[useVideoPreview] Failed to open HEVC help', error)
+    })
+  }, [])
 
   // Video playback clock - publishes preview time from the video element while playing.
   useVideoPlaybackClock({
@@ -132,13 +141,19 @@ export function useVideoPreview(videoRef, isActive = true) {
   })
   const videoEndSecond = videoSyncOffsetSeconds + videoDuration
   const frozenFrameSecond = videoSrc && videoDuration > 0 && selectedSecond >= videoEndSecond ? videoDuration : null
-  const videoPreviewMessages = [...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(Boolean)
+  const videoPreviewHelpAvailable = Boolean(hevcPlaybackWarning) && platformOs === 'windows'
+  const videoPreviewMessages = [hevcPlaybackWarning, ...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(
+    Boolean,
+  )
 
   return {
     videoSrc,
     importId: importedVideoImportId,
     frozenFrameSecond,
     isOutOfRange,
+    hevcPlaybackWarning,
+    openVideoPreviewHelp,
+    videoPreviewHelpAvailable,
     videoPreviewMessages,
   }
 }

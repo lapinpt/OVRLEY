@@ -69,16 +69,14 @@ export function getClipGeometry({ startSecond, durationSeconds, viewStart, viewE
  * @returns {number} Clamped marker second.
  */
 export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSecond, totalDuration }) {
-  const safeTotal = Math.max(0, Number(totalDuration) || 0)
-  const safeSecond = Number(second) || 0
-  const safeFrom = clamp(Number(fromSecond) || 0, 0, safeTotal)
-  const safeTo = clamp(Number(toSecond) || 0, 0, safeTotal)
+  const from = clamp(fromSecond, 0, totalDuration)
+  const to = clamp(toSecond, 0, totalDuration)
 
   if (marker === 'from') {
-    return clamp(safeSecond, 0, Math.max(0, safeTo - EXPORT_RANGE_MIN_GAP_SECONDS))
+    return clamp(second, 0, Math.max(0, to - EXPORT_RANGE_MIN_GAP_SECONDS))
   }
 
-  return clamp(safeSecond, Math.min(safeTotal, safeFrom + EXPORT_RANGE_MIN_GAP_SECONDS), safeTotal)
+  return clamp(second, Math.min(totalDuration, from + EXPORT_RANGE_MIN_GAP_SECONDS), totalDuration)
 }
 
 /**
