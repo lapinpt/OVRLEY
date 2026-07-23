@@ -54,10 +54,12 @@ export default function useOverlayPlayer({ backgroundMode }) {
       selectedSecond: state.selectedSecond,
       setSelectedSecond: state.setSelectedSecond,
       setVideoSyncOffset: state.setVideoSyncOffset,
+      setVideoSyncOffsetPreview: state.setVideoSyncOffsetPreview,
       startPreviewPlayback: state.startPreviewPlayback,
       updatePreviewScrub: state.updatePreviewScrub,
       updateRate: state.updateRate,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      videoSyncOffsetPreviewSeconds: state.videoSyncOffsetPreviewSeconds,
     })),
   )
 
@@ -87,6 +89,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
   // Clip drag - owns horizontal drag gesture state for sync offset adjustment.
   const clipDrag = useClipDrag({
     setVideoSyncOffset: playerStore.setVideoSyncOffset,
+    setVideoSyncOffsetPreview: playerStore.setVideoSyncOffsetPreview,
     activityDurationSeconds,
     importedVideoDuration: playback.importedVideoDuration,
   })
@@ -96,6 +99,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     snapGuidelineSecond,
     updateMetrics: updateClipDragMetrics,
   } = clipDrag
+  const timelineVideoSyncOffsetSeconds = playerStore.videoSyncOffsetPreviewSeconds ?? playback.videoSyncOffsetSeconds
 
   // Viewport domain - owns measurement, fit targets, ticks, zoom, pan, and playback follow behavior.
   const viewport = useTimelineViewport({
@@ -108,7 +112,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     isPlaying: playback.isPlaying,
     playheadSecond: playback.clampedPlayhead,
     totalDuration: playback.totalDuration,
-    videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
+    videoSyncOffsetSeconds: timelineVideoSyncOffsetSeconds,
   })
 
   // Gesture metrics sync - pointer math uses the latest measured element and viewport without re-rendering on every move.
@@ -185,7 +189,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     hasVideo,
     importedVideoDuration: playback.importedVideoDuration,
     importedVideoPath: playback.importedVideoPath,
-    videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
+    videoSyncOffsetSeconds: timelineVideoSyncOffsetSeconds,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
     widthPx: viewport.widthPx,

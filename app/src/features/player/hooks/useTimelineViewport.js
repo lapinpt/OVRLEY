@@ -141,6 +141,7 @@ export default function useTimelineViewport({
     () =>
       buildFitTargets({
         totalDuration,
+        widthPx,
         hasVideo,
         videoSyncOffsetSeconds,
         importedVideoDuration,
@@ -148,7 +149,7 @@ export default function useTimelineViewport({
         activityDurationSeconds,
         fallbackDurationSeconds,
       }),
-    [activityDurationSeconds, fallbackDurationSeconds, hasActivityData, hasVideo, importedVideoDuration, totalDuration, videoSyncOffsetSeconds],
+    [activityDurationSeconds, fallbackDurationSeconds, hasActivityData, hasVideo, importedVideoDuration, totalDuration, videoSyncOffsetSeconds, widthPx],
   )
 
   const displayedFitTargetId = useMemo(() => getMatchingFitTargetId({ viewport, targets: fitTargets }), [fitTargets, viewport])

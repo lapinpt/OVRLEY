@@ -38,10 +38,11 @@ function getAutoScrollPointerSecond(metrics, clientX) {
  * Owns horizontal drag gestures for activity and video clips.
  *
  * @param {object} options Drag command inputs.
- * @param {function} options.setVideoSyncOffset Store action for updating the sync offset.
+ * @param {function} options.setVideoSyncOffset Store action for committing the sync offset.
+ * @param {function} [options.setVideoSyncOffsetPreview=options.setVideoSyncOffset] Store action for updating the transient preview offset.
  * @returns {object} Per-lane drag props, dragging flag, and metrics sync command.
  */
-export default function useClipDrag({ setVideoSyncOffset }) {
+export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPreview = setVideoSyncOffset }) {
   const [isDragging, setIsDragging] = useState(false)
   const [snapGuidelineSecond, setSnapGuidelineSecond] = useState(null)
 
@@ -77,13 +78,13 @@ export default function useClipDrag({ setVideoSyncOffset }) {
     pendingOffsetRef.current = null
   }, [])
 
-  const publishOffset = useCallback(
+  const publishPreviewOffset = useCallback(
     (offset) => {
       pendingOffsetRef.current = offset
       if (offsetFrameRef.current !== null) return
       if (typeof window.requestAnimationFrame !== 'function') {
         pendingOffsetRef.current = null
-        setVideoSyncOffset(offset)
+        setVideoSyncOffsetPreview(offset)
         return
       }
 
@@ -91,10 +92,10 @@ export default function useClipDrag({ setVideoSyncOffset }) {
         offsetFrameRef.current = null
         const nextOffset = pendingOffsetRef.current
         pendingOffsetRef.current = null
-        if (nextOffset !== null) setVideoSyncOffset(nextOffset)
+        if (nextOffset !== null) setVideoSyncOffsetPreview(nextOffset)
       })
     },
-    [setVideoSyncOffset],
+    [setVideoSyncOffsetPreview],
   )
 
   const updateDragOffset = useCallback(
@@ -126,9 +127,9 @@ export default function useClipDrag({ setVideoSyncOffset }) {
       drag.currentOffset = nextOffset
       drag.guidelineSecond = snap.guidelineSecond
       setSnapGuidelineSecond(snap.guidelineSecond)
-      publishOffset(nextOffset)
+      publishPreviewOffset(nextOffset)
     },
-    [publishOffset],
+    [publishPreviewOffset],
   )
 
   const autoScrollTick = useCallback(() => {
@@ -176,19 +177,21 @@ export default function useClipDrag({ setVideoSyncOffset }) {
         viewStart: metrics.viewStart,
         widthPx: getTimelineWidth(metrics),
       })
-      const nextOffset = commit ? Math.round(snap.offset) : drag.initialOffset
+      const nextOffset = commit ? Math.round(snap.offset * 10) / 10 : drag.initialOffset
       setSnapGuidelineSecond(null)
       setVideoSyncOffset(nextOffset)
+      setVideoSyncOffsetPreview(null)
     },
-    [cancelAutoScroll, cancelPendingOffset, setVideoSyncOffset],
+    [cancelAutoScroll, cancelPendingOffset, setVideoSyncOffset, setVideoSyncOffsetPreview],
   )
 
   useEffect(
     () => () => {
       cancelAutoScroll()
       cancelPendingOffset()
+      setVideoSyncOffsetPreview(null)
     },
-    [cancelAutoScroll, cancelPendingOffset],
+    [cancelAutoScroll, cancelPendingOffset, setVideoSyncOffsetPreview],
   )
 
   const getLaneDragProps = useCallback(
@@ -200,6 +203,7 @@ export default function useClipDrag({ setVideoSyncOffset }) {
         event.currentTarget.setPointerCapture?.(event.pointerId)
         cancelAutoScroll()
         cancelPendingOffset()
+        setVideoSyncOffsetPreview(metricsRef.current.videoSyncOffsetSeconds)
         setSnapGuidelineSecond(null)
         dragRef.current = {
           type: 'clip-drag',
@@ -224,7 +228,7 @@ export default function useClipDrag({ setVideoSyncOffset }) {
       onPointerUp: (event) => endDrag(event, true),
       onPointerCancel: (event) => endDrag(event, false),
     }),
-    [cancelPendingOffset, endDrag, scheduleAutoScroll, updateDragOffset],
+    [cancelPendingOffset, cancelAutoScroll, endDrag, scheduleAutoScroll, setVideoSyncOffsetPreview, updateDragOffset],
   )
 
   return {

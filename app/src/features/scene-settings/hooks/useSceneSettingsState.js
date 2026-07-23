@@ -179,6 +179,10 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
   }
 
+  const handleComputeVideoSync = useCallback(() => {
+    computeVideoSync(activitySummary)
+  }, [activitySummary, computeVideoSync])
+
   const handlers = {
     handleAspectRatioChange,
     handleCustomFpsChange: handleCustomFpsChangeEvent,
@@ -204,7 +208,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     },
     videoSyncSettings: {
       activitySummary,
-      computeVideoSync,
+      computeVideoSync: handleComputeVideoSync,
       importedVideoBitRate,
       importedVideoCameraType,
       importedVideoCameraModel,

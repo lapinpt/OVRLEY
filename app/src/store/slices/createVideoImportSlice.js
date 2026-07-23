@@ -57,6 +57,7 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoPreviewWarnings: [],
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
+  videoSyncOffsetPreviewSeconds: null, // transient drag preview; committed on release
   videoSyncWarning: null, // string warning or null
   availableCodecs: null,
   importedVideoCodecName: null,
@@ -81,6 +82,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
       importedBackgroundImagePath: null,
+      videoSyncOffsetPreviewSeconds: null,
       importedVideoCodecName: metadata.codecName ?? null,
       importedVideoCodecLongName: metadata.codecLongName ?? null,
       importedVideoBitRate: metadata.bitRate ?? null,
@@ -107,6 +109,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPreviewWarnings: [],
       importedBackgroundImagePath: path || null,
       videoSyncOffsetSeconds: 0,
+      videoSyncOffsetPreviewSeconds: null,
       videoSyncWarning: null,
       importedVideoCodecName: null,
       importedVideoCodecLongName: null,
@@ -130,6 +133,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPreviewWarnings: [],
       importedBackgroundImagePath: null,
       videoSyncOffsetSeconds: 0,
+      videoSyncOffsetPreviewSeconds: null,
       videoSyncWarning: null,
       importedVideoCodecName: null,
       importedVideoCodecLongName: null,
@@ -145,6 +149,15 @@ export const createVideoImportSlice = (set, get) => ({
     }
     set({
       videoSyncOffsetSeconds: seconds,
+    })
+  },
+
+  setVideoSyncOffsetPreview: (seconds) => {
+    if (seconds !== null && !Number.isFinite(seconds)) {
+      throw new Error('Video sync offset preview must be null or a finite number')
+    }
+    set({
+      videoSyncOffsetPreviewSeconds: seconds,
     })
   },
 

@@ -94,10 +94,10 @@ export function zoomRange({ viewStart, viewEnd, pivot, direction, totalDuration,
 /**
  * Fits the viewport to a target range with padding and clamping.
  *
- * @param {{ rangeStart: number, rangeEnd: number, totalDuration: number }} options
+ * @param {{ rangeStart: number, rangeEnd: number, totalDuration: number, widthPx?: number }} options
  * @returns {{ viewStart: number, viewEnd: number }} Fitted viewport.
  */
-export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration }) {
+export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration, widthPx = 0 }) {
   const safeTotal = Math.max(0, Number(totalDuration) || 0)
   const safeStart = Math.max(0, Number(rangeStart) || 0)
   const safeEnd = Math.min(safeTotal, Math.max(safeStart, Number(rangeEnd) || 0))
@@ -108,11 +108,12 @@ export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration }) {
   let viewEnd = safeEnd + padding
   let span = viewEnd - viewStart
 
-  if (span < FIT_MIN_SPAN && safeTotal >= FIT_MIN_SPAN) {
-    const halfExtra = (FIT_MIN_SPAN - span) / 2
+  const minimumSpan = Math.min(Math.max(FIT_MIN_SPAN, getMinimumZoomSpan(widthPx)), safeTotal)
+  if (span < minimumSpan) {
+    const halfExtra = (minimumSpan - span) / 2
     viewStart -= halfExtra
     viewEnd += halfExtra
-    span = FIT_MIN_SPAN
+    span = minimumSpan
   }
 
   span = Math.min(span, safeTotal)
@@ -166,11 +167,12 @@ export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDurati
 /**
  * Builds canonical fit targets for the current media shape.
  *
- * @param {{ totalDuration: number, hasVideo: boolean, videoSyncOffsetSeconds: number, importedVideoDuration: number, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
+ * @param {{ totalDuration: number, widthPx?: number, hasVideo: boolean, videoSyncOffsetSeconds: number, importedVideoDuration: number, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
  * @returns {Array<{ id: 'all'|'video'|'activity', label: string, viewport: { viewStart: number, viewEnd: number } }>}
  */
 export function buildFitTargets({
   totalDuration,
+  widthPx = 0,
   hasVideo,
   videoSyncOffsetSeconds,
   importedVideoDuration,
@@ -189,7 +191,7 @@ export function buildFitTargets({
     targets.push({
       id: 'video',
       label: 'Video',
-      viewport: fitRangeToViewport({ rangeStart: start, rangeEnd: end, totalDuration }),
+      viewport: fitRangeToViewport({ rangeStart: start, rangeEnd: end, totalDuration, widthPx }),
     })
   }
 
@@ -199,7 +201,7 @@ export function buildFitTargets({
     targets.push({
       id: 'activity',
       label: 'Activity',
-      viewport: fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, totalDuration }),
+      viewport: fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, totalDuration, widthPx }),
     })
   }
 
