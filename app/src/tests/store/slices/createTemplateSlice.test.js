@@ -131,10 +131,12 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(effectiveConfig.values[0].color).toBe('#ff0000')
   })
 
-  test('setAspectRatio is pure — updates aspectRatio', () => {
-    useStore.getState().setAspectRatio('21:9')
+  test('setAspectRatioPreset is pure — updates aspect ratio and resolution', () => {
+    useStore.getState().setAspectRatioPreset('21:9', { width: 3440, height: 1440 })
 
     expect(useStore.getState().aspectRatio).toBe('21:9')
+    expect(useStore.getState().config.scene.width).toBe(3440)
+    expect(useStore.getState().config.scene.height).toBe(1440)
   })
 
   test('createNewTemplate is pure — resets state to defaults without network', () => {

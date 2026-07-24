@@ -95,6 +95,7 @@ function CanvasToolbar({ editorControls, importedBackgroundImageFilename, import
         onSetGridVisible={editorControls.onSetGridVisible}
         snapToGrid={editorControls.snapToGrid}
         onSetSnapToGrid={editorControls.onSetSnapToGrid}
+        undoRedoControls={editorControls.undoRedoControls}
       />
     </div>
   )

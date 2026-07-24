@@ -26,6 +26,7 @@ import {
   useEditorShellState,
 } from '@/features/app-shell'
 import { useVideoImport } from '@/features/video-preview'
+import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from './api/backend'
 
 function useRightClickDevtools() {
@@ -84,6 +85,9 @@ function useAppShellComposition() {
   const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
+  const undoRedoControls = useUndoRedo({
+    disabled: renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.showNewTemplateConfirm,
+  })
 
   useAppBootstrap()
 
@@ -117,6 +121,7 @@ function useAppShellComposition() {
     onZoomIn: editorShell.increaseZoom,
     onZoomOut: editorShell.decreaseZoom,
     snapToGrid: editorShell.editorSnapToGrid,
+    undoRedoControls,
     zoomLevel: editorShell.editorZoomLevel,
   }
 

@@ -7,6 +7,7 @@ import { hasTauriRuntime } from '@/api/backend'
 import { useActivityStore } from '@/hooks/useAppStoreSelectors'
 import importActivityFile, { importCsvActivityPath, importVboActivityPath } from '@/lib/activity/import-activity'
 import { fileFromSelectedPath, openSinglePath, selectBrowserFile } from '@/lib/file-dialog'
+import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useStore from '@/store/useStore'
 
 export default function useActivityImport() {
@@ -39,7 +40,7 @@ export default function useActivityImport() {
       if (!importSelection) return
 
       setProcessing(true)
-      await importSelection()
+      await runWithoutEditorHistory(useStore, importSelection)
     } catch (error) {
       console.error('Activity selection failed:', error)
       setErrorMessage(`Activity selection failed: ${error.message}`)
