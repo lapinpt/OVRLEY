@@ -71,7 +71,7 @@ impl PipelineShutdown {
 }
 
 const WRITER_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
-const FFMPEG_FINALIZE_TIMEOUT: Duration = Duration::from_secs(30);
+const FFMPEG_FINALIZE_TIMEOUT: Duration = Duration::from_secs(600);
 const FFMPEG_TERMINATE_TIMEOUT: Duration = Duration::from_secs(2);
 const SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
