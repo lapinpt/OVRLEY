@@ -28,13 +28,9 @@ export default function useRenderWorkflow({ backendStatus }) {
     renderStatus,
     renderingVideo,
     setActiveRenderId,
-    setConfig,
     setErrorMessage,
-    setExportCodec,
-    setExportRange,
     setRenderProgress,
     setRenderingVideo,
-    setUpdateRate,
     setVideoFilename,
     updateRate,
   } = useRenderStore()
@@ -171,47 +167,50 @@ export default function useRenderWorkflow({ backendStatus }) {
   useEffect(() => {
     if (!renderingVideo) return
 
-    const unsubscribe = useStore.subscribe(
-      (state) => state.renderProgress,
-      (nextProgress) => {
-        const { activeRenderId: nextActiveRenderId } = useStore.getState()
-        if (nextProgress.renderId !== nextActiveRenderId) {
-          return
-        }
+    let previousProgress = useStore.getState().renderProgress
+    const unsubscribe = useStore.subscribe((state) => {
+      const nextProgress = state.renderProgress
+      if (nextProgress === previousProgress) return
+      previousProgress = nextProgress
 
-        const { filename, message, status } = nextProgress
+      const { activeRenderId: nextActiveRenderId } = useStore.getState()
+      if (nextProgress.renderId !== nextActiveRenderId) {
+        return
+      }
 
-        if (status === 'complete' && filename) {
-          setVideoFilename(filename)
-          setActiveRenderId(null)
-          setRenderingVideo(false)
-          backend.openVideo(filename).catch((error) => {
-            console.error('Error calling open-video:', error)
-          })
-          return
-        }
+      const { filename, message, status } = nextProgress
 
-        if (status === 'cancelled') {
-          setActiveRenderId(null)
-          setRenderingVideo(false)
-          return
-        }
+      if (status === 'complete' && filename) {
+        setVideoFilename(filename)
+        setActiveRenderId(null)
+        setRenderingVideo(false)
+        backend.openVideo(filename).catch((error) => {
+          console.error('Error calling open-video:', error)
+        })
+        return
+      }
 
-        if (status === 'error') {
-          setActiveRenderId(null)
-          setRenderingVideo(false)
-          if (message) {
-            setErrorMessage(message)
-          }
+      if (status === 'cancelled') {
+        setActiveRenderId(null)
+        setRenderingVideo(false)
+        return
+      }
+
+      if (status === 'error') {
+        setActiveRenderId(null)
+        setRenderingVideo(false)
+        if (message) {
+          setErrorMessage(message)
         }
-      },
-    )
+      }
+    })
 
     return unsubscribe
   }, [renderingVideo, setErrorMessage, setActiveRenderId, setRenderingVideo, setVideoFilename])
 
-  // Confirm handler — persists dialog-local render choices, resolves the active export
-  // pipeline, kicks off the render IPC call, and manages error/recovery flow.
+  // Confirm handler — resolves dialog-local render choices, kicks off the
+  // render IPC call, and manages error/recovery flow. Modal choices are not
+  // promoted into editor state.
   const handleRenderVideoConfirm = useCallback(async () => {
     if (!config?.scene || !renderSettingsDraft) {
       return
@@ -235,12 +234,6 @@ export default function useRenderWorkflow({ backendStatus }) {
       },
     }
 
-    setConfig(nextConfig)
-    setUpdateRate(nextUpdateRate)
-    if (!shouldComposite) {
-      setExportCodec(renderSettingsDraft.exportCodec)
-    }
-    setExportRange(nextExportRange)
     setActiveRenderId(null)
     setRenderProgress({
       ...DEFAULT_RENDER_PROGRESS,
@@ -283,19 +276,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       console.error('Render failed:', error)
       useStore.getState().setErrorMessage(error.message || 'Unknown error')
     }
-  }, [
-    config,
-    globalDefaults,
-    renderSettingsDraft,
-    setConfig,
-    setActiveRenderId,
-    setExportCodec,
-    setExportRange,
-    setRenderProgress,
-    setRenderingVideo,
-    setUpdateRate,
-    setRenderDialogPhase,
-  ])
+  }, [config, globalDefaults, renderSettingsDraft, setActiveRenderId, setRenderProgress, setRenderingVideo, setRenderDialogPhase])
 
   const handleRenderPreviewFrame = useCallback(async () => {
     if (renderPreviewFrameDisabled || !config?.scene) {

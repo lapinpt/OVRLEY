@@ -9,6 +9,7 @@
  * @returns {object} Object containing the selectCommunityTemplate callback.
  */
 import { useCallback } from 'react'
+import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
 import useStore from '@/store/useStore'
 
 /**
@@ -40,11 +41,12 @@ export default function useCommunityTemplate() {
       const data = await response.json()
       const state = useStore.getState()
 
-      if (!state.activityFilename) {
-        useStore.getState().setDemoActivity()
-      }
-
-      useStore.getState().setConfig(data)
+      replaceEditorDocument(useStore, () => {
+        if (!state.activityFilename) {
+          useStore.getState().setDemoActivity()
+        }
+        useStore.getState().setConfig(data)
+      })
 
       const editor = useStore.getState().editor
       if (editor) {

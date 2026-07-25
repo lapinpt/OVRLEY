@@ -42,6 +42,27 @@ function formatOffsetInput(seconds) {
   return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
 }
 
+function getResolutionPreset(aspectRatio, resolutionId) {
+  const presets = RESOLUTIONS[aspectRatio]
+  if (!presets) {
+    throw new Error(`Unknown aspect ratio "${aspectRatio}"`)
+  }
+
+  for (const preset of presets) {
+    if (preset.id === resolutionId) return preset
+  }
+
+  throw new Error(`Unknown resolution preset "${resolutionId}" for aspect ratio "${aspectRatio}"`)
+}
+
+function getDefaultResolutionPreset(aspectRatio) {
+  const presets = RESOLUTIONS[aspectRatio]
+  if (!presets) {
+    throw new Error(`Unknown aspect ratio "${aspectRatio}"`)
+  }
+  return presets[0]
+}
+
 export default function useSceneSettingsState({ config, onConfigChange }) {
   const {
     activitySummary,
@@ -60,9 +81,11 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     importedVideoPath,
     importedVideoResolution,
     resetGlobalDefaults,
-    setAspectRatio,
+    setAspectRatioPreset,
+    setCustomAspectRatio,
     setExportRange,
     setGlobalDefault,
+    setSceneFpsAndUpdateRate,
     setUpdateRate,
     setVideoSyncOffset,
     setVideoSyncWarning,
@@ -87,9 +110,11 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       importedVideoPath: state.importedVideoPath,
       importedVideoResolution: state.importedVideoResolution,
       resetGlobalDefaults: state.resetGlobalDefaults,
-      setAspectRatio: state.setAspectRatio,
+      setAspectRatioPreset: state.setAspectRatioPreset,
+      setCustomAspectRatio: state.setCustomAspectRatio,
       setExportRange: state.setExportRange,
       setGlobalDefault: state.setGlobalDefault,
+      setSceneFpsAndUpdateRate: state.setSceneFpsAndUpdateRate,
       setUpdateRate: state.setUpdateRate,
       setVideoSyncOffset: state.setVideoSyncOffset,
       setVideoSyncWarning: state.setVideoSyncWarning,
@@ -111,8 +136,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({
     fps: scene?.fps,
     onFpsChange: (nextFps) => {
-      setUpdateRate(normalizeUpdateRateForFps(nextFps, updateRate))
-      updateScene('fps', nextFps)
+      setSceneFpsAndUpdateRate(nextFps, normalizeUpdateRateForFps(nextFps, updateRate))
     },
     updateRate,
   })
@@ -145,11 +169,13 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   }
 
   const handleAspectRatioChange = (v) => {
-    setAspectRatio(v)
-    if (v !== 'custom' && RESOLUTIONS[v]) {
-      const preset = RESOLUTIONS[v][0]
-      onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
+    if (v === 'custom') {
+      setCustomAspectRatio()
+      return
     }
+
+    const preset = getDefaultResolutionPreset(v)
+    setAspectRatioPreset(v, { width: preset.w, height: preset.h })
   }
 
   const handleResolutionChange = (v) => {
@@ -158,8 +184,8 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       return
     }
     setCustomResolutionAnchor(null)
-    const preset = RESOLUTIONS[aspectRatio]?.find((r) => r.id === v)
-    if (preset) onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
+    const preset = getResolutionPreset(aspectRatio, v)
+    onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
   }
 
   const handleUpdateRateChange = (v) => setUpdateRate(parseInt(v))
@@ -234,7 +260,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     },
     handlers,
     // Store actions exposed directly for callers that need them
-    setAspectRatio,
     setExportRange,
     setUpdateRate,
   }

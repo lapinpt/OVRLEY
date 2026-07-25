@@ -6,6 +6,7 @@
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Film, Grid3X3, Image, LayoutGrid, Magnet, Minus, RotateCcw, Square, ZoomIn } from 'lucide-react'
+import { UndoRedoControls } from '@/features/undo-redo'
 
 /**
  * Renders the editor toolbar controls for background mode, zoom, grid, and snap.
@@ -23,6 +24,7 @@ import { Film, Grid3X3, Image, LayoutGrid, Magnet, Minus, RotateCcw, Square, Zoo
  * @param {function} props.onSetGridVisible - Toggles grid visibility.
  * @param {boolean} props.snapToGrid - Whether snap-to-grid is enabled.
  * @param {function} props.onSetSnapToGrid - Toggles snap-to-grid.
+ * @param {object} props.undoRedoControls - Undo and redo command state.
  * @returns {JSX.Element} Rendered component.
  */
 export default function EditorToolbar({
@@ -38,10 +40,18 @@ export default function EditorToolbar({
   onSetGridVisible,
   snapToGrid,
   onSetSnapToGrid,
+  undoRedoControls,
 }) {
   return (
     <div>
       <div className="flex items-center gap-1 rounded-xs border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
+        <UndoRedoControls
+          canRedo={undoRedoControls.canRedo}
+          canUndo={undoRedoControls.canUndo}
+          onRedo={undoRedoControls.redo}
+          onUndo={undoRedoControls.undo}
+        />
+        <div className="mx-1 h-5 w-px bg-border/70" />
         <SimpleTooltip side="bottom" content="Checkered background">
           <Button
             type="button"

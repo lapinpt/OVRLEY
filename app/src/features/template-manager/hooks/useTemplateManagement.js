@@ -9,6 +9,8 @@ import { hasTauriRuntime } from '@/features/app-shell'
 import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
 import { deletePreference, getPreference, setPreference } from '@/lib/preferences-store'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
+import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
+import useStore from '@/store/useStore'
 import useTemplateFetching from './useTemplateFetching'
 import {
   createTemplateFilePayload,
@@ -115,11 +117,13 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         })
         const { name: _templateName, ...templateState } = normalizedTemplate
 
-        hydrateTemplateState(templateState, {
-          filename,
-          source: 'backend',
+        replaceEditorDocument(useStore, () => {
+          hydrateTemplateState(templateState, {
+            filename,
+            source: 'backend',
+          })
+          setLastSavedTemplateState(templateState)
         })
-        setLastSavedTemplateState(templateState)
         await setPreference('last-template', { source: 'backend', filename })
       } catch (error) {
         console.error('Failed to load template:', error)
@@ -242,11 +246,13 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       const { name: _templateName, ...templateState } = normalizedTemplate
       const importedFilename = sanitizeTemplateFilename(normalizedTemplate.name || file.name)
 
-      hydrateTemplateState(templateState, {
-        filename: importedFilename,
-        source: 'file',
+      replaceEditorDocument(useStore, () => {
+        hydrateTemplateState(templateState, {
+          filename: importedFilename,
+          source: 'file',
+        })
+        setLastSavedTemplateState(templateState)
       })
-      setLastSavedTemplateState(templateState)
     } catch (error) {
       console.error('Failed to import template:', error)
       setErrorMessage(`Failed to import template: ${getErrorMessage(error, 'Unknown error')}`)
@@ -255,7 +261,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
   // Confirm create new — executes the new template action and closes confirmation
   const confirmCreateNewTemplate = useCallback(() => {
-    createNewTemplate()
+    replaceEditorDocument(useStore, createNewTemplate)
     deletePreference('last-template')
     onTemplateCreated()
     setShowNewTemplateConfirm(false)

@@ -262,7 +262,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
       {!hasTransparentBackground ? (
         <div
           className={cn(
-            'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-border/50',
+            'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-border/50 mt-16',
             backgroundMode === 'checker' && !gridVisible && 'bg-overlay-grid-muted',
           )}
           style={{

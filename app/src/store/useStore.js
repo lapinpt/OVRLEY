@@ -1,15 +1,15 @@
 /**
- * Zustand store — combines all feature slices with Immer, devtools, and subscription middleware.
+ * Zustand store — combines all feature slices with undo history and development tooling.
  */
 
 import { create } from 'zustand'
-import { immer } from 'zustand/middleware/immer'
-import { devtools, subscribeWithSelector } from 'zustand/middleware'
+import { devtools } from 'zustand/middleware'
 import { createEditorSlice } from './slices/createEditorSlice'
 import { createMediaSlice } from './slices/createMediaSlice'
 import { createTemplateSlice } from './slices/createTemplateSlice'
 import { createVideoImportSlice } from './slices/createVideoImportSlice'
 import { createLayoutSlice } from './slices/createLayoutSlice'
+import { withEditorHistory } from '@/features/undo-redo/undoHistory'
 
 function createStoreState(set, get) {
   return {
@@ -25,7 +25,7 @@ function shouldEnableStoreDevtools() {
   return import.meta.env.DEV && typeof window !== 'undefined'
 }
 
-const storeInitializer = subscribeWithSelector(immer(createStoreState))
+const storeInitializer = withEditorHistory(createStoreState)
 
 const useStore = create(
   shouldEnableStoreDevtools()
