@@ -31,9 +31,10 @@ const requiredFilters =
     : ["format", "hwupload"];
 
 const defaultFfmpegArchives = {
-  win32: PINNED_WINDOWS_FFMPEG_ARCHIVE,
-  linux: PINNED_LINUX_FFMPEG_ARCHIVE,
-  darwin: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip",
+  "win32-x64": PINNED_WINDOWS_FFMPEG_ARCHIVE,
+  "linux-x64": PINNED_LINUX_FFMPEG_ARCHIVE,
+  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip",
+  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffmpeg.zip",
 };
 
 const expectedFfmpegBuild =
@@ -44,7 +45,8 @@ const expectedFfmpegVersion =
   process.platform === "darwin" && !process.env.OVRLEY_FFMPEG_ARCHIVE_URL ? PINNED_DARWIN_FFMPEG_VERSION : null;
 
 const defaultFfprobeArchives = {
-  darwin: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
+  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
+  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffprobe.zip",
 };
 
 main().catch((error) => {
@@ -67,9 +69,10 @@ async function main() {
   }
   console.log(`[ffmpeg] ${existingStatus.message}`);
 
-  const archiveUrl = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ?? defaultFfmpegArchives[process.platform];
+  const platformKey = `${process.platform}-${process.arch}`;
+  const archiveUrl = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ?? defaultFfmpegArchives[platformKey];
   if (!archiveUrl) {
-    console.log(`[ffmpeg] No bundled installer for ${process.platform}; install ffmpeg on PATH or set OVRLEY_FFMPEG.`);
+    console.log(`[ffmpeg] No bundled installer for ${platformKey}; install ffmpeg on PATH or set OVRLEY_FFMPEG.`);
     return;
   }
 
@@ -85,7 +88,7 @@ async function main() {
   await download(archiveUrl, archivePath);
   await extractArchive(archivePath, extractDir);
 
-  const ffprobeArchiveUrl = process.env.OVRLEY_FFPROBE_ARCHIVE_URL ?? defaultFfprobeArchives[process.platform];
+  const ffprobeArchiveUrl = process.env.OVRLEY_FFPROBE_ARCHIVE_URL ?? defaultFfprobeArchives[platformKey];
   if (ffprobeArchiveUrl) {
     const ffprobeArchivePath = join(workDir, basename(new URL(ffprobeArchiveUrl).pathname));
     const ffprobeExtractDir = join(workDir, "extract-ffprobe");
