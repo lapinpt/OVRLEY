@@ -107,35 +107,38 @@ describe('handleAspectRatioChange', () => {
     act(() => {
       useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
     })
-    const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn() }))
 
     act(() => {
       result.current.handlers.handleAspectRatioChange('4:3')
     })
 
-    expect(onConfigChange).toHaveBeenCalled()
-    const updatedConfig = onConfigChange.mock.calls[0][0]
+    const updatedConfig = useStore.getState().config
     expect(updatedConfig.scene.width).toBeDefined()
     expect(updatedConfig.scene.height).toBeDefined()
+    expect(useStore.getState().aspectRatio).toBe('4:3')
   })
 
   test('does not change resolution when aspect ratio is custom', () => {
     act(() => {
       useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
     })
-    const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn() }))
+
+    const initialWidth = useStore.getState().config.scene.width
+    const initialHeight = useStore.getState().config.scene.height
 
     act(() => {
       result.current.handlers.handleAspectRatioChange('custom')
     })
 
-    expect(onConfigChange).not.toHaveBeenCalled()
+    expect(useStore.getState().aspectRatio).toBe('custom')
+    expect(useStore.getState().config.scene.width).toBe(initialWidth)
+    expect(useStore.getState().config.scene.height).toBe(initialHeight)
   })
 })
 
@@ -144,18 +147,15 @@ describe('handleFpsModeChange', () => {
     act(() => {
       useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
     })
-    const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
+    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange: vi.fn() }))
 
     act(() => {
       result.current.handlers.handleFpsModeChange('60')
     })
 
-    expect(onConfigChange).toHaveBeenCalled()
-    const updated = onConfigChange.mock.calls[0][0]
-    expect(updated.scene.fps).toBe(60)
+    expect(useStore.getState().config.scene.fps).toBe(60)
   })
 
   test('enters custom FPS mode without changing scene fps', () => {

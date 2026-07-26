@@ -129,11 +129,12 @@ describe('MetricWidgetEditor new metric controls', () => {
       />,
     )
 
-    expect(screen.getByText('Coordinate Format')).toBeInTheDocument()
-    expect(screen.getByText('Degrees / Minutes / Seconds')).toBeInTheDocument()
+    expect(screen.getByText('Format')).toBeInTheDocument()
+    expect(screen.getByText('Coordinates')).toBeInTheDocument()
+    expect(screen.getByText('Deg / Min / Sec')).toBeInTheDocument()
 
     const selectors = screen.getAllByRole('combobox')
-    expect(screen.getByText('Lat/Lon')).toBeInTheDocument()
+    expect(screen.getByText('Both')).toBeInTheDocument()
     expect(selectors[selectors.length - 1]).not.toBeDisabled()
   })
 

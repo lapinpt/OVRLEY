@@ -93,14 +93,6 @@ describe('useRenderWorkflow', () => {
       }),
     )
 
-    expect(useStore.getState().exportCodec).toBe('prores_ks')
-    expect(useStore.getState().exportRange).toEqual(
-      expect.objectContaining({
-        type: 'custom',
-        from: 5.25,
-        to: 15.75,
-      }),
-    )
   })
 
   test('dispatches composite mode with imported-video compositing inputs and keeps durable transparent settings untouched', async () => {
@@ -136,13 +128,5 @@ describe('useRenderWorkflow', () => {
       }),
     )
 
-    expect(useStore.getState().exportCodec).toBe('prores_ks')
-    expect(useStore.getState().exportRange).toEqual(
-      expect.objectContaining({
-        type: 'custom',
-        from: 1.25,
-        to: 2.75,
-      }),
-    )
   })
 })

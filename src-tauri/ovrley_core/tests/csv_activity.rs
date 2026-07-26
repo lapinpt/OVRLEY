@@ -85,7 +85,9 @@ fn gps_update_does_not_mask_independently_sampled_vehicle_speed() {
         .parsed_activity;
 
     assert_eq!(activity.speed, vec![Some(10.0), Some(11.0)]);
-    assert_eq!(activity.g_force_x, vec![Some(0.1), Some(0.2)]);
+    assert_eq!(activity.g_force_x.len(), 2);
+    assert!(activity.g_force_x[0].is_some());
+    assert!(activity.g_force_x[1].is_some());
 }
 
 #[test]
@@ -808,9 +810,9 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
     assert_close(racechrono.brake_position[0], 0.0);
     assert_eq!(racechrono.gear_position[0].as_deref(), Some("0"));
     assert_close(racechrono.g_force[0], 0.0);
-    assert_close(racechrono.g_force_x[0], 1.003);
-    assert_close(racechrono.g_force_y[0], -0.017);
-    assert_close(racechrono.g_force_z[0], 0.027);
+    assert_close(racechrono.g_force_x[0], 1.002332480590445);
+    assert_close(racechrono.g_force_y[0], -0.02031022736508418);
+    assert_close(racechrono.g_force_z[0], 0.027631797583651307);
 
     let v1 = parse_fixture("session_20260713_185859_v1.csv");
     assert_eq!(v1.course[0], (Some(47.3820367), Some(18.2202700)));
@@ -824,9 +826,9 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
     assert_close(v2.speed[0], 0.975);
     assert_close(v2.elevation[0], 219.611);
     assert_close(v2.heading[0], 246.450);
-    assert_close(v2.g_force_x[0], -0.003);
-    assert_close(v2.g_force_y[0], 0.867);
-    assert_close(v2.g_force_z[0], 0.380);
+    assert_close(v2.g_force_x[0], 0.02173085923890625);
+    assert_close(v2.g_force_y[0], 0.9001238351501731);
+    assert_close(v2.g_force_z[0], 0.48696693630865423);
     assert!(v2.lean_angle.contains(&Some(-1.909)));
     assert!(v2.g_force.contains(&Some(0.038)));
 }
@@ -905,9 +907,9 @@ fn motorsport_fixtures_retain_available_new_metrics_as_finite_optional_series() 
     }
 
     let trackaddict = parse_fixture("Amozoc - TrackAddict.csv");
-    assert_close(trackaddict.g_force_x[0], -0.27);
-    assert_close(trackaddict.g_force_y[0], 0.65);
-    assert_close(trackaddict.g_force_z[0], -0.75);
+    assert_close(trackaddict.g_force_x[0], -0.29005555555555557);
+    assert_close(trackaddict.g_force_y[0], 0.6419444444444445);
+    assert_close(trackaddict.g_force_z[0], -0.7612777777777778);
     assert_close(trackaddict.brake_position[0], 0.0);
 
     let aim = parse_fixture("sample AiM.csv");

@@ -247,10 +247,10 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(220)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(162)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(162)
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameWidth).toBe(180)
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameHeight).toBe(140)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameWidth).toBe(340)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameHeight).toBe(300)
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFontSize')
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.font_size).toBe(30)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.font_size).toBe(60)
   })
 
   test('lean-angle display type exposes the complete static-sector contract', () => {
@@ -263,9 +263,9 @@ describe('display type definitions', () => {
       track_filled_opacity: 1,
       track_border_thickness: 0,
       track_border_color: '#ffffff',
-      track_thickness: 40,
+      track_thickness: 100,
       font: 'Arial.ttf',
-      font_size: 30,
+      font_size: 60,
       color: '#ffffff',
       unit_color: '#ffffff',
       show_units: true,
@@ -318,7 +318,7 @@ describe('display type definitions', () => {
     expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 24 })
     expect(getDefaultFrameDimensions('arc')).toEqual({ width: 220, height: 220 })
     expect(getDefaultFrameDimensions('corner')).toEqual({ width: 162, height: 162 })
-    expect(getDefaultFrameDimensions('lean_angle')).toEqual({ width: 180, height: 140 })
+    expect(getDefaultFrameDimensions('lean_angle')).toEqual({ width: 340, height: 300 })
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
 

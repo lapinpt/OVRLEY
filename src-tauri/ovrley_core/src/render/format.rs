@@ -963,16 +963,16 @@ mod tests {
     fn coordinate_format_handles_equator_and_prime_meridian() {
         let display = format_coordinates(Some(0.0), Some(0.0), "both", "dms");
         assert_eq!(display.lines[0].direction.as_deref(), Some("N"));
-        assert_eq!(display.lines[0].value_text, "0°0′0″");
+        assert_eq!(display.lines[0].value_text, "0°00′00″");
         assert_eq!(display.lines[1].direction.as_deref(), Some("E"));
-        assert_eq!(display.lines[1].value_text, "0°0′0″");
+        assert_eq!(display.lines[1].value_text, "0°00′00″");
     }
 
     #[test]
-    fn coordinate_format_uses_unpadded_fields_without_spaces() {
+    fn coordinate_format_uses_padded_fields_without_spaces() {
         let dms = format_coordinates(Some(8.1), Some(-8.1), "both", "dms");
-        assert_eq!(dms.lines[0].value_text, "8°6′0″");
-        assert_eq!(dms.lines[1].value_text, "8°6′0″");
+        assert_eq!(dms.lines[0].value_text, "8°06′00″");
+        assert_eq!(dms.lines[1].value_text, "8°06′00″");
 
         let ddm = format_coordinates(Some(8.0), Some(-8.0), "both", "ddm");
         assert_eq!(ddm.lines[0].value_text, "8°0.000′");

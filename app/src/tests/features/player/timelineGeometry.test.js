@@ -62,7 +62,7 @@ describe('timelineGeometry utilities', () => {
     expect(
       snapClipOffset({
         activityDuration: 100,
-        proposedOffset: 1.5,
+        proposedOffset: 0.5,
         videoDuration: 20,
         viewEnd: 100,
         viewStart: 0,

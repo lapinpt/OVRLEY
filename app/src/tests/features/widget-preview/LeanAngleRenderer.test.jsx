@@ -48,7 +48,7 @@ describe('OverlayLeanAngleWidget', () => {
     const emptyFill = screen.getByTestId('lean-angle-empty-track')
     expect(emptyFill).toHaveAttribute(
       'd',
-      'M 35.797299 35.969614 A 64 64 0 0 1 144.202701 35.969614 L 127.264357 46.604109 A 44 44 0 0 0 52.735643 46.604109 Z',
+      'M 35.601444 36.283578 A 64 64 0 0 1 144.398556 36.283578 L 127.065733 46.290688 A 44 44 0 0 0 52.934267 46.290688 Z',
     )
     expect(emptyFill).toHaveAttribute('fill', '#222222')
     expect(emptyFill).toHaveAttribute('fill-opacity', '0.5')
@@ -115,7 +115,7 @@ describe('OverlayLeanAngleWidget', () => {
 
     expect(borderShadow).toBeTruthy()
     expect(borderShadow).toHaveAttribute('transform', 'translate(3 3)')
-    expect(svg.querySelector('text[filter="url(#lean-angle-preview-value-shadow)"]')).toBeTruthy()
-    expect(svg.querySelector('text[filter="url(#lean-angle-preview-unit-shadow)"]')).toBeTruthy()
+    expect(svg.querySelector('text[filter="url(#lean-angle-lean-angle-preview-value-shadow)"]')).toBeTruthy()
+    expect(svg.querySelector('text[filter="url(#lean-angle-lean-angle-preview-unit-shadow)"]')).toBeTruthy()
   })
 })

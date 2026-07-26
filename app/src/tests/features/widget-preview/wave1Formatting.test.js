@@ -146,25 +146,25 @@ describe('total ascent and GPS coordinate formatting', () => {
     expect(formatCoordinates([0, 0], 'both', 'dms', '#fff')).toEqual({
       type: 'coordinates',
       lines: [
-        { direction: 'N', valueText: '0°0′0″', directionColor: '#fff' },
-        { direction: 'E', valueText: '0°0′0″', directionColor: '#fff' },
+        { direction: 'N', valueText: '0°00′00″', directionColor: '#fff' },
+        { direction: 'E', valueText: '0°00′00″', directionColor: '#fff' },
       ],
     })
   })
 
-  test('formats coordinate values without zero padding', () => {
+  test('formats coordinate values with zero padding', () => {
     expect(formatCoordinates([8.1, -8.1], 'both', 'dms', '#fff')).toEqual({
       type: 'coordinates',
       lines: [
-        { direction: 'N', valueText: '8°6′0″', directionColor: '#fff' },
-        { direction: 'W', valueText: '8°6′0″', directionColor: '#fff' },
+        { direction: 'N', valueText: '8°06′00″', directionColor: '#fff' },
+        { direction: 'W', valueText: '8°06′00″', directionColor: '#fff' },
       ],
     })
     expect(formatCoordinates([8, -8], 'both', 'ddm', '#fff')).toEqual({
       type: 'coordinates',
       lines: [
-        { direction: 'N', valueText: '8°0.000′', directionColor: '#fff' },
-        { direction: 'W', valueText: '8°0.000′', directionColor: '#fff' },
+        { direction: 'N', valueText: '8°00.000′', directionColor: '#fff' },
+        { direction: 'W', valueText: '8°00.000′', directionColor: '#fff' },
       ],
     })
   })

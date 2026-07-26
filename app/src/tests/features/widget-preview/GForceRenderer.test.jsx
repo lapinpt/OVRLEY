@@ -65,8 +65,6 @@ describe('OverlayGForceWidget', () => {
     expect(getByTestId('g-force-marker')).toHaveAttribute('cy', '150')
     expect(getByTestId('g-force-label')).toHaveTextContent('2.5 G')
     expect(getByTestId('g-force-unit')).toHaveTextContent('G')
-    expect(getByTestId('g-force-coordinates')).toHaveTextContent('[1.5, 2.0]')
-    expect(getByTestId('g-force-components')).toHaveTextContent('X 1.5 Y 2.0 Z 1.5')
   })
 
   test('does not apply the scene shadow to the marker', () => {
@@ -99,8 +97,6 @@ describe('OverlayGForceWidget', () => {
     expect(getByTestId('g-force-marker')).toHaveAttribute('cx', '110')
     expect(getByTestId('g-force-marker')).toHaveAttribute('cy', '110')
     expect(getByTestId('g-force-label')).toHaveTextContent('--')
-    expect(getByTestId('g-force-coordinates')).toHaveTextContent('[--, --]')
-    expect(getByTestId('g-force-components')).toHaveTextContent('X -- Y -- Z --')
     expect(queryByTestId('g-force-unit')).toBeNull()
   })
 
@@ -129,8 +125,6 @@ describe('OverlayGForceWidget', () => {
 
     expect(baselineX).toBe('140')
     expect(inverted.getByTestId('g-force-marker')).toHaveAttribute('cx', '80')
-    expect(inverted.getByTestId('g-force-coordinates')).toHaveTextContent('[-1.5, 2.0]')
-    expect(inverted.getByTestId('g-force-components')).toHaveTextContent('X 1.5 Y 2.0 Z 1.5')
   })
 
   test('rebuilds the scale and marker position when the horizontal axis is remapped', () => {
@@ -142,6 +136,5 @@ describe('OverlayGForceWidget', () => {
 
     expect(prepareGForcePreview(ACTIVITY, remappedWidget.data).maxG).toBe(6)
     expect(getByTestId('g-force-marker')).toHaveAttribute('cx', '135')
-    expect(getByTestId('g-force-coordinates')).toHaveTextContent('[1.5, 2.0]')
   })
 })

@@ -42,15 +42,15 @@ describe('template snapshot standard metric schema', () => {
 
     expect(leanAngleDefaults).toMatchObject({
       font: 'Arial.ttf',
-      font_size: 30,
+      font_size: 60,
       color: '#ffffff',
       unit_color: '#ffffff',
       show_units: true,
     })
     expect(leanAngleDefaults.display_variants.lean_angle).toMatchObject({
-      width: 180,
-      height: 140,
-      track_thickness: 40,
+      width: 340,
+      height: 300,
+      track_thickness: 100,
       value_offset_x: 0,
       value_offset_y: 0,
     })
@@ -67,7 +67,7 @@ describe('template snapshot standard metric schema', () => {
     const defaults = createMetricValueDefaults('g_force', { font_values: 'Roboto.ttf' }, 'g_force')
 
     expect(defaults.display_variants.g_force.label_font).toBe('Roboto.ttf')
-    expect(defaults.display_variants.g_force.label_font_size).toBe(14)
+    expect(defaults.display_variants.g_force.label_font_size).toBe(20)
     expect(defaults.display_variants.g_force.axis_horizontal).toBe('x')
     expect(defaults.display_variants.g_force.axis_vertical).toBe('y')
     expect(defaults.display_variants.g_force.invert_horizontal).toBe(false)
