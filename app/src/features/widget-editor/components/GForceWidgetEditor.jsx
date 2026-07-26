@@ -28,21 +28,21 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
   return (
     <div className="space-y-2" data-testid={`${label.toLowerCase()}-axis-row`}>
       <Label className="text-[9px] text-muted-foreground uppercase font-bold">{label} axis</Label>
-      <div className="flex items-center justify-between gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <Tabs value={value} onValueChange={onValueChange}>
           <TabsList variant="toolbar" aria-label={`${label} axis`}>
             {AXES.map((axis) => (
               <span key={axis.value} className="inline-flex">
-                <TabsTrigger value={axis.value} variant="toolbar">
+                <TabsTrigger value={axis.value} variant="toolbar" className="p-3 px-5 font-bold">
                   {axis.label}
                 </TabsTrigger>
               </span>
             ))}
           </TabsList>
         </Tabs>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex justify-between items-center gap-2 pl-1">
           <Label htmlFor={switchId} className="text-[9px] text-muted-foreground uppercase font-bold">
-            Invert
+            Invert sign
           </Label>
           <Switch id={switchId} checked={inverted} onCheckedChange={onInvertChange} />
         </div>
@@ -67,7 +67,7 @@ export default function GForceWidgetEditor({ widget, updateWidgetData }) {
       <GForceDisplaySection widget={widget} updateWidgetData={updateWidgetData} />
       <div className="space-y-4">
         <SectionHeading icon={CircleGauge} title="Axis Mapping" />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <GForceAxisRow
             label="Horizontal"
             value={data.axis_horizontal}

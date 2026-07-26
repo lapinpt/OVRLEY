@@ -28,7 +28,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
   const unitOptions = getStandardMetricUnitOptions(widget.type)
   const size = leanVariant.width ?? widget.data.width
   const trackThicknessMax = Math.floor(getLeanAngleOuterRadius(leanVariant.width, leanVariant.height) - 1)
-  const borderThicknessMax = Math.min(24, Math.floor((leanVariant.track_thickness - 1) / 2))
+  const borderThicknessMax = Math.min(8, Math.floor((leanVariant.track_thickness - 1) / 2))
 
   const handleSizeChange = (nextSize) => {
     const update = buildUniformResizeUpdate(widget, nextSize)
@@ -39,8 +39,16 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
     <>
       <div className="space-y-4">
         <SectionHeading icon={SlidersHorizontal} title="Lean Angle" />
-        <SliderField label="Size" value={size} min={30} max={600} step={1} valueDisplay={`${Math.round(size)}px`} onSliderChange={handleSizeChange} />
         <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Size"
+            value={size}
+            min={30}
+            max={600}
+            step={1}
+            valueDisplay={`${Math.round(size)}px`}
+            onSliderChange={handleSizeChange}
+          />
           <SliderField
             label="Thickness"
             value={leanVariant.track_thickness}
@@ -49,15 +57,6 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
             step={1}
             valueDisplay={`${leanVariant.track_thickness}px`}
             onSliderChange={(track_thickness) => updateLean({ track_thickness })}
-          />
-          <SliderField
-            label="Border"
-            value={leanVariant.track_border_thickness}
-            min={0}
-            max={borderThicknessMax}
-            step={1}
-            valueDisplay={`${leanVariant.track_border_thickness}px`}
-            onSliderChange={(track_border_thickness) => updateLean({ track_border_thickness })}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -88,7 +87,22 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
             onSliderChange={(track_filled_opacity) => updateLean({ track_filled_opacity })}
           />
         </div>
-        <ColorField label="Border Color" value={leanVariant.track_border_color} onChange={(track_border_color) => updateLean({ track_border_color })} />
+        <div className="grid grid-cols-2 gap-4">
+          <ColorField
+            label="Border Color"
+            value={leanVariant.track_border_color}
+            onChange={(track_border_color) => updateLean({ track_border_color })}
+          />
+          <SliderField
+            label="Border"
+            value={leanVariant.track_border_thickness}
+            min={0}
+            max={borderThicknessMax}
+            step={1}
+            valueDisplay={`${leanVariant.track_border_thickness}px`}
+            onSliderChange={(track_border_thickness) => updateLean({ track_border_thickness })}
+          />
+        </div>
       </div>
 
       <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Label" />
