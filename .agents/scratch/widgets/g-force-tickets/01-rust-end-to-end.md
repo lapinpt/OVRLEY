@@ -14,6 +14,8 @@ Compute `max_g` as the `clip_percentile`th percentile (default 99) of the radial
 
 Per-frame render: read cache, interpolate `(h, v)`, render the dot at `cx + (h/max_g)·radius`, `cy + (v/max_g)·radius` clamped to `radius`, render the text label as `format_with_decimals(√(h² + v²), text_decimals)` + `" G"` using the existing decimal formatter in `render/format.rs`. Missing data (series absent OR per-sample null) renders the dot at centre and the text "--". Zero magnitude ("0.0 G" with dot at centre) is a normal value distinct from missing data.
 
+Border should be drawn without overlapping the inner circle fill. Use mask if necessary. Shadow should be applied on the dot, border, and the text. Consult other widgets to understand how they are implemented.
+
 This ticket also establishes the **fixture**: a JSON file under `src-tauri/ovrley_core/tests/fixtures/g_force/` containing `g_force_x`/`g_force_y`/`g_force_z` sample arrays (with at least one null sample), an axis-horizontal / axis-vertical / clip-percentile configuration, and the hand-computed expected `max_g` value.
 
 Rust frame-state tests under `src-tauri/ovrley_core/src/render/widgets/tests/` (new file matching the elevation frame-state test pattern) assert: cache `max_g` matches the fixture, per-frame dot position matches the closed-form for known samples, clamp fires when the sample exceeds `max_g`, invert sign-flips the dot, axis remapping uses the correct series, missing series → dot at centre + "--" text, null sample → dot at centre + "--" text. The fixture is consumed by one Rust test asserting the computed `max_g` matches the expected value exactly.

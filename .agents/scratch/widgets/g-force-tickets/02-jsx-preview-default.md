@@ -8,9 +8,12 @@ Implement `features/widget-preview/widgets/g-force/` (mirroring the heading prev
 
 Wire the display type into dispatch: `WidgetPreview.jsx` adds a `widget.data.display_type === 'g_force'` clause routing to `OverlayGForceWidget`, mirroring how the other display types are dispatched. The display-type dropdown for a `g_force` metric widget exposes the new G-Force option automatically because of the metric override added in ticket 01.
 
-The editor at this stage is a placeholder — standard layout/paint controls (x, y, rotation, opacity, diameter, fill color, fill opacity, border thickness, border color, dot size, dot color, dot opacity, text fields) wired through the existing shared metric-widget controls. The axis-mapping minitabs + invert switches are NOT in this ticket; the widget uses the default axis mapping (`horizontal = "x"`, `vertical = "y"`) with both invert switches off.
+The editor at this stage is a placeholder — standard layout/paint controls (x, y, rotation, opacity, diameter, fill color, fill opacity, border thickness, border color, dot size, dot color, dot opacity, text fields) wired through the existing shared metric-widget controls. The axis-mapping minitabs + invert switches are NOT in this ticket; the widget uses the default axis mapping (`horizontal = "x"`, `vertical = "y"`) with both invert switches off. The value font must be seeded from global font values settings when adding the widget - this value must be updated when the global font values change. The value must be seeded properly also when the display type is changed from text to this plot display type.
+
+Border should be drawn without overlapping the inner circle fill. Use mask if necessary. Shadow should be applied on the dot, border, and the text. Consult other widgets to understand implementation; the rust path is authoritative - JSX preview must mirror the rust path exactly.
 
 Frontend tests added in this ticket:
+
 1. `GForceRenderer.test.jsx` (mirroring `ElevationRenderer.test.jsx`): renders `OverlayGForceWidget` with a known activity fixture at a fixed previewSecond, asserts the parent `<circle>` carries the configured radius/fill/stroke-width, the dot `<circle>` has `cx`/`cy` matching the closed-form for the fixture's interpolated sample, the text `<text>` content matches `"<magnitude> G"`, and the `unit` element matches `"G"`. A second case renders with an activity that has no `g_force_*` series and asserts dot at centre + text `"--"`.
 2. A Vitest test reads the fixture committed in ticket 01 from `src-tauri/ovrley_core/tests/fixtures/g_force/` and asserts the JSX `max_g` derivation matches the same `expected max_g` value recorded in the fixture. Drift between Rust and JSX surfaces as a failing Vitest.
 
