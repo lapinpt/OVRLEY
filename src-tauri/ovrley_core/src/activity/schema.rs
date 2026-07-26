@@ -543,6 +543,12 @@ pub struct DenseSeriesReport {
     pub pace: Vec<Option<f64>>,
     /// G-force in multiples of Earth gravity.
     pub g_force: Vec<Option<f64>>,
+    /// Source X acceleration in multiples of Earth gravity.
+    pub g_force_x: Vec<Option<f64>>,
+    /// Source Y acceleration in multiples of Earth gravity.
+    pub g_force_y: Vec<Option<f64>>,
+    /// Source Z acceleration in multiples of Earth gravity.
+    pub g_force_z: Vec<Option<f64>>,
     /// Engine speed in revolutions per minute.
     pub rpm: Vec<Option<f64>>,
     /// Accelerator or throttle position as percent.
@@ -638,6 +644,12 @@ pub struct TrimmedActivity {
     pub pace: NumericSeries,
     /// Trimmed g-force samples.
     pub g_force: NumericSeries,
+    /// Trimmed source X acceleration samples in multiples of Earth gravity.
+    pub g_force_x: NumericSeries,
+    /// Trimmed source Y acceleration samples in multiples of Earth gravity.
+    pub g_force_y: NumericSeries,
+    /// Trimmed source Z acceleration samples in multiples of Earth gravity.
+    pub g_force_z: NumericSeries,
     /// Trimmed engine speed samples in revolutions per minute.
     pub rpm: NumericSeries,
     /// Trimmed accelerator or throttle position samples as percent.

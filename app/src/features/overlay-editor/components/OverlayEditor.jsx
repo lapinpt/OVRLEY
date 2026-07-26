@@ -312,9 +312,7 @@ function OverlayEditor({
   const canRotateSelected = hasSingleSelection && selectedWidget?.type === 'course'
   const maintainAspectRatio =
     hasSingleSelection &&
-    (selectedDisplayType === 'arc' ||
-      selectedDisplayType === 'corner' ||
-      selectedDisplayType === 'lean_angle' ||
+    (isUniformResizeDisplayType(selectedDisplayType) ||
       (isBackdropSelected && selectedDisplayType === 'circle') ||
       selectedWidget?.type === 'course' ||
       !isFramedSelected)

@@ -4,7 +4,6 @@
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
 import { buildResizeUpdate, captureResizeOrigin } from '../utils/widgetResizeScaling'
-import { clamp } from '@/lib/utils'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
@@ -47,7 +46,6 @@ export function useResizeHandlers({
         id: selectedWidget.id,
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
-        markerSize: selectedWidget.data.marker_size ?? null,
         type: 'resize',
         ...resizeOrigin,
       }
@@ -62,18 +60,16 @@ export function useResizeHandlers({
       const dimensionScale = isFramedWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
-      const widthScale = origin.width ? nextWidth / origin.width : 1
-      const heightScale = origin.height ? nextHeight / origin.height : 1
-      const markerScale = (widthScale + heightScale) / 2
-      const nextMarkerSize = origin.markerSize === null ? undefined : clamp(Math.round(origin.markerSize * markerScale), 0, 400)
       const resizeUpdate = buildResizeUpdate(origin, { x: nextX, y: nextY, width: nextWidth, height: nextHeight }, { round: false })
+      const liveResizeUpdate = isBackdropWidget(selectedWidget)
+        ? resizeUpdate
+        : resolveActiveMetricWidgetData({ ...origin.widgetData, ...resizeUpdate })
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
-        ...resizeUpdate,
+        ...liveResizeUpdate,
         width: resizeUpdate.width ?? nextWidth,
         height: resizeUpdate.height ?? nextHeight,
-        ...(nextMarkerSize === undefined ? {} : { marker_size: nextMarkerSize }),
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)
@@ -92,7 +88,6 @@ export function useResizeHandlers({
           y: Math.round(draft.y ?? origin.y),
           width: Math.max(Math.round(draft.width ?? 0), 0),
           height: Math.max(Math.round(draft.height ?? 0), 0),
-          ...(draft.marker_size === undefined ? {} : { marker_size: Math.max(Math.round(draft.marker_size), 0) }),
         }
         commitWidgetUpdate(origin.id, buildResizeUpdate(origin, geometryPatch, { round: true }))
       }

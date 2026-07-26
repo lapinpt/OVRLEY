@@ -25,6 +25,7 @@ const LINEAR_FRAME: (u32, u32) = (200, 24);
 const ARC_FRAME: (u32, u32) = (220, 220);
 const CORNER_FRAME: (u32, u32) = (162, 162);
 const LEAN_ANGLE_FRAME: (u32, u32) = (180, 140);
+const G_FORCE_FRAME: (u32, u32) = (220, 220);
 
 #[test]
 fn display_type_definitions_load_from_manifest() {
@@ -57,6 +58,12 @@ fn display_type_definitions_load_from_manifest() {
     assert_eq!(lean_angle.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(lean_angle.default_frame_width, Some(LEAN_ANGLE_FRAME.0));
     assert_eq!(lean_angle.default_frame_height, Some(LEAN_ANGLE_FRAME.1));
+
+    let g_force = display_type_definition("g_force").expect("g_force must exist");
+    assert_eq!(g_force.label, "G-Force");
+    assert_eq!(g_force.layout_mode, DisplayTypeLayoutMode::Boxed);
+    assert_eq!(g_force.default_frame_width, Some(G_FORCE_FRAME.0));
+    assert_eq!(g_force.default_frame_height, Some(G_FORCE_FRAME.1));
 }
 
 #[test]
@@ -75,6 +82,7 @@ fn is_boxed_display_type_correct() {
     assert!(is_boxed_display_type("corner"));
     assert!(is_boxed_display_type("heading_tape"));
     assert!(is_boxed_display_type("lean_angle"));
+    assert!(is_boxed_display_type("g_force"));
     assert!(!is_boxed_display_type("nonexistent"));
 }
 
@@ -89,6 +97,7 @@ fn default_frame_dimensions_for_boxed_types() {
         default_frame_dimensions("lean_angle"),
         Some(LEAN_ANGLE_FRAME)
     );
+    assert_eq!(default_frame_dimensions("g_force"), Some(G_FORCE_FRAME));
     assert_eq!(default_frame_dimensions("nonexistent"), None);
 }
 
@@ -118,6 +127,9 @@ fn supported_display_types_per_metric() {
 
     let lean_angle = supported_display_types(MetricKind::LeanAngle);
     assert_eq!(lean_angle, ["text", "lean_angle"]);
+
+    let g_force = supported_display_types(MetricKind::GForce);
+    assert_eq!(g_force, ["text", "g_force"]);
 }
 
 #[test]

@@ -6,9 +6,10 @@
 //! place.
 
 use crate::normalize::{
-    ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGradientWidget,
-    ValidatedHeading, ValidatedLabel, ValidatedLeanAngleWidget, ValidatedLinearGaugeOrientation,
-    ValidatedLinearGaugeWidget, ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
+    ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGForceWidget,
+    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedLeanAngleWidget,
+    ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget, ValidatedSceneConfig,
+    ValidatedTimeValue, ValidatedValueWidget,
 };
 use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 use skia_safe::Image;
@@ -62,6 +63,7 @@ pub enum PresentationCache {
     LeanAngle(LeanAngleCache),
     LinearGauge(LinearGaugeCache),
     ArcGauge(ArcGaugeCache),
+    GForce(GForceWidgetCache),
 }
 
 /// One validated render value, keyed implicitly by its index in the config array.
@@ -74,6 +76,7 @@ pub enum PreparedValue {
     LeanAngle(ValidatedLeanAngleWidget),
     LinearGauge(ValidatedLinearGaugeWidget),
     ArcGauge(ValidatedArcGaugeWidget),
+    GForce(ValidatedGForceWidget),
 }
 
 impl PreparedValue {
@@ -86,6 +89,7 @@ impl PreparedValue {
             Self::LeanAngle(_) => MetricKind::LeanAngle,
             Self::LinearGauge(value) => value.metric,
             Self::ArcGauge(value) => value.metric,
+            Self::GForce(_) => MetricKind::GForce,
         }
     }
 
@@ -98,6 +102,7 @@ impl PreparedValue {
             Self::LeanAngle(_) => DisplayType::LeanAngle,
             Self::LinearGauge(_) => DisplayType::Linear,
             Self::ArcGauge(value) => value.display_type,
+            Self::GForce(_) => DisplayType::GForce,
         }
     }
 
@@ -110,6 +115,7 @@ impl PreparedValue {
             Self::LeanAngle(value) => value.x,
             Self::LinearGauge(value) => value.x,
             Self::ArcGauge(value) => value.x,
+            Self::GForce(value) => value.x,
         }
     }
 
@@ -122,6 +128,7 @@ impl PreparedValue {
             Self::LeanAngle(value) => value.y,
             Self::LinearGauge(value) => value.y,
             Self::ArcGauge(value) => value.y,
+            Self::GForce(value) => value.y,
         }
     }
 }
@@ -260,6 +267,45 @@ pub struct HeadingWidgetCache {
     pub indicator_shadow: Option<ShadowStyle>,
     /// Visual representation mode. When `Text`, the tape is not drawn.
     pub display_type: DisplayType,
+}
+
+/// Cached static circle and dynamic drawing contract for a G-force widget.
+#[derive(Clone, Debug)]
+pub struct GForceWidgetCache {
+    pub parent_circle_image: Image,
+    pub parent_circle_image_x: f32,
+    pub parent_circle_image_y: f32,
+    pub max_g: f64,
+    pub x: f32,
+    pub y: f32,
+    pub width: u32,
+    pub height: u32,
+    pub center_x: f32,
+    pub center_y: f32,
+    pub radius: f32,
+    pub opacity: f32,
+    pub marker_radius: f32,
+    pub marker_color: String,
+    pub marker_opacity: f32,
+    pub label_font: String,
+    pub label_font_size: f32,
+    pub label_color: String,
+    pub label_decimals: usize,
+    pub label_unit: String,
+    pub label_unit_color: String,
+    pub label_offset_x: f32,
+    pub label_offset_y: f32,
+    pub horizontal_values: Vec<Option<f64>>,
+    pub vertical_values: Vec<Option<f64>>,
+    pub shadow: Option<ShadowStyle>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GForceFrameState {
+    pub marker_x: f32,
+    pub marker_y: f32,
+    pub magnitude: Option<f64>,
+    pub label: String,
 }
 
 /// Cached static empty track and border for a lean-angle sector.

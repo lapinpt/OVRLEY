@@ -63,6 +63,17 @@ describe('template snapshot standard metric schema', () => {
     expect(themedLeanAngleDefaults.display_variants.lean_angle).not.toHaveProperty('font')
   })
 
+  test('seeds G-force label typography from value globals', () => {
+    const defaults = createMetricValueDefaults('g_force', { font_values: 'Roboto.ttf' }, 'g_force')
+
+    expect(defaults.display_variants.g_force.label_font).toBe('Roboto.ttf')
+    expect(defaults.display_variants.g_force.label_font_size).toBe(14)
+    expect(defaults.display_variants.g_force.axis_horizontal).toBe('x')
+    expect(defaults.display_variants.g_force.axis_vertical).toBe('y')
+    expect(defaults.display_variants.g_force.invert_horizontal).toBe(false)
+    expect(defaults.display_variants.g_force.invert_vertical).toBe(false)
+  })
+
   test('normalizes standard metric widgets with display_unit and strips legacy unit fields', () => {
     const normalized = normalizeTemplateConfig({
       scene: {},

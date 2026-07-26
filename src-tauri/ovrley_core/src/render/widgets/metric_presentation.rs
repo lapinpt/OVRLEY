@@ -19,6 +19,7 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::render::text::ResolvedTextStyle;
+use crate::render::widgets::g_force::draw_g_force_widget;
 use crate::render::widgets::gauges::arc::draw_arc_gauge_widget;
 use crate::render::widgets::gauges::linear::draw_linear_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
@@ -86,7 +87,40 @@ pub fn draw_metric_presentation(
             font_dirs,
             frame_profiler,
         ),
+        DisplayType::GForce => draw_g_force_presentation(
+            canvas,
+            metric_kind,
+            presentation_caches.get(&value_idx),
+            frame_index,
+            font_dirs,
+            frame_profiler,
+        ),
     }
+}
+
+fn draw_g_force_presentation(
+    canvas: &Canvas,
+    metric_kind: MetricKind,
+    cache: Option<&PresentationCache>,
+    frame_index: usize,
+    font_dirs: &[std::path::PathBuf],
+    frame_profiler: &mut RenderProfiler,
+) -> Option<WidgetRenderReport> {
+    assert_eq!(
+        metric_kind,
+        MetricKind::GForce,
+        "g_force display type requires the g_force metric"
+    );
+    let Some(PresentationCache::GForce(g_force_cache)) = cache else {
+        panic!("g_force presentation requires its prepared GForce cache");
+    };
+    draw_g_force_widget(
+        canvas,
+        g_force_cache,
+        frame_index,
+        font_dirs,
+        frame_profiler,
+    )
 }
 
 fn draw_lean_angle_presentation(

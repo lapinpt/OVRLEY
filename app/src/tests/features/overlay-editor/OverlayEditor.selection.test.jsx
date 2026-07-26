@@ -52,9 +52,16 @@ vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
 }))
 
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: ({ canResizeSelected, maintainAspectRatio, moveableRef }) => {
+  default: ({ canResizeSelected, maintainAspectRatio, moveableRef, showEdgeResizeHandles }) => {
     moveableRef.current = { updateRect: moveableUpdateRectMock }
-    return <div data-testid="moveable-props" data-can-resize={String(canResizeSelected)} data-maintain-ratio={String(maintainAspectRatio)} />
+    return (
+      <div
+        data-testid="moveable-props"
+        data-can-resize={String(canResizeSelected)}
+        data-maintain-ratio={String(maintainAspectRatio)}
+        data-edge-handles={String(showEdgeResizeHandles)}
+      />
+    )
   },
 }))
 
@@ -99,6 +106,7 @@ const defaultEditorControls = {
   onZoomIn: vi.fn(),
   onZoomOut: vi.fn(),
   snapToGrid: false,
+  undoRedoControls: { canRedo: false, canUndo: false, redo: vi.fn(), undo: vi.fn() },
   zoomLevel: 1,
 }
 
@@ -502,6 +510,60 @@ describe('OverlayEditor selection flow', () => {
 
     expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
     expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'true')
+  })
+
+  test('uses corner-only square resize handles for selected G-force widgets', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      backdrops: [],
+      labels: [],
+      plots: [],
+      values: [
+        {
+          id: 'widget-g-force',
+          value: 'g_force',
+          x: 0,
+          y: 0,
+          display_type: 'g_force',
+          display_variants: {
+            g_force: {
+              width: 220,
+              height: 220,
+              diameter: 200,
+            },
+          },
+        },
+      ],
+    }
+
+    useStore.getState().setConfig(config)
+
+    const { container, getByTestId } = render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const gForce = container.querySelector('[data-widget-id="widget-g-force"]')
+    expect(gForce).toBeTruthy()
+
+    fireEvent.mouseDown(gForce, { button: 0 })
+
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-edge-handles', 'false')
   })
 
   test('renders the canvas toolbar centered above the preview area', () => {

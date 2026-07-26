@@ -571,7 +571,8 @@ fn render_frame_to_surface(
                 PreparedValue::HeadingTape(_)
                 | PreparedValue::LeanAngle(_)
                 | PreparedValue::LinearGauge(_)
-                | PreparedValue::ArcGauge(_) => {}
+                | PreparedValue::ArcGauge(_)
+                | PreparedValue::GForce(_) => {}
             }
         }
         Ok(())

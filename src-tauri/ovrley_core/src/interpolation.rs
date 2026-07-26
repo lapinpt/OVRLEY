@@ -22,6 +22,12 @@ pub fn collect_valid_numeric_points(x_values: &[f64], y_values: &[Option<f64>]) 
         .collect()
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MissingSamplePolicy {
+    Bridge,
+    Preserve,
+}
+
 /// Linearly interpolates y at `target_x` between two nearest points.
 ///
 /// Uses `partition_point` for O(log n) lookup. Returns `None` if
@@ -61,7 +67,37 @@ pub fn interpolate_numeric_series_value(
     x_values: &[f64],
     y_values: &[Option<f64>],
     target_x: f64,
+    missing_sample_policy: MissingSamplePolicy,
 ) -> Option<f64> {
+    if missing_sample_policy == MissingSamplePolicy::Preserve {
+        if y_values.is_empty() {
+            return None;
+        }
+        assert_eq!(
+            x_values.len(),
+            y_values.len(),
+            "numeric series must align with its timestamp series"
+        );
+        let right = x_values.partition_point(|x| *x < target_x);
+        if right < x_values.len() && (x_values[right] - target_x).abs() <= 1e-9 {
+            return y_values[right];
+        }
+        if right == 0 {
+            return y_values[0];
+        }
+        if right >= x_values.len() {
+            return y_values[y_values.len() - 1];
+        }
+        let left = right - 1;
+        return interpolate_points(
+            &[
+                (x_values[left], y_values[left]?),
+                (x_values[right], y_values[right]?),
+            ],
+            target_x,
+        );
+    }
+
     let points = collect_valid_numeric_points(x_values, y_values);
     interpolate_points(&points, target_x)
 }

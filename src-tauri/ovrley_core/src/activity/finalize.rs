@@ -714,6 +714,9 @@ fn apply_metric_smoothing(
         "speed",
         "vertical_speed",
         "g_force",
+        "g_force_x",
+        "g_force_y",
+        "g_force_z",
         "gradient",
         "pace",
     ]);

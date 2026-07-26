@@ -207,6 +207,7 @@ fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValue
         | PreparedValue::HeadingTape(_)
         | PreparedValue::LeanAngle(_)
         | PreparedValue::LinearGauge(_)
-        | PreparedValue::ArcGauge(_) => None,
+        | PreparedValue::ArcGauge(_)
+        | PreparedValue::GForce(_) => None,
     }
 }

@@ -126,6 +126,7 @@ pub(crate) fn interpolate_distance_progress_at_elapsed(
         x_values,
         &y_values,
         elapsed_second,
+        crate::interpolation::MissingSamplePolicy::Bridge,
     )
 }
 

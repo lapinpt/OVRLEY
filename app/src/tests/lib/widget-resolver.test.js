@@ -334,6 +334,12 @@ describe('initDisplayVariant', () => {
   test('returns data as-is when data is null', () => {
     expect(initDisplayVariant(null, 'heading_tape')).toBeNull()
   })
+
+  test('seeds a new G-force variant label font from the value font', () => {
+    const result = initDisplayVariant({ value: 'g_force', display_type: 'text', font: 'Roboto.ttf' }, 'g_force')
+
+    expect(result.display_variants.g_force.label_font).toBe('Roboto.ttf')
+  })
 })
 
 describe('resetCurrentDisplayConfig', () => {

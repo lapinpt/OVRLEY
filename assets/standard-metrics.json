@@ -93,8 +93,8 @@
           "assetFile": "display-type-lean-angle.svg"
         },
         "layoutMode": "boxed",
-        "defaultFrameWidth": 180,
-        "defaultFrameHeight": 140,
+        "defaultFrameWidth": 340,
+        "defaultFrameHeight": 300,
         "defaults": {
           "display_type": "lean_angle",
           "show_icon": false,
@@ -104,14 +104,49 @@
           "track_filled_opacity": 1,
           "track_border_thickness": 0,
           "track_border_color": "#ffffff",
-          "track_thickness": 40,
+          "track_thickness": 100,
           "font": "Arial.ttf",
-          "font_size": 30,
+          "font_size": 60,
           "color": "#ffffff",
           "unit_color": "#ffffff",
           "show_units": true,
           "value_offset_x": 0,
           "value_offset_y": 0
+        }
+      },
+      "g_force": {
+        "label": "G-Force",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-g-force.svg"
+        },
+        "layoutMode": "boxed",
+        "defaultFrameWidth": 220,
+        "defaultFrameHeight": 220,
+        "defaults": {
+          "display_type": "g_force",
+          "diameter": 200,
+          "fill_color": "#212121",
+          "fill_opacity": 0.5,
+          "border_thickness": 0,
+          "border_color": "#ffffff",
+          "border_opacity": 1,
+          "marker_size": 24,
+          "marker_color": "#ffffff",
+          "marker_opacity": 1,
+          "axis_horizontal": "x",
+          "axis_vertical": "y",
+          "invert_horizontal": false,
+          "invert_vertical": false,
+          "clip_percentile": 99,
+          "label_font": "Arial.ttf",
+          "label_font_size": 20,
+          "label_color": "#ffffff",
+          "label_decimals": 1,
+          "label_unit": "G",
+          "label_unit_color": "#ffffff",
+          "label_offset_x": 0,
+          "label_offset_y": 0
         }
       },
       "linear": {
@@ -209,6 +244,7 @@
     "defaults": ["text", "linear", "arc", "corner"],
     "overrides": {
       "heading": ["text", "heading_tape"],
+      "g_force": ["text", "g_force"],
       "core_temperature": ["text"],
       "gear_position": ["text"],
       "left_right_balance": ["text"],

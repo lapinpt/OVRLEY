@@ -16,12 +16,14 @@ pub(super) use super::timing::LocalPreamble;
 use super::timing::{selected_absolute_timestamps, AbsoluteTimestamp};
 use super::units::convert;
 use super::Metric;
-use crate::activity::schema::{ActivityColumns, DirectMetricGapPolicy, RawActivityOptions};
+use crate::activity::schema::{
+    ActivityColumns, DirectMetricGapPolicy, RawActivityOptions, SmoothingOption,
+};
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::lean_angle_from_lateral_g;
 use csv::StringRecord;
 use serde_json::json;
-use std::ops::Range;
+use std::{collections::BTreeMap, ops::Range};
 
 /// Builds canonical raw activity columns from a resolved CSV layout.
 ///
@@ -260,12 +262,28 @@ pub(super) fn build_activity_columns(
         &groups,
     );
     let empty = || vec![None; sample_count];
+    let smoothing = ["g_force_x", "g_force_y", "g_force_z"]
+        .into_iter()
+        .map(|metric| {
+            (
+                metric.to_string(),
+                SmoothingOption {
+                    enabled: true,
+                    method: "zero_phase_ma".to_string(),
+                    window_seconds: 0.2,
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
 
     Ok(ActivityColumns {
         file_name: file_name.to_string(),
         file_format: "csv".to_string(),
         metadata: json!({}),
-        options: RawActivityOptions::default(),
+        options: RawActivityOptions {
+            smoothing,
+            ..RawActivityOptions::default()
+        },
         preserve_direct_metric_gaps,
         timestamp,
         elapsed_seconds: elapsed_seconds.into_iter().map(Some).collect(),

@@ -196,6 +196,9 @@ export function initDisplayVariant(widgetData, displayType) {
   if (!variantDefaults.min_max_label_font && widgetData.font) {
     variantDefaults.min_max_label_font = widgetData.font
   }
+  if (displayType === 'g_force' && !variants[displayType] && widgetData.font) {
+    variantDefaults.label_font = widgetData.font
+  }
 
   return {
     ...widgetData,

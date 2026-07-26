@@ -8,6 +8,7 @@ mod arc_gauge;
 mod backdrop;
 mod bar_geometry;
 mod elevation;
+mod g_force;
 mod gradient;
 mod heading;
 mod helpers;
@@ -44,6 +45,7 @@ pub(crate) use bar_geometry::{
     scale_bar_geometry, track_corner_radius_max,
 };
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
+pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
@@ -78,6 +80,9 @@ pub struct RenderDataRequirements {
     pub temperature: bool,
     pub pace: bool,
     pub g_force: bool,
+    pub g_force_x: bool,
+    pub g_force_y: bool,
+    pub g_force_z: bool,
     pub rpm: bool,
     pub throttle_position: bool,
     pub brake_position: bool,
@@ -133,6 +138,10 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
         .into_iter()
         .enumerate()
         .map(|(idx, value)| {
+            if value.value == MetricKind::GForce && value.display_type == DisplayType::GForce {
+                let value = value.with_promoted_display_variant("g_force")?;
+                return validate_g_force(value, idx).map(PreparedValue::GForce);
+            }
             if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
                 return validate_heading(&value, idx, &scene).map(PreparedValue::HeadingTape);
             }
@@ -224,6 +233,16 @@ impl ValidatedRenderConfig {
         let mut requirements = RenderDataRequirements::default();
 
         for value in &self.values {
+            if let PreparedValue::GForce(widget) = value {
+                for axis in [widget.axis_horizontal, widget.axis_vertical] {
+                    match axis {
+                        GForceAxis::X => requirements.g_force_x = true,
+                        GForceAxis::Y => requirements.g_force_y = true,
+                        GForceAxis::Z => requirements.g_force_z = true,
+                    }
+                }
+                continue;
+            }
             match value.metric_kind() {
                 MetricKind::Speed => requirements.speed = true,
                 MetricKind::Distance => requirements.distance = true,

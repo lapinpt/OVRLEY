@@ -5,11 +5,7 @@
 
 import { createFontSelection } from '@/lib/fonts'
 import { initBackdropVariant } from '@/lib/widget/widget-resolver'
-import {
-  getDefaultFrameDimensions,
-  getDisplayTypeConfigDefaults,
-  getDisplayTypeDefaultFontSize,
-} from '@/lib/widget/standard-metrics'
+import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults, getDisplayTypeDefaultFontSize } from '@/lib/widget/standard-metrics'
 import {
   BACKDROP_DEFAULT_DISPLAY_TYPES,
   BACKDROP_CIRCLE_DEFAULTS,
@@ -192,6 +188,11 @@ export function createMetricValueDefaults(type, globalDefaults, displayType) {
       }
       if (!seed.min_max_label_font && font) {
         seed.min_max_label_font = font
+      }
+      if (resolvedDisplayType === 'g_force') {
+        seed.label_font = font
+        seed.label_color = getGlobalColor(globalDefaults, 'color_values')
+        seed.label_unit_color = getGlobalColor(globalDefaults, 'color_units')
       }
       displayVariants[resolvedDisplayType] = seed
     }

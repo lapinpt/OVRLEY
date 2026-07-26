@@ -5,57 +5,84 @@
  * Domain-agnostic pure functions extracted from features/overlay-editor.
  */
 
+export const MISSING_SAMPLE_POLICY = Object.freeze({
+  BRIDGE: 'bridge',
+  PRESERVE: 'preserve',
+})
+
+function findNearestPresentSampleIndex(elapsedSeries, values, startIndex, direction) {
+  for (let index = startIndex; index >= 0 && index < elapsedSeries.length; index += direction) {
+    if (values[index] !== null) return index
+  }
+  return -1
+}
+
+function findFirstIndexAtOrAfter(elapsedSeries, targetSecond, low, high) {
+  let left = low
+  let right = high
+  let result = high
+  while (left <= right) {
+    const middle = Math.floor((left + right) / 2)
+    if (elapsedSeries[middle] >= targetSecond) {
+      result = middle
+      right = middle - 1
+    } else {
+      left = middle + 1
+    }
+  }
+  return result
+}
+
+function interpolatePreservingMissing(elapsedSeries, values, targetSecond) {
+  if (targetSecond <= elapsedSeries[0]) return values[0]
+  const lastIndex = elapsedSeries.length - 1
+  if (targetSecond >= elapsedSeries[lastIndex]) return values[lastIndex]
+
+  const rightIndex = findFirstIndexAtOrAfter(elapsedSeries, targetSecond, 0, lastIndex)
+  if (elapsedSeries[rightIndex] === targetSecond) return values[rightIndex]
+  const leftIndex = rightIndex - 1
+  const leftValue = values[leftIndex]
+  const rightValue = values[rightIndex]
+  if (leftValue === null || rightValue === null) return null
+
+  const ratio = (targetSecond - elapsedSeries[leftIndex]) / (elapsedSeries[rightIndex] - elapsedSeries[leftIndex])
+  return leftValue + (rightValue - leftValue) * ratio
+}
+
+function interpolateBridgingMissing(elapsedSeries, values, targetSecond) {
+  const firstValidIndex = findNearestPresentSampleIndex(elapsedSeries, values, 0, 1)
+  if (firstValidIndex === -1) return null
+  const lastValidIndex = findNearestPresentSampleIndex(elapsedSeries, values, values.length - 1, -1)
+  if (targetSecond <= elapsedSeries[firstValidIndex]) return values[firstValidIndex]
+  if (targetSecond >= elapsedSeries[lastValidIndex]) return values[lastValidIndex]
+
+  const insertionIndex = findFirstIndexAtOrAfter(elapsedSeries, targetSecond, firstValidIndex, lastValidIndex)
+  const rightIndex = findNearestPresentSampleIndex(elapsedSeries, values, insertionIndex, 1)
+  const leftIndex = findNearestPresentSampleIndex(elapsedSeries, values, elapsedSeries[rightIndex] === targetSecond ? rightIndex : rightIndex - 1, -1)
+  if (rightIndex === leftIndex || elapsedSeries[rightIndex] === elapsedSeries[leftIndex]) return values[leftIndex]
+
+  const ratio = (targetSecond - elapsedSeries[leftIndex]) / (elapsedSeries[rightIndex] - elapsedSeries[leftIndex])
+  return values[leftIndex] + (values[rightIndex] - values[leftIndex]) * ratio
+}
+
 /**
  * Interpolates a numeric series at the target time.
  *
  * @param {number[]} elapsedSeries - Sample elapsed seconds.
- * @param {number[]} values - Numeric series aligned with elapsed samples.
+ * @param {(number|null)[]} values - Numeric series aligned with elapsed samples.
  * @param {number} targetSecond - Requested elapsed second.
+ * @param {'bridge'|'preserve'} [missingSamplePolicy='bridge'] - Whether interpolation may bridge null samples.
  * @returns {number|null} Interpolated numeric value.
  */
-export function interpolateNumericSeries(elapsedSeries, values, targetSecond) {
-  const validSamples = elapsedSeries.reduce((result, elapsed, index) => {
-    const rawValue = values[index]
-    if (rawValue === null || rawValue === undefined) {
-      return result
-    }
-
-    const value = Number(rawValue)
-    if (Number.isFinite(elapsed) && Number.isFinite(value)) {
-      result.push([elapsed, value])
-    }
-    return result
-  }, [])
-
-  if (!validSamples.length) {
-    return null
+export function interpolateNumericSeries(elapsedSeries, values, targetSecond, missingSamplePolicy = MISSING_SAMPLE_POLICY.BRIDGE) {
+  if (elapsedSeries === null || values === null || elapsedSeries.length === 0 || values.length === 0) return null
+  if (missingSamplePolicy === MISSING_SAMPLE_POLICY.PRESERVE) {
+    return interpolatePreservingMissing(elapsedSeries, values, targetSecond)
   }
-
-  if (targetSecond <= validSamples[0][0]) {
-    return validSamples[0][1]
+  if (missingSamplePolicy === MISSING_SAMPLE_POLICY.BRIDGE) {
+    return interpolateBridgingMissing(elapsedSeries, values, targetSecond)
   }
-
-  const lastSample = validSamples[validSamples.length - 1]
-  if (targetSecond >= lastSample[0]) {
-    return lastSample[1]
-  }
-
-  for (let index = 1; index < validSamples.length; index += 1) {
-    const [leftElapsed, leftValue] = validSamples[index - 1]
-    const [rightElapsed, rightValue] = validSamples[index]
-    if (rightElapsed < targetSecond) {
-      continue
-    }
-
-    if (rightElapsed === leftElapsed) {
-      return rightValue
-    }
-
-    const ratio = (targetSecond - leftElapsed) / (rightElapsed - leftElapsed)
-    return leftValue + (rightValue - leftValue) * ratio
-  }
-
-  return lastSample[1]
+  throw new Error(`Unknown missing sample policy: ${missingSamplePolicy}`)
 }
 
 /**

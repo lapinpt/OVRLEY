@@ -25,7 +25,7 @@
  * @returns {JSX.Element|null} Widget preview component.
  */
 
-import { memo } from 'react'
+import { createElement, memo } from 'react'
 import { OverlayTextWidget } from './widgets/text/TextPreview'
 import { OverlayMetricWidget } from './widgets/metric/MetricPreview'
 import { OverlayRouteWidget } from './widgets/route/RoutePreview'
@@ -34,19 +34,16 @@ import { OverlayHeadingWidget } from './widgets/heading/HeadingPreview'
 import { OverlayLinearGaugeWidget } from './widgets/linear-gauge/LinearGaugePreview'
 import { OverlayArcGaugeWidget } from './widgets/arc-gauge/ArcGaugePreview'
 import { OverlayLeanAngleWidget } from './widgets/lean-angle/LeanAnglePreview'
+import { OverlayGForceWidget } from './widgets/g-force/GForcePreview'
 import OverlayBackdropWidget from './widgets/backdrop/BackdropPreview'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
-/**
- * Registry mapping boxed display_type values to their preview components.
- * New boxed presentations add their renderer here — the dispatch logic
- * is driven by the manifest's set of boxed display types, not by this map.
- */
 const BOXED_PREVIEW_COMPONENTS = {
   heading_tape: OverlayHeadingWidget,
   linear: OverlayLinearGaugeWidget,
   arc: OverlayArcGaugeWidget,
   corner: OverlayArcGaugeWidget,
+  g_force: OverlayGForceWidget,
 }
 
 function getBoxedPreviewComponent(displayType) {
@@ -129,18 +126,7 @@ function WidgetPreview({
   // Metric widgets: dispatch by display_type.
   if (isBoxedDisplayType(widget.data.display_type)) {
     const BoxedPreview = getBoxedPreviewComponent(widget.data.display_type)
-    return (
-      <BoxedPreview
-        widget={widget}
-        activity={activity}
-        previewSecond={previewSecond}
-        globalOpacity={globalOpacity}
-        globalScale={globalScale}
-        sceneFont={sceneFont}
-        sceneStyle={sceneStyle}
-        valueFont={valueFont}
-      />
-    )
+    return createElement(BoxedPreview, { widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, sceneStyle, valueFont })
     // Boxed type with no renderer — show explicit fallback instead of silent null.
   }
 
