@@ -23,7 +23,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData }) {
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={CircleGauge} title="G-Force" />
+        <SectionHeading icon={CircleGauge} title="G-Force Plot" />
         <SliderField
           label="Diameter"
           value={data.diameter}

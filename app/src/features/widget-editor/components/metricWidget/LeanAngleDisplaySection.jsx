@@ -1,16 +1,12 @@
 import { useMemo } from 'react'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, Type } from 'lucide-react'
 import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
-import {
-  getStandardMetricDefinition,
-  getStandardMetricDisplayUnit,
-  getStandardMetricUnitOptions,
-  getStandardMetricUnitsMode,
-} from '@/lib/widget/standard-metrics'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
+import { SectionHeading } from '../widgetEditorSections'
 import { ColorField, SliderField } from '../widgetFormControls'
+import FontSelectField from '@/components/ui/font-select-field'
 import { getLeanAngleOuterRadius } from '@/features/widget-preview/widgets/lean-angle/geometry'
+import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 
 /**
  * Editor controls for the fixed-ratio lean-angle display type.
@@ -23,12 +19,11 @@ import { getLeanAngleOuterRadius } from '@/features/widget-preview/widgets/lean-
 export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
   const leanVariant = useMemo(() => widget.data.display_variants?.lean_angle ?? {}, [widget.data.display_variants?.lean_angle])
   const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetData)
-  const definition = getStandardMetricDefinition(widget.type)
-  const unitsMode = getStandardMetricUnitsMode(widget.type)
-  const unitOptions = getStandardMetricUnitOptions(widget.type)
+
   const size = leanVariant.width ?? widget.data.width
   const trackThicknessMax = Math.floor(getLeanAngleOuterRadius(leanVariant.width, leanVariant.height) - 1)
   const borderThicknessMax = Math.min(8, Math.floor((leanVariant.track_thickness - 1) / 2))
+  const availableFonts = useAvailableFonts()
 
   const handleSizeChange = (nextSize) => {
     const update = buildUniformResizeUpdate(widget, nextSize)
@@ -38,7 +33,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={SlidersHorizontal} title="Lean Angle" />
+        <SectionHeading icon={SlidersHorizontal} title="Angle Track" />
         <div className="grid grid-cols-2 gap-4">
           <SliderField
             label="Size"
@@ -104,42 +99,52 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
           />
         </div>
       </div>
-
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Label" />
-      <div className="grid grid-cols-2 gap-4">
-        <SliderField
-          label="Horizontal Offset"
-          value={leanVariant.value_offset_x}
-          min={-50}
-          max={50}
-          step={1}
-          valueDisplay={`${leanVariant.value_offset_x}px`}
-          onSliderChange={(value_offset_x) => updateLean({ value_offset_x })}
-        />
-        <SliderField
-          label="Vertical Offset"
-          value={leanVariant.value_offset_y}
-          min={-50}
-          max={50}
-          step={1}
-          valueDisplay={`${leanVariant.value_offset_y}px`}
-          onSliderChange={(value_offset_y) => updateLean({ value_offset_y })}
-        />
+      <div className="space-y-4">
+        <SectionHeading icon={Type} title="Label" />
+        <div className="grid grid-cols-2 gap-4">
+          <FontSelectField
+            label="Label Font"
+            value={widget.data.font}
+            onValueChange={(font) => updateWidgetData(widget.id, { font })}
+            recommendedFonts={availableFonts.recommendedFonts}
+            systemFonts={availableFonts.systemFonts}
+            triggerClassName="h-9 border-border/70 bg-surface text-xs"
+            labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
+          />
+          <SliderField
+            label="Font Size"
+            value={widget.data.font_size}
+            min={6}
+            max={200}
+            valueDisplay={`${widget.data.font_size}px`}
+            onSliderChange={(font_size) => updateWidgetData(widget.id, { font_size })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <ColorField label="Label Color" value={widget.data.color} onChange={(color) => updateWidgetData(widget.id, { color })} />
+          <ColorField label="Unit Color" value={widget.data.unit_color} onChange={(unit_color) => updateWidgetData(widget.id, { unit_color })} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Horizontal Offset"
+            value={leanVariant.value_offset_x}
+            min={-50}
+            max={50}
+            step={1}
+            valueDisplay={`${leanVariant.value_offset_x}px`}
+            onSliderChange={(value_offset_x) => updateLean({ value_offset_x })}
+          />
+          <SliderField
+            label="Vertical Offset"
+            value={leanVariant.value_offset_y}
+            min={-50}
+            max={50}
+            step={1}
+            valueDisplay={`${leanVariant.value_offset_y}px`}
+            onSliderChange={(value_offset_y) => updateLean({ value_offset_y })}
+          />
+        </div>
       </div>
-
-      {unitsMode !== 'hidden' ? (
-        <UnitsControlRow
-          title="Unit"
-          checked={widget.data.show_units ?? definition?.showUnitsByDefault ?? false}
-          onCheckedChange={(show_units) => updateWidgetData(widget.id, { show_units })}
-          colorValue={widget.data.unit_color}
-          onColorChange={(unit_color) => updateWidgetData(widget.id, { unit_color })}
-          selectLabel="Unit"
-          value={getStandardMetricDisplayUnit(widget.type, widget.data)}
-          onValueChange={(display_unit) => updateWidgetData(widget.id, { display_unit })}
-          options={unitOptions.length > 1 ? unitOptions : undefined}
-        />
-      ) : null}
     </>
   )
 }
