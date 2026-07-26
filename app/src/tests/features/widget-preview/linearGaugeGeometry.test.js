@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import {
-  formatLinearGaugeLabel,
   getFillPercentage,
   getLinearFillRect,
   getLinearGaugeRange,
   getLinearGaugeLayout,
 } from '@/features/widget-preview/widgets/linear-gauge/geometry'
+import { formatGaugeBoundaryLabel } from '@/features/widget-preview/shared/gaugeLabelFormat'
 
 describe('linearGaugeGeometry', () => {
   test('fill percentage clamps values into the configured range', () => {
@@ -74,8 +74,9 @@ describe('linearGaugeGeometry', () => {
     expect(getLinearGaugeLayout({ value: null, values: [], width: 200, height: 40 }).fill).toBe(0.5)
   })
 
-  test('labels keep integer ranges compact and decimal ranges visible', () => {
-    expect(formatLinearGaugeLabel(10)).toBe('10')
-    expect(formatLinearGaugeLabel(10.24)).toBe('10.2')
+  test('labels round boundary values to integers', () => {
+    expect(formatGaugeBoundaryLabel('heartrate', 10, null)).toBe('10')
+    expect(formatGaugeBoundaryLabel('heartrate', 10.24, null)).toBe('10')
+    expect(formatGaugeBoundaryLabel('heartrate', 10.7, null)).toBe('11')
   })
 })

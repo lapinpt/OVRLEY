@@ -87,7 +87,7 @@ describe('OverlayArcGaugeWidget', () => {
     expect(border.parentElement).toHaveAttribute('mask')
     expect(screen.getByTestId('arc-gauge-empty-track').tagName).toBe('path')
     expect(screen.getByText('0')).toBeInTheDocument()
-    expect(screen.getByText('100')).toBeInTheDocument()
+    expect(screen.getByText('360')).toBeInTheDocument()
   })
 
   test('changes the filled outline continuously as the configured corner radius changes', () => {

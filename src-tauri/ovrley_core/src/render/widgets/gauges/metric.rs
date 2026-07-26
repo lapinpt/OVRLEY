@@ -7,6 +7,7 @@
 
 use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::DenseSeriesReport;
+use crate::render::format::convert_standard_metric_value;
 use crate::types::MetricKind;
 
 /// Maps a metric value into the inclusive normalized gauge range.
@@ -92,11 +93,9 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
     }
 }
 
-/// Formats a min/max label with no decimal for integers and one otherwise.
-pub(crate) fn format_gauge_label(value: f64) -> String {
-    if value.fract().abs() < f64::EPSILON {
-        format!("{value:.0}")
-    } else {
-        format!("{value:.1}")
-    }
+/// Converts a raw telemetry min/max value through the selected display unit
+/// and rounds it to the nearest integer label.
+pub(crate) fn format_gauge_label(kind: MetricKind, display_unit: Option<&str>, value: f64) -> String {
+    let converted = convert_standard_metric_value(kind, display_unit, value);
+    (converted.round() as i64).to_string()
 }

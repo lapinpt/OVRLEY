@@ -505,22 +505,15 @@ fn format_validated_standard_metric_parts<'a>(
     let value_text = match standard_metric_formatter(kind) {
         Some(StandardMetricFormatterKind::Speed) => raw
             .map(|speed_mps| {
-                let factor = match validated.display_unit.as_str() {
-                    "mph" | "imperial" => 2.23694,
-                    "kn" => 1.943844,
-                    "mps" => 1.0,
-                    _ => 3.6,
-                };
-                format_number(speed_mps * factor, decimals)
+                format_number(
+                    convert_standard_metric_value(kind, display_unit, speed_mps),
+                    decimals,
+                )
             })
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Temperature) => raw
             .map(|temp_c| {
-                let resolved = if validated.display_unit == "fahrenheit" {
-                    (temp_c * 9.0 / 5.0) + 32.0
-                } else {
-                    temp_c
-                };
+                let resolved = convert_standard_metric_value(kind, display_unit, temp_c);
                 if decimals > 0 {
                     format!("{resolved:.decimals$}")
                 } else {
@@ -530,11 +523,8 @@ fn format_validated_standard_metric_parts<'a>(
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Pace) => raw
             .map(|seconds_per_km| {
-                let total_seconds = if validated.display_unit == "min_per_mi" {
-                    seconds_per_km * 1.609_344
-                } else {
-                    seconds_per_km
-                };
+                let total_seconds =
+                    convert_standard_metric_value(kind, display_unit, seconds_per_km);
                 format_pace_value(total_seconds)
             })
             .unwrap_or_else(|| "--".to_string()),
@@ -709,7 +699,7 @@ where
 //
 // Zero-decimal values intentionally round instead of truncating so backend
 // preview PNGs match the editor canvas' metric formatting.
-fn format_number(value: f64, decimals: usize) -> String {
+pub(crate) fn format_number(value: f64, decimals: usize) -> String {
     if decimals == 0 {
         let rounded = value.round();
         return if rounded == 0.0 {
@@ -809,7 +799,7 @@ fn format_coordinate_placeholder(coordinate_format: &str) -> String {
     }
 }
 
-fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, value: f64) -> f64 {
+pub(crate) fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, value: f64) -> f64 {
     match kind {
         MetricKind::Heartrate
         | MetricKind::Cadence
@@ -817,7 +807,28 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
         | MetricKind::GroundContactTime
         | MetricKind::StrokeRate
         | MetricKind::GearPosition
-        | MetricKind::VerticalRatio => value,
+        | MetricKind::VerticalRatio
+        | MetricKind::Torque => value,
+        MetricKind::Speed => match display_unit.unwrap_or("kmh") {
+            "mph" | "imperial" => value * 2.23694,
+            "kn" => value * 1.943844,
+            "mps" => value,
+            _ => value * 3.6,
+        },
+        MetricKind::Temperature | MetricKind::CoreTemperature => {
+            if display_unit == Some("fahrenheit") {
+                (value * 9.0 / 5.0) + 32.0
+            } else {
+                value
+            }
+        }
+        MetricKind::Pace => {
+            if display_unit == Some("min_per_mi") {
+                value * 1.609_344
+            } else {
+                value
+            }
+        }
         MetricKind::VerticalOscillation => {
             if display_unit == Some("cm") {
                 value / 10.0
@@ -863,7 +874,6 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
             "in" => value * 39.370_1,
             _ => value,
         },
-        MetricKind::Torque => value,
         MetricKind::VerticalSpeed => match display_unit.unwrap_or("mps") {
             "ftmin" => value * 196.850_394,
             "ftph" => value * 11_811.023_64,
