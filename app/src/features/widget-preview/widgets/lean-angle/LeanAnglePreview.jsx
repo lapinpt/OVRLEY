@@ -27,12 +27,10 @@ export function OverlayLeanAngleWidget({ widget, activity, previewSecond, global
         </clipPath>
       </defs>
       {presentation.shadow && widget.data.track_border_thickness > 0 ? (
-        <g
-          transform={`translate(${presentation.shadow.distance} ${presentation.shadow.distance})`}
-          filter={`url(#${presentation.shadowFilterId})`}
-          mask={`url(#${presentation.maskId})`}
-        >
-          <path d={presentation.outerTrackPath} fill={presentation.shadow.color} fillOpacity={presentation.opacity} fillRule="evenodd" />
+        <g transform={`translate(${presentation.shadow.distance} ${presentation.shadow.distance})`} filter={`url(#${presentation.shadowFilterId})`}>
+          <g mask={`url(#${presentation.maskId})`}>
+            <path d={presentation.outerTrackPath} fill={presentation.shadow.color} fillOpacity={presentation.opacity} fillRule="evenodd" />
+          </g>
         </g>
       ) : null}
       <path

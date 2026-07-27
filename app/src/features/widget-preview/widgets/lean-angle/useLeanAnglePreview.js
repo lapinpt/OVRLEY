@@ -59,5 +59,5 @@ export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpa
       textOriginX,
       textOriginY,
     }
-  }, [activity, fontFamily, globalOpacity, previewSecond, sceneStyle, widget])
+  }, [activity, fontFamily, globalOpacity, maskId, previewSecond, sceneStyle, widget])
 }

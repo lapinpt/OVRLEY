@@ -1,4 +1,4 @@
-import { PreviewSvgShadowOnlyFilter } from '../../shared/PreviewSvgComponents'
+import { PreviewSvgShadowBlurFilter, PreviewSvgShadowOnlyFilter } from '../../shared/PreviewSvgComponents'
 import { useGForcePreviewModel } from './useGForcePreview'
 
 function GForceLabel({ model, config }) {
@@ -62,7 +62,7 @@ export function OverlayGForceWidget({ widget, activity, previewSecond, globalOpa
     >
       {model.shadow && config.border_thickness > 0 ? (
         <>
-          <PreviewSvgShadowOnlyFilter id={model.borderShadowFilterId} shadow={model.shadow} opacity={model.opacity} />
+          <PreviewSvgShadowBlurFilter id={model.borderShadowFilterId} shadow={model.shadow} />
           <circle
             cx={model.centerX}
             cy={model.centerY}
@@ -71,6 +71,7 @@ export function OverlayGForceWidget({ widget, activity, previewSecond, globalOpa
             stroke={model.shadow.color}
             strokeWidth={config.border_thickness}
             opacity={model.opacity}
+            transform={`translate(${model.shadow.distance} ${model.shadow.distance})`}
             filter={`url(#${model.borderShadowFilterId})`}
           />
         </>

@@ -52,8 +52,8 @@ export function PreviewSvgShadowBlurFilter({ id, shadow }) {
 
   return (
     <defs>
-      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
-        <feGaussianBlur stdDeviation={shadow.strength} />
+      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" overflow="visible" colorInterpolationFilters="sRGB">
+        <feGaussianBlur stdDeviation={Math.max(shadow.strength, 0)} />
       </filter>
     </defs>
   )
