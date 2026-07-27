@@ -188,6 +188,7 @@
         "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
           "font_size": 60,
+          "font": "Arial.ttf",
           "arc_angle": 240,
           "track_fill_style": "fill",
           "inner_widget_offset_x": 0,
@@ -220,6 +221,7 @@
         "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
           "font_size": 51,
+          "font": "Arial.ttf",
           "corner_orientation": "bottom-left",
           "track_fill_style": "fill",
           "inner_widget_offset_x": 0,

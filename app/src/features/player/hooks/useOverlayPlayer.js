@@ -93,12 +93,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     activityDurationSeconds,
     importedVideoDuration: playback.importedVideoDuration,
   })
-  const {
-    getLaneDragProps,
-    isDragging: isClipDragging,
-    snapGuidelineSecond,
-    updateMetrics: updateClipDragMetrics,
-  } = clipDrag
+  const { getLaneDragProps, isDragging: isClipDragging, snapGuidelineSecond, updateMetrics: updateClipDragMetrics } = clipDrag
   const timelineVideoSyncOffsetSeconds = playerStore.videoSyncOffsetPreviewSeconds ?? playback.videoSyncOffsetSeconds
 
   // Viewport domain - owns measurement, fit targets, ticks, zoom, pan, and playback follow behavior.

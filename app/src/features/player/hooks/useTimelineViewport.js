@@ -66,13 +66,7 @@ export default function useTimelineViewport({
   }, [])
 
   // Media identity - any structural media change should reset stale zoom/pan state to the full range.
-  const mediaIdentity = [
-    hasVideo,
-    importedVideoDuration,
-    hasActivityData,
-    activityDurationSeconds,
-    fallbackDurationSeconds,
-  ].join('|')
+  const mediaIdentity = [hasVideo, importedVideoDuration, hasActivityData, activityDurationSeconds, fallbackDurationSeconds].join('|')
 
   useEffect(() => {
     totalDurationRef.current = totalDuration
@@ -149,7 +143,16 @@ export default function useTimelineViewport({
         activityDurationSeconds,
         fallbackDurationSeconds,
       }),
-    [activityDurationSeconds, fallbackDurationSeconds, hasActivityData, hasVideo, importedVideoDuration, totalDuration, videoSyncOffsetSeconds, widthPx],
+    [
+      activityDurationSeconds,
+      fallbackDurationSeconds,
+      hasActivityData,
+      hasVideo,
+      importedVideoDuration,
+      totalDuration,
+      videoSyncOffsetSeconds,
+      widthPx,
+    ],
   )
 
   const displayedFitTargetId = useMemo(() => getMatchingFitTargetId({ viewport, targets: fitTargets }), [fitTargets, viewport])

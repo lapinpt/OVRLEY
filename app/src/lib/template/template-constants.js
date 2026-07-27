@@ -73,6 +73,9 @@ export const COURSE_PLOT_KEYS = [...Object.keys(COURSE_PLOT_DEFAULTS), 'id']
 /** Keys preserved when normalizing an elevation plot widget. */
 export const ELEVATION_PLOT_KEYS = [...Object.keys(ELEVATION_PLOT_DEFAULTS), 'id']
 
+/** Keys that are structural/identity and never belong in per-display variants. */
+const DISPLAY_VARIANT_EXCLUDED_KEYS = new Set(['id', 'value', 'display_variants', 'x', 'y', 'display_type'])
+
 /** Allowed keys for display variant configs during normalization. */
 const DISPLAY_VARIANT_FRAME_KEYS = ['width', 'height', 'rotation']
 
@@ -84,7 +87,7 @@ export const DISPLAY_VARIANT_KEYS = Object.freeze(
         displayType,
         [
           ...DISPLAY_VARIANT_FRAME_KEYS,
-          ...Object.keys(definition.defaults || {}).filter((key) => !VALUE_SHARED_KEYS.includes(key)),
+          ...Object.keys(definition.defaults || {}).filter((key) => !DISPLAY_VARIANT_EXCLUDED_KEYS.has(key)),
           ...(definition.conditionalKeys || []),
         ],
       ]),

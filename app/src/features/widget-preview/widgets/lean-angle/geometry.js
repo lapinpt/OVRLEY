@@ -111,9 +111,7 @@ export function getLeanAngleInnerTrackPath(geometry, borderThickness) {
 
     return {
       radius,
-      startAngle: reverse
-        ? geometry.startAngle + geometry.sweepAngle - direction * angleOffset
-        : geometry.startAngle + direction * angleOffset,
+      startAngle: reverse ? geometry.startAngle + geometry.sweepAngle - direction * angleOffset : geometry.startAngle + direction * angleOffset,
       sweepAngle: reverse ? -insetSweep : insetSweep,
     }
   })

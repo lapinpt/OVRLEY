@@ -109,10 +109,9 @@ describe('useTimelineViewport', () => {
   })
 
   test('does not change viewport scale while a sync offset drag changes total duration', () => {
-    const { result, rerender } = renderHook(
-      ([totalDuration, isDragging]) => useTimelineViewport({ isDragging, totalDuration }),
-      { initialProps: [120, true] },
-    )
+    const { result, rerender } = renderHook(([totalDuration, isDragging]) => useTimelineViewport({ isDragging, totalDuration }), {
+      initialProps: [120, true],
+    })
 
     act(() => {
       rerender([110, true])

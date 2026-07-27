@@ -36,10 +36,7 @@ describe('OverlayLeanAngleWidget', () => {
     render(<OverlayLeanAngleWidget widget={DEFAULT_WIDGET} activity={null} previewSecond={0} globalOpacity={1} globalScale={1} />)
 
     const border = screen.getByTestId('lean-angle-border')
-    expect(border).toHaveAttribute(
-      'd',
-      'M 32.842323 37 A 66 66 0 0 1 147.157677 37 L 126.373067 49 A 42 42 0 0 0 53.626933 49 Z',
-    )
+    expect(border).toHaveAttribute('d', 'M 32.842323 37 A 66 66 0 0 1 147.157677 37 L 126.373067 49 A 42 42 0 0 0 53.626933 49 Z')
     expect(border).toHaveAttribute('fill', '#ffffff')
     expect(border.getAttribute('mask')).toBeTruthy()
     expect(border).not.toHaveAttribute('stroke')

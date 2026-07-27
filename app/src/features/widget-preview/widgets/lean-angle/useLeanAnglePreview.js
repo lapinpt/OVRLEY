@@ -4,13 +4,7 @@ import { formatStandardMetricDisplay } from '../metric/format'
 import { getTextShadowParts } from '../../shared/shadow'
 import { getMetricWidgetLayout, getPreviewFontFamily } from '../../shared/textMeasurement'
 import { useFontMetricsVersion } from '../../shared/useFontMetrics'
-import {
-  getLeanAngleFillPath,
-  getLeanAngleFillSweep,
-  getLeanAngleGeometry,
-  getLeanAngleInnerTrackPath,
-  getLeanAngleOuterTrackPath,
-} from './geometry'
+import { getLeanAngleFillPath, getLeanAngleFillSweep, getLeanAngleGeometry, getLeanAngleInnerTrackPath, getLeanAngleOuterTrackPath } from './geometry'
 
 const DEGREE_UNIT_CENTERING_OFFSET_RATIO = 0.1
 

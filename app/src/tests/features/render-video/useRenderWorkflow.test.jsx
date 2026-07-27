@@ -92,7 +92,6 @@ describe('useRenderWorkflow', () => {
         importedVideoPath: null,
       }),
     )
-
   })
 
   test('dispatches composite mode with imported-video compositing inputs and keeps durable transparent settings untouched', async () => {
@@ -127,6 +126,5 @@ describe('useRenderWorkflow', () => {
         importedVideoPath: 'C:\\video.mp4',
       }),
     )
-
   })
 })
