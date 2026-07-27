@@ -49,6 +49,19 @@ pub(super) fn parse_header_candidate(record: &StringRecord) -> Option<HeaderLayo
             }
         }
     }
+    // A bare Time column paired with a Date column is a local time-of-day that
+    // needs the companion date to reconstruct an absolute timestamp.
+    let has_companion_date = columns
+        .iter()
+        .any(|column| column.metric == Metric::CompanionDate);
+    if has_companion_date {
+        for column in &mut columns {
+            if column.timing == Some(TimingKind::BareTime) {
+                column.metric = Metric::Timestamp;
+                column.timing = Some(TimingKind::TimeOfDay);
+            }
+        }
+    }
     let has_timing = columns.iter().any(|column| column.metric.is_timing());
     let has_telemetry = columns.iter().any(|column| !column.metric.is_timing());
     (has_timing && has_telemetry).then_some(HeaderLayout {
@@ -99,6 +112,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
+        "date" => (Metric::CompanionDate, SourcePriority::Direct, None, None, None),
         "timestamp" => (
             Metric::ElapsedSeconds,
             SourcePriority::Direct,
@@ -122,7 +136,9 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         ),
         "latitude" => (Metric::Latitude, SourcePriority::Direct, None, None, None),
         "longitude" => (Metric::Longitude, SourcePriority::Direct, None, None, None),
+        "gps" => (Metric::GpsCoordinate, SourcePriority::Direct, None, None, None),
         "speed" | "kph" => (Metric::Speed, SourcePriority::Direct, None, None, None),
+        "gspd" => (Metric::Speed, SourcePriority::Direct, None, None, None),
         "vehspd1" => (Metric::Speed, SourcePriority::Vehicle, None, None, None),
         "distance" => (Metric::Distance, SourcePriority::Direct, None, None, None),
         "distance 2d" | "distance on gps speed" => (
@@ -132,7 +148,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "elevation" | "altitude" => (Metric::Elevation, SourcePriority::Direct, None, None, None),
+        "elevation" | "altitude" | "alt" => (Metric::Elevation, SourcePriority::Direct, None, None, None),
         "pressure altitude" | "barometric altitude" => (
             Metric::BarometricAltitude,
             SourcePriority::Direct,
@@ -140,7 +156,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "heading" | "bearing" => (Metric::Heading, SourcePriority::Direct, None, None, None),
+        "heading" | "bearing" | "hdg" => (Metric::Heading, SourcePriority::Direct, None, None, None),
         "accel xyz" | "combined acceleration" => {
             (Metric::GForce, SourcePriority::Direct, None, None, None)
         }
@@ -317,24 +333,25 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
 
 /// Splits a header cell into semantic name, unit annotation, and source.
 ///
-/// Supported forms include parenthetical units, a trailing percent marker,
-/// parenthetical source qualifiers, and a ` *source` suffix. Contradictory
-/// source qualifiers are rejected.
+/// Supported forms include parenthetical units with or without a leading space
+/// (`Alt(m)` and `Altitude (m)`), a trailing percent marker, parenthetical
+/// source qualifiers, and a ` *source` suffix. Contradictory source qualifiers
+/// are rejected.
 fn split_header(value: &str) -> Option<(String, Option<String>, Option<SourceQualifier>)> {
     let normalized = normalize_syntax(value);
     let (without_source, explicit_source) = match normalized.rsplit_once(" *") {
         Some((base, source)) => (base, Some(parse_source(source)?)),
         None => (normalized.as_str(), None),
     };
-    if let Some(open) = without_source.rfind(" (") {
+    if let Some(open) = without_source.rfind('(') {
         if without_source.ends_with(')') {
-            let annotation = &without_source[open + 2..without_source.len() - 1];
+            let annotation = &without_source[open + 1..without_source.len() - 1];
             if let Some(parenthetical_source) = parse_source(annotation) {
                 let source = combine_sources(explicit_source, Some(parenthetical_source))?;
-                return split_semantic_source(&without_source[..open], None, source);
+                return split_semantic_source(without_source[..open].trim(), None, source);
             }
             return split_semantic_source(
-                &without_source[..open],
+                without_source[..open].trim(),
                 Some(annotation.to_string()),
                 explicit_source,
             );

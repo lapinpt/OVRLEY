@@ -79,7 +79,7 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
     let unit = match normalized.as_str() {
         "s" | "sec" | "second" | "seconds" => Unit::Seconds,
         "ms" | "millisecond" | "milliseconds" => Unit::Milliseconds,
-        "deg" | "degree" | "degrees" => Unit::Degrees,
+        "deg" | "degree" | "degrees" | "°" => Unit::Degrees,
         "m/s" | "mps" => Unit::MetresPerSecond,
         "km/h" | "kmh" | "kph" => Unit::KilometresPerHour,
         "mph" | "mi/h" => Unit::MilesPerHour,
@@ -180,6 +180,7 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
+        Metric::CompanionDate | Metric::GpsCoordinate => matches!(unit, Unit::Raw),
     }
 }
 
@@ -215,5 +216,6 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,
         Metric::GearPosition => Unit::Raw,
+        Metric::CompanionDate | Metric::GpsCoordinate => Unit::Raw,
     }
 }

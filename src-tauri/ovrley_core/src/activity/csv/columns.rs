@@ -158,8 +158,33 @@ pub(super) fn build_activity_columns(
             uses_gps_update && gps_updates.is_some(),
         )
     };
-    let (latitude, _) = series(Metric::Latitude);
-    let (longitude, _) = series(Metric::Longitude);
+    let (mut latitude, _) = series(Metric::Latitude);
+    let (mut longitude, _) = series(Metric::Longitude);
+
+    // Some loggers emit a single GPS column containing a space-separated
+    // "lat lon" pair. When no dedicated latitude/longitude columns produced
+    // values, derive them from that combined column.
+    if latitude.iter().all(Option::is_none) && longitude.iter().all(Option::is_none) {
+        if let Some(gps_column) = header
+            .columns
+            .iter()
+            .find(|column| column.metric == Metric::GpsCoordinate)
+        {
+            let split = (0..data.len())
+                .map(|row| parse_gps_coordinate(data.value(row, gps_column.index)))
+                .collect::<Vec<_>>();
+            let coalesced = coalesce_series(split, &groups);
+            latitude = coalesced
+                .iter()
+                .map(|value| value.map(|(lat, _)| lat))
+                .collect();
+            longitude = coalesced
+                .iter()
+                .map(|value| value.map(|(_, lon)| lon))
+                .collect();
+        }
+    }
+
     let (elevation, _) = series(Metric::Elevation);
     let (barometric_altitude, _) = series(Metric::BarometricAltitude);
     let (speed, preserve_speed_gaps) = series(Metric::Speed);
@@ -328,6 +353,24 @@ pub(super) fn build_activity_columns(
         ev: empty(),
         color_temperature: empty(),
     })
+}
+
+/// Parses a single space-separated "lat lon" GPS coordinate string.
+///
+/// Both values must be finite and lie within the valid latitude/longitude
+/// ranges. Any extra tokens are ignored; missing or malformed values return
+/// `None`.
+fn parse_gps_coordinate(value: Option<&str>) -> Option<(f64, f64)> {
+    let mut parts = value?.trim().split_whitespace();
+    let lat: f64 = parts.next()?.parse().ok()?;
+    let lon: f64 = parts.next()?.parse().ok()?;
+    if !lat.is_finite() || !lon.is_finite() {
+        return None;
+    }
+    if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
+        return None;
+    }
+    Some((lat, lon))
 }
 
 /// Parses an optional GPS freshness signal as a strict row-aligned contract.

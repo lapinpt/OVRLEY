@@ -160,6 +160,50 @@ fn racebox_reader_produces_canonical_activity_columns() {
 }
 
 #[test]
+fn katana_fixture_reconstructs_time_gps_and_telemetry() {
+    let activity = parse_fixture("Katana-2026-07-25-111811.csv");
+
+    assert_eq!(activity.sample_elapsed_seconds.len(), 366);
+    assert_eq!(activity.sample_elapsed_seconds[0], 0.0);
+    assert_eq!(
+        activity.sample_elapsed_seconds.last().copied(),
+        Some(365.0)
+    );
+    assert!(activity
+        .sample_elapsed_seconds
+        .windows(2)
+        .all(|pair| pair[0] < pair[1]));
+
+    assert_eq!(
+        activity.time.first().and_then(|value| value.as_deref()),
+        Some("2026-07-25T11:18:11.160Z")
+    );
+    assert_eq!(
+        activity.time.last().and_then(|value| value.as_deref()),
+        Some("2026-07-25T11:24:16.160Z")
+    );
+    assert_eq!(
+        activity.sync_time.as_deref(),
+        Some("2026-07-25T11:18:11.160Z")
+    );
+
+    assert_eq!(
+        activity.course[0],
+        (Some(51.178278), Some(0.301071))
+    );
+    assert!(activity.course.iter().any(|(lat, lon)| lat.is_some() && lon.is_some()));
+
+    assert_eq!(activity.speed[0], Some(0.0));
+    assert!(activity.speed.iter().any(Option::is_some));
+
+    assert_eq!(activity.heading[0], Some(0.0));
+    assert!(activity.heading.iter().any(Option::is_some));
+
+    assert_eq!(activity.elevation[0], Some(149.0));
+    assert!(activity.elevation.iter().any(Option::is_some));
+}
+
+#[test]
 fn maps_explicit_utc_and_paired_elapsed_absolute_timing_semantically() {
     let utc_csv = "UTC Time,Speed\n\
 1700000000.250,36\n\

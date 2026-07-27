@@ -66,6 +66,16 @@ enum Metric {
     LeanAngle,
     /// Gear position as an unscaled numeric value.
     GearPosition,
+    /// Raw date string companion for time-of-day timestamp reconstruction.
+    ///
+    /// This is not emitted as an activity metric; it supplies the calendar date
+    /// paired with a [`Timestamp`](TimingKind::TimeOfDay) column.
+    CompanionDate,
+    /// Combined GPS coordinate as a space-separated "lat lon" string.
+    ///
+    /// This is not emitted as an activity metric; it is split into separate
+    /// latitude and longitude series during column assembly.
+    GpsCoordinate,
 }
 
 impl Metric {
