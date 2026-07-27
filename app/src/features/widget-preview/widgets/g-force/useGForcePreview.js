@@ -35,16 +35,14 @@ export function useGForcePreviewModel({ widget, activity, previewSecond, globalO
     const radius = config.diameter / 2
     const frame = buildGForceFrameState(prepared, config, previewSecond, centerX, centerY, radius)
     const lineHeight = config.label_font_size * 0.92
-    const margin = config.label_font_size * 0.5
-    const right = centerX + radius - margin + config.label_offset_x
+    const margin = config.label_font_size * 0.05
     const top = centerY + radius - lineHeight - margin + config.label_offset_y
     const valueWidth = measurePreviewText(frame.valueText, config.label_font_size, fontFamily).width
-    const unitWidth = measurePreviewText(frame.unitText, config.label_font_size, fontFamily).width
     const unitGap = frame.unitText ? 3 / globalScale : 0
     const verticalMetrics = getPreviewVerticalMetrics(frame.valueText, config.label_font_size, fontFamily)
     const coordinateMetrics = getPreviewVerticalMetrics(frame.coordinateText, config.label_font_size, fontFamily)
     const componentMetrics = getPreviewVerticalMetrics(frame.componentText, config.label_font_size, fontFamily)
-    const valueX = right - valueWidth - unitGap - unitWidth
+    const valueX = centerX + radius + margin + config.label_offset_x
 
     return {
       ...frame,

@@ -126,15 +126,9 @@ fn draw_label(
     };
     let value_width = measure_text(value_text, &value_style, font_dirs)?.width;
     let unit_gap = if unit_text.is_empty() { 0.0 } else { 3.0 };
-    let unit_width = if unit_text.is_empty() {
-        0.0
-    } else {
-        measure_text(unit_text, &value_style, font_dirs)?.width
-    };
-    let margin = cache.label_font_size * 0.5;
-    let right = cache.center_x + cache.radius - margin + cache.label_offset_x;
+    let margin = cache.label_font_size * 0.05;
     let top = cache.center_y + cache.radius - line_height - margin + cache.label_offset_y;
-    value_style.x = right - value_width - unit_gap - unit_width;
+    value_style.x = cache.center_x + cache.radius + margin + cache.label_offset_x;
     value_style.y = top;
     draw_text(canvas, value_text, &value_style, font_dirs)?;
 

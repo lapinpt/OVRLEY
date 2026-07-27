@@ -140,7 +140,7 @@
           "invert_vertical": false,
           "clip_percentile": 99,
           "label_font": "Arial.ttf",
-          "label_font_size": 20,
+          "label_font_size": 40,
           "label_color": "#ffffff",
           "label_decimals": 1,
           "label_unit": "G",
