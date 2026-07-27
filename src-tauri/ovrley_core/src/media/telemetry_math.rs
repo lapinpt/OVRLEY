@@ -80,3 +80,9 @@ pub fn g_force_from_components(x: f64, y: f64, z: f64) -> Option<f64> {
 pub fn lean_angle_from_lateral_g(lateral_g: f64) -> Option<f64> {
     finite_f64(-lateral_g.atan().to_degrees())
 }
+
+/// Calculates lateral acceleration in g from a signed lean angle in degrees.
+#[inline]
+pub fn lateral_g_from_lean_angle(lean_angle_deg: f64) -> Option<f64> {
+    finite_f64(-lean_angle_deg.to_radians().tan())
+}

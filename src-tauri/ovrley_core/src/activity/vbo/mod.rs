@@ -9,7 +9,7 @@ mod channels;
 use crate::activity::finalize::{finalize_activity_columns, FinalizeActivityResponse};
 use crate::activity::schema::{ActivityColumns, RawActivityOptions};
 use crate::error::{CoreError, CoreResult};
-use crate::media::telemetry_math::lean_angle_from_lateral_g;
+use crate::media::telemetry_math::{lateral_g_from_lean_angle, lean_angle_from_lateral_g};
 use chrono::{Duration, NaiveDate, NaiveTime, SecondsFormat, Utc};
 use serde_json::json;
 use std::fs::File;
@@ -169,8 +169,14 @@ fn parse_creation_date(line: &str, line_number: usize) -> CoreResult<NaiveDate> 
     let time = tokens.next();
     let parsed = date
         .and_then(|date| NaiveDate::parse_from_str(date, "%d/%m/%Y").ok())
-        .zip(time.and_then(|time| NaiveTime::parse_from_str(time, "%H:%M:%S").ok()))
-        .filter(|_| separator == Some("at"));
+        .zip(
+            time.and_then(|time| {
+                NaiveTime::parse_from_str(time, "%H:%M:%S")
+                    .or_else(|_| NaiveTime::parse_from_str(time, "%H:%M"))
+                    .ok()
+            }),
+        )
+        .filter(|_| matches!(separator, Some("at" | "@")));
     parsed.map(|(date, _)| date).ok_or_else(|| {
         CoreError::Activity(format!(
             "VBO line {line_number} contains invalid file creation timestamp '{value}'"
@@ -226,21 +232,27 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
     let latitude = series(layout.latitude, minutes_to_degrees);
     let longitude = series(layout.longitude, longitude_minutes_to_degrees);
     validate_coordinates(&latitude, &longitude, &sections.data)?;
-    let g_force_x = series(layout.g_force_x, identity);
+    let mut g_force_x = series(layout.g_force_x, identity);
     let g_force_y = series(layout.g_force_y, identity);
+    let mut lean_angle = series(layout.lean_angle, identity);
+    if lean_angle.iter().all(Option::is_none) {
+        lean_angle = series(layout.lateral_acceleration, identity)
+            .into_iter()
+            .map(|value| value.and_then(lean_angle_from_lateral_g))
+            .collect();
+    }
+    if g_force_x.iter().all(Option::is_none) {
+        g_force_x = lean_angle
+            .iter()
+            .map(|angle| angle.and_then(lateral_g_from_lean_angle))
+            .collect();
+    }
     let mut g_force = series(layout.g_force, identity);
     if g_force.iter().all(Option::is_none) {
         g_force = g_force_x
             .iter()
             .zip(&g_force_y)
             .map(|(x, y)| (*x).zip(*y).map(|(x, y)| x.hypot(y)))
-            .collect();
-    }
-    let mut lean_angle = series(layout.lean_angle, identity);
-    if lean_angle.iter().all(Option::is_none) {
-        lean_angle = series(layout.lateral_acceleration, identity)
-            .into_iter()
-            .map(|value| value.and_then(lean_angle_from_lateral_g))
             .collect();
     }
 
