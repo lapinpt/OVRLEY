@@ -259,9 +259,9 @@
       "ev": ["text"],
       "color_temperature": ["text"],
       "gps_coordinates": ["text"],
-      "distance_to_home": ["text"],
-      "total_ascent": ["text"],
-      "calories": ["text"]
+      "distance_to_home": ["text", "linear"],
+      "total_ascent": ["text", "linear"],
+      "calories": ["text", "linear"]
     }
   },
   "definitions": [
@@ -322,6 +322,11 @@
           "value": "mi",
           "label": "mi",
           "renderLabel": "mi"
+        },
+        {
+          "value": "ft",
+          "label": "ft",
+          "renderLabel": "ft"
         }
       ],
       "showUnitsByDefault": true,
@@ -383,6 +388,11 @@
           "value": "mi",
           "label": "mi",
           "renderLabel": "mi"
+        },
+        {
+          "value": "ft",
+          "label": "ft",
+          "renderLabel": "ft"
         }
       ],
       "showUnitsByDefault": true,

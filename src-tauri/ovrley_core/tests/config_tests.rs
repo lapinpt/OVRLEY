@@ -281,7 +281,7 @@ fn rejects_malformed_new_metric_display_variants() {
             "distance_to_home",
             "display_unit",
             json!("yards"),
-            "expected 'm', 'km', or 'mi'",
+            "expected 'm', 'km', 'mi', or 'ft'",
         ),
         ("calories", "display_unit", json!("cal"), "expected 'kcal'"),
     ];

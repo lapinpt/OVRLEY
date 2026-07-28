@@ -82,7 +82,7 @@ describe('standard metric widget catalog', () => {
         assetFile: 'widget-distance.svg',
       },
     })
-    expect(distance.supportedDisplayUnits.map((option) => option.value)).toEqual(['m', 'km', 'mi'])
+    expect(distance.supportedDisplayUnits.map((option) => option.value)).toEqual(['m', 'km', 'mi', 'ft'])
   })
 
   test('exposes the new text metric definitions from the shared manifest', () => {

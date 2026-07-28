@@ -839,6 +839,7 @@ pub(crate) fn convert_standard_metric_value(kind: MetricKind, display_unit: Opti
         MetricKind::Distance | MetricKind::DistanceToHome => match display_unit.unwrap_or("km") {
             "m" => value,
             "mi" => value / 1609.344,
+            "ft" => value * 3.280_84,
             _ => value / 1000.0,
         },
         MetricKind::GForce => {

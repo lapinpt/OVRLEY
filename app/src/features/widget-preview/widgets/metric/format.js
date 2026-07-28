@@ -158,6 +158,8 @@ export function convertStandardMetricValue(type, value, displayUnit) {
           return value / 1000
         case 'mi':
           return value / 1609.344
+        case 'ft':
+          return value * 3.28084
         default:
           return value
       }
