@@ -64,6 +64,29 @@ describe('template snapshot standard metric schema', () => {
     expect(themedLeanAngleDefaults.display_variants.lean_angle).not.toHaveProperty('font')
   })
 
+  test('rejects malformed durable lean-angle geometry at normalization', () => {
+    const leanAngle = createMetricValueDefaults('lean_angle', undefined, 'lean_angle')
+    const { diameter: _diameter, ...missingDiameter } = leanAngle.display_variants.lean_angle
+
+    expect(() =>
+      normalizeTemplateConfig({
+        scene: {},
+        labels: [],
+        values: [{ ...leanAngle, display_variants: { lean_angle: missingDiameter } }],
+        plots: [],
+      }),
+    ).toThrow('lean_angle diameter must be a positive finite number')
+
+    expect(() =>
+      normalizeTemplateConfig({
+        scene: {},
+        labels: [],
+        values: [{ ...leanAngle, display_variants: { lean_angle: { ...leanAngle.display_variants.lean_angle, width: 180 } } }],
+        plots: [],
+      }),
+    ).toThrow('lean_angle does not accept width or height; use diameter')
+  })
+
   test('seeds G-force label typography from value globals', () => {
     const defaults = createMetricValueDefaults('g_force', { font_values: 'Roboto.ttf' }, 'g_force')
 

@@ -7,6 +7,7 @@ use crate::types::{DisplayType, MetricKind};
 
 const START_ANGLE: f32 = 210.0;
 const SWEEP_ANGLE: f32 = 120.0;
+pub(crate) const LEAN_ANGLE_MAX_FILL_SWEEP: f32 = SWEEP_ANGLE * 0.5;
 const LABEL_LINE_HEIGHT_RATIO: f32 = 0.92;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

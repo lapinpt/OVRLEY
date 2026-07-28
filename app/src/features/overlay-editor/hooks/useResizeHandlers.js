@@ -59,20 +59,13 @@ export function useResizeHandlers({
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
       const resizeUpdate = buildResizeUpdate(origin, { x: nextX, y: nextY, width: nextWidth, height: nextHeight }, { round: false })
-      let liveResizeUpdate = resizeUpdate
-      if (!isBackdropWidget(selectedWidget)) {
-        const resolveData =
-          origin.displayType === 'lean_angle'
-            ? Object.fromEntries(Object.entries(origin.widgetData).filter(([key]) => key !== 'width' && key !== 'height'))
-            : origin.widgetData
-        liveResizeUpdate = resolveActiveMetricWidgetData({ ...resolveData, ...resizeUpdate })
-      }
+      const liveResizeUpdate = isBackdropWidget(selectedWidget)
+        ? { ...resizeUpdate, width: nextWidth, height: nextHeight }
+        : resolveActiveMetricWidgetData({ ...origin.widgetData, ...resizeUpdate })
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
         ...liveResizeUpdate,
-        width: liveResizeUpdate.width ?? resizeUpdate.width ?? nextWidth,
-        height: liveResizeUpdate.height ?? resizeUpdate.height ?? nextHeight,
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)

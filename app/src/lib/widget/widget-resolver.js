@@ -11,7 +11,7 @@
 
 import { TEXT_DEFAULTS, BACKDROP_CIRCLE_DEFAULTS, BACKDROP_RECTANGLE_DEFAULTS } from './standard-widgets'
 import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults } from './standard-metrics'
-import { getLeanAngleLayout } from './lean-angle-geometry'
+import { getLeanAngleLayout } from '@/features/widget-preview/widgets/lean-angle/geometry'
 
 // ---------------------------------------------------------------------------
 // Backdrop constants
@@ -156,33 +156,13 @@ export function resolveActiveMetricWidgetData(widgetData) {
 
   const variants = widgetData.display_variants || {}
   const variantConfig = variants[displayType]
+  const resolved = {
+    ...widgetData,
+    ...variantConfig,
+  }
 
   if (displayType === 'lean_angle') {
-    if (
-      Object.hasOwn(widgetData, 'width') ||
-      Object.hasOwn(widgetData, 'height') ||
-      Object.hasOwn(variantConfig || {}, 'width') ||
-      Object.hasOwn(variantConfig || {}, 'height')
-    ) {
-      throw new Error('lean_angle does not accept width or height; use diameter')
-    }
-
-    const resolved = {
-      ...widgetData,
-      ...(variantConfig || {}),
-      id: widgetData.id,
-      value: widgetData.value,
-      x: widgetData.x,
-      y: widgetData.y,
-      opacity: widgetData.opacity,
-      display_type: displayType,
-      rotation: variantConfig?.rotation ?? widgetData.rotation ?? 0,
-    }
-    const layout = getLeanAngleLayout({
-      diameter: resolved.diameter,
-      track_thickness: resolved.track_thickness,
-      font_size: resolved.font_size,
-    })
+    const layout = getLeanAngleLayout(resolved)
 
     return {
       ...resolved,
@@ -194,15 +174,8 @@ export function resolveActiveMetricWidgetData(widgetData) {
   const frameDefaults = getDefaultFrameDimensions(displayType)
 
   return {
-    ...widgetData,
-    ...(variantConfig || {}),
+    ...resolved,
     ...resolveFrameGeometry(variantConfig, widgetData, frameDefaults),
-    id: widgetData.id,
-    value: widgetData.value,
-    x: widgetData.x,
-    y: widgetData.y,
-    opacity: widgetData.opacity,
-    display_type: displayType,
   }
 }
 
@@ -340,10 +313,6 @@ export function buildFrameGeometryUpdate(widgetData, geometryPatch) {
   if (displayType === 'text') return geometryPatch
 
   if (displayType === 'lean_angle') {
-    if (Object.hasOwn(geometryPatch, 'width') || Object.hasOwn(geometryPatch, 'height')) {
-      throw new Error('lean_angle does not accept width or height; use diameter')
-    }
-
     const variants = widgetData.display_variants || {}
     const currentVariant = variants[displayType] || {}
     const patch = {
@@ -351,7 +320,7 @@ export function buildFrameGeometryUpdate(widgetData, geometryPatch) {
         ...variants,
         [displayType]: {
           ...currentVariant,
-          ...(geometryPatch.rotation !== undefined ? { rotation: geometryPatch.rotation } : {}),
+          rotation: geometryPatch.rotation,
         },
       },
     }

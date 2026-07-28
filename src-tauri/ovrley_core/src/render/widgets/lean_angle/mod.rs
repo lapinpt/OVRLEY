@@ -5,6 +5,7 @@ use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{
     lean_angle_layout, LeanAngleLayout, ValidatedLeanAngleWidget, ValidatedSceneConfig,
+    LEAN_ANGLE_MAX_FILL_SWEEP,
 };
 use crate::render::format::format_lean_angle_value;
 use crate::render::surface::create_surface;
@@ -28,26 +29,33 @@ use skia_safe::{
 use std::path::PathBuf;
 
 const CENTER_ANGLE: f32 = 270.0;
-const MAX_FILL_SWEEP: f32 = 60.0;
 const DEGREE_UNIT_CENTERING_OFFSET_RATIO: f32 = 0.1;
 
-/// Returns the usable track width after applying the inward border on both
-/// sides, matching linear-bar geometry.
-pub fn lean_angle_track_width(track_thickness: f32, border_thickness: f32) -> f32 {
-    track_thickness - border_thickness * 2.0
+#[derive(Clone, Copy)]
+struct LeanAngleGeometry {
+    center_x: f32,
+    center_y: f32,
+    outer_radius: f32,
+    inner_radius: f32,
+    start_angle: f32,
+    sweep_angle: f32,
 }
 
-/// Returns the inner track geometry after applying the border inset.
-pub fn lean_angle_inner_geometry(
-    geometry: LeanAngleLayout,
-    border_thickness: f32,
-) -> LeanAngleLayout {
-    let track_width = lean_angle_track_width(
-        geometry.outer_radius - geometry.inner_radius,
-        border_thickness,
-    );
+fn geometry_from_layout(layout: LeanAngleLayout) -> LeanAngleGeometry {
+    LeanAngleGeometry {
+        center_x: layout.center_x,
+        center_y: layout.center_y,
+        outer_radius: layout.outer_radius,
+        inner_radius: layout.inner_radius,
+        start_angle: layout.start_angle,
+        sweep_angle: layout.sweep_angle,
+    }
+}
+
+fn inset_geometry(geometry: LeanAngleGeometry, border_thickness: f32) -> LeanAngleGeometry {
+    let track_width = geometry.outer_radius - geometry.inner_radius - border_thickness * 2.0;
     let outer_radius = geometry.outer_radius - border_thickness;
-    LeanAngleLayout {
+    LeanAngleGeometry {
         outer_radius,
         inner_radius: outer_radius - track_width,
         ..geometry
@@ -60,7 +68,7 @@ pub fn lean_angle_fill_sweep(raw: Option<f64>) -> f32 {
         return 0.0;
     };
 
-    let magnitude = raw.abs().min(MAX_FILL_SWEEP as f64) as f32;
+    let magnitude = raw.abs().min(LEAN_ANGLE_MAX_FILL_SWEEP as f64) as f32;
     if raw > 0.0 {
         magnitude
     } else if raw < 0.0 {
@@ -86,10 +94,11 @@ pub fn prepare_lean_angle_cache(
         let height = layout.height.ceil().max(1.0) as u32;
         let track_thickness = widget.track_thickness * scale;
         let border_thickness = widget.track_border_thickness * scale;
+        let geometry = geometry_from_layout(layout);
 
-        let outer_path = annular_sector_path(layout);
-        let inner_path = annular_sector_inset_path(layout, border_thickness);
-        let border_path = annular_sector_border_path(layout, border_thickness);
+        let outer_path = annular_sector_path(geometry);
+        let inner_path = annular_sector_inset_path(geometry, border_thickness);
+        let border_path = annular_sector_border_path(geometry, border_thickness);
         let shadow = normalize_shadow_style_validated(
             &scene.shadow_color,
             scene.shadow_strength,
@@ -157,8 +166,6 @@ pub fn prepare_lean_angle_cache(
             y: widget.y,
             width,
             height,
-            logical_width: layout.width,
-            logical_height: layout.height,
             rotation: widget.rotation,
             layout,
             track_thickness,
@@ -207,17 +214,15 @@ pub fn draw_lean_angle_widget(
         let center_y = cache.y + cache.layout.center_y;
 
         if fill_sweep != 0.0 {
-            let track_geometry = LeanAngleLayout {
+            let track_geometry = LeanAngleGeometry {
                 center_x,
                 center_y,
-                ..cache.layout
+                ..geometry_from_layout(cache.layout)
             };
-            let inner_geometry =
-                lean_angle_inner_geometry(track_geometry, cache.track_border_thickness);
-            let fill_geometry = LeanAngleLayout {
+            let fill_geometry = LeanAngleGeometry {
                 start_angle: CENTER_ANGLE,
                 sweep_angle: fill_sweep,
-                ..inner_geometry
+                ..inset_geometry(track_geometry, cache.track_border_thickness)
             };
             let inner_track_path =
                 annular_sector_inset_path(track_geometry, cache.track_border_thickness);
@@ -247,13 +252,13 @@ pub fn draw_lean_angle_widget(
                 point_count: 0,
                 source_point_count: 0,
                 simplification: "lean_angle".to_string(),
-                bbox: [cache.x, cache.y, cache.logical_width, cache.logical_height],
+                bbox: [cache.x, cache.y, cache.layout.width, cache.layout.height],
                 widget_width: cache.width,
                 widget_height: cache.height,
                 rotation_deg: cache.rotation,
             },
             frame: WidgetFrameReport {
-                progress01: fill_sweep.abs() / MAX_FILL_SWEEP,
+                progress01: fill_sweep.abs() / LEAN_ANGLE_MAX_FILL_SWEEP,
                 marker_x: marker.x - cache.x,
                 marker_y: marker.y - cache.y,
                 marker_abs_x: marker.x,
@@ -391,20 +396,20 @@ fn draw_lean_angle_value(
     Ok(())
 }
 
-fn annular_sector_path(geometry: LeanAngleLayout) -> Path {
+fn annular_sector_path(geometry: LeanAngleGeometry) -> Path {
     let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
     append_annular_sector_contour(&mut path, geometry);
     path.detach()
 }
 
-fn annular_sector_border_path(outer_geometry: LeanAngleLayout, border_thickness: f32) -> Path {
+fn annular_sector_border_path(outer_geometry: LeanAngleGeometry, border_thickness: f32) -> Path {
     let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
     append_annular_sector_contour(&mut path, outer_geometry);
     append_annular_sector_inset_contour(&mut path, outer_geometry, border_thickness);
     path.detach()
 }
 
-fn annular_sector_inset_path(geometry: LeanAngleLayout, border_thickness: f32) -> Path {
+fn annular_sector_inset_path(geometry: LeanAngleGeometry, border_thickness: f32) -> Path {
     let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
     append_annular_sector_inset_contour(&mut path, geometry, border_thickness);
     path.detach()
@@ -412,10 +417,10 @@ fn annular_sector_inset_path(geometry: LeanAngleLayout, border_thickness: f32) -
 
 fn append_annular_sector_inset_contour(
     builder: &mut PathBuilder,
-    geometry: LeanAngleLayout,
+    geometry: LeanAngleGeometry,
     border_thickness: f32,
 ) {
-    let inner_geometry = lean_angle_inner_geometry(geometry, border_thickness);
+    let inner_geometry = inset_geometry(geometry, border_thickness);
     let direction = geometry.sweep_angle.signum();
     let max_angle_offset = geometry.sweep_angle.abs() * 0.5;
     let outer_angle_offset = parallel_side_angle_offset(
@@ -476,7 +481,7 @@ fn parallel_side_angle_offset(border_thickness: f32, radius: f32, max_angle_offs
         .min(max_angle_offset)
 }
 
-fn append_annular_sector_contour(builder: &mut PathBuilder, geometry: LeanAngleLayout) {
+fn append_annular_sector_contour(builder: &mut PathBuilder, geometry: LeanAngleGeometry) {
     let end_angle = geometry.start_angle + geometry.sweep_angle;
     builder.move_to(polar_point(
         geometry.center_x,

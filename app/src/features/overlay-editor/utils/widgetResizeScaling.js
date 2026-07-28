@@ -47,7 +47,7 @@ function captureVariantResizeOrigin(widget, data) {
   return {
     displayType,
     data,
-    variant: widget.data.display_variants?.[displayType] ?? {},
+    variant: widget.data.display_variants[displayType],
   }
 }
 
@@ -164,9 +164,8 @@ export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidge
 
   const origin = {
     widgetData: widget.data,
-    width: frameData?.width ?? widget.data.width ?? 0,
-    height: frameData?.height ?? widget.data.height ?? 0,
-    diameter: frameData?.diameter ?? widget.data.diameter ?? 0,
+    width: frameData.width,
+    height: frameData.height,
     markerSize: widget.data.marker_size ?? null,
   }
 
@@ -186,9 +185,7 @@ export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidge
  */
 function mergeResizeUpdate(widgetData, framePatch, contentDraft = {}) {
   const frameUpdate =
-    widgetData?.display_type === 'lean_angle'
-      ? Object.fromEntries(Object.entries(framePatch).filter(([key, value]) => (key === 'x' || key === 'y') && value !== undefined))
-      : buildFrameGeometryUpdate(widgetData, framePatch)
+    widgetData.display_type === 'lean_angle' ? { x: framePatch.x, y: framePatch.y } : buildFrameGeometryUpdate(widgetData, framePatch)
   const { display_variants: contentVariants, ...topLevelContent } = contentDraft
 
   if (!contentVariants) {
@@ -206,12 +203,10 @@ function mergeResizeUpdate(widgetData, framePatch, contentDraft = {}) {
       ...(contentVariants[variantKey] || {}),
     }
 
-    if (widgetData?.display_type !== 'lean_angle') {
-      const frameVariant = frameVariants[variantKey] || {}
-      for (const key of ['width', 'height', 'rotation']) {
-        if (Object.hasOwn(frameVariant, key)) {
-          mergedVariant[key] = frameVariant[key]
-        }
+    const frameVariant = frameVariants[variantKey] || {}
+    for (const key of ['width', 'height', 'rotation']) {
+      if (Object.hasOwn(frameVariant, key)) {
+        mergedVariant[key] = frameVariant[key]
       }
     }
 
@@ -253,29 +248,16 @@ export function buildResizeUpdate(origin, framePatch, { round = false } = {}) {
  */
 export function buildUniformResizeUpdate(widget, size) {
   const origin = captureResizeOrigin(widget)
-  const nextSize = Number(size)
+  if (!origin || !Number.isFinite(size)) return null
 
-  if (origin?.displayType === 'lean_angle') {
-    if (!Number.isFinite(origin.diameter) || origin.diameter <= 0 || !Number.isFinite(nextSize) || nextSize <= 0) return null
-
-    const contentDraft = buildLeanAngleResizeContentDraft(origin, nextSize / origin.diameter, { round: true })
+  if (origin.displayType === 'lean_angle') {
+    const contentDraft = buildLeanAngleResizeContentDraft(origin, size / origin.data.diameter, { round: true })
     return mergeResizeUpdate(origin.widgetData, { x: origin.widgetData.x, y: origin.widgetData.y }, contentDraft)
   }
 
-  if (
-    !origin ||
-    !Number.isFinite(origin.width) ||
-    !Number.isFinite(origin.height) ||
-    origin.width <= 0 ||
-    origin.height <= 0 ||
-    !Number.isFinite(nextSize)
-  ) {
-    return null
-  }
-
   const framePatch = {
-    width: Math.round(nextSize),
-    height: origin.displayType === G_FORCE_DISPLAY_TYPE ? Math.round(nextSize) : Math.round(origin.height * (nextSize / origin.width)),
+    width: Math.round(size),
+    height: origin.displayType === G_FORCE_DISPLAY_TYPE ? Math.round(size) : Math.round(origin.height * (size / origin.width)),
   }
 
   return buildResizeUpdate(origin, framePatch, { round: true })

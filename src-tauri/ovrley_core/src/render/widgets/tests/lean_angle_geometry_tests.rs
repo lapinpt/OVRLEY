@@ -1,8 +1,6 @@
 use crate::normalize::lean_angle_layout;
 use crate::render::format::format_lean_angle_value;
-use crate::render::widgets::lean_angle::{
-    lean_angle_fill_sweep, lean_angle_inner_geometry, lean_angle_track_width,
-};
+use crate::render::widgets::lean_angle::lean_angle_fill_sweep;
 
 #[test]
 fn lean_angle_layout_uses_diameter_and_includes_the_stable_label_frame() {
@@ -25,12 +23,6 @@ fn lean_angle_inner_radius_respects_track_thickness() {
     assert_eq!(geometry.outer_radius, 90.0);
     assert_eq!(geometry.inner_radius, 66.0);
     assert_eq!(geometry.outer_radius - geometry.inner_radius, 24.0);
-
-    let inner = lean_angle_inner_geometry(geometry, 2.0);
-    assert_eq!(inner.outer_radius, 88.0);
-    assert_eq!(inner.inner_radius, 68.0);
-    assert_eq!(inner.outer_radius - inner.inner_radius, 20.0);
-    assert_eq!(lean_angle_track_width(24.0, 2.0), 20.0);
 }
 
 #[test]

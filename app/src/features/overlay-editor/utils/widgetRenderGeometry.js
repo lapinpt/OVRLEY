@@ -1,6 +1,6 @@
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { getLeanAngleSelectionFrame } from '@/lib/widget/lean-angle-geometry'
+import { getLeanAngleSelectionFrame } from '@/features/widget-preview/widgets/lean-angle/geometry'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 
 function buildScaleTranslate(tx, ty) {

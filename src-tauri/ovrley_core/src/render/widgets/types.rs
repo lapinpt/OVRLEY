@@ -318,8 +318,6 @@ pub struct LeanAngleCache {
     pub y: f32,
     pub width: u32,
     pub height: u32,
-    pub logical_width: f32,
-    pub logical_height: f32,
     pub rotation: f32,
     pub layout: crate::normalize::LeanAngleLayout,
     pub track_thickness: f32,

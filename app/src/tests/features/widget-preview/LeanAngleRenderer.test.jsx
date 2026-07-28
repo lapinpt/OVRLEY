@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import { OverlayLeanAngleWidget } from '@/features/widget-preview/widgets/lean-angle/LeanAnglePreview'
-import { getLeanAngleLayout } from '@/lib/widget/lean-angle-geometry'
+import { getLeanAngleLayout } from '@/features/widget-preview/widgets/lean-angle/geometry'
 
 const DEFAULT_WIDGET = {
   id: 'lean-angle-preview',
