@@ -184,7 +184,7 @@ fn time_of_day_timestamp(date: Option<&str>, time: Option<&str>) -> Option<Absol
     Some(AbsoluteTimestamp(Utc.from_utc_datetime(&date.and_time(time))))
 }
 
-/// Parses an RFC 3339 or numeric Unix timestamp.
+/// Parses an RFC 3339, ISO 8601 (assumed UTC), or numeric Unix timestamp.
 ///
 /// Numeric values require an explicit `numeric_unit`; this prevents elapsed
 /// values from being reinterpreted as absolute time based on their magnitude.
@@ -195,6 +195,9 @@ fn parse_absolute_timestamp(
     let value = value?.trim();
     if let Ok(timestamp) = DateTime::parse_from_rfc3339(value) {
         return Some(AbsoluteTimestamp(timestamp.with_timezone(&Utc)));
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
     }
     let seconds = convert(parse_number(Some(value))?, numeric_unit?);
     unix_timestamp(seconds)

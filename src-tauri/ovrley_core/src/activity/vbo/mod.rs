@@ -7,9 +7,13 @@
 mod channels;
 
 use crate::activity::finalize::{finalize_activity_columns, FinalizeActivityResponse};
-use crate::activity::schema::{ActivityColumns, RawActivityOptions};
+use crate::activity::schema::{
+    ActivityColumns, RawActivityOptions, SmoothingOption,
+};
 use crate::error::{CoreError, CoreResult};
-use crate::media::telemetry_math::{lateral_g_from_lean_angle, lean_angle_from_lateral_g};
+use crate::media::telemetry_math::{
+    backfill_lateral_g_from_lean_angle, derive_lean_from_speed_heading, lean_angle_from_lateral_g,
+};
 use chrono::{Duration, NaiveDate, NaiveTime, SecondsFormat, Utc};
 use serde_json::json;
 use std::fs::File;
@@ -232,21 +236,27 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
     let latitude = series(layout.latitude, minutes_to_degrees);
     let longitude = series(layout.longitude, longitude_minutes_to_degrees);
     validate_coordinates(&latitude, &longitude, &sections.data)?;
-    let mut g_force_x = series(layout.g_force_x, identity);
+    let g_force_x = series(layout.g_force_x, identity);
     let g_force_y = series(layout.g_force_y, identity);
     let mut lean_angle = series(layout.lean_angle, identity);
+    if lean_angle.iter().all(Option::is_none) {
+        let speed_mps = selected_series(&sections.data, layout.speed, |value| {
+            layout.speed_to_meters_per_second(value)
+        });
+        lean_angle = derive_lean_from_speed_heading(
+            &speed_mps,
+            &series(layout.heading, identity),
+            &elapsed_seconds,
+        );
+    }
     if lean_angle.iter().all(Option::is_none) {
         lean_angle = series(layout.lateral_acceleration, identity)
             .into_iter()
             .map(|value| value.and_then(lean_angle_from_lateral_g))
             .collect();
     }
-    if g_force_x.iter().all(Option::is_none) {
-        g_force_x = lean_angle
-            .iter()
-            .map(|angle| angle.and_then(lateral_g_from_lean_angle))
-            .collect();
-    }
+    let (g_force_x, g_force_y) =
+        backfill_lateral_g_from_lean_angle(&g_force_x, &g_force_y, &lean_angle);
     let mut g_force = series(layout.g_force, identity);
     if g_force.iter().all(Option::is_none) {
         g_force = g_force_x
@@ -260,7 +270,18 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         file_name: file_name.to_string(),
         file_format: "vbo".to_string(),
         metadata: json!({}),
-        options: RawActivityOptions::default(),
+        options: RawActivityOptions {
+            smoothing: [(
+                "heading".to_string(),
+                SmoothingOption {
+                    enabled: true,
+                    method: "circular_ema".to_string(),
+                    window_seconds: 0.0,
+                },
+            )]
+            .into(),
+            ..RawActivityOptions::default()
+        },
         preserve_direct_metric_gaps: Default::default(),
         timestamp,
         elapsed_seconds: elapsed_seconds.into_iter().map(Some).collect(),

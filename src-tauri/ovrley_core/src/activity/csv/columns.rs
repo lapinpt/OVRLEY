@@ -20,7 +20,9 @@ use crate::activity::schema::{
     ActivityColumns, DirectMetricGapPolicy, RawActivityOptions, SmoothingOption,
 };
 use crate::error::{CoreError, CoreResult};
-use crate::media::telemetry_math::lean_angle_from_lateral_g;
+use crate::media::telemetry_math::{
+    backfill_lateral_g_from_lean_angle, derive_lean_from_speed_heading, lean_angle_from_lateral_g,
+};
 use csv::StringRecord;
 use serde_json::json;
 use std::{collections::BTreeMap, ops::Range};
@@ -189,8 +191,8 @@ pub(super) fn build_activity_columns(
     let (barometric_altitude, _) = series(Metric::BarometricAltitude);
     let (speed, preserve_speed_gaps) = series(Metric::Speed);
     let (heading, preserve_heading_gaps) = series(Metric::Heading);
-    let (g_force_x, _) = series(Metric::GForceX);
-    let (g_force_y, _) = series(Metric::GForceY);
+    let (mut g_force_x, _) = series(Metric::GForceX);
+    let (mut g_force_y, _) = series(Metric::GForceY);
     let (g_force_z, _) = series(Metric::GForceZ);
     let mut g_force_source = selected_series(Metric::GForce, &header.columns, units_row, data);
     if g_force_source.iter().all(Option::is_none) {
@@ -268,6 +270,9 @@ pub(super) fn build_activity_columns(
     let (brake_position, _) = series(Metric::BrakePosition);
     let (mut lean_angle, _) = series(Metric::LeanAngle);
     if lean_angle.iter().all(Option::is_none) {
+        lean_angle = derive_lean_from_speed_heading(&speed, &heading, &elapsed_seconds);
+    }
+    if lean_angle.iter().all(Option::is_none) {
         if let Some(lateral) = selected_acceleration_series(
             Metric::GForceX,
             AccelerationKind::Semantic,
@@ -281,6 +286,12 @@ pub(super) fn build_activity_columns(
                 .collect::<Vec<_>>();
             lean_angle = coalesce_series(derived, &groups);
         }
+    }
+    if lean_angle.iter().any(Option::is_some) {
+        let (new_x, new_y) =
+            backfill_lateral_g_from_lean_angle(&g_force_x, &g_force_y, &lean_angle);
+        g_force_x = new_x;
+        g_force_y = new_y;
     }
     let gear_position = coalesce_series(
         selected_gear_series(&header.columns, units_row, data),
@@ -299,6 +310,14 @@ pub(super) fn build_activity_columns(
                 },
             )
         })
+        .chain([(
+            "heading".to_string(),
+            SmoothingOption {
+                enabled: true,
+                method: "circular_ema".to_string(),
+                window_seconds: 0.0,
+            },
+        )])
         .collect::<BTreeMap<_, _>>();
 
     Ok(ActivityColumns {

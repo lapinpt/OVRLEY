@@ -6,12 +6,11 @@
 //! The output is [`ActivityColumns`], which the shared activity finalizer turns
 //! into the canonical [`ParsedActivity`](crate::activity::schema::ParsedActivity).
 
-use std::collections::BTreeMap;
 use std::iter;
 
 use serde_json::json;
 
-use crate::activity::schema::{ActivityColumns, RawActivityOptions};
+use crate::activity::schema::{ActivityColumns, RawActivityOptions, SmoothingOption};
 use crate::media::native_sample::{NativeSample, TelemetrySeriesCounts};
 use crate::media::telemetry_math::finite_f64;
 
@@ -149,7 +148,15 @@ pub fn build_activity_columns(
         metadata,
         options: RawActivityOptions {
             skip_idle_gap_fill: true,
-            smoothing: BTreeMap::new(),
+            smoothing: [(
+                "heading".to_string(),
+                SmoothingOption {
+                    enabled: true,
+                    method: "circular_ema".to_string(),
+                    window_seconds: 0.0,
+                },
+            )]
+            .into(),
         },
         preserve_direct_metric_gaps: Default::default(),
         timestamp,

@@ -160,21 +160,21 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         "accel xyz" | "combined acceleration" => {
             (Metric::GForce, SourcePriority::Direct, None, None, None)
         }
-        "x" | "accel x" | "x acceleration" => (
+        "gforcex" | "x" | "accel x" | "x acceleration" => (
             Metric::GForceX,
             SourcePriority::AccelerationSensor,
             None,
             None,
             Some(AccelerationKind::Literal),
         ),
-        "y" | "accel y" | "y acceleration" => (
+        "gforcey" | "y" | "accel y" | "y acceleration" => (
             Metric::GForceY,
             SourcePriority::AccelerationSensor,
             None,
             None,
             Some(AccelerationKind::Literal),
         ),
-        "z" | "accel z" | "z acceleration" => (
+        "gforcez" | "z" | "accel z" | "z acceleration" => (
             Metric::GForceZ,
             SourcePriority::AccelerationSensor,
             None,
@@ -259,7 +259,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(ControlKind::Infer),
             None,
         ),
-        "lean angle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
+        "lean angle" | "leanangle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
         "gear" => (
             Metric::GearPosition,
             SourcePriority::Direct,
