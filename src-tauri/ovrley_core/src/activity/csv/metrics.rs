@@ -215,7 +215,9 @@ fn validate(metric: Metric, value: f64) -> Option<f64> {
     match metric {
         Metric::Latitude if !(-90.0..=90.0).contains(&value) => None,
         Metric::Longitude if !(-180.0..=180.0).contains(&value) => None,
-        Metric::Speed | Metric::Distance | Metric::Rpm if value < 0.0 => None,
+        Metric::Speed | Metric::Distance | Metric::DistanceToHome | Metric::Rpm if value < 0.0 => {
+            None
+        }
         Metric::ThrottlePosition | Metric::BrakePosition if !(0.0..=100.0).contains(&value) => None,
         Metric::Heading => Some(value.rem_euclid(360.0)),
         _ => Some(value),

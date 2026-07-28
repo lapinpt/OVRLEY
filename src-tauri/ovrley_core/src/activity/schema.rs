@@ -148,6 +148,7 @@ pub struct ActivityColumns {
     pub gradient: NumericSeries,
     pub pace: NumericSeries,
     pub distance: NumericSeries,
+    pub distance_to_home: NumericSeries,
     pub g_force: NumericSeries,
     pub g_force_x: NumericSeries,
     pub g_force_y: NumericSeries,

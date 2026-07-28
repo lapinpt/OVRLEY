@@ -230,6 +230,7 @@ fn finalize_columns_with_debug(
         .collect();
     let elevation_profile_series =
         preferred_elevation_series(&barometric_altitude_series, &elevation_base_series).to_vec();
+
     let mut metric_series_map = derive_activity_metric_series(
         &course_series,
         &distance_series,
@@ -402,6 +403,7 @@ fn activity_columns_from_samples(
         gradient: collect!(gradient),
         pace: collect!(pace),
         distance: collect!(distance),
+        distance_to_home: raw_samples.iter().map(|_| None).collect(),
         g_force: collect!(g_force),
         g_force_x: raw_samples.iter().map(|_| None).collect(),
         g_force_y: raw_samples.iter().map(|_| None).collect(),
@@ -458,6 +460,7 @@ fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
         ("gradient", columns.gradient.len()),
         ("pace", columns.pace.len()),
         ("distance", columns.distance.len()),
+        ("distance_to_home", columns.distance_to_home.len()),
         ("g_force", columns.g_force.len()),
         ("g_force_x", columns.g_force_x.len()),
         ("g_force_y", columns.g_force_y.len()),

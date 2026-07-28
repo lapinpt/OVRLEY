@@ -175,6 +175,7 @@ pub fn build_activity_columns(
         gradient: none(),
         pace: none(),
         distance: none(),
+        distance_to_home: none(),
         g_force,
         g_force_x: none(),
         g_force_y: none(),

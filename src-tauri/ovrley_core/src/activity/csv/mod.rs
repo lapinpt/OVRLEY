@@ -48,6 +48,8 @@ enum Metric {
     Heading,
     /// Cumulative travelled distance in metres.
     Distance,
+    /// Distance from the starting home point in metres.
+    DistanceToHome,
     /// Scalar acceleration magnitude in standard gravity units.
     GForce,
     /// Lateral or literal X acceleration in standard gravity units.
@@ -94,6 +96,7 @@ impl Metric {
                 | Self::Speed
                 | Self::Heading
                 | Self::Distance
+                | Self::DistanceToHome
         )
     }
 }
@@ -153,7 +156,7 @@ pub fn parse_csv_activity_reader<R: Read>(
             let record = record.map_err(csv_error)?;
             record_count = record_index + 1;
             if header.is_none() {
-                if let Some(candidate) = headers::parse_header_candidate(&record) {
+                if let Some(candidate) = headers::parse_header_candidate(&record)? {
                     data = Some(columns::CsvColumnData::new(&candidate));
                     header = Some(candidate);
                     awaiting_units_row = true;

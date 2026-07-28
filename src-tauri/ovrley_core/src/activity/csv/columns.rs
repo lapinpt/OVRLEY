@@ -261,6 +261,7 @@ pub(super) fn build_activity_columns(
                 .filter(|distance| *distance >= 0.0)
         });
     }
+    let (distance_to_home, _) = series(Metric::DistanceToHome);
     let preserve_direct_metric_gaps = DirectMetricGapPolicy {
         speed: preserve_speed_gaps,
         heading: preserve_heading_gaps,
@@ -338,6 +339,7 @@ pub(super) fn build_activity_columns(
         speed,
         heading,
         distance,
+        distance_to_home,
         g_force,
         g_force_x,
         g_force_y,

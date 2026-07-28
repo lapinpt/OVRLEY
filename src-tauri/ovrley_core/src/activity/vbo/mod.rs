@@ -301,6 +301,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         gradient: empty(),
         pace: empty(),
         distance: build_distance(&sections.data, layout.distance)?,
+        distance_to_home: empty(),
         g_force,
         g_force_x,
         g_force_y,

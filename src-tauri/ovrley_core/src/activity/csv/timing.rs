@@ -181,7 +181,9 @@ fn time_of_day_timestamp(date: Option<&str>, time: Option<&str>) -> Option<Absol
     let time = NaiveTime::parse_from_str(time_str, "%H:%M:%S%.f")
         .or_else(|_| NaiveTime::parse_from_str(time_str, "%H:%M:%S"))
         .ok()?;
-    Some(AbsoluteTimestamp(Utc.from_utc_datetime(&date.and_time(time))))
+    Some(AbsoluteTimestamp(
+        Utc.from_utc_datetime(&date.and_time(time)),
+    ))
 }
 
 /// Parses an RFC 3339, ISO 8601 (assumed UTC), or numeric Unix timestamp.
