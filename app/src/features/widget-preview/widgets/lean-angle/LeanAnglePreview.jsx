@@ -4,13 +4,13 @@ import { PreviewSvgShadowBlurFilter, PreviewSvgText } from '../../shared/Preview
 /** Renders the lean-angle track, dynamic signed fill, and centred value. */
 export function OverlayLeanAngleWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const presentation = useLeanAnglePreview({ widget, activity, previewSecond, globalOpacity, sceneStyle })
-  const { textLayout } = presentation
+  const { layout, textLayout } = presentation
 
   return (
     <svg
-      width={widget.data.width * globalScale}
-      height={widget.data.height * globalScale}
-      viewBox={`0 0 ${widget.data.width} ${widget.data.height}`}
+      width={layout.width * globalScale}
+      height={layout.height * globalScale}
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
       className="block overflow-visible"
       data-testid="lean-angle-preview"
     >

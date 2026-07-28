@@ -1,6 +1,6 @@
 import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
+import { isFramedWidget } from '@/lib/widget/display-type-behavior'
+import { getLeanAngleSelectionFrame } from '@/lib/widget/lean-angle-geometry'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 
 function buildScaleTranslate(tx, ty) {
@@ -12,14 +12,23 @@ function buildScaleTranslate(tx, ty) {
 }
 
 export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview = null) {
-  const isBackdrop = isBackdropWidget(widget)
   const isFramed = isFramedWidget(widget)
   const scaleFactor = preview?.scaleFactor
   const isScaling = Number.isFinite(scaleFactor)
   const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
-  const resolvedData = isBackdrop ? resolveActiveBackdropData(widget.data) : isFramed ? resolveActiveMetricWidgetData(widget.data) : widget.data
-  const frameWidth = (resolvedData.width ?? 0) * (globalScale || 1)
-  const frameHeight = (resolvedData.height ?? 0) * (globalScale || 1)
+  const resolvedData = widget.data
+  const displayScale = globalScale || 1
+  const leanSelectionFrame =
+    resolvedData.display_type === 'lean_angle'
+      ? getLeanAngleSelectionFrame({
+          diameter: resolvedData.diameter,
+          track_thickness: resolvedData.track_thickness,
+          font_size: resolvedData.font_size,
+          value_offset_y: resolvedData.value_offset_y,
+        })
+      : null
+  const frameWidth = (leanSelectionFrame?.width ?? resolvedData.width ?? 0) * displayScale
+  const frameHeight = (leanSelectionFrame?.height ?? resolvedData.height ?? 0) * displayScale
   const staticOrigin = getWidgetSceneOrigin(widget, null, visualBounds, {
     boundsScale: isFramed ? 1 : globalScale,
   })

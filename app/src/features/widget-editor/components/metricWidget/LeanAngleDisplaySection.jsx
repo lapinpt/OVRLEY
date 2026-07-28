@@ -5,11 +5,10 @@ import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { SectionHeading } from '../widgetEditorSections'
 import { ColorField, SliderField } from '../widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
-import { getLeanAngleOuterRadius } from '@/features/widget-preview/widgets/lean-angle/geometry'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 
 /**
- * Editor controls for the fixed-ratio lean-angle display type.
+ * Editor controls for the diameter-based lean-angle display type.
  *
  * @param {object} props
  * @param {object} props.widget - Widget config.
@@ -20,13 +19,13 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
   const leanVariant = useMemo(() => widget.data.display_variants?.lean_angle ?? {}, [widget.data.display_variants?.lean_angle])
   const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetData)
 
-  const size = leanVariant.width ?? widget.data.width
-  const trackThicknessMax = Math.floor(getLeanAngleOuterRadius(leanVariant.width, leanVariant.height) - 1)
+  const diameter = leanVariant.diameter
+  const trackThicknessMax = Math.floor((diameter - 1) / 2)
   const borderThicknessMax = Math.min(8, Math.floor((leanVariant.track_thickness - 1) / 2))
   const availableFonts = useAvailableFonts()
 
-  const handleSizeChange = (nextSize) => {
-    const update = buildUniformResizeUpdate(widget, nextSize)
+  const handleDiameterChange = (nextDiameter) => {
+    const update = buildUniformResizeUpdate(widget, nextDiameter)
     if (update) updateWidgetData(widget.id, update)
   }
 
@@ -36,13 +35,13 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
         <SectionHeading icon={SlidersHorizontal} title="Angle Track" />
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Size"
-            value={size}
+            label="Diameter"
+            value={diameter}
             min={30}
             max={600}
             step={1}
-            valueDisplay={`${Math.round(size)}px`}
-            onSliderChange={handleSizeChange}
+            valueDisplay={`${Math.round(diameter)}px`}
+            onSliderChange={handleDiameterChange}
           />
           <SliderField
             label="Thickness"

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import { OverlayLeanAngleWidget } from '@/features/widget-preview/widgets/lean-angle/LeanAnglePreview'
+import { getLeanAngleLayout } from '@/lib/widget/lean-angle-geometry'
 
 const DEFAULT_WIDGET = {
   id: 'lean-angle-preview',
@@ -9,8 +10,7 @@ const DEFAULT_WIDGET = {
   data: {
     value: 'lean_angle',
     display_type: 'lean_angle',
-    width: 180,
-    height: 140,
+    diameter: 180,
     opacity: 1,
     track_empty_color: '#222222',
     track_empty_opacity: 0.5,
@@ -32,11 +32,22 @@ const DEFAULT_WIDGET = {
 const ACTIVITY = { sample_elapsed_seconds: [0], lean_angle: [30] }
 
 describe('OverlayLeanAngleWidget', () => {
+  test('derives the default logical frame from diameter, track thickness, and font size', () => {
+    const layout = getLeanAngleLayout({ diameter: 300, track_thickness: 100, font_size: 60 })
+
+    expect(layout.outerRadius).toBe(150)
+    expect(layout.innerRadius).toBe(50)
+    expect(layout.width).toBeCloseTo(259.80762, 5)
+    expect(layout.height).toBeCloseTo(177.6, 5)
+    expect(layout.centerX).toBeCloseTo(129.90381, 5)
+    expect(layout.centerY).toBe(150)
+  })
+
   test('renders the border, empty track fill, and no dynamic fill when there is no activity', () => {
     render(<OverlayLeanAngleWidget widget={DEFAULT_WIDGET} activity={null} previewSecond={0} globalOpacity={1} globalScale={1} />)
 
     const border = screen.getByTestId('lean-angle-border')
-    expect(border).toHaveAttribute('d', 'M 32.842323 37 A 66 66 0 0 1 147.157677 37 L 126.373067 49 A 42 42 0 0 0 53.626933 49 Z')
+    expect(border).toHaveAttribute('d', 'M 0 45 A 90 90 0 0 1 155.884573 45 L 135.099963 57 A 66 66 0 0 0 20.78461 57 Z')
     expect(border).toHaveAttribute('fill', '#ffffff')
     expect(border.getAttribute('mask')).toBeTruthy()
     expect(border).not.toHaveAttribute('stroke')
@@ -45,7 +56,7 @@ describe('OverlayLeanAngleWidget', () => {
     const emptyFill = screen.getByTestId('lean-angle-empty-track')
     expect(emptyFill).toHaveAttribute(
       'd',
-      'M 35.601444 36.283578 A 64 64 0 0 1 144.398556 36.283578 L 127.065733 46.290688 A 44 44 0 0 0 52.934267 46.290688 Z',
+      'M 2.751736 44.279314 A 88 88 0 0 1 153.132837 44.279314 L 135.806537 54.282658 A 68 68 0 0 0 20.078036 54.282658 Z',
     )
     expect(emptyFill).toHaveAttribute('fill', '#222222')
     expect(emptyFill).toHaveAttribute('fill-opacity', '0.5')
@@ -59,7 +70,7 @@ describe('OverlayLeanAngleWidget', () => {
 
     expect(screen.getByTestId('lean-angle-filled-track')).toHaveAttribute(
       'd',
-      'M 90 6 A 64 64 0 0 1 122 14.574374 L 112 31.894882 A 44 44 0 0 0 90 26 Z',
+      'M 77.942286 2 A 88 88 0 0 1 121.942286 13.789764 L 111.942286 31.110273 A 68 68 0 0 0 77.942286 22 Z',
     )
     expect(screen.getByText('30')).toBeInTheDocument()
     expect(screen.getByText('\u00b0')).toBeInTheDocument()
@@ -75,7 +86,7 @@ describe('OverlayLeanAngleWidget', () => {
     )
     expect(screen.getByTestId('lean-angle-filled-track')).toHaveAttribute(
       'd',
-      'M 90 6 A 64 64 0 0 0 34.574374 38 L 51.894882 48 A 44 44 0 0 1 90 26 Z',
+      'M 77.942286 2 A 88 88 0 0 0 1.732051 46 L 19.052559 56 A 68 68 0 0 1 77.942286 22 Z',
     )
   })
 
@@ -108,10 +119,14 @@ describe('OverlayLeanAngleWidget', () => {
     )
 
     const svg = screen.getByTestId('lean-angle-preview')
-    const borderShadow = svg.querySelector('g[filter][mask]')
+    const borderShadow = svg.querySelector('g[filter]')
 
     expect(borderShadow).toBeTruthy()
     expect(borderShadow).toHaveAttribute('transform', 'translate(3 3)')
+    expect(borderShadow.querySelector('g[mask]')).toBeTruthy()
+    expect(Number(svg.getAttribute('width'))).toBeCloseTo(155.884573, 5)
+    expect(Number(svg.getAttribute('height'))).toBeCloseTo(117.6, 5)
+    expect(svg).toHaveAttribute('viewBox', '0 0 155.88457268119896 117.6')
     expect(svg.querySelector('text[filter="url(#lean-angle-lean-angle-preview-value-shadow)"]')).toBeTruthy()
     expect(svg.querySelector('text[filter="url(#lean-angle-lean-angle-preview-unit-shadow)"]')).toBeTruthy()
   })

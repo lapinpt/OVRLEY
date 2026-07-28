@@ -24,7 +24,6 @@ use ovrley_core::MetricKind;
 const LINEAR_FRAME: (u32, u32) = (200, 24);
 const ARC_FRAME: (u32, u32) = (220, 220);
 const CORNER_FRAME: (u32, u32) = (162, 162);
-const LEAN_ANGLE_FRAME: (u32, u32) = (340, 300);
 const G_FORCE_FRAME: (u32, u32) = (220, 220);
 
 #[test]
@@ -56,8 +55,8 @@ fn display_type_definitions_load_from_manifest() {
     let lean_angle = display_type_definition("lean_angle").expect("lean_angle must exist");
     assert_eq!(lean_angle.label, "Lean Angle");
     assert_eq!(lean_angle.layout_mode, DisplayTypeLayoutMode::Boxed);
-    assert_eq!(lean_angle.default_frame_width, Some(LEAN_ANGLE_FRAME.0));
-    assert_eq!(lean_angle.default_frame_height, Some(LEAN_ANGLE_FRAME.1));
+    assert!(lean_angle.default_frame_width.is_none());
+    assert!(lean_angle.default_frame_height.is_none());
 
     let g_force = display_type_definition("g_force").expect("g_force must exist");
     assert_eq!(g_force.label, "G-Force");
@@ -93,10 +92,7 @@ fn default_frame_dimensions_for_boxed_types() {
     assert_eq!(default_frame_dimensions("arc"), Some(ARC_FRAME));
     assert_eq!(default_frame_dimensions("corner"), Some(CORNER_FRAME));
     assert_eq!(default_frame_dimensions("heading_tape"), Some((600, 100)));
-    assert_eq!(
-        default_frame_dimensions("lean_angle"),
-        Some(LEAN_ANGLE_FRAME)
-    );
+    assert_eq!(default_frame_dimensions("lean_angle"), None);
     assert_eq!(default_frame_dimensions("g_force"), Some(G_FORCE_FRAME));
     assert_eq!(default_frame_dimensions("nonexistent"), None);
 }

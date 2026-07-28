@@ -49,8 +49,9 @@ pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
-pub(crate) use lean_angle::lean_angle_outer_radius;
-pub use lean_angle::{validate_lean_angle, ValidatedLeanAngleWidget};
+pub use lean_angle::{
+    lean_angle_layout, validate_lean_angle, LeanAngleLayout, ValidatedLeanAngleWidget,
+};
 pub use linear_gauge::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
     ValidatedLinearGaugeWidget,

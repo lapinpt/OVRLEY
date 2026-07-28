@@ -59,6 +59,7 @@ export function isBoxedDisplayType(displayType) {
 export function getDefaultFrameDimensions(displayType) {
   const definition = getDisplayTypeDefinition(displayType)
   if (!definition || definition.layoutMode !== 'boxed') return null
+  if (definition.defaultFrameWidth === undefined || definition.defaultFrameHeight === undefined) return null
   return { width: definition.defaultFrameWidth, height: definition.defaultFrameHeight }
 }
 

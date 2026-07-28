@@ -3,7 +3,9 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
-use crate::normalize::{lean_angle_outer_radius, ValidatedLeanAngleWidget, ValidatedSceneConfig};
+use crate::normalize::{
+    lean_angle_layout, LeanAngleLayout, ValidatedLeanAngleWidget, ValidatedSceneConfig,
+};
 use crate::render::format::format_lean_angle_value;
 use crate::render::surface::create_surface;
 use crate::render::text::{
@@ -25,37 +27,9 @@ use skia_safe::{
 };
 use std::path::PathBuf;
 
-const START_ANGLE: f32 = 210.0;
-const SWEEP_ANGLE: f32 = 120.0;
 const CENTER_ANGLE: f32 = 270.0;
-const MAX_FILL_SWEEP: f32 = SWEEP_ANGLE / 2.0;
+const MAX_FILL_SWEEP: f32 = 60.0;
 const DEGREE_UNIT_CENTERING_OFFSET_RATIO: f32 = 0.1;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LeanAngleGeometry {
-    pub center_x: f32,
-    pub center_y: f32,
-    pub outer_radius: f32,
-    pub inner_radius: f32,
-    pub start_angle: f32,
-    pub sweep_angle: f32,
-}
-
-/// Fits the complete 120-degree sector inside the frame.
-pub fn lean_angle_geometry(width: f32, height: f32, track_thickness: f32) -> LeanAngleGeometry {
-    let center_x = width * 0.5;
-    let center_y = height * 0.5;
-    let outer_radius = lean_angle_outer_radius(width, height);
-
-    LeanAngleGeometry {
-        center_x,
-        center_y,
-        outer_radius,
-        inner_radius: outer_radius - track_thickness,
-        start_angle: START_ANGLE,
-        sweep_angle: SWEEP_ANGLE,
-    }
-}
 
 /// Returns the usable track width after applying the inward border on both
 /// sides, matching linear-bar geometry.
@@ -65,15 +39,15 @@ pub fn lean_angle_track_width(track_thickness: f32, border_thickness: f32) -> f3
 
 /// Returns the inner track geometry after applying the border inset.
 pub fn lean_angle_inner_geometry(
-    geometry: LeanAngleGeometry,
+    geometry: LeanAngleLayout,
     border_thickness: f32,
-) -> LeanAngleGeometry {
+) -> LeanAngleLayout {
     let track_width = lean_angle_track_width(
         geometry.outer_radius - geometry.inner_radius,
         border_thickness,
     );
     let outer_radius = geometry.outer_radius - border_thickness;
-    LeanAngleGeometry {
+    LeanAngleLayout {
         outer_radius,
         inner_radius: outer_radius - track_width,
         ..geometry
@@ -103,15 +77,19 @@ pub fn prepare_lean_angle_cache(
 ) -> CoreResult<LeanAngleCache> {
     prepare_profiler.measure("lean_angle.prepare", || {
         let scale = scene.scale;
-        let width = ((widget.width as f32) * scale).round().max(1.0) as u32;
-        let height = ((widget.height as f32) * scale).round().max(1.0) as u32;
+        let layout = lean_angle_layout(
+            widget.diameter * scale,
+            widget.track_thickness * scale,
+            widget.font_size * scale,
+        );
+        let width = layout.width.ceil().max(1.0) as u32;
+        let height = layout.height.ceil().max(1.0) as u32;
         let track_thickness = widget.track_thickness * scale;
         let border_thickness = widget.track_border_thickness * scale;
-        let geometry = lean_angle_geometry(width as f32, height as f32, track_thickness);
 
-        let outer_path = annular_sector_path(geometry);
-        let inner_path = annular_sector_inset_path(geometry, border_thickness);
-        let border_path = annular_sector_border_path(geometry, border_thickness);
+        let outer_path = annular_sector_path(layout);
+        let inner_path = annular_sector_inset_path(layout, border_thickness);
+        let border_path = annular_sector_border_path(layout, border_thickness);
         let shadow = normalize_shadow_style_validated(
             &scene.shadow_color,
             scene.shadow_strength,
@@ -179,13 +157,10 @@ pub fn prepare_lean_angle_cache(
             y: widget.y,
             width,
             height,
+            logical_width: layout.width,
+            logical_height: layout.height,
             rotation: widget.rotation,
-            center_x: geometry.center_x,
-            center_y: geometry.center_y,
-            start_angle: geometry.start_angle,
-            sweep_angle: geometry.sweep_angle,
-            outer_radius: geometry.outer_radius,
-            inner_radius: geometry.inner_radius,
+            layout,
             track_thickness,
             track_border_thickness: border_thickness,
             shadow,
@@ -228,21 +203,18 @@ pub fn draw_lean_angle_widget(
             .copied()
             .flatten();
         let fill_sweep = lean_angle_fill_sweep(raw);
-        let center_x = cache.x + cache.center_x;
-        let center_y = cache.y + cache.center_y;
+        let center_x = cache.x + cache.layout.center_x;
+        let center_y = cache.y + cache.layout.center_y;
 
         if fill_sweep != 0.0 {
-            let track_geometry = LeanAngleGeometry {
+            let track_geometry = LeanAngleLayout {
                 center_x,
                 center_y,
-                outer_radius: cache.outer_radius,
-                inner_radius: cache.inner_radius,
-                start_angle: cache.start_angle,
-                sweep_angle: cache.sweep_angle,
+                ..cache.layout
             };
             let inner_geometry =
                 lean_angle_inner_geometry(track_geometry, cache.track_border_thickness);
-            let fill_geometry = LeanAngleGeometry {
+            let fill_geometry = LeanAngleLayout {
                 start_angle: CENTER_ANGLE,
                 sweep_angle: fill_sweep,
                 ..inner_geometry
@@ -267,7 +239,7 @@ pub fn draw_lean_angle_widget(
         let marker = polar_point(
             center_x,
             center_y,
-            cache.outer_radius,
+            cache.layout.outer_radius,
             CENTER_ANGLE + fill_sweep,
         );
         Some(WidgetRenderReport {
@@ -275,7 +247,7 @@ pub fn draw_lean_angle_widget(
                 point_count: 0,
                 source_point_count: 0,
                 simplification: "lean_angle".to_string(),
-                bbox: [cache.x, cache.y, cache.width as f32, cache.height as f32],
+                bbox: [cache.x, cache.y, cache.logical_width, cache.logical_height],
                 widget_width: cache.width,
                 widget_height: cache.height,
                 rotation_deg: cache.rotation,
@@ -419,20 +391,20 @@ fn draw_lean_angle_value(
     Ok(())
 }
 
-fn annular_sector_path(geometry: LeanAngleGeometry) -> Path {
+fn annular_sector_path(geometry: LeanAngleLayout) -> Path {
     let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
     append_annular_sector_contour(&mut path, geometry);
     path.detach()
 }
 
-fn annular_sector_border_path(outer_geometry: LeanAngleGeometry, border_thickness: f32) -> Path {
+fn annular_sector_border_path(outer_geometry: LeanAngleLayout, border_thickness: f32) -> Path {
     let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
     append_annular_sector_contour(&mut path, outer_geometry);
     append_annular_sector_inset_contour(&mut path, outer_geometry, border_thickness);
     path.detach()
 }
 
-fn annular_sector_inset_path(geometry: LeanAngleGeometry, border_thickness: f32) -> Path {
+fn annular_sector_inset_path(geometry: LeanAngleLayout, border_thickness: f32) -> Path {
     let mut path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
     append_annular_sector_inset_contour(&mut path, geometry, border_thickness);
     path.detach()
@@ -440,7 +412,7 @@ fn annular_sector_inset_path(geometry: LeanAngleGeometry, border_thickness: f32)
 
 fn append_annular_sector_inset_contour(
     builder: &mut PathBuilder,
-    geometry: LeanAngleGeometry,
+    geometry: LeanAngleLayout,
     border_thickness: f32,
 ) {
     let inner_geometry = lean_angle_inner_geometry(geometry, border_thickness);
@@ -504,7 +476,7 @@ fn parallel_side_angle_offset(border_thickness: f32, radius: f32, max_angle_offs
         .min(max_angle_offset)
 }
 
-fn append_annular_sector_contour(builder: &mut PathBuilder, geometry: LeanAngleGeometry) {
+fn append_annular_sector_contour(builder: &mut PathBuilder, geometry: LeanAngleLayout) {
     let end_angle = geometry.start_angle + geometry.sweep_angle;
     builder.move_to(polar_point(
         geometry.center_x,

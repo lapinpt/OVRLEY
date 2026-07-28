@@ -48,12 +48,13 @@ describe('template snapshot standard metric schema', () => {
       show_units: true,
     })
     expect(leanAngleDefaults.display_variants.lean_angle).toMatchObject({
-      width: 340,
-      height: 300,
+      diameter: 300,
       track_thickness: 100,
       value_offset_x: 0,
       value_offset_y: 0,
     })
+    expect(leanAngleDefaults.display_variants.lean_angle).not.toHaveProperty('width')
+    expect(leanAngleDefaults.display_variants.lean_angle).not.toHaveProperty('height')
     for (const sharedKey of ['display_type', 'show_icon', 'font', 'font_size', 'color', 'unit_color', 'show_units']) {
       expect(leanAngleDefaults.display_variants.lean_angle).not.toHaveProperty(sharedKey)
     }

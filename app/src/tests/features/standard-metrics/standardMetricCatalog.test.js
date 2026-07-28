@@ -240,15 +240,16 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).toMatchObject({ label: 'Lean Angle', layoutMode: 'boxed' })
   })
 
-  test('boxed display types include default frame dimensions', () => {
+  test('boxed display types use explicit or derived geometry contracts', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameWidth).toBe(200)
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(24)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(220)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(220)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(162)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(162)
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameWidth).toBe(340)
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaultFrameHeight).toBe(300)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFrameWidth')
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFrameHeight')
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.diameter).toBe(300)
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFontSize')
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.font_size).toBe(60)
   })
@@ -256,6 +257,7 @@ describe('display type definitions', () => {
   test('lean-angle display type exposes the complete static-sector contract', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults).toEqual({
       display_type: 'lean_angle',
+      diameter: 300,
       show_icon: false,
       track_empty_color: '#222222',
       track_empty_opacity: 0.5,
@@ -318,7 +320,7 @@ describe('display type definitions', () => {
     expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 24 })
     expect(getDefaultFrameDimensions('arc')).toEqual({ width: 220, height: 220 })
     expect(getDefaultFrameDimensions('corner')).toEqual({ width: 162, height: 162 })
-    expect(getDefaultFrameDimensions('lean_angle')).toEqual({ width: 340, height: 300 })
+    expect(getDefaultFrameDimensions('lean_angle')).toBeNull()
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
 

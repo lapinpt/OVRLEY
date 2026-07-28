@@ -422,6 +422,59 @@ describe('OverlayEditor selection flow', () => {
     expect(renderGeometry.height).toBe(80)
   })
 
+  test('uses already-resolved lean-angle dimensions without re-resolving ephemeral frame fields', () => {
+    const renderGeometry = resolveWidgetRenderGeometry(
+      {
+        id: 'lean-angle-1',
+        type: 'lean_angle',
+        category: 'values',
+        data: {
+          x: 10,
+          y: 20,
+          display_type: 'lean_angle',
+          diameter: 180,
+          track_thickness: 24,
+          font_size: 60,
+          value_offset_y: 0,
+          width: 155.88457268119896,
+          height: 117.6,
+        },
+      },
+      null,
+      1,
+    )
+
+    expect(renderGeometry.width).toBeCloseTo(155.884573, 5)
+    expect(renderGeometry.height).toBeCloseTo(117.6, 5)
+  })
+
+  test('expands and contracts the lean-angle selection frame with vertical label offset', () => {
+    const widget = {
+      id: 'lean-angle-1',
+      type: 'lean_angle',
+      category: 'values',
+      data: {
+        x: 10,
+        y: 20,
+        display_type: 'lean_angle',
+        diameter: 180,
+        track_thickness: 24,
+        font_size: 60,
+        value_offset_y: -20,
+        width: 155.88457268119896,
+        height: 117.6,
+      },
+    }
+
+    const contracted = resolveWidgetRenderGeometry(widget, null, 1)
+    expect(contracted.top).toBe(20)
+    expect(contracted.height).toBeCloseTo(97.6, 5)
+
+    const expanded = resolveWidgetRenderGeometry({ ...widget, data: { ...widget.data, value_offset_y: 100 } }, null, 1)
+    expect(expanded.top).toBe(20)
+    expect(expanded.height).toBeCloseTo(217.6, 5)
+  })
+
   test('enables resize handles for selected backdrop frames', () => {
     const config = {
       ...DEFAULT_CONFIG,

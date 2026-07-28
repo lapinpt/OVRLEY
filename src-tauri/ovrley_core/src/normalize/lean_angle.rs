@@ -5,19 +5,62 @@ use super::raw::ValueConfig;
 use crate::error::{CoreError, CoreResult};
 use crate::types::{DisplayType, MetricKind};
 
-const FRAME_MARGIN: f32 = 4.0;
+const START_ANGLE: f32 = 210.0;
+const SWEEP_ANGLE: f32 = 120.0;
+const LABEL_LINE_HEIGHT_RATIO: f32 = 0.92;
 
-pub(crate) fn lean_angle_outer_radius(width: f32, height: f32) -> f32 {
-    let horizontal_radius = (width * 0.5 - FRAME_MARGIN) / 30.0_f32.to_radians().cos();
-    horizontal_radius.min(height * 0.5 - FRAME_MARGIN)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LeanAngleLayout {
+    pub width: f32,
+    pub height: f32,
+    pub min_x: f32,
+    pub min_y: f32,
+    pub max_x: f32,
+    pub max_y: f32,
+    pub center_x: f32,
+    pub center_y: f32,
+    pub outer_radius: f32,
+    pub inner_radius: f32,
+    pub start_angle: f32,
+    pub sweep_angle: f32,
+}
+
+/// Derives the logical lean-angle frame from the canonical diameter geometry.
+pub fn lean_angle_layout(diameter: f32, track_thickness: f32, font_size: f32) -> LeanAngleLayout {
+    let outer_radius = diameter * 0.5;
+    let inner_radius = outer_radius - track_thickness;
+    let half_sweep_radians = (SWEEP_ANGLE * 0.5).to_radians();
+    let sector_min_x = -outer_radius * half_sweep_radians.sin();
+    let sector_max_x = outer_radius * half_sweep_radians.sin();
+    let sector_min_y = -outer_radius;
+    let sector_max_y = -inner_radius * half_sweep_radians.cos();
+    let label_line_height = font_size * LABEL_LINE_HEIGHT_RATIO;
+    let min_x = sector_min_x;
+    let max_x = sector_max_x;
+    let min_y = sector_min_y.min(-label_line_height * 0.5);
+    let max_y = sector_max_y.max(label_line_height * 0.5);
+
+    LeanAngleLayout {
+        width: max_x - min_x,
+        height: max_y - min_y,
+        min_x,
+        min_y,
+        max_x,
+        max_y,
+        center_x: -min_x,
+        center_y: -min_y,
+        outer_radius,
+        inner_radius,
+        start_angle: START_ANGLE,
+        sweep_angle: SWEEP_ANGLE,
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct ValidatedLeanAngleWidget {
     pub x: f32,
     pub y: f32,
-    pub width: u32,
-    pub height: u32,
+    pub diameter: f32,
     pub rotation: f32,
     pub opacity: f32,
     pub show_icon: bool,
@@ -57,18 +100,17 @@ pub fn validate_lean_angle(
         )));
     }
 
-    let width = value
-        .width
-        .ok_or_else(|| CoreError::Config(format!("{}: required", p("width"))))?;
-    let height = value
-        .height
-        .ok_or_else(|| CoreError::Config(format!("{}: required", p("height"))))?;
-    if width == 0 || height == 0 {
+    if value.width.is_some() || value.height.is_some() {
         return Err(CoreError::Config(format!(
-            "{} and {}: must be > 0",
+            "{} and {}: must be absent for diameter-based geometry",
             p("width"),
             p("height")
         )));
+    }
+
+    let diameter = require_f32(value.diameter, &p("diameter"))?;
+    if diameter <= 0.0 {
+        return Err(CoreError::Config(format!("{}: must be > 0", p("diameter"))));
     }
 
     let opacity = require_f32(value.opacity, &p("opacity"))?;
@@ -102,17 +144,9 @@ pub fn validate_lean_angle(
             p("track_thickness")
         )));
     }
-    let outer_radius = lean_angle_outer_radius(width as f32, height as f32);
-    if outer_radius <= 0.0 {
+    if track_thickness >= diameter * 0.5 {
         return Err(CoreError::Config(format!(
-            "{} and {}: frame must leave a positive lean_angle radius",
-            p("width"),
-            p("height")
-        )));
-    }
-    if track_thickness >= outer_radius {
-        return Err(CoreError::Config(format!(
-            "{}: must be less than the frame's outer radius {outer_radius}",
+            "{}: must be less than diameter / 2",
             p("track_thickness")
         )));
     }
@@ -149,8 +183,7 @@ pub fn validate_lean_angle(
     Ok(ValidatedLeanAngleWidget {
         x: value.x,
         y: value.y,
-        width,
-        height,
+        diameter,
         rotation: value.rotation.unwrap_or(0.0),
         opacity,
         show_icon: require_bool(value.show_icon, &p("show_icon"))?,

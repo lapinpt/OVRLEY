@@ -411,14 +411,12 @@ describe('MetricWidgetEditor corner gauge controls', () => {
 })
 
 describe('MetricWidgetEditor lean-angle controls', () => {
-  test('shows Size without separate Width or Height controls and updates both frame dimensions', async () => {
+  test('shows Diameter without separate Width or Height controls and updates the canonical diameter', async () => {
     const updateWidgetData = vi.fn()
     render(
       <MetricWidgetEditor
         widget={makeWidget('lean_angle', {
           display_type: 'lean_angle',
-          width: 180,
-          height: 140,
           font: 'Arial.ttf',
           font_size: 60,
           color: '#ffffff',
@@ -426,8 +424,7 @@ describe('MetricWidgetEditor lean-angle controls', () => {
           show_units: true,
           display_variants: {
             lean_angle: {
-              width: 180,
-              height: 140,
+              diameter: 180,
               track_thickness: 24,
               track_border_thickness: 2,
               value_offset_x: 0,
@@ -445,7 +442,7 @@ describe('MetricWidgetEditor lean-angle controls', () => {
       />,
     )
 
-    expect(screen.getByText('Size')).toBeInTheDocument()
+    expect(screen.getByText('Diameter')).toBeInTheDocument()
     expect(screen.queryByText('Width')).not.toBeInTheDocument()
     expect(screen.queryByText('Height')).not.toBeInTheDocument()
 
@@ -455,13 +452,16 @@ describe('MetricWidgetEditor lean-angle controls', () => {
     expect(updateWidgetData).toHaveBeenLastCalledWith(
       'value-0',
       expect.objectContaining({
-        width: 600,
-        height: 467,
+        font_size: 200,
         display_variants: expect.objectContaining({
-          lean_angle: expect.objectContaining({ width: 600, height: 467 }),
+          lean_angle: expect.objectContaining({ diameter: 600 }),
         }),
       }),
     )
+    expect(updateWidgetData.mock.lastCall[1]).not.toHaveProperty('width')
+    expect(updateWidgetData.mock.lastCall[1]).not.toHaveProperty('height')
+    expect(updateWidgetData.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('width')
+    expect(updateWidgetData.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('height')
     expect(updateWidgetData.mock.lastCall[1].display_variants.lean_angle).not.toHaveProperty('font_size')
   })
 })

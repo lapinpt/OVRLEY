@@ -166,7 +166,11 @@ describe('WidgetPreview dispatch by display_type', () => {
   test('lean_angle display_type uses the dedicated lean-angle renderer', () => {
     const { getByTestId } = render(
       <WidgetPreview
-        widget={{ type: 'lean_angle', category: 'values', data: { display_type: 'lean_angle', x: 0, y: 0, width: 180, height: 140 } }}
+        widget={{
+          type: 'lean_angle',
+          category: 'values',
+          data: { display_type: 'lean_angle', x: 0, y: 0, display_variants: { lean_angle: { diameter: 300 } } },
+        }}
         activity={ACTIVITY}
       />,
     )

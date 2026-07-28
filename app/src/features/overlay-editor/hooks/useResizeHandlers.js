@@ -5,7 +5,7 @@
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
 import { buildResizeUpdate, captureResizeOrigin } from '../utils/widgetResizeScaling'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { resolveActiveBackdropData, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
+import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
 /**
  * Creates resize-related moveable handlers.
@@ -38,9 +38,7 @@ export function useResizeHandlers({
         dragStart.set([0, 0])
       }
 
-      const frameData = isBackdropWidget(selectedWidget)
-        ? resolveActiveBackdropData(selectedWidget.data)
-        : resolveActiveMetricWidgetData(selectedWidget.data)
+      const frameData = selectedWidget.data
       const resizeOrigin = captureResizeOrigin(selectedWidget, frameData)
       interactionStartRef.current = {
         id: selectedWidget.id,
@@ -61,15 +59,20 @@ export function useResizeHandlers({
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
       const resizeUpdate = buildResizeUpdate(origin, { x: nextX, y: nextY, width: nextWidth, height: nextHeight }, { round: false })
-      const liveResizeUpdate = isBackdropWidget(selectedWidget)
-        ? resizeUpdate
-        : resolveActiveMetricWidgetData({ ...origin.widgetData, ...resizeUpdate })
+      let liveResizeUpdate = resizeUpdate
+      if (!isBackdropWidget(selectedWidget)) {
+        const resolveData =
+          origin.displayType === 'lean_angle'
+            ? Object.fromEntries(Object.entries(origin.widgetData).filter(([key]) => key !== 'width' && key !== 'height'))
+            : origin.widgetData
+        liveResizeUpdate = resolveActiveMetricWidgetData({ ...resolveData, ...resizeUpdate })
+      }
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
         ...liveResizeUpdate,
-        width: resizeUpdate.width ?? nextWidth,
-        height: resizeUpdate.height ?? nextHeight,
+        width: liveResizeUpdate.width ?? resizeUpdate.width ?? nextWidth,
+        height: liveResizeUpdate.height ?? resizeUpdate.height ?? nextHeight,
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)

@@ -1,13 +1,19 @@
-import { pathLine, pathMove } from '../../shared/trackPathGeometry'
-
 const START_ANGLE = 210
 const SWEEP_ANGLE = 120
 const CENTER_ANGLE = 270
 const MAX_FILL_SWEEP = 60
-const FRAME_MARGIN = 4
+const LABEL_LINE_HEIGHT_RATIO = 0.92
 
 function formatPathNumber(value) {
   return Number(value.toFixed(6))
+}
+
+function pathMove(point) {
+  return `M ${formatPathNumber(point.x)} ${formatPathNumber(point.y)}`
+}
+
+function pathLine(point) {
+  return `L ${formatPathNumber(point.x)} ${formatPathNumber(point.y)}`
 }
 
 function polarPoint(centerX, centerY, radius, angle) {
@@ -18,21 +24,45 @@ function polarPoint(centerX, centerY, radius, angle) {
   }
 }
 
+function requireFinitePositive(value, field) {
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`lean_angle ${field} must be a positive finite number`)
+  return value
+}
+
 /**
- * Resolves the static lean-angle annular-sector geometry.
- * @param {{width: number, height: number, track_thickness: number}} data
- * @returns {{centerX: number, centerY: number, outerRadius: number, innerRadius: number, startAngle: number, sweepAngle: number}}
+ * Resolves the canonical lean-angle logical frame and annular-sector geometry.
+ * @param {{diameter: number, track_thickness: number, font_size: number}} data
+ * @returns {{width: number, height: number, minX: number, minY: number, maxX: number, maxY: number, centerX: number, centerY: number, outerRadius: number, innerRadius: number, startAngle: number, sweepAngle: number}}
  */
-export function getLeanAngleGeometry(data) {
-  const centerX = data.width / 2
-  const centerY = data.height / 2
-  const outerRadius = getLeanAngleOuterRadius(data.width, data.height)
-  const innerRadius = outerRadius - data.track_thickness
-  if (innerRadius <= 0) throw new Error('lean_angle track_thickness must leave a positive inner radius')
+export function getLeanAngleLayout({ diameter, track_thickness: trackThickness, font_size: fontSize }) {
+  requireFinitePositive(diameter, 'diameter')
+  requireFinitePositive(trackThickness, 'track_thickness')
+  requireFinitePositive(fontSize, 'font_size')
+
+  const outerRadius = diameter / 2
+  if (trackThickness >= outerRadius) throw new Error('lean_angle track_thickness must be less than diameter / 2')
+
+  const innerRadius = outerRadius - trackThickness
+  const halfSweepRadians = (SWEEP_ANGLE / 2) * (Math.PI / 180)
+  const sectorMinX = -outerRadius * Math.sin(halfSweepRadians)
+  const sectorMaxX = outerRadius * Math.sin(halfSweepRadians)
+  const sectorMinY = -outerRadius
+  const sectorMaxY = -innerRadius * Math.cos(halfSweepRadians)
+  const labelLineHeight = fontSize * LABEL_LINE_HEIGHT_RATIO
+  const minX = sectorMinX
+  const maxX = sectorMaxX
+  const minY = Math.min(sectorMinY, -labelLineHeight / 2)
+  const maxY = Math.max(sectorMaxY, labelLineHeight / 2)
 
   return {
-    centerX,
-    centerY,
+    width: maxX - minX,
+    height: maxY - minY,
+    minX,
+    minY,
+    maxX,
+    maxY,
+    centerX: -minX,
+    centerY: -minY,
     outerRadius,
     innerRadius,
     startAngle: START_ANGLE,
@@ -41,23 +71,26 @@ export function getLeanAngleGeometry(data) {
 }
 
 /**
- * Returns the largest sector radius that fits inside the frame margin.
- * @param {number} width
- * @param {number} height
- * @returns {number}
+ * Resolves the selection frame for a lean-angle widget without changing its
+ * canonical SVG viewport. The label may move outside that viewport through
+ * `value_offset_y`, so the editor target expands or contracts around it.
+ * @param {{diameter: number, track_thickness: number, font_size: number, value_offset_y: number}} data
+ * @returns {{width: number, height: number}}
  */
-export function getLeanAngleOuterRadius(width, height) {
-  const horizontalRadius = (width / 2 - FRAME_MARGIN) / Math.cos(Math.PI / 6)
-  return Math.min(horizontalRadius, height / 2 - FRAME_MARGIN)
-}
+export function getLeanAngleSelectionFrame({ diameter, track_thickness: trackThickness, font_size: fontSize, value_offset_y: valueOffsetY }) {
+  if (!Number.isFinite(valueOffsetY)) throw new Error('lean_angle value_offset_y must be a finite number')
 
-/**
- * Builds the SVG path for the static lean-angle annular sector (full geometry, used for border).
- * @param {ReturnType<typeof getLeanAngleGeometry>} geometry
- * @returns {string}
- */
-export function getLeanAngleOuterTrackPath(geometry) {
-  return getLeanAngleSectorPath(geometry, geometry.startAngle, geometry.sweepAngle)
+  const layout = getLeanAngleLayout({ diameter, track_thickness: trackThickness, font_size: fontSize })
+  const labelLineHeight = fontSize * LABEL_LINE_HEIGHT_RATIO
+  const labelMinY = valueOffsetY - labelLineHeight / 2
+  const labelMaxY = valueOffsetY + labelLineHeight / 2
+  const minY = Math.min(-layout.outerRadius, labelMinY)
+  const maxY = Math.max(-layout.innerRadius * Math.cos((SWEEP_ANGLE / 2) * (Math.PI / 180)), labelMaxY)
+
+  return {
+    width: layout.width,
+    height: maxY - minY,
+  }
 }
 
 /**
@@ -77,9 +110,9 @@ export function getLeanAngleTrackWidth(trackThickness, borderThickness) {
 /**
  * Builds the inner lean-angle track geometry after applying the border inset.
  *
- * @param {ReturnType<typeof getLeanAngleGeometry>} geometry
+ * @param {ReturnType<typeof getLeanAngleLayout>} geometry
  * @param {number} borderThickness
- * @returns {ReturnType<typeof getLeanAngleGeometry>}
+ * @returns {ReturnType<typeof getLeanAngleLayout>}
  */
 export function getLeanAngleInnerGeometry(geometry, borderThickness) {
   const trackWidth = getLeanAngleTrackWidth(geometry.outerRadius - geometry.innerRadius, borderThickness)
@@ -93,8 +126,17 @@ export function getLeanAngleInnerGeometry(geometry, borderThickness) {
 }
 
 /**
+ * Builds the SVG path for the static lean-angle annular sector.
+ * @param {ReturnType<typeof getLeanAngleLayout>} geometry
+ * @returns {string}
+ */
+export function getLeanAngleOuterTrackPath(geometry) {
+  return getLeanAngleSectorPath(geometry, geometry.startAngle, geometry.sweepAngle)
+}
+
+/**
  * Builds the SVG path for the inner track, inset by the border on both sides.
- * @param {ReturnType<typeof getLeanAngleGeometry>} geometry
+ * @param {ReturnType<typeof getLeanAngleLayout>} geometry
  * @param {number} borderThickness
  * @returns {string}
  */
@@ -138,7 +180,7 @@ export function getLeanAngleFillSweep(raw) {
 
 /**
  * Builds the dynamic fill path from the centre vertical inside the inner track.
- * @param {ReturnType<typeof getLeanAngleGeometry>} geometry
+ * @param {ReturnType<typeof getLeanAngleLayout>} geometry
  * @param {number|null|undefined} raw - Signed interpolated lean angle.
  * @param {number} borderThickness
  * @returns {string} SVG path 'd' attribute value, or an empty string for no fill.

@@ -152,6 +152,9 @@ function normalizeDisplayVariants(variants) {
   const normalized = {}
   for (const [displayType, variantConfig] of Object.entries(variants)) {
     if (!variantConfig || typeof variantConfig !== 'object') continue
+    if (displayType === 'lean_angle' && (Object.hasOwn(variantConfig, 'width') || Object.hasOwn(variantConfig, 'height'))) {
+      throw new Error('lean_angle does not accept width or height; use diameter')
+    }
     const allowedKeys = DISPLAY_VARIANT_KEYS[displayType]
     if (!allowedKeys) continue
     normalized[displayType] = normalizeColorFields(pickDefined(variantConfig, allowedKeys))
@@ -176,6 +179,9 @@ function normalizeLinearGaugeLabelPosition(variant) {
 
 function normalizeValue(value = {}) {
   const type = value.value
+  if (value.display_type === 'lean_angle' && (Object.hasOwn(value, 'width') || Object.hasOwn(value, 'height'))) {
+    throw new Error('lean_angle does not accept width or height; use diameter')
+  }
   const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
   const extraKeys = Object.keys(valueDefaults).filter((key) => !VALUE_SHARED_KEYS.includes(key))
   const keys = [...VALUE_SHARED_KEYS, ...extraKeys]

@@ -78,6 +78,9 @@ const DISPLAY_VARIANT_EXCLUDED_KEYS = new Set(['id', 'value', 'display_variants'
 
 /** Allowed keys for display variant configs during normalization. */
 const DISPLAY_VARIANT_FRAME_KEYS = ['width', 'height', 'rotation']
+const DISPLAY_VARIANT_FRAME_KEYS_BY_TYPE = {
+  lean_angle: ['rotation'],
+}
 
 export const DISPLAY_VARIANT_KEYS = Object.freeze(
   Object.fromEntries(
@@ -86,7 +89,7 @@ export const DISPLAY_VARIANT_KEYS = Object.freeze(
       .map(([displayType, definition]) => [
         displayType,
         [
-          ...DISPLAY_VARIANT_FRAME_KEYS,
+          ...(DISPLAY_VARIANT_FRAME_KEYS_BY_TYPE[displayType] || DISPLAY_VARIANT_FRAME_KEYS),
           ...Object.keys(definition.defaults || {}).filter((key) => !DISPLAY_VARIANT_EXCLUDED_KEYS.has(key)),
           ...(definition.conditionalKeys || []),
         ],

@@ -18,7 +18,6 @@ function scaleNumber(value, scaleFactor, { min = -Infinity, max = Infinity, roun
 
 const GAUGE_DISPLAY_TYPES = new Set(['arc', 'corner', 'lean_angle'])
 const G_FORCE_DISPLAY_TYPE = 'g_force'
-const LEAN_ANGLE_FRAME_HEIGHT_RATIO = 140 / 180
 
 function isLeanAngleDisplayType(displayType) {
   return displayType === 'lean_angle'
@@ -84,14 +83,26 @@ function buildGaugeResizeContentDraft(origin, scaleFactor, { round = true } = {}
 
 function buildLeanAngleResizeContentDraft(origin, scaleFactor, { round = true } = {}) {
   const { data } = origin
+  const diameter = scaleNumber(data.diameter, scaleFactor, { min: 8, max: 10_000, round })
+  const trackThickness = scaleNumber(data.track_thickness, scaleFactor, {
+    min: 1,
+    max: diameter * 0.5 - Number.EPSILON,
+    round,
+  })
+  const borderThickness = scaleNumber(data.track_border_thickness, scaleFactor, {
+    min: 0,
+    max: Math.max(0, trackThickness * 0.5 - Number.EPSILON),
+    round,
+  })
 
   return {
     font_size: scaleNumber(data.font_size, scaleFactor, { min: 8, max: 400, round }),
     display_variants: {
       [origin.displayType]: {
         ...origin.variant,
-        track_thickness: scaleNumber(data.track_thickness, scaleFactor, { min: 1, max: 100, round }),
-        track_border_thickness: scaleNumber(data.track_border_thickness, scaleFactor, { min: 0, max: 24, round }),
+        diameter,
+        track_thickness: trackThickness,
+        track_border_thickness: borderThickness,
         value_offset_x: scaleNumber(data.value_offset_x, scaleFactor, { min: -10_000, max: 10_000, round }),
         value_offset_y: scaleNumber(data.value_offset_y, scaleFactor, { min: -10_000, max: 10_000, round }),
       },
@@ -138,12 +149,7 @@ function lockResizeFrame(origin, framePatch, { round = false } = {}) {
     }
   }
 
-  if (!isLeanAngleDisplayType(origin.displayType)) return framePatch
-
-  return {
-    ...framePatch,
-    height: round ? Math.round(framePatch.width * LEAN_ANGLE_FRAME_HEIGHT_RATIO) : framePatch.width * LEAN_ANGLE_FRAME_HEIGHT_RATIO,
-  }
+  return framePatch
 }
 
 /**
@@ -160,6 +166,7 @@ export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidge
     widgetData: widget.data,
     width: frameData?.width ?? widget.data.width ?? 0,
     height: frameData?.height ?? widget.data.height ?? 0,
+    diameter: frameData?.diameter ?? widget.data.diameter ?? 0,
     markerSize: widget.data.marker_size ?? null,
   }
 
@@ -169,8 +176,8 @@ export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidge
 
 /**
  * Merges a content draft with the normal frame update while preserving the
- * durable display-variant shape. Frame geometry wins when both drafts contain
- * width, height, or rotation.
+ * durable display-variant shape. Lean-angle frame dimensions remain derived
+ * and therefore are never included in the commit patch.
  *
  * @param {object|null} widgetData - Current stored widget data.
  * @param {object} framePatch - Position/frame update.
@@ -178,7 +185,10 @@ export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidge
  * @returns {object} Commit-ready widget update patch.
  */
 function mergeResizeUpdate(widgetData, framePatch, contentDraft = {}) {
-  const frameUpdate = buildFrameGeometryUpdate(widgetData, framePatch)
+  const frameUpdate =
+    widgetData?.display_type === 'lean_angle'
+      ? Object.fromEntries(Object.entries(framePatch).filter(([key, value]) => (key === 'x' || key === 'y') && value !== undefined))
+      : buildFrameGeometryUpdate(widgetData, framePatch)
   const { display_variants: contentVariants, ...topLevelContent } = contentDraft
 
   if (!contentVariants) {
@@ -196,10 +206,12 @@ function mergeResizeUpdate(widgetData, framePatch, contentDraft = {}) {
       ...(contentVariants[variantKey] || {}),
     }
 
-    const frameVariant = frameVariants[variantKey] || {}
-    for (const key of ['width', 'height', 'rotation']) {
-      if (Object.hasOwn(frameVariant, key)) {
-        mergedVariant[key] = frameVariant[key]
+    if (widgetData?.display_type !== 'lean_angle') {
+      const frameVariant = frameVariants[variantKey] || {}
+      for (const key of ['width', 'height', 'rotation']) {
+        if (Object.hasOwn(frameVariant, key)) {
+          mergedVariant[key] = frameVariant[key]
+        }
       }
     }
 
@@ -241,7 +253,14 @@ export function buildResizeUpdate(origin, framePatch, { round = false } = {}) {
  */
 export function buildUniformResizeUpdate(widget, size) {
   const origin = captureResizeOrigin(widget)
-  const nextWidth = Number(size)
+  const nextSize = Number(size)
+
+  if (origin?.displayType === 'lean_angle') {
+    if (!Number.isFinite(origin.diameter) || origin.diameter <= 0 || !Number.isFinite(nextSize) || nextSize <= 0) return null
+
+    const contentDraft = buildLeanAngleResizeContentDraft(origin, nextSize / origin.diameter, { round: true })
+    return mergeResizeUpdate(origin.widgetData, { x: origin.widgetData.x, y: origin.widgetData.y }, contentDraft)
+  }
 
   if (
     !origin ||
@@ -249,19 +268,14 @@ export function buildUniformResizeUpdate(widget, size) {
     !Number.isFinite(origin.height) ||
     origin.width <= 0 ||
     origin.height <= 0 ||
-    !Number.isFinite(nextWidth)
+    !Number.isFinite(nextSize)
   ) {
     return null
   }
 
   const framePatch = {
-    width: Math.round(nextWidth),
-    height:
-      origin.displayType === G_FORCE_DISPLAY_TYPE
-        ? Math.round(nextWidth)
-        : isLeanAngleDisplayType(origin.displayType)
-          ? Math.round(nextWidth * LEAN_ANGLE_FRAME_HEIGHT_RATIO)
-          : Math.round(origin.height * (nextWidth / origin.width)),
+    width: Math.round(nextSize),
+    height: origin.displayType === G_FORCE_DISPLAY_TYPE ? Math.round(nextSize) : Math.round(origin.height * (nextSize / origin.width)),
   }
 
   return buildResizeUpdate(origin, framePatch, { round: true })

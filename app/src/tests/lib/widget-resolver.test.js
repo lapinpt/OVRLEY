@@ -243,6 +243,23 @@ describe('resolveActiveMetricWidgetData', () => {
     expect(resolved.id).toBe('widget-42')
     expect(resolved.display_type).toBe('heading_tape')
   })
+
+  test('rejects rectangular lean-angle geometry fields', () => {
+    expect(() =>
+      resolveActiveMetricWidgetData({
+        value: 'lean_angle',
+        display_type: 'lean_angle',
+        width: 180,
+        font_size: 60,
+        display_variants: {
+          lean_angle: {
+            diameter: 180,
+            track_thickness: 24,
+          },
+        },
+      }),
+    ).toThrow('lean_angle does not accept width or height; use diameter')
+  })
 })
 
 describe('initDisplayVariant', () => {

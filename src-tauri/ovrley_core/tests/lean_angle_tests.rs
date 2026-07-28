@@ -25,7 +25,7 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     let PreparedValue::LeanAngle(widget) = &config.values[0] else {
         panic!("lean_angle display type must use the dedicated prepared value");
     };
-    assert_eq!((widget.width, widget.height), (180, 140));
+    assert_eq!(widget.diameter, 180.0);
     assert_eq!(widget.track_thickness, 24.0);
 
     let paths = test_paths();
@@ -38,8 +38,12 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     let Some(PresentationCache::LeanAngle(cache)) = assets.presentation_caches.get(&0) else {
         panic!("lean-angle value index must own the static lean-angle cache");
     };
-    assert_eq!((cache.center_x, cache.center_y), (90.0, 70.0));
-    assert_eq!((cache.outer_radius, cache.inner_radius), (66.0, 42.0));
+    assert!((cache.layout.center_x - 77.94229).abs() < 0.0001);
+    assert_eq!(cache.layout.center_y, 90.0);
+    assert_eq!(
+        (cache.layout.outer_radius, cache.layout.inner_radius),
+        (90.0, 66.0)
+    );
     assert_eq!(cache.track_thickness, 24.0);
     assert_eq!(cache.track_border_thickness, 2.0);
 }
@@ -47,7 +51,7 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
 #[test]
 fn lean_angle_rejects_track_thickness_that_consumes_the_inner_radius() {
     let mut value = full_lean_angle_config();
-    value["track_thickness"] = serde_json::json!(66);
+    value["track_thickness"] = serde_json::json!(90);
 
     let error = match validate_render_config(render_config_with_lean_angle(value)) {
         Ok(_) => panic!("track thickness consuming the inner radius must fail validation"),
@@ -56,7 +60,7 @@ fn lean_angle_rejects_track_thickness_that_consumes_the_inner_radius() {
 
     assert!(error
         .to_string()
-        .contains("track_thickness: must be less than the frame's outer radius"));
+        .contains("track_thickness: must be less than diameter / 2"));
 }
 
 #[test]
@@ -72,6 +76,32 @@ fn lean_angle_rejects_border_that_consumes_the_track() {
     assert!(error
         .to_string()
         .contains("track_border_thickness: must leave a positive usable width"));
+}
+
+#[test]
+fn lean_angle_rejects_missing_diameter() {
+    let mut value = full_lean_angle_config();
+    value.as_object_mut().unwrap().remove("diameter");
+
+    let error = match validate_render_config(render_config_with_lean_angle(value)) {
+        Ok(_) => panic!("missing diameter must fail validation"),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("diameter: required"));
+}
+
+#[test]
+fn lean_angle_rejects_rectangular_geometry_fields() {
+    let mut value = full_lean_angle_config();
+    value["width"] = serde_json::json!(180);
+
+    let error = match validate_render_config(render_config_with_lean_angle(value)) {
+        Ok(_) => panic!("lean-angle width must fail validation"),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("width"));
 }
 
 fn render_config_with_lean_angle(value: serde_json::Value) -> RenderConfig {
@@ -91,8 +121,7 @@ fn full_lean_angle_config() -> serde_json::Value {
         "x": 20,
         "y": 30,
         "display_type": "lean_angle",
-        "width": 180,
-        "height": 140,
+        "diameter": 180,
         "rotation": 0,
         "opacity": 1,
         "show_icon": false,

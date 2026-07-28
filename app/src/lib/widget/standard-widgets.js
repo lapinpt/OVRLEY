@@ -48,7 +48,8 @@ export const STANDARD_METRIC_WIDGET_TYPES = Object.freeze(standardMetricsManifes
 /**
  * Map of display_type value -> definition object.
  * Each definition includes: `label`, `layoutMode` ("intrinsic" | "boxed"),
- * and for boxed presentations: `defaultFrameWidth`, `defaultFrameHeight`.
+ * and, for explicitly sized boxed presentations, `defaultFrameWidth` and
+ * `defaultFrameHeight`.
  */
 export const DISPLAY_TYPE_DEFINITIONS = Object.freeze(
   Object.fromEntries(Object.entries(standardMetricsManifest.displayTypes.definitions).map(([key, def]) => [key, Object.freeze(def)])),

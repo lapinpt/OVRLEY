@@ -93,10 +93,9 @@
           "assetFile": "display-type-lean-angle.svg"
         },
         "layoutMode": "boxed",
-        "defaultFrameWidth": 340,
-        "defaultFrameHeight": 300,
         "defaults": {
           "display_type": "lean_angle",
+          "diameter": 300,
           "show_icon": false,
           "track_empty_color": "#222222",
           "track_empty_opacity": 0.5,
