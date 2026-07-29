@@ -35,7 +35,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
         <SectionHeading icon={SlidersHorizontal} title="Angle Track" />
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Diameter"
+            label="Size"
             value={diameter}
             min={30}
             max={600}

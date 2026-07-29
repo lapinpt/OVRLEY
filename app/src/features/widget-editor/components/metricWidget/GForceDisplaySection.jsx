@@ -25,7 +25,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData }) {
       <div className="space-y-4">
         <SectionHeading icon={CircleGauge} title="G-Force Plot" />
         <SliderField
-          label="Diameter"
+          label="Size"
           value={data.diameter}
           min={20}
           max={600}
