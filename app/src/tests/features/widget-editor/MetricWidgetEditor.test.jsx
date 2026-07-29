@@ -411,7 +411,7 @@ describe('MetricWidgetEditor corner gauge controls', () => {
 })
 
 describe('MetricWidgetEditor lean-angle controls', () => {
-  test('shows Diameter without separate Width or Height controls and updates the canonical diameter', async () => {
+  test('shows Size without separate Width or Height controls and updates the canonical diameter', async () => {
     const updateWidgetData = vi.fn()
     render(
       <MetricWidgetEditor
@@ -442,7 +442,7 @@ describe('MetricWidgetEditor lean-angle controls', () => {
       />,
     )
 
-    expect(screen.getByText('Diameter')).toBeInTheDocument()
+    expect(screen.getByText('Size')).toBeInTheDocument()
     expect(screen.queryByText('Width')).not.toBeInTheDocument()
     expect(screen.queryByText('Height')).not.toBeInTheDocument()
 

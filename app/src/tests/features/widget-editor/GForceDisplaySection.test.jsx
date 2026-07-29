@@ -36,16 +36,16 @@ describe('GForceWidgetEditor', () => {
     }
     render(<MetricWidgetEditor widget={widget} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
 
-    for (const label of ['Diameter', 'Fill Color', 'Border Thickness', 'Marker Size', 'Label Font', 'Decimals', 'Unit Color']) {
+    for (const label of ['Size', 'Fill Color', 'Border Thickness', 'Marker Size', 'Label Font', 'Unit Color']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
     expect(screen.queryByText('Rotation')).not.toBeInTheDocument()
     expect(screen.getByText('Horizontal axis')).toBeInTheDocument()
     expect(screen.getByText('Vertical axis')).toBeInTheDocument()
-    expect(screen.getAllByText('Invert')).toHaveLength(2)
+    expect(screen.getAllByText('Invert sign')).toHaveLength(2)
   })
 
-  test('scales the frame and all G-force dimensions when diameter changes', () => {
+  test('scales the frame and all G-force dimensions when size changes', () => {
     const widget = {
       id: 'g-force-1',
       type: 'g_force',
@@ -54,21 +54,21 @@ describe('GForceWidgetEditor', () => {
     const updateWidgetData = vi.fn()
     render(<MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={vi.fn()} />)
 
-    screen.getByRole('button', { name: 'Diameter' }).click()
+    screen.getByRole('button', { name: 'Size' }).click()
 
     expect(updateWidgetData).toHaveBeenCalledWith(
       'g-force-1',
       expect.objectContaining({
-        width: 110,
-        height: 110,
+        width: 137,
+        height: 137,
         display_variants: expect.objectContaining({
           g_force: expect.objectContaining({
-            width: 110,
-            height: 110,
-            diameter: 100,
+            width: 137,
+            height: 137,
+            diameter: 125,
             border_thickness: 0,
             marker_size: 12,
-            label_font_size: 10,
+            label_font_size: 25,
           }),
         }),
       }),

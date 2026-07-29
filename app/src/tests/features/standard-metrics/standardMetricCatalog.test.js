@@ -249,15 +249,15 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(162)
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFrameWidth')
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFrameHeight')
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.diameter).toBe(300)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.diameter).toBe(450)
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFontSize')
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.font_size).toBe(60)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.font_size).toBe(90)
   })
 
   test('lean-angle display type exposes the complete static-sector contract', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults).toEqual({
       display_type: 'lean_angle',
-      diameter: 300,
+      diameter: 450,
       show_icon: false,
       track_empty_color: '#222222',
       track_empty_opacity: 0.5,
@@ -265,9 +265,9 @@ describe('display type definitions', () => {
       track_filled_opacity: 1,
       track_border_thickness: 0,
       track_border_color: '#ffffff',
-      track_thickness: 100,
+      track_thickness: 150,
       font: 'Arial.ttf',
-      font_size: 60,
+      font_size: 90,
       color: '#ffffff',
       unit_color: '#ffffff',
       show_units: true,

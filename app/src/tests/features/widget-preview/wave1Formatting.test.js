@@ -57,7 +57,7 @@ describe('Wave 2 metric formatting', () => {
     })
 
     expect(model?.valueText).toBe('2.50')
-    expect(model?.unitText).toBe('km')
+    expect(model?.unitText).toBe('KM')
   })
 
   test('vertical_oscillation formats as mm', () => {

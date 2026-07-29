@@ -112,7 +112,7 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('22.1/35.7')
-    expect(model?.unitText).toBe('km')
+    expect(model?.unitText).toBe('KM')
   })
 
   test('formats distance widgets as current-only when show_full_distance is disabled', () => {
@@ -136,7 +136,7 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('1.00')
-    expect(model?.unitText).toBe('mi')
+    expect(model?.unitText).toBe('MI')
   })
 
   test('formats the altitude widget from the canonical elevation series', () => {
@@ -206,7 +206,7 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('2.30/5.00')
-    expect(model?.unitText).toBe('km')
+    expect(model?.unitText).toBe('KM')
   })
 
   test('formats temperature widgets from display_unit', () => {

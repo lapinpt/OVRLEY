@@ -66,7 +66,7 @@ describe('GForceWidgetEditor axis controls', () => {
     const updateWidgetData = vi.fn()
     render(<GForceWidgetEditor widget={makeWidget()} updateWidgetData={updateWidgetData} />)
 
-    await user.click(within(screen.getByTestId('horizontal-axis-row')).getByRole('switch', { name: 'Invert' }))
+    await user.click(within(screen.getByTestId('horizontal-axis-row')).getByRole('switch', { name: 'Invert sign' }))
 
     expect(updateWidgetData).toHaveBeenCalledWith(
       'g-force-1',
