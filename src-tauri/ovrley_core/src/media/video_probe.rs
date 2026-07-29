@@ -107,6 +107,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         rotation_degrees: None,
         camera_type: None,
         camera_model: None,
+        time_source: None,
     };
 
     let format = json.get("format");
@@ -222,6 +223,9 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         .or(stream_creation_time)
         .or(apple_creation_date)
         .map(|s| s.to_string());
+    if metadata.creation_time.is_some() {
+        metadata.time_source = Some("ffprobe".to_string());
+    }
 
     if metadata.creation_time.is_none() {
         log::warn!("No creation time found in video metadata. Using file system modified time as fallback.");
@@ -231,6 +235,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
                 let rfc3339 = dt.to_rfc3339();
                 log::debug!("Fallback file modified time: {}", rfc3339);
                 metadata.creation_time = Some(rfc3339);
+                metadata.time_source = Some("file_mtime".to_string());
             }
         }
     }

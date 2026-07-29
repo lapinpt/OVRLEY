@@ -17,17 +17,10 @@ fn extracts_supported_mp4_telemetry_fixtures_with_provenance() {
             .and_then(|s| s.to_str())
             .unwrap_or("video");
 
-        let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
-            .unwrap_or_else(|err| panic!("{stem}: probe failed: {err}"));
-        let activity = mp4_telemetry::extract_activity(
-            repo_root,
-            fixture.to_str().unwrap(),
-            metadata.fps.unwrap_or(30.0),
-            metadata.duration.unwrap_or(0.0),
-        )
-        .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
-        .unwrap_or_else(|| panic!("{stem}: expected telemetry activity"))
-        .parsed_activity;
+        let activity = mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
+            .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
+            .unwrap_or_else(|| panic!("{stem}: expected telemetry activity"))
+            .parsed_activity;
 
         assert_eq!(
             activity.file_format.as_deref(),

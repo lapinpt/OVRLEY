@@ -31,16 +31,9 @@ fn extract_activity_from_telemetry_fixtures() {
             .and_then(|s| s.to_str())
             .unwrap_or("video");
 
-        let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
-            .unwrap_or_else(|err| panic!("{stem}: probe failed: {err}"));
-
-        let fps = metadata.fps.unwrap_or(30.0);
-        let duration_s = metadata.duration.unwrap_or(0.0);
-
-        let response =
-            mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap(), fps, duration_s)
-                .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
-                .unwrap_or_else(|| panic!("{stem}: expected activity, got None"));
+        let response = mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
+            .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
+            .unwrap_or_else(|| panic!("{stem}: expected activity, got None"));
 
         // Write artifact
         fs::write(

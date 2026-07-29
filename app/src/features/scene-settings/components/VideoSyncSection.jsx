@@ -8,6 +8,7 @@
  * @param {number} props.importedVideoFps - Video frame rate.
  * @param {object} props.importedVideoResolution - Video resolution ({ width, height }).
  * @param {number} props.importedVideoCreationTime - Video creation timestamp.
+ * @param {string} props.importedVideoTimeSource - "gps" | "ffprobe" | "file_mtime" | null.
  * @param {string|null} props.videoSyncWarning - Sync warning message (or null).
  * @param {boolean} props.videoResolutionMismatch - Whether overlay/video resolutions differ.
  * @param {string} props.offsetInput - Current sync offset input value.
@@ -33,6 +34,7 @@ export default function VideoSyncSection({
   importedVideoBitRate,
   importedVideoCameraModel,
   importedVideoCreationTime,
+  importedVideoTimeSource,
   videoSyncWarning,
   videoResolutionMismatch,
   offsetInput,
@@ -65,7 +67,9 @@ export default function VideoSyncSection({
         <div className="flex justify-between">
           <b>Created at:</b>
           <span className="text-xs font-normal text-foreground/70">
-            {importedVideoCreationTime ? new Date(importedVideoCreationTime).toLocaleString() : 'Unknown'}
+                        {importedVideoCreationTime
+              ? importedVideoCreationTime.replace('T', ' ').replace(/\.\d+Z$/, ' UTC')
+              : 'Unknown'}
           </span>
         </div>
         <div className="flex justify-between">

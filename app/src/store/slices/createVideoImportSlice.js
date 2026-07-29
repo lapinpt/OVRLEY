@@ -52,6 +52,7 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoFpsDen: null, // exact ffprobe FPS denominator
   importedVideoResolution: null, // display-oriented { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
+  importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | null
   importedVideoImportId: null, // opaque local preview server import ID
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
   importedVideoPreviewWarnings: [],
@@ -78,6 +79,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFpsDen: metadata.fpsDen,
       importedVideoResolution,
       importedVideoCreationTime: metadata.creationTime,
+      importedVideoTimeSource: metadata.timeSource ?? null,
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
