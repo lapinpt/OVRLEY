@@ -56,7 +56,7 @@ use crate::media::native_sample::{NativeSample, TelemetrySeriesCounts};
 use crate::media::time::{
     gps_unix_seconds_to_video_start_rfc3339, gpsu_millis_to_video_start_rfc3339,
 };
-use crate::media::{dji_ac004, Resolution, SourceVideoMetadata};
+use crate::media::{dji_ac004, timezone, Resolution, SourceVideoMetadata};
 
 use tags::{extract_tag_u64, gps5_fix_is_usable, GOPRO_GPSU_TAG};
 
@@ -75,6 +75,9 @@ pub fn probe_video_metadata(repo_root: &Path, file_path: &str) -> CoreResult<Sou
     let camera_model = telemetry
         .as_ref()
         .and_then(|value| value.camera_model.clone());
+    let timezone = telemetry
+        .as_ref()
+        .and_then(|value| value.timezone.clone());
     let sync_time = telemetry.and_then(|value| value.sync_time);
     let time_source = sync_time.as_ref().map(|_| "gps".to_string());
 
@@ -102,6 +105,7 @@ pub fn probe_video_metadata(repo_root: &Path, file_path: &str) -> CoreResult<Sou
         rotation_degrees: Some(vm.rotation),
         camera_type,
         camera_model,
+        timezone,
     })
 }
 
@@ -151,6 +155,7 @@ struct ResolvedTelemetry {
     camera_type: String,
     camera_model: Option<String>,
     sync_time: Option<String>,
+    timezone: Option<String>,
     source: TelemetrySource,
 }
 
@@ -187,6 +192,7 @@ struct Mp4TelemetryExtraction {
     camera_type: String,
     camera_model: Option<String>,
     sync_time: Option<String>,
+    timezone: Option<String>,
     file_name: Option<String>,
 }
 
@@ -240,6 +246,7 @@ fn resolve_telemetry(repo_root: &Path, path: &Path) -> CoreResult<Option<Resolve
                     sync_time: extract_sync_time_from_samples(parser_samples),
                     camera_type,
                     camera_model,
+                    timezone: None,
                     source: TelemetrySource::TelemetryParser,
                 })
             }
@@ -247,7 +254,10 @@ fn resolve_telemetry(repo_root: &Path, path: &Path) -> CoreResult<Option<Resolve
         _ => resolve_dji_fallback(repo_root, path, camera_type)?,
     };
 
-    Ok(resolved)
+    Ok(resolved.map(|mut telemetry| {
+        telemetry.timezone = timezone::timezone_for_samples(&telemetry.samples);
+        telemetry
+    }))
 }
 
 /// Shared core: resolves telemetry once, smooths GPS/IMU series, and records
@@ -281,6 +291,7 @@ fn extract_telemetry_data(
         camera_type,
         camera_model,
         sync_time,
+        timezone,
         source,
     } = resolved;
 
@@ -296,6 +307,7 @@ fn extract_telemetry_data(
         camera_type,
         camera_model,
         sync_time,
+        timezone,
         file_name,
     }))
 }
@@ -317,6 +329,7 @@ fn resolve_dji_fallback(
         sync_time: dji.sync_time,
         camera_type,
         camera_model: dji.device_name,
+        timezone: None,
         source: TelemetrySource::DjiAc004Fallback,
     }))
 }
@@ -416,6 +429,7 @@ pub fn extract_activity(
         &result.camera_type,
         result.camera_model,
         result.sync_time,
+        result.timezone,
         result.source.as_str(),
         result.timeline.as_str(),
         result.counts,

@@ -35,6 +35,19 @@ pub struct NativeSample {
 }
 
 impl NativeSample {
+    /// Returns the first-class GPS coordinate pair when both coordinates are
+    /// finite and not the zero-coordinate sentinel.
+    pub fn gps_coordinates(&self) -> Option<(f64, f64)> {
+        let latitude = self.latitude?;
+        let longitude = self.longitude?;
+        if !latitude.is_finite() || !longitude.is_finite() || (latitude == 0.0 && longitude == 0.0)
+        {
+            return None;
+        }
+
+        Some((longitude, latitude))
+    }
+
     /// True when at least one telemetry domain has data.
     pub fn has_payload(&self) -> bool {
         self.has_gps_payload() || self.has_camera_payload() || self.g_force.is_some()

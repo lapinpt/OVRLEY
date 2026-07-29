@@ -107,6 +107,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         rotation_degrees: None,
         camera_type: None,
         camera_model: None,
+        timezone: None,
         time_source: None,
     };
 

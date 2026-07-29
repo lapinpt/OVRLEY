@@ -55,6 +55,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             importedVideoCameraModel={videoSyncSettings.importedVideoCameraModel}
             importedVideoCreationTime={videoSyncSettings.importedVideoCreationTime}
             importedVideoTimeSource={videoSyncSettings.importedVideoTimeSource}
+            importedVideoTimezone={videoSyncSettings.importedVideoTimezone}
             videoSyncWarning={videoSyncSettings.videoSyncWarning}
             videoResolutionMismatch={videoSyncSettings.videoResolutionMismatch}
             offsetInput={videoSyncSettings.offsetInput}

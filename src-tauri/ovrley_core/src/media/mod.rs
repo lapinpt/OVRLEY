@@ -15,6 +15,8 @@ pub mod source_video_metadata;
 pub mod telemetry_math;
 /// Shared time conversion and media-relative timestamp helpers.
 pub mod time;
+/// GPS-coordinate timezone lookup for media telemetry.
+pub mod timezone;
 /// MP4/MOV metadata extraction via ffprobe.
 pub mod video_probe;
 

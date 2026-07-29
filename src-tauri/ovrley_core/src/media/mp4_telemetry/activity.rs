@@ -13,7 +13,6 @@ use serde_json::json;
 
 use crate::activity::schema::{ActivityColumns, RawActivityOptions};
 use crate::media::native_sample::{NativeSample, TelemetrySeriesCounts};
-use crate::media::telemetry_math::finite_f64;
 
 /// Builds aligned activity columns from pre-smoothed MP4 telemetry samples.
 ///
@@ -30,21 +29,14 @@ pub fn build_activity_columns(
     camera_type: &str,
     camera_model: Option<String>,
     sync_time: Option<String>,
+    timezone: Option<String>,
     telemetry_source: &str,
     timeline_kind: &str,
     series_counts: TelemetrySeriesCounts,
 ) -> ActivityColumns {
     let gps: Vec<&NativeSample> = samples
         .iter()
-        .filter(|sample| {
-            matches!(
-                (
-                    sample.latitude.and_then(finite_f64),
-                    sample.longitude.and_then(finite_f64),
-                ),
-                (Some(latitude), Some(longitude)) if latitude != 0.0 || longitude != 0.0
-            )
-        })
+        .filter(|sample| sample.gps_coordinates().is_some())
         .collect();
     let imu: Vec<&NativeSample> = samples.iter().filter(|s| s.g_force.is_some()).collect();
     let cam: Vec<&NativeSample> = samples.iter().filter(|s| s.has_camera_payload()).collect();
@@ -141,6 +133,9 @@ pub fn build_activity_columns(
     });
     if let Some(sync_time) = sync_time {
         metadata["sync_time"] = json!(sync_time);
+    }
+    if let Some(timezone) = timezone {
+        metadata["timezone"] = json!(timezone);
     }
 
     ActivityColumns {

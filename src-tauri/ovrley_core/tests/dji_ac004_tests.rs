@@ -80,6 +80,13 @@ fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
             .and_then(|value| value.as_str()),
         Some("dji_ac004_fallback")
     );
+    assert_eq!(
+        activity
+            .metadata
+            .get("timezone")
+            .and_then(|value| value.as_str()),
+        Some("Europe/Prague")
+    );
 }
 
 #[test]

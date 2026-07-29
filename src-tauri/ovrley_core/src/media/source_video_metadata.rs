@@ -34,6 +34,7 @@ pub struct SourceVideoMetadata {
     pub rotation_degrees: Option<i32>,
     pub camera_type: Option<String>,
     pub camera_model: Option<String>,
+    pub timezone: Option<String>,
     pub time_source: Option<String>,
 }
 

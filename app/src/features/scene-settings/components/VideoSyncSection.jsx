@@ -9,6 +9,7 @@
  * @param {object} props.importedVideoResolution - Video resolution ({ width, height }).
  * @param {number} props.importedVideoCreationTime - Video creation timestamp.
  * @param {string} props.importedVideoTimeSource - "gps" | "ffprobe" | "file_mtime" | null.
+ * @param {string} props.importedVideoTimezone - IANA timezone from the first GPS point.
  * @param {string|null} props.videoSyncWarning - Sync warning message (or null).
  * @param {boolean} props.videoResolutionMismatch - Whether overlay/video resolutions differ.
  * @param {string} props.offsetInput - Current sync offset input value.
@@ -25,6 +26,7 @@ import { BlurInput } from '@/components/ui/blur-input'
 import { Separator } from '@/components/ui/separator'
 import { Video, Bell, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { formatVideoCreationTime } from '../utils/sceneSettingsUtils'
 
 export default function VideoSyncSection({
   importedVideoDuration,
@@ -35,6 +37,7 @@ export default function VideoSyncSection({
   importedVideoCameraModel,
   importedVideoCreationTime,
   importedVideoTimeSource,
+  importedVideoTimezone,
   videoSyncWarning,
   videoResolutionMismatch,
   offsetInput,
@@ -67,9 +70,7 @@ export default function VideoSyncSection({
         <div className="flex justify-between">
           <b>Created at:</b>
           <span className="text-xs font-normal text-foreground/70">
-                        {importedVideoCreationTime
-              ? importedVideoCreationTime.replace('T', ' ').replace(/\.\d+Z$/, ' UTC')
-              : 'Unknown'}
+            {formatVideoCreationTime(importedVideoCreationTime, importedVideoTimeSource, importedVideoTimezone)}
           </span>
         </div>
         <div className="flex justify-between">

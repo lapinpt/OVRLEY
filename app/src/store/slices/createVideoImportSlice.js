@@ -53,6 +53,7 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoResolution: null, // display-oriented { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
   importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | null
+  importedVideoTimezone: null, // IANA timezone from the first GPS point or null
   importedVideoImportId: null, // opaque local preview server import ID
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
   importedVideoPreviewWarnings: [],
@@ -80,6 +81,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoResolution,
       importedVideoCreationTime: metadata.creationTime,
       importedVideoTimeSource: metadata.timeSource ?? null,
+      importedVideoTimezone: metadata.timezone ?? null,
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
@@ -106,6 +108,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFpsDen: null,
       importedVideoResolution: null,
       importedVideoCreationTime: null,
+      importedVideoTimeSource: null,
+      importedVideoTimezone: null,
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
@@ -130,6 +134,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFpsDen: null,
       importedVideoResolution: null,
       importedVideoCreationTime: null,
+      importedVideoTimeSource: null,
+      importedVideoTimezone: null,
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
