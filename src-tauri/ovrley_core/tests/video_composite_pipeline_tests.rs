@@ -281,7 +281,6 @@ fn test_5_8_video_with_audio_copies_audio_track() {
     assert!(audio.contains("codec_name=aac"));
 }
 
-#[test]
 /// Multi-threaded cancellation test: spawns a composite render on a
 /// background thread, cancels after 100ms, and verifies the render returns
 /// a Cancelled error and no partial output files are left behind.
@@ -293,6 +292,8 @@ fn test_5_8_video_with_audio_copies_audio_track() {
 /// Regressions guarded: cancelled renders leaving stale output files,
 /// cancel flag not respected by the render loop, error from cancel path
 /// not containing "cancelled".
+#[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
     let paths = test_paths_named("phase6_cancel");
     let before = composited_outputs(&paths);

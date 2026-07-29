@@ -235,7 +235,7 @@ fn formats_metric_parts_for_distance_with_fixed_decimals() {
 
     let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
     assert_eq!(parts.standard_text().0, "2.30/5.00");
-    assert_eq!(parts.standard_text().1, Some("km"));
+    assert_eq!(parts.standard_text().1, Some("KM"));
     assert_eq!(parts.icon_kind, Some(MetricIconKind::Distance));
     assert!(parts.show_icon);
 }

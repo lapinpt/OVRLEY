@@ -310,22 +310,22 @@
         {
           "value": "m",
           "label": "m",
-          "renderLabel": "m"
+          "renderLabel": "M"
         },
         {
           "value": "km",
           "label": "km",
-          "renderLabel": "km"
+          "renderLabel": "KM"
         },
         {
           "value": "mi",
           "label": "mi",
-          "renderLabel": "mi"
+          "renderLabel": "MI"
         },
         {
           "value": "ft",
           "label": "ft",
-          "renderLabel": "ft"
+          "renderLabel": "FT"
         }
       ],
       "showUnitsByDefault": true,
@@ -376,22 +376,22 @@
         {
           "value": "m",
           "label": "m",
-          "renderLabel": "m"
+          "renderLabel": "M"
         },
         {
           "value": "km",
           "label": "km",
-          "renderLabel": "km"
+          "renderLabel": "KM"
         },
         {
           "value": "mi",
           "label": "mi",
-          "renderLabel": "mi"
+          "renderLabel": "MI"
         },
         {
           "value": "ft",
           "label": "ft",
-          "renderLabel": "ft"
+          "renderLabel": "FT"
         }
       ],
       "showUnitsByDefault": true,

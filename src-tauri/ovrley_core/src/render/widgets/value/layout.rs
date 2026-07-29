@@ -381,7 +381,7 @@ pub fn metric_vertical_metrics_text(text: &str) -> &str {
         || (!text.is_empty()
             && text
                 .chars()
-                .all(|ch| ch.is_ascii_digit() || matches!(ch, ':' | '.' | '%' | '+' | '-')))
+                .all(|ch| ch.is_ascii_digit() || matches!(ch, ':' | '.' | '%' | '+' | '-' | '/')))
     {
         NUMERIC_VERTICAL_METRICS_TEXT
     } else {
