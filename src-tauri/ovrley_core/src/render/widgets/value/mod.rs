@@ -25,6 +25,7 @@ use crate::render::format::{format_validated_metric_parts, format_validated_time
 use crate::render::text::ResolvedTextStyle;
 use crate::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use crate::types::{DisplayType, MetricKind};
+use chrono_tz::Tz;
 use skia_safe::Canvas;
 use std::path::PathBuf;
 
@@ -63,6 +64,7 @@ pub(crate) struct MetricWidgetRequest<'a> {
     /// Pre-validated time widget. When present, the validated path is used
     /// instead of reading from legacy raw `ValueConfig`.
     pub validated_time: Option<&'a ValidatedTimeValue>,
+    pub timezone: Option<Tz>,
 }
 
 /// Draws a configured metric widget and reports whether it handled the value.
@@ -105,7 +107,7 @@ pub(crate) fn draw_metric_value_widget_with_config(
             .time
             .get(request.frame_index)
             .and_then(|value| value.as_deref());
-        let parts = format_validated_time_parts(validated_time, raw_time);
+        let parts = format_validated_time_parts(validated_time, raw_time, request.timezone);
         draw_metric_parts(
             request.canvas,
             request.base_style,
@@ -241,6 +243,7 @@ mod tests {
                     validated: None,
                     validated_gradient: None,
                     validated_time: None,
+                    timezone: None,
                 })
                 .unwrap(),
                 "Boxed display type {dt_str} should be marked handled by value module"
@@ -354,6 +357,7 @@ mod tests {
                 validated: Some(&validated),
                 validated_gradient: None,
                 validated_time: None,
+                timezone: None,
             })
             .unwrap(),
             "Text display type should be handled by value module"
@@ -380,6 +384,7 @@ mod tests {
                 validated: Some(&validated),
                 validated_gradient: None,
                 validated_time: None,
+                timezone: None,
             })
             .unwrap(),
             "GPS coordinate text should be handled by value module"

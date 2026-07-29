@@ -276,7 +276,11 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
     valueText = formatted.value
     unitText = formatted.units
   } else if (widget.type === 'time') {
-    valueText = formatTimeValue(widget.data.format, getInterpolatedTimeValue(activity, previewSecond))
+    valueText = formatTimeValue(
+      widget.data.format,
+      getInterpolatedTimeValue(activity, previewSecond),
+      activity?.metadata?.timezone,
+    )
   } else {
     throw new Error(`Cannot build intrinsic metric preview for widget type: ${widget.type}`)
   }

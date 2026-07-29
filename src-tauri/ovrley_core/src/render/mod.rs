@@ -530,6 +530,7 @@ fn render_frame_to_surface(
                         validated: Some(validated),
                         validated_gradient: None,
                         validated_time: None,
+                        timezone: None,
                     })?;
                 }
                 PreparedValue::TimeText(validated) => {
@@ -549,6 +550,7 @@ fn render_frame_to_surface(
                         validated: None,
                         validated_gradient: None,
                         validated_time: Some(validated),
+                        timezone: prepared_assets.timezone,
                     })?;
                 }
                 PreparedValue::Gradient(validated) => {
@@ -566,6 +568,7 @@ fn render_frame_to_surface(
                         validated: None,
                         validated_gradient: Some(validated),
                         validated_time: None,
+                        timezone: None,
                     })?;
                 }
                 PreparedValue::HeadingTape(_)

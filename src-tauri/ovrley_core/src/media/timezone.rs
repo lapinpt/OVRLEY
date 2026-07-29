@@ -1,21 +1,25 @@
-//! Timezone lookup for GPS-backed media telemetry.
+//! Timezone lookup for GPS coordinates.
 //!
 //! The finder is initialized once because loading the bundled timezone
 //! boundaries is relatively expensive. Coordinates are passed to `tzf-rs` in
-//! longitude/latitude order, while [`NativeSample::gps_coordinates`] owns the
-//! canonical coordinate validation used by telemetry consumers.
+//! longitude/latitude order.
 
 use std::sync::OnceLock;
 
 use tzf_rs::DefaultFinder;
 
-use crate::media::native_sample::NativeSample;
-
 static FINDER: OnceLock<DefaultFinder> = OnceLock::new();
 
-/// Finds the timezone containing the first valid GPS sample.
-pub fn timezone_for_samples(samples: &[NativeSample]) -> Option<String> {
-    let (longitude, latitude) = samples.iter().find_map(NativeSample::gps_coordinates)?;
+/// Finds the timezone containing one validated GPS coordinate.
+pub fn timezone_for_coordinates(longitude: f64, latitude: f64) -> Option<String> {
+    if !longitude.is_finite()
+        || !latitude.is_finite()
+        || !(-180.0..=180.0).contains(&longitude)
+        || !(-90.0..=90.0).contains(&latitude)
+        || (longitude == 0.0 && latitude == 0.0)
+    {
+        return None;
+    }
     let timezone = FINDER
         .get_or_init(DefaultFinder::new)
         .get_tz_name(longitude, latitude);
@@ -25,41 +29,18 @@ pub fn timezone_for_samples(samples: &[NativeSample]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::timezone_for_samples;
-    use crate::media::native_sample::NativeSample;
+    use super::timezone_for_coordinates;
 
     #[test]
-    fn finds_timezone_from_first_valid_gps_sample() {
-        let samples = vec![NativeSample {
-            latitude: Some(50.087_465),
-            longitude: Some(14.421_254),
-            ..NativeSample::default()
-        }];
-
+    fn finds_timezone_from_coordinates() {
         assert_eq!(
-            timezone_for_samples(&samples).as_deref(),
+            timezone_for_coordinates(14.421_254, 50.087_465).as_deref(),
             Some("Europe/Prague")
         );
     }
 
     #[test]
-    fn skips_invalid_gps_samples() {
-        let samples = vec![
-            NativeSample {
-                latitude: Some(0.0),
-                longitude: Some(0.0),
-                ..NativeSample::default()
-            },
-            NativeSample {
-                latitude: Some(50.087_465),
-                longitude: Some(14.421_254),
-                ..NativeSample::default()
-            },
-        ];
-
-        assert_eq!(
-            timezone_for_samples(&samples).as_deref(),
-            Some("Europe/Prague")
-        );
+    fn returns_no_timezone_for_unmapped_coordinates() {
+        assert_eq!(timezone_for_coordinates(0.0, 0.0), None);
     }
 }

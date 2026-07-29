@@ -70,6 +70,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     computeVideoSync,
     exportRange,
     globalDefaults,
+    parsedActivity,
     importedVideoBitRate,
     importedVideoCameraType,
     importedVideoCameraModel,
@@ -77,7 +78,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     importedVideoCodecLongName,
     importedVideoCreationTime,
     importedVideoTimeSource,
-    importedVideoTimezone,
     importedVideoDuration,
     importedVideoFps,
     importedVideoPath,
@@ -101,6 +101,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       computeVideoSync: state.computeVideoSync,
       exportRange: state.exportRange,
       globalDefaults: state.globalDefaults,
+      parsedActivity: state.parsedActivity,
       importedVideoBitRate: state.importedVideoBitRate,
       importedVideoCameraType: state.importedVideoCameraType,
       importedVideoCameraModel: state.importedVideoCameraModel,
@@ -108,7 +109,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       importedVideoCodecLongName: state.importedVideoCodecLongName,
       importedVideoCreationTime: state.importedVideoCreationTime,
       importedVideoTimeSource: state.importedVideoTimeSource,
-      importedVideoTimezone: state.importedVideoTimezone,
       importedVideoDuration: state.importedVideoDuration,
       importedVideoFps: state.importedVideoFps,
       importedVideoPath: state.importedVideoPath,
@@ -127,6 +127,8 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       videoSyncWarning: state.videoSyncWarning,
     })),
   )
+
+  const timezone = parsedActivity?.metadata?.timezone ?? null
 
   const availableFonts = useAvailableFonts()
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
@@ -246,7 +248,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       importedVideoCodecLongName,
       importedVideoCreationTime,
       importedVideoTimeSource,
-      importedVideoTimezone,
+      timezone,
       importedVideoDuration,
       importedVideoFps,
       importedVideoPath,

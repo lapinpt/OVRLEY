@@ -30,7 +30,9 @@ use crate::activity::schema::{
 };
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{finite_f64, round_f64};
+use crate::media::timezone::timezone_for_coordinates;
 use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -208,6 +210,19 @@ fn finalize_columns_with_debug(
     let time_series = build_time_series(columns);
     let course_series = build_course_series(columns);
     validate_course_coordinate_ranges(&course_series)?;
+    let timezone = course_series.iter().find_map(|(latitude, longitude)| {
+        let (Some(latitude), Some(longitude)) = (*latitude, *longitude) else {
+            return None;
+        };
+        timezone_for_coordinates(longitude, latitude)
+    });
+    let timezone_tz = timezone
+        .as_deref()
+        .map(str::parse::<Tz>)
+        .transpose()
+        .map_err(|_| {
+            CoreError::Activity("Timezone finder returned an invalid IANA timezone".into())
+        })?;
     let elapsed_series = build_elapsed_series(columns, &time_series);
     let direct_distance_series: Vec<Option<f64>> = columns
         .distance
@@ -263,6 +278,10 @@ fn finalize_columns_with_debug(
     }
     if let Some(object) = metadata.as_object_mut() {
         object.remove("start_time");
+        object.remove("timezone");
+        if let Some(timezone) = &timezone {
+            object.insert("timezone".to_string(), json!(timezone));
+        }
         object.insert("sync_time".to_string(), json!(sync_time));
         object.insert(
             "duration_seconds".to_string(),
@@ -301,6 +320,7 @@ fn finalize_columns_with_debug(
         file_name: Some(columns.file_name.clone()),
         file_format: Some(columns.file_format.clone()),
         metadata,
+        timezone: timezone_tz,
         sync_time,
         sample_elapsed_seconds: elapsed_series,
         sample_distance_progress: distance_progress_series,

@@ -8,7 +8,7 @@
 //!       trimming (see [`crate::activity::trim`]), interpolation (see
 //!       [`crate::activity::interpolate`] and [`crate::interpolation`]).
 //!
-//! Allowed dependencies: `serde`, `serde_json`.
+//! Allowed dependencies: `chrono-tz`, `serde`, `serde_json`.
 //! Forbidden dependencies: `render`, `encode`, `commands`.
 //!
 //! Related modules: [`crate::activity::interpolate`] (consumes these types for
@@ -28,6 +28,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+use chrono_tz::Tz;
 use std::collections::BTreeMap;
 
 /// Numeric telemetry series aligned with `sample_elapsed_seconds`.
@@ -319,6 +320,9 @@ pub struct ParsedActivity {
     /// Parser-provided metadata preserved for diagnostics and future widgets.
     #[serde(default)]
     pub metadata: Value,
+    /// Parsed IANA timezone from `metadata.timezone`, when GPS metadata provides one.
+    #[serde(skip)]
+    pub timezone: Option<Tz>,
     /// Canonical absolute timestamp for activity/video time zero.
     #[serde(default)]
     pub sync_time: Option<String>,

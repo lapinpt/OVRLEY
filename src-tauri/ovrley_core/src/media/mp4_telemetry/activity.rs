@@ -29,7 +29,6 @@ pub fn build_activity_columns(
     camera_type: &str,
     camera_model: Option<String>,
     sync_time: Option<String>,
-    timezone: Option<String>,
     telemetry_source: &str,
     timeline_kind: &str,
     series_counts: TelemetrySeriesCounts,
@@ -134,10 +133,6 @@ pub fn build_activity_columns(
     if let Some(sync_time) = sync_time {
         metadata["sync_time"] = json!(sync_time);
     }
-    if let Some(timezone) = timezone {
-        metadata["timezone"] = json!(timezone);
-    }
-
     ActivityColumns {
         file_name: file_name.unwrap_or_default(),
         file_format: "mp4_telemetry".to_string(),

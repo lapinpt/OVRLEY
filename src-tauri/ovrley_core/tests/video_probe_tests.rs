@@ -76,7 +76,6 @@ fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
         rotation_degrees: Some(0),
         camera_type: None,
         camera_model: None,
-        timezone: None,
     };
 
     let value = serde_json::to_value(metadata).unwrap();

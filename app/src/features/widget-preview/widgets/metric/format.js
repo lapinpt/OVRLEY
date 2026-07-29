@@ -400,27 +400,47 @@ function padNumber(value) {
  *
  * @param {string} format - Format key (e.g. 'time-24', 'date-dd-mm-yyyy').
  * @param {number|string|null|undefined} timestamp - Timestamp in milliseconds or ISO string.
+ * @param {string|null|undefined} timezone - Optional IANA timezone from activity metadata.
  * @returns {string} Formatted time/date string.
  */
-export function formatTimeValue(format, timestamp) {
+export function formatTimeValue(format, timestamp, timezone) {
   // Early return — missing or invalid timestamps show a placeholder
   if (!timestamp) return '--:--'
 
   const date = new Date(timestamp)
   if (!Number.isFinite(date.getTime())) return '--:--'
 
-  // Extract all date/time components for format string composition
-  const day = padNumber(date.getDate())
-  const month = padNumber(date.getMonth() + 1)
-  const year = date.getFullYear()
-  const shortMonth = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-  const longMonth = date.toLocaleString('en-US', { month: 'long' }).toUpperCase()
-  const hour24 = padNumber(date.getHours())
-  const hour12Raw = date.getHours() % 12 || 12
+  const timezoneOptions = timezone ? { timeZone: timezone } : {}
+  const dateTimeParts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      ...timezoneOptions,
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .map(({ type, value }) => [type, value]),
+  )
+
+  // Extract all date/time components for format string composition. Intl applies
+  // the IANA zone's historical and daylight-saving rules when one is supplied.
+  const day = dateTimeParts.day
+  const month = dateTimeParts.month
+  const year = dateTimeParts.year
+  const shortMonth = new Intl.DateTimeFormat('en-US', { ...timezoneOptions, month: 'short' }).format(date).toUpperCase()
+  const longMonth = new Intl.DateTimeFormat('en-US', { ...timezoneOptions, month: 'long' }).format(date).toUpperCase()
+  const hour24 = dateTimeParts.hour
+  const hour12Raw = Number(hour24) % 12 || 12
   const hour12 = padNumber(hour12Raw)
-  const minutes = padNumber(date.getMinutes())
-  const seconds = padNumber(date.getSeconds())
-  const suffix = date.getHours() >= 12 ? 'PM' : 'AM'
+  const minutes = dateTimeParts.minute
+  const seconds = dateTimeParts.second
+  const suffix = Number(hour24) >= 12 ? 'PM' : 'AM'
 
   // Format map — selects the rendered string based on the format key; falls back to 24-hour time
   const formatMap = {

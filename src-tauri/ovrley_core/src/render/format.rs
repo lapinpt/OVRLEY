@@ -16,6 +16,7 @@ use crate::standard_metrics::{
 };
 use crate::MetricKind;
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
+use chrono_tz::Tz;
 
 /// Built-in metric icon kinds supported by value widgets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -468,8 +469,9 @@ pub fn format_validated_gradient(validated: &ValidatedGradientWidget, raw: Optio
 pub fn format_validated_time_parts(
     validated: &ValidatedTimeValue,
     raw: Option<&str>,
+    timezone: Option<Tz>,
 ) -> MetricDisplayParts {
-    let mut value_text = format_validated_time_text(validated, raw);
+    let mut value_text = format_validated_time_text(validated, raw, timezone);
     if !validated.base.prefix.is_empty() {
         value_text = format!("{}{value_text}", validated.base.prefix);
     }
@@ -639,14 +641,33 @@ fn validated_decimals(formatting: &ValidatedValueFormatting) -> usize {
     }
 }
 
-fn format_validated_time_text(validated: &ValidatedTimeValue, raw: Option<&str>) -> String {
+fn format_validated_time_text(
+    validated: &ValidatedTimeValue,
+    raw: Option<&str>,
+    timezone: Option<Tz>,
+) -> String {
     let Some(raw) = raw else {
         return "--:--".to_string();
     };
     let Ok(parsed) = DateTime::parse_from_rfc3339(raw) else {
         return raw.to_string();
     };
-    let adjusted = parsed.with_timezone(&Local) + Duration::hours(validated.hours_offset);
+
+    match timezone {
+        Some(timezone) => format_time_in_zone(validated, parsed.with_timezone(&timezone)),
+        None => format_time_in_zone(validated, parsed.with_timezone(&Local)),
+    }
+}
+
+fn format_time_in_zone<TzValue>(
+    validated: &ValidatedTimeValue,
+    value: DateTime<TzValue>,
+) -> String
+where
+    TzValue: TimeZone,
+    TzValue::Offset: std::fmt::Display,
+{
+    let adjusted = value + Duration::hours(validated.hours_offset);
     match &validated.formatting {
         ValidatedTimeFormatting::Preset(format_key) => format_time_key(format_key, adjusted),
         ValidatedTimeFormatting::Strftime(strftime) => adjusted.format(strftime).to_string(),

@@ -11,6 +11,7 @@ use crate::normalize::{
     ValidatedLinearGaugeWidget, ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
 };
 use crate::types::{DisplayType, MetricKind, TrackFillStyle};
+use chrono_tz::Tz;
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -130,6 +131,7 @@ impl PreparedValue {
 #[derive(Clone, Debug)]
 pub struct PreparedRenderAssets {
     pub(crate) scene: ValidatedSceneConfig,
+    pub(crate) timezone: Option<Tz>,
     pub(crate) backdrops: Vec<ValidatedBackdrop>,
     pub(crate) labels: Vec<ValidatedLabel>,
     pub(crate) values: Vec<PreparedValue>,

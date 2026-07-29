@@ -81,6 +81,7 @@ pub fn prepare_render_assets(
 
     let mut assets = PreparedRenderAssets {
         scene,
+        timezone: activity.timezone.clone(),
         backdrops,
         labels,
         values,
