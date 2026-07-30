@@ -379,7 +379,7 @@ function OverlayEditor({
         importedBackgroundImageFilename={importedBackgroundImageFilename}
         importedVideoFilename={importedVideoFilename}
       />
-      <div ref={scrollViewportRef} className="absolute inset-0 overflow-auto" onWheel={handleWheel}>
+      <div ref={scrollViewportRef} className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>
         <div
           ref={setStageElement}
           data-testid="overlay-editor-stage"
