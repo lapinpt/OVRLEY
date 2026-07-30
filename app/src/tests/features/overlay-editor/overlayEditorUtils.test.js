@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { getContainerFps } from '@/lib/update-rate'
-import { getInterpolatedActivityValue } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
 
 describe('getContainerFps', () => {
   test('returns a number for common FPS and update rate combinations', () => {
@@ -96,5 +96,17 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     }
     expect(getInterpolatedActivityValue(sparseActivity, 'iso', 1.5)).toBe(100)
     expect(getInterpolatedActivityValue(sparseActivity, 'iso', 3.5)).toBe(800)
+  })
+})
+
+describe('getInterpolatedTimeValue', () => {
+  test('uses the source time series before sync_time', () => {
+    const activity = {
+      sample_elapsed_seconds: [0, 60],
+      sync_time: '2026-07-18T08:20:03.000Z',
+      time: ['2026-07-18T07:20:03.000Z', '2026-07-18T07:21:03.000Z'],
+    }
+
+    expect(getInterpolatedTimeValue(activity, 60)).toBe('2026-07-18T07:21:03.000Z')
   })
 })

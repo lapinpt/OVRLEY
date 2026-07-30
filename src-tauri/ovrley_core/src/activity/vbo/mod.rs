@@ -270,6 +270,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         file_name: file_name.to_string(),
         file_format: "vbo".to_string(),
         metadata: json!({}),
+        sync_time: None,
         options: RawActivityOptions {
             smoothing: [(
                 "heading".to_string(),

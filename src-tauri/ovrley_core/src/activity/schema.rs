@@ -131,6 +131,8 @@ pub struct ActivityColumns {
     pub file_name: String,
     pub file_format: String,
     pub metadata: Value,
+    /// Optional source-provided activity start instant, normalized by the finalizer.
+    pub sync_time: Option<String>,
     pub options: RawActivityOptions,
     /// Direct metrics whose intentional source gaps must remain available for interpolation.
     pub preserve_direct_metric_gaps: DirectMetricGapPolicy,

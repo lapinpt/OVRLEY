@@ -220,15 +220,26 @@ fn interpolate_course_series(
     )
 }
 
-// Generates or interpolates timestamps over all target frame times.
+// Interpolates source timestamps, falling back to sync_time only when the
+// activity has no timestamp series at all.
 fn interpolate_time_series(
     sync_time: Option<&str>,
     x_values: &[f64],
     y_values: &TimeSeries,
     target_x_values: &[f64],
 ) -> Vec<Option<String>> {
-    // If the sync time is known, generating timestamps from elapsed seconds
-    // avoids drift caused by sparse or missing source timestamp samples.
+    // The source time series is authoritative. In particular, using sync_time
+    // here would hide a mismatch between the activity start and its actual
+    // timestamp samples and would make the time widget display the wrong time.
+    if y_values.iter().any(Option::is_some) {
+        return target_x_values
+            .iter()
+            .map(|target| interpolate_time_series_value(x_values, y_values, *target))
+            .collect();
+    }
+
+    // sync_time is only a fallback for formats that do not provide absolute
+    // timestamp samples at all.
     if let Some(start_time) = sync_time
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| value.with_timezone(&Utc))
@@ -245,10 +256,7 @@ fn interpolate_time_series(
             .collect();
     }
 
-    target_x_values
-        .iter()
-        .map(|target| interpolate_time_series_value(x_values, y_values, *target))
-        .collect()
+    vec![None; target_x_values.len()]
 }
 
 /// Converts a trimmed activity into frame-aligned render data.
@@ -296,8 +304,8 @@ pub fn densify_activity(
         (Vec::new(), Vec::new())
     };
 
-    // Timestamps use sync_time to generate synthetic values when
-    // available, falling back to interpolation from sparse source samples.
+    // Timestamps use the source time series when available. sync_time is only
+    // used for formats that have no absolute timestamp samples.
     let time = if requirements.time && !trimmed.time.is_empty() {
         interpolate_time_series(
             trimmed.sync_time.as_deref(),

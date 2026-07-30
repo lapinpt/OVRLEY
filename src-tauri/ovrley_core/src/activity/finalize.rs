@@ -209,7 +209,6 @@ fn finalize_columns_with_debug(
 ) -> CoreResult<FinalizedActivity> {
     validate_column_lengths(columns)?;
 
-    let time_series = build_time_series(columns);
     let course_series = build_course_series(columns);
     validate_course_coordinate_ranges(&course_series)?;
     let timezone = course_series.iter().find_map(|(latitude, longitude)| {
@@ -225,6 +224,7 @@ fn finalize_columns_with_debug(
         .map_err(|_| {
             CoreError::Activity("Timezone finder returned an invalid IANA timezone".into())
         })?;
+    let time_series = build_time_series(columns);
     let elapsed_series = build_elapsed_series(columns, &time_series);
     let direct_distance_series: Vec<Option<f64>> = columns
         .distance
@@ -265,13 +265,24 @@ fn finalize_columns_with_debug(
     let duration_seconds = elapsed_series.last().copied().unwrap_or(0.0);
     let total_distance_meters = distance_series.last().copied().flatten().unwrap_or(0.0);
     let first_sample_time = time_series.iter().find_map(Clone::clone);
-    let sync_time = columns
-        .metadata
-        .get("sync_time")
-        .and_then(|value| value.as_str())
-        .filter(|value| DateTime::parse_from_rfc3339(value).is_ok())
-        .map(ToOwned::to_owned)
-        .or(first_sample_time);
+    let explicit_sync_time = columns
+        .sync_time
+        .as_deref()
+        .map(|value| {
+            DateTime::parse_from_rfc3339(value)
+                .map(|parsed| {
+                    parsed
+                        .with_timezone(&Utc)
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                })
+                .map_err(|error| {
+                    CoreError::Activity(format!(
+                        "Activity sync_time must be a valid RFC3339 timestamp: {error}"
+                    ))
+                })
+        })
+        .transpose()?;
+    let sync_time = explicit_sync_time.or(first_sample_time);
     let end_time = time_series.iter().rev().find_map(Clone::clone);
     let distance_progress_series = build_progress_series(&distance_series);
 
@@ -282,10 +293,10 @@ fn finalize_columns_with_debug(
     if let Some(object) = metadata.as_object_mut() {
         object.remove("start_time");
         object.remove("timezone");
+        object.remove("sync_time");
         if let Some(timezone) = &timezone {
             object.insert("timezone".to_string(), json!(timezone));
         }
-        object.insert("sync_time".to_string(), json!(sync_time));
         object.insert(
             "duration_seconds".to_string(),
             json!(round_f64(duration_seconds, 3).unwrap_or(0.0)),
@@ -402,6 +413,7 @@ fn activity_columns_from_samples(
         file_name: raw_activity.file_name.clone(),
         file_format: raw_activity.file_format.clone(),
         metadata: raw_activity.metadata.clone(),
+        sync_time: None,
         options: raw_activity.options.clone(),
         preserve_direct_metric_gaps: Default::default(),
         timestamp: raw_samples

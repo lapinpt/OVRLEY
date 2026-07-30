@@ -15,7 +15,7 @@ use crate::standard_metrics::{
     standard_metric_formatter, standard_metric_unit_label, StandardMetricFormatterKind,
 };
 use crate::MetricKind;
-use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use chrono_tz::Tz;
 
 /// Built-in metric icon kinds supported by value widgets.
@@ -645,7 +645,7 @@ fn format_validated_time_text(
 
     match timezone {
         Some(timezone) => format_time_in_zone(validated, parsed.with_timezone(&timezone)),
-        None => format_time_in_zone(validated, parsed.with_timezone(&Local)),
+        None => format_time_in_zone(validated, parsed.with_timezone(&Utc)),
     }
 }
 

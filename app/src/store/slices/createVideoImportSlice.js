@@ -1,5 +1,15 @@
 import { detectCodecs } from '@/api/backend'
+import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
+
+function parseSyncTimestamp(timestamp, source, timezone) {
+  const formattedTimestamp = formatVideoCreationTime(timestamp, source, timezone)
+  if (typeof formattedTimestamp !== 'string' || formattedTimestamp.trim() === '') return null
+
+  const normalized = formattedTimestamp.trim().replace(' ', 'T')
+  const parsed = Date.parse(normalized.endsWith('Z') ? normalized : `${normalized}Z`)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 let fetchCodecsOnce = null
 
@@ -205,11 +215,23 @@ export const createVideoImportSlice = (set, get) => ({
         }
       }
 
-      const videoStart = new Date(state.importedVideoCreationTime).getTime()
-      const activityStart = new Date(activitySummary?.syncTime).getTime()
-      const activityEnd = new Date(activitySummary?.endTime).getTime()
+      const timezone = activitySummary?.timezone
+      if (!timezone) {
+        return {
+          videoSyncOffsetSeconds: 0,
+          videoSyncWarning: 'Activity timezone is required for video sync',
+        }
+      }
 
-      if (isNaN(videoStart) || (activitySummary && (isNaN(activityStart) || isNaN(activityEnd)))) {
+      const activityStart = parseSyncTimestamp(activitySummary.syncTime, 'gps', timezone)
+      const activityEnd = parseSyncTimestamp(activitySummary.endTime, 'gps', timezone)
+      const videoStart = parseSyncTimestamp(
+        state.importedVideoCreationTime,
+        state.importedVideoTimeSource === 'ffprobe' ? 'ffprobe' : 'gps',
+        timezone,
+      )
+
+      if (videoStart === null || activityStart === null || activityEnd === null) {
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Invalid timestamp formats',
@@ -218,7 +240,6 @@ export const createVideoImportSlice = (set, get) => ({
 
       const offsetSeconds = (videoStart - activityStart) / 1000
 
-      // within [activityStart, activityEnd]
       if (videoStart < activityStart || videoStart > activityEnd) {
         return {
           videoSyncOffsetSeconds: 0,

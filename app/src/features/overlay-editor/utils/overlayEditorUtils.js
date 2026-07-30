@@ -123,19 +123,14 @@ function getPreferredElevationSeries(activity) {
 
 /**
  * Interpolates the time-of-day value at the given elapsed second.
- * Uses the sync_time offset when available, otherwise
- * interpolates the ISO time series.
+ * Interpolates the ISO time series when available, falling back to sync_time
+ * only when the activity has no time series values.
  *
  * @param {object|null} activity - Parsed activity data.
  * @param {number} elapsedSecond - Target elapsed second.
  * @returns {string} ISO timestamp string.
  */
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
-  const syncTimeMs = Date.parse(activity?.sync_time || '')
-  if (Number.isFinite(syncTimeMs)) {
-    return new Date(syncTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
-  }
-
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const timeSeries = Array.isArray(activity?.time) ? activity.time : []
   const numericTimeSeries = timeSeries.map((value) => {
@@ -144,7 +139,18 @@ export function getInterpolatedTimeValue(activity, elapsedSecond) {
   })
   const interpolatedTimeMs = interpolateNumericSeries(elapsedSeries, numericTimeSeries, elapsedSecond)
 
-  return Number.isFinite(interpolatedTimeMs) ? new Date(interpolatedTimeMs).toISOString() : DEFAULT_ACTIVITY_PREVIEW.time
+  if (Number.isFinite(interpolatedTimeMs)) {
+    return new Date(interpolatedTimeMs).toISOString()
+  }
+
+  if (numericTimeSeries.every((value) => value === null)) {
+    const syncTimeMs = Date.parse(activity?.sync_time || '')
+    if (Number.isFinite(syncTimeMs)) {
+      return new Date(syncTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
+    }
+  }
+
+  return DEFAULT_ACTIVITY_PREVIEW.time
 }
 
 /**

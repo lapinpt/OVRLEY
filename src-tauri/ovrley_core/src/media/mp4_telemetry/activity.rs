@@ -119,7 +119,7 @@ pub fn build_activity_columns(
         .map(|timestamp_ms| Some(timestamp_ms / 1000.0))
         .collect();
     let none = || vec![None; n];
-    let mut metadata = json!({
+    let metadata = json!({
         "camera_type": camera_type,
         "camera_model": camera_model,
         "telemetry_source": telemetry_source,
@@ -129,13 +129,11 @@ pub fn build_activity_columns(
         "imu_sample_count": series_counts.imu,
         "camera_sample_count": series_counts.camera,
     });
-    if let Some(sync_time) = sync_time {
-        metadata["sync_time"] = json!(sync_time);
-    }
     ActivityColumns {
         file_name: file_name.unwrap_or_default(),
         file_format: "mp4_telemetry".to_string(),
         metadata,
+        sync_time,
         options: RawActivityOptions {
             skip_idle_gap_fill: true,
             smoothing: [(

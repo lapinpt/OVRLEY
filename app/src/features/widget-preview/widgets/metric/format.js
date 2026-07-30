@@ -443,7 +443,10 @@ export function formatTimeValue(format, timestamp, timezone) {
   const date = new Date(timestamp)
   if (!Number.isFinite(date.getTime())) return '--:--'
 
-  const timezoneOptions = timezone ? { timeZone: timezone } : {}
+  // Parsed activity timestamps are canonical UTC values. An absent activity
+  // timezone must remain deterministic and must never resolve through the
+  // user's computer timezone.
+  const timezoneOptions = { timeZone: timezone || 'UTC' }
   const dateTimeParts = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
       ...timezoneOptions,

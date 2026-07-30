@@ -113,6 +113,20 @@ describe('MP4 activity — store actions', () => {
       expect(summary).not.toBeNull()
       expect(summary.durationSeconds).toBe(3600)
     })
+
+    test('includes the activity timezone in the sync summary', () => {
+      const activity = {
+        ...activityFile,
+        metadata: {
+          ...activityFile.metadata,
+          timezone: 'Europe/Moscow',
+        },
+      }
+
+      useStore.getState().activateActivityFile(activity)
+
+      expect(useStore.getState().activitySummary.timezone).toBe('Europe/Moscow')
+    })
   })
 
   describe('clearActivityFile', () => {
@@ -274,6 +288,22 @@ describe('MP4 activity — store actions', () => {
   })
 
   describe('syncVideoMetadata', () => {
+    test('computes ffprobe clock offset in the activity timezone', () => {
+      useStore.setState({
+        importedVideoCreationTime: '2026-07-18T10:51:00.000000Z',
+        importedVideoTimeSource: 'ffprobe',
+      })
+
+      useStore.getState().computeVideoSync({
+        endTime: '2026-07-18T08:20:03.000Z',
+        syncTime: '2026-07-18T07:20:03.000Z',
+        timezone: 'Europe/Moscow',
+      })
+
+      expect(useStore.getState().videoSyncOffsetSeconds).toBe(1857)
+      expect(useStore.getState().videoSyncWarning).toBeNull()
+    })
+
     test('computes video sync when activity file is active', () => {
       const computeVideoSync = vi.fn()
       useStore.setState({

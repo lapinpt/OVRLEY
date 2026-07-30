@@ -325,6 +325,7 @@ pub(super) fn build_activity_columns(
         file_name: file_name.to_string(),
         file_format: "csv".to_string(),
         metadata: json!({}),
+        sync_time: None,
         options: RawActivityOptions {
             smoothing,
             ..RawActivityOptions::default()
