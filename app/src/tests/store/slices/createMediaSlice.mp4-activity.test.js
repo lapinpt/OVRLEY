@@ -302,6 +302,31 @@ describe('MP4 activity — store actions', () => {
 
       expect(useStore.getState().videoSyncOffsetSeconds).toBe(1857)
       expect(useStore.getState().videoSyncWarning).toBeNull()
+      expect(useStore.getState().videoSyncTimezoneMode).toBeNull()
+    })
+
+    test('offers both ffprobe timezone interpretations when both fit the activity', () => {
+      const activitySummary = {
+        endTime: '2026-07-18T11:20:03.000Z',
+        syncTime: '2026-07-18T07:20:03.000Z',
+        timezone: 'Europe/Moscow',
+      }
+
+      useStore.setState({
+        importedVideoCreationTime: '2026-07-18T10:51:00.000000Z',
+        importedVideoTimeSource: 'ffprobe',
+        activitySummary,
+      })
+
+      useStore.getState().computeVideoSync(activitySummary)
+
+      expect(useStore.getState().videoSyncOffsetSeconds).toBe(1857)
+      expect(useStore.getState().videoSyncTimezoneMode).toBe('local')
+
+      useStore.getState().setVideoSyncTimezoneMode('utc')
+
+      expect(useStore.getState().videoSyncOffsetSeconds).toBe(12657)
+      expect(useStore.getState().videoSyncTimezoneMode).toBe('utc')
     })
 
     test('computes video sync when activity file is active', () => {

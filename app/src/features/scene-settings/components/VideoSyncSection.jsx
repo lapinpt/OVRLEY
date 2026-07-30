@@ -10,6 +10,7 @@
  * @param {number} props.importedVideoCreationTime - Video creation timestamp.
  * @param {string} props.importedVideoTimeSource - "gps" | "ffprobe" | "file_mtime" | null.
  * @param {string} props.timezone - IANA timezone from the finalized activity metadata.
+ * @param {string|null} props.videoSyncTimezoneMode - "local" or "utc" when both ffprobe interpretations fit.
  * @param {string|null} props.videoSyncWarning - Sync warning message (or null).
  * @param {boolean} props.videoResolutionMismatch - Whether overlay/video resolutions differ.
  * @param {string} props.offsetInput - Current sync offset input value.
@@ -22,6 +23,7 @@
  */
 
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Separator } from '@/components/ui/separator'
 import { Video, Bell, ChevronUp, ChevronDown } from 'lucide-react'
@@ -38,6 +40,8 @@ export default function VideoSyncSection({
   importedVideoCreationTime,
   importedVideoTimeSource,
   timezone,
+  videoSyncTimezoneMode,
+  onVideoSyncTimezoneModeChange,
   videoSyncWarning,
   videoResolutionMismatch,
   offsetInput,
@@ -101,8 +105,23 @@ export default function VideoSyncSection({
       )}
       {activitySummary?.syncTime && (
         <div className="space-y-1">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold pb-2!">Sync Offset</Label>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between pt-2">
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Sync Offset</Label>
+            {videoSyncTimezoneMode && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="video-sync-timezone-toggle" className="text-[10px] text-muted-foreground uppercase font-bold">
+                  Timezone conversion
+                </Label>
+                <Switch
+                  id="video-sync-timezone-toggle"
+                  checked={videoSyncTimezoneMode === 'utc'}
+                  onCheckedChange={(checked) => onVideoSyncTimezoneModeChange(checked ? 'utc' : 'local')}
+                  aria-label="Timezone conversion"
+                />
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="relative flex-1">
               <BlurInput
                 type="text"

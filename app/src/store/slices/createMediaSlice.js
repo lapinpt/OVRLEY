@@ -180,6 +180,7 @@ export function createMediaSlice(set, get) {
           state.videoSyncOffsetSeconds = 0
           state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
+          state.videoSyncTimezoneMode = null
           applyParsedDataToScene(state, activity)
         })
         get().setActivitySummary(activity, { computeVideoSync: false })
@@ -205,6 +206,7 @@ export function createMediaSlice(set, get) {
           state.videoSyncOffsetSeconds = 0
           state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
+          state.videoSyncTimezoneMode = null
           applyParsedDataToScene(state, stashedVideoTelemetry)
         })
         get().setActivitySummary(get().parsedActivity, { computeVideoSync: false })
@@ -245,6 +247,7 @@ export function createMediaSlice(set, get) {
           state.videoSyncOffsetSeconds = 0
           state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
+          state.videoSyncTimezoneMode = null
         })
       }
     },

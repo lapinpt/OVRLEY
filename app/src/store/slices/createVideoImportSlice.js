@@ -2,6 +2,16 @@ import { detectCodecs } from '@/api/backend'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
 
+/**
+ * Converts a timestamp to the comparison clock used for activity sync.
+ *
+ * Activity/GPS timestamps are absolute UTC instants, so the formatter converts
+ * them to the activity timezone before the clock text is parsed. The `ffprobe`
+ * path deliberately keeps the tag's clock text unchanged: camera metadata is
+ * inconsistent, and a value ending in `Z` may be either real UTC or local
+ * camera time incorrectly labeled as UTC. Both interpretations are evaluated
+ * in `computeVideoSync` when that source is used.
+ */
 function parseSyncTimestamp(timestamp, source, timezone) {
   const formattedTimestamp = formatVideoCreationTime(timestamp, source, timezone)
   if (typeof formattedTimestamp !== 'string' || formattedTimestamp.trim() === '') return null
@@ -70,6 +80,7 @@ export const createVideoImportSlice = (set, get) => ({
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncOffsetPreviewSeconds: null, // transient drag preview; committed on release
   videoSyncWarning: null, // string warning or null
+  videoSyncTimezoneMode: null, // "local" or "utc" when both ffprobe interpretations fit the activity
   availableCodecs: null,
   importedVideoCodecName: null,
   importedVideoCodecLongName: null,
@@ -95,6 +106,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
       importedBackgroundImagePath: null,
       videoSyncOffsetPreviewSeconds: null,
+      videoSyncTimezoneMode: null,
       importedVideoCodecName: metadata.codecName ?? null,
       importedVideoCodecLongName: metadata.codecLongName ?? null,
       importedVideoBitRate: metadata.bitRate ?? null,
@@ -124,6 +136,7 @@ export const createVideoImportSlice = (set, get) => ({
       videoSyncOffsetSeconds: 0,
       videoSyncOffsetPreviewSeconds: null,
       videoSyncWarning: null,
+      videoSyncTimezoneMode: null,
       importedVideoCodecName: null,
       importedVideoCodecLongName: null,
       importedVideoBitRate: null,
@@ -149,6 +162,7 @@ export const createVideoImportSlice = (set, get) => ({
       videoSyncOffsetSeconds: 0,
       videoSyncOffsetPreviewSeconds: null,
       videoSyncWarning: null,
+      videoSyncTimezoneMode: null,
       importedVideoCodecName: null,
       importedVideoCodecLongName: null,
       importedVideoBitRate: null,
@@ -179,6 +193,15 @@ export const createVideoImportSlice = (set, get) => ({
     set({
       videoSyncWarning: msg,
     }),
+
+  setVideoSyncTimezoneMode: (mode) => {
+    if (mode !== 'local' && mode !== 'utc') {
+      throw new Error('Video sync timezone mode must be local or utc')
+    }
+
+    set({ videoSyncTimezoneMode: mode })
+    get().computeVideoSync(get().activitySummary)
+  },
 
   setImportedVideoPreviewWarnings: (warnings) =>
     set({
@@ -212,6 +235,7 @@ export const createVideoImportSlice = (set, get) => ({
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Could not determine video creation time',
+          videoSyncTimezoneMode: null,
         }
       }
 
@@ -220,21 +244,68 @@ export const createVideoImportSlice = (set, get) => ({
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Activity timezone is required for video sync',
+          videoSyncTimezoneMode: null,
         }
       }
 
       const activityStart = parseSyncTimestamp(activitySummary.syncTime, 'gps', timezone)
       const activityEnd = parseSyncTimestamp(activitySummary.endTime, 'gps', timezone)
-      const videoStart = parseSyncTimestamp(
-        state.importedVideoCreationTime,
-        state.importedVideoTimeSource === 'ffprobe' ? 'ffprobe' : 'gps',
-        timezone,
-      )
-
-      if (videoStart === null || activityStart === null || activityEnd === null) {
+      if (activityStart === null || activityEnd === null) {
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncTimezoneMode: null,
+        }
+      }
+
+      let videoStart = null
+      let timezoneMode = null
+
+      if (state.importedVideoTimeSource === 'ffprobe') {
+        // An ffprobe `creation_time` tag cannot reliably identify its timezone.
+        // Some cameras write a real UTC instant; others write local camera time
+        // and append `Z`. Build both candidates, then keep only candidates whose
+        // start time lies inside the activity interval. If both survive, the
+        // stored mode selects one and the UI exposes the alternate choice.
+        const withoutTimezone = parseSyncTimestamp(state.importedVideoCreationTime, 'ffprobe', timezone)
+        const withTimezone = parseSyncTimestamp(state.importedVideoCreationTime, 'gps', timezone)
+        const isWithinActivity = (timestamp) => timestamp >= activityStart && timestamp <= activityEnd
+        const candidates = [
+          { timestamp: withoutTimezone, timezoneApplied: false },
+          { timestamp: withTimezone, timezoneApplied: true },
+        ].filter(({ timestamp }) => timestamp !== null && isWithinActivity(timestamp))
+
+        if (withoutTimezone === null || withTimezone === null) {
+          return {
+            videoSyncOffsetSeconds: 0,
+            videoSyncWarning: 'Invalid timestamp formats',
+            videoSyncTimezoneMode: null,
+          }
+        }
+
+        if (candidates.length === 0) {
+          return {
+            videoSyncOffsetSeconds: 0,
+            videoSyncWarning: 'Video could not be synced with activity',
+            videoSyncTimezoneMode: null,
+          }
+        }
+
+        const timezoneAmbiguous = candidates.length === 2 && withoutTimezone !== withTimezone
+        timezoneMode = timezoneAmbiguous ? (state.videoSyncTimezoneMode ?? 'local') : null
+        const selectedCandidate = timezoneAmbiguous
+          ? (candidates.find(({ timezoneApplied: candidateApplied }) => (candidateApplied ? 'utc' : 'local') === timezoneMode) ?? candidates[0])
+          : candidates[0]
+        videoStart = selectedCandidate.timestamp
+      } else {
+        videoStart = parseSyncTimestamp(state.importedVideoCreationTime, 'gps', timezone)
+      }
+
+      if (videoStart === null) {
+        return {
+          videoSyncOffsetSeconds: 0,
+          videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncTimezoneMode: null,
         }
       }
 
@@ -244,12 +315,14 @@ export const createVideoImportSlice = (set, get) => ({
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Video could not be synced with activity',
+          videoSyncTimezoneMode: null,
         }
       }
 
       return {
         videoSyncOffsetSeconds: offsetSeconds,
         videoSyncWarning: null,
+        videoSyncTimezoneMode: timezoneMode,
       }
     }),
 })
