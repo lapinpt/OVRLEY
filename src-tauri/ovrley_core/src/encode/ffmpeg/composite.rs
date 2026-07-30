@@ -30,7 +30,8 @@ use crate::render::FrameSize;
 
 use super::composite_filters::{
     composite_filter_complex, composite_overlay_thread_queue_size, cuda_display_metadata_filter,
-    format_seconds_arg, source_rotation_filter,
+    format_seconds_arg, normalize_source_rotation, qsv_overlay_cpu_rotation_filter,
+    source_rotation_filter,
 };
 use super::composite_profiles::composite_profile;
 
@@ -98,6 +99,9 @@ pub fn build_composite_ffmpeg_settings(
     source_rotation_degrees: Option<i32>,
 ) -> CoreResult<CompositeFfmpegSettings> {
     let FrameSize { width, height } = frame_size;
+    // Establish one canonical rotation value before profile selection and reuse
+    // it for filters, dimensions, autorotation, and output metadata.
+    let source_rotation_degrees = normalize_source_rotation(source_rotation_degrees)?;
     // ── PHASE 1: VALIDATE INPUTS & REDUCE FPS ──
     let video_path = render.video_path.to_string_lossy().into_owned();
 
@@ -137,6 +141,11 @@ pub fn build_composite_ffmpeg_settings(
         }
     }
 
+    let filter_stack_kind = selected_profile.codec_id.metadata().filter_stack_kind;
+    let qsv_full_overlay = matches!(filter_stack_kind, CompositeFilterStackKind::QsvFullOverlay);
+    let qsv_overlay_cpu_rotation_filter =
+        qsv_overlay_cpu_rotation_filter(source_rotation_degrees, filter_stack_kind);
+
     // ── PHASE 3: BUILD INPUT 0 ARGS (unseeked source video for filter-side trim) ──
     let mut input_0_args = if matches!(
         selected_profile.codec_id.metadata().filter_stack_kind,
@@ -150,7 +159,10 @@ pub fn build_composite_ffmpeg_settings(
             .map(|arg| (*arg).to_string())
             .collect()
     };
-    let source_autorotate_arg = if source_rotation_filter.is_some() {
+    // QSV-full must retain coded main-video surfaces for zero-copy compositing.
+    // Other profiles keep their existing behavior: disable FFmpeg autorotation
+    // only when the selected graph physically applies a rotation filter.
+    let source_autorotate_arg = if qsv_full_overlay || source_rotation_filter.is_some() {
         "-noautorotate"
     } else {
         "-autorotate"
@@ -201,7 +213,9 @@ pub fn build_composite_ffmpeg_settings(
         render.trim_start,
         render.render_duration,
         selected_profile,
+        source_rotation_degrees,
         source_rotation_filter,
+        qsv_overlay_cpu_rotation_filter,
     )?;
 
     // ── PHASE 7: BUILD OUTPUT ARGS (map, codec, bitrate, audio copy, mux flags) ──
@@ -235,13 +249,13 @@ pub fn build_composite_ffmpeg_settings(
     if include_audio {
         output_args.extend(["-c:a".to_string(), "copy".to_string()]);
     }
-    output_args.extend([
-        "-movflags".to_string(),
-        "faststart".to_string(),
-        "-metadata:s:v:0".to_string(),
-        "rotate=0".to_string(),
-        "-y".to_string(),
-    ]);
+    output_args.extend(["-movflags".to_string(), "faststart".to_string()]);
+    // Physical-rotation profiles clear the now-stale display matrix. QSV-full
+    // leaves it untouched so players rotate the completed coded composite.
+    if !qsv_full_overlay {
+        output_args.extend(["-metadata:s:v:0".to_string(), "rotate=0".to_string()]);
+    }
+    output_args.push("-y".to_string());
 
     Ok(CompositeFfmpegSettings {
         codec_id: selected_profile.codec_id,

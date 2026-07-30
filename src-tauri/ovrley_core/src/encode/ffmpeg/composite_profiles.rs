@@ -38,8 +38,8 @@ const CUDA_HEVC_FILTER: &str =
 [base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
 
 const QSV_FULL_FILTER: &str =
-    "[0:v]{base_video_filters}scale_qsv=w={width}:h={height}:format=nv12[main_hw];\
-[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw];\
+    "[0:v]{base_video_filters}scale_qsv=w={main_width}:h={main_height}:format=nv12[main_hw];\
+[1:v]setpts=PTS-STARTPTS,{qsv_overlay_cpu_rotation_filter}hwupload=extra_hw_frames=64[overlay_hw];\
 [main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]";
 
 const BUILTIN_PROFILES: &[CompositeProfile] = &[

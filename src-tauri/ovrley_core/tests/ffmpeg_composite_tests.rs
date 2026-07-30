@@ -48,6 +48,24 @@ fn settings_for_codec(
     overlay_pipe_fps: Fps,
     trim_start: f64,
 ) -> CompositeFfmpegSettings {
+    settings_for_codec_with_rotation(
+        codec,
+        bitrate,
+        source_fps,
+        overlay_pipe_fps,
+        trim_start,
+        None,
+    )
+}
+
+fn settings_for_codec_with_rotation(
+    codec: &str,
+    bitrate: &str,
+    source_fps: Fps,
+    overlay_pipe_fps: Fps,
+    trim_start: f64,
+    rotation_degrees: Option<i32>,
+) -> CompositeFfmpegSettings {
     let render = render_plan(codec, bitrate, source_fps, overlay_pipe_fps, trim_start);
     build_composite_ffmpeg_settings(
         &render,
@@ -56,7 +74,7 @@ fn settings_for_codec(
             height: 2160,
         },
         true,
-        None,
+        rotation_degrees,
     )
     .unwrap()
 }
@@ -520,12 +538,13 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
         "-hwaccel_output_format".to_string(),
         "qsv".to_string(),
     ];
-    let built = settings_for_codec(
+    let built = settings_for_codec_with_rotation(
         "qsv_full_h264",
         "60M",
         Fps::new(30, 1).unwrap(),
         Fps::new(30, 1).unwrap(),
         0.0,
+        Some(0),
     );
 
     assert_eq!(built.codec_id, CompositeCodecId::QsvFullH264);
@@ -544,7 +563,81 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
         .contains("[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw]"));
     assert!(built.filter_complex.contains("overlay_qsv"));
     assert!(!built.filter_complex.contains("hwdownload"));
+    assert_argument_pair(&built.input_0_args, "-noautorotate", "-i");
+    assert!(!has_argument_pair(
+        &built.output_args,
+        "-metadata:s:v:0",
+        "rotate=0"
+    ));
     assert_argument_pair(&built.output_args, "-c:v", "h264_qsv");
+}
+
+#[test]
+fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
+    let cases = [
+        (
+            90,
+            "scale_qsv=w=2160:h=3840:format=nv12[main_hw]",
+            "transpose=1,",
+        ),
+        (
+            180,
+            "scale_qsv=w=3840:h=2160:format=nv12[main_hw]",
+            "hflip,vflip,",
+        ),
+        (
+            270,
+            "scale_qsv=w=2160:h=3840:format=nv12[main_hw]",
+            "transpose=2,",
+        ),
+    ];
+
+    for (rotation, main_scale, overlay_rotation) in cases {
+        let built = settings_for_codec_with_rotation(
+            "qsv_full_h264",
+            "60M",
+            Fps::new(30, 1).unwrap(),
+            Fps::new(30, 1).unwrap(),
+            0.0,
+            Some(rotation),
+        );
+
+        assert_argument_pair(&built.input_0_args, "-noautorotate", "-i");
+        assert!(built.filter_complex.contains(main_scale));
+        assert!(built.filter_complex.contains(&format!(
+            "[1:v]setpts=PTS-STARTPTS,{overlay_rotation}hwupload=extra_hw_frames=64[overlay_hw]"
+        )));
+        assert!(!built.filter_complex.contains("vpp_qsv"));
+        assert!(!built
+            .filter_complex
+            .contains("sidedata=mode=delete:type=DISPLAYMATRIX"));
+        assert!(!has_argument_pair(
+            &built.output_args,
+            "-metadata:s:v:0",
+            "rotate=0"
+        ));
+    }
+
+    let render = render_plan(
+        "qsv_full_h264",
+        "60M",
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        0.0,
+    );
+    let error = build_composite_ffmpeg_settings(
+        &render,
+        FrameSize {
+            width: 3840,
+            height: 2160,
+        },
+        true,
+        Some(45),
+    )
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("Unsupported source rotation 45 degrees"));
 }
 
 #[test]
