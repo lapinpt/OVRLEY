@@ -190,6 +190,9 @@ mod tests {
                 temperature: vec![],
                 pace: vec![],
                 g_force: vec![],
+                g_force_x: vec![],
+                g_force_y: vec![],
+                g_force_z: vec![],
                 rpm: vec![],
                 throttle_position: vec![],
                 brake_position: vec![],
@@ -220,10 +223,18 @@ mod tests {
         };
         let mut surface = create_surface(400, 200).unwrap();
 
-        for dt_str in ["heading_tape", "lean_angle", "linear", "arc", "corner"] {
+        for dt_str in [
+            "heading_tape",
+            "lean_angle",
+            "g_force",
+            "linear",
+            "arc",
+            "corner",
+        ] {
             let display_type = match dt_str {
                 "heading_tape" => DisplayType::Tape,
                 "lean_angle" => DisplayType::LeanAngle,
+                "g_force" => DisplayType::GForce,
                 "linear" => DisplayType::Linear,
                 "arc" => DisplayType::Arc,
                 "corner" => DisplayType::Corner,
@@ -287,6 +298,9 @@ mod tests {
                 temperature: vec![],
                 pace: vec![],
                 g_force: vec![],
+                g_force_x: vec![],
+                g_force_y: vec![],
+                g_force_z: vec![],
                 rpm: vec![],
                 throttle_position: vec![],
                 brake_position: vec![],

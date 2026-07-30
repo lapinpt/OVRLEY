@@ -46,6 +46,7 @@ import displayTypeArcSvg from '../../../../assets/widget-icons/display-type-arc.
 import displayTypeCornerSvg from '../../../../assets/widget-icons/display-type-corner.svg?raw'
 import displayTypeCircleSvg from '../../../../assets/widget-icons/display-type-circle.svg?raw'
 import displayTypeRectangleSvg from '../../../../assets/widget-icons/display-type-rectangle.svg?raw'
+import displayTypeGForceSvg from '../../../../assets/widget-icons/display-type-g-force.svg?raw'
 
 function parseMetricIconSvg(svgMarkup) {
   const rootTag = svgMarkup.match(/<svg[^>]*>/i)?.[0]
@@ -117,4 +118,5 @@ export const DISPLAY_TYPE_ICON_SVGS = {
   corner: parseMetricIconSvg(displayTypeCornerSvg),
   circle: parseMetricIconSvg(displayTypeCircleSvg),
   rectangle: parseMetricIconSvg(displayTypeRectangleSvg),
+  g_force: parseMetricIconSvg(displayTypeGForceSvg),
 }

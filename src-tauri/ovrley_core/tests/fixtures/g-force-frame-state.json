@@ -1,0 +1,15 @@
+{
+  "activity": {
+    "sample_elapsed_seconds": [0, 1, 2, 3, 4, 5],
+    "trim_end_seconds": 5,
+    "g_force_x": [0, 3, 0, null, 8, 0],
+    "g_force_y": [0, 4, 2, 1, 6, 0],
+    "g_force_z": [1, 2, 12, null, 0, -5]
+  },
+  "config": {
+    "axis_horizontal": "x",
+    "axis_vertical": "y",
+    "clip_percentile": 80
+  },
+  "expected_max_g": 5
+}

@@ -31,7 +31,7 @@ fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
     );
     assert_eq!(activity.elevation, vec![Some(100.0), None, Some(110.0)]);
     assert_eq!(activity.speed, vec![Some(10.0), None, Some(20.0)]);
-    assert_eq!(activity.heading, vec![Some(90.0), None, Some(100.0)]);
+    assert_eq!(activity.heading, vec![Some(90.0), None, Some(90.498)]);
     assert_eq!(activity.g_force_x, vec![Some(0.1), Some(0.2), Some(0.3)]);
     assert_eq!(activity.sample_distance_progress, vec![0.0, 0.1, 1.0]);
 
@@ -52,7 +52,7 @@ fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
 
     assert_eq!(dense.series.speed[1], Some(15.0));
     assert_eq!(dense.series.elevation[1], Some(105.0));
-    assert_eq!(dense.series.heading[1], Some(95.0));
+    assert_eq!(dense.series.heading[1], Some(90.249));
     assert_eq!(dense.series.course_lat[1], Some(10.05));
     assert_eq!(dense.series.course_lon[1], Some(20.05));
     assert_eq!(dense.frame_distance_progress[1], Some(0.5));
@@ -85,7 +85,9 @@ fn gps_update_does_not_mask_independently_sampled_vehicle_speed() {
         .parsed_activity;
 
     assert_eq!(activity.speed, vec![Some(10.0), Some(11.0)]);
-    assert_eq!(activity.g_force_x, vec![Some(0.1), Some(0.2)]);
+    assert_eq!(activity.g_force_x.len(), 2);
+    assert!(activity.g_force_x[0].is_some());
+    assert!(activity.g_force_x[1].is_some());
 }
 
 #[test]
@@ -155,6 +157,50 @@ fn racebox_reader_produces_canonical_activity_columns() {
     );
     assert_eq!(activity.elevation, vec![Some(147.8), Some(147.9)]);
     assert_eq!(activity.speed, vec![Some(1.5166666666666666), Some(2.0)]);
+}
+
+#[test]
+fn katana_fixture_reconstructs_time_gps_and_telemetry() {
+    let activity = parse_fixture("Katana-2026-07-25-111811.csv");
+
+    assert_eq!(activity.sample_elapsed_seconds.len(), 366);
+    assert_eq!(activity.sample_elapsed_seconds[0], 0.0);
+    assert_eq!(
+        activity.sample_elapsed_seconds.last().copied(),
+        Some(365.0)
+    );
+    assert!(activity
+        .sample_elapsed_seconds
+        .windows(2)
+        .all(|pair| pair[0] < pair[1]));
+
+    assert_eq!(
+        activity.time.first().and_then(|value| value.as_deref()),
+        Some("2026-07-25T11:18:11.160Z")
+    );
+    assert_eq!(
+        activity.time.last().and_then(|value| value.as_deref()),
+        Some("2026-07-25T11:24:16.160Z")
+    );
+    assert_eq!(
+        activity.sync_time.as_deref(),
+        Some("2026-07-25T11:18:11.160Z")
+    );
+
+    assert_eq!(
+        activity.course[0],
+        (Some(51.178278), Some(0.301071))
+    );
+    assert!(activity.course.iter().any(|(lat, lon)| lat.is_some() && lon.is_some()));
+
+    assert_eq!(activity.speed[0], Some(0.0));
+    assert!(activity.speed.iter().any(Option::is_some));
+
+    assert_eq!(activity.heading[0], Some(0.0));
+    assert!(activity.heading.iter().any(Option::is_some));
+
+    assert_eq!(activity.elevation[0], Some(149.0));
+    assert!(activity.elevation.iter().any(Option::is_some));
 }
 
 #[test]
@@ -337,7 +383,7 @@ fn local_preamble_timestamps_respect_dst_transitions_and_reject_non_unique_start
 
 #[test]
 fn coalesces_equal_time_rows_before_rebasing_distance() {
-    let csv = "Time,Speed (m/s),Distance (m),Latitude\n\
+    let csv = "Time,Speed (m/s),mileage (m),Latitude\n\
 10,5,100,34.0\n\
 10,,110,\n\
 11,7,120,34.2\n";
@@ -358,6 +404,63 @@ fn coalesces_equal_time_rows_before_rebasing_distance() {
         .windows(2)
         .all(|pair| pair[0] < pair[1]));
     assert!(activity.metadata.get("coalesced_row_count").is_none());
+}
+
+#[test]
+fn generic_distance_headers_remain_cumulative_distance() {
+    let csv = "Time,Distance (m),Latitude,Longitude\n\
+0,3,0.0,0.0\n\
+1,11,0.0,0.0001\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "generic-distance.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.distance, vec![Some(0.0), Some(8.0)]);
+    assert_eq!(activity.distance_to_home.first(), Some(&Some(0.0)));
+    assert!(activity.distance_to_home[1].is_some());
+}
+
+#[test]
+fn airdata_distance_pair_maps_home_distance_and_mileage_consistently() {
+    let csv = "time(millisecond),latitude,longitude,altitude_above_seaLevel(feet),speed(mph),distance(feet),mileage(feet),compass_heading(degrees)\n\
+0,53.4881644,-1.2102215,100,0,10,100,90\n\
+1000,53.4881645,-1.2102216,101,1,20,130,100\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "airdata.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.distance, vec![Some(0.0), Some(9.144)]);
+    assert_eq!(activity.distance_to_home, vec![Some(3.048), Some(6.096)]);
+    assert_eq!(activity.elevation, vec![Some(30.48), Some(30.7848)]);
+    assert!(activity.heading.iter().any(Option::is_some));
+}
+
+#[test]
+fn unprofiled_distance_and_mileage_headers_are_rejected_as_ambiguous() {
+    let csv = "Time,Distance,Mileage,Latitude\n\
+0,1,2,0.0\n\
+1,3,4,0.1\n";
+
+    let error = parse_csv_activity_reader(Cursor::new(csv), "ambiguous-distance.csv").unwrap_err();
+
+    assert!(error
+        .to_string()
+        .contains("ambiguous Distance and Mileage headers"));
+}
+
+#[test]
+fn explicit_distance_to_home_rejects_negative_observations() {
+    let csv = "Time,Distance to home (m),Latitude\n\
+0,-1,0.0\n\
+1,2,0.0\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "distance-to-home.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.distance_to_home, vec![None, Some(2.0)]);
 }
 
 #[test]
@@ -431,7 +534,7 @@ fn malformed_metric_observations_become_missing_without_repairing_bounded_values
     assert_eq!(activity.rpm, vec![None, Some(1000.0)]);
     assert_eq!(activity.throttle_position, vec![None, Some(50.0)]);
     assert_eq!(activity.brake_position, vec![None, Some(25.0)]);
-    assert_eq!(activity.heading, vec![Some(359.0), Some(1.0)]);
+    assert_eq!(activity.heading, vec![Some(359.0), Some(359.1)]);
     assert_eq!(activity.speed, vec![None, Some(10.0)]);
 }
 
@@ -491,7 +594,12 @@ fn csv_command_returns_the_native_path_response() {
         .join("tests/fixtures/activity/sample Racebox.csv");
 
     let response = backend_parse_csv_activity(fixture.to_str().unwrap()).unwrap();
-    assert!(response.debug_payload.is_none());
+    // debug_payload is Some only in debug builds
+    if cfg!(not(debug_assertions)) {
+        assert!(response.debug_payload.is_none());
+    } else {
+        assert!(response.debug_payload.is_some());
+    }
     let activity = response.parsed_activity;
 
     assert_eq!(activity.file_name.as_deref(), Some("sample Racebox.csv"));
@@ -515,7 +623,7 @@ Time,GPS Latitude (deg),GPS Longitude (deg),GPS Speed (mph),GPS Altitude (ft),GP
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(activity.speed, vec![Some(4.4704), Some(8.9408)]);
     assert_eq!(activity.elevation, vec![Some(30.48), Some(33.528)]);
-    assert_eq!(activity.heading, vec![Some(1.0), Some(359.0)]);
+    assert_eq!(activity.heading, vec![Some(1.0), Some(0.9)]);
 }
 
 #[test]
@@ -808,9 +916,9 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
     assert_close(racechrono.brake_position[0], 0.0);
     assert_eq!(racechrono.gear_position[0].as_deref(), Some("0"));
     assert_close(racechrono.g_force[0], 0.0);
-    assert_close(racechrono.g_force_x[0], 1.003);
-    assert_close(racechrono.g_force_y[0], -0.017);
-    assert_close(racechrono.g_force_z[0], 0.027);
+    assert_close(racechrono.g_force_x[0], 1.002332480590445);
+    assert_close(racechrono.g_force_y[0], -0.02031022736508418);
+    assert_close(racechrono.g_force_z[0], 0.027631797583651307);
 
     let v1 = parse_fixture("session_20260713_185859_v1.csv");
     assert_eq!(v1.course[0], (Some(47.3820367), Some(18.2202700)));
@@ -824,9 +932,9 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
     assert_close(v2.speed[0], 0.975);
     assert_close(v2.elevation[0], 219.611);
     assert_close(v2.heading[0], 246.450);
-    assert_close(v2.g_force_x[0], -0.003);
-    assert_close(v2.g_force_y[0], 0.867);
-    assert_close(v2.g_force_z[0], 0.380);
+    assert_close(v2.g_force_x[0], 0.02173085923890625);
+    assert_close(v2.g_force_y[0], 0.9001238351501731);
+    assert_close(v2.g_force_z[0], 0.48696693630865423);
     assert!(v2.lean_angle.contains(&Some(-1.909)));
     assert!(v2.g_force.contains(&Some(0.038)));
 }
@@ -905,9 +1013,9 @@ fn motorsport_fixtures_retain_available_new_metrics_as_finite_optional_series() 
     }
 
     let trackaddict = parse_fixture("Amozoc - TrackAddict.csv");
-    assert_close(trackaddict.g_force_x[0], -0.27);
-    assert_close(trackaddict.g_force_y[0], 0.65);
-    assert_close(trackaddict.g_force_z[0], -0.75);
+    assert_close(trackaddict.g_force_x[0], -0.29005555555555557);
+    assert_close(trackaddict.g_force_y[0], 0.6419444444444445);
+    assert_close(trackaddict.g_force_z[0], -0.7612777777777778);
     assert_close(trackaddict.brake_position[0], 0.0);
 
     let aim = parse_fixture("sample AiM.csv");

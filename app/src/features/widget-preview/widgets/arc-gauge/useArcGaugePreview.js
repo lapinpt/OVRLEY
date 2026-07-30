@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { getInterpolatedActivityValue } from '@/features/overlay-editor'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from './geometry'
 import { getArcInnerWidgetLayout } from './arcGaugeInnerLayout'
@@ -8,6 +8,7 @@ import { buildArcGaugeInnerWidgetModel } from '../metric/model'
 import { getTextShadowParts } from '../../shared/shadow'
 import { getPreviewFontFamily, measureArcPreviewText } from '../../shared/textMeasurement'
 import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Returns the SVG text origin that centers measured text around an x-coordinate. */
 function centeredTextX(measurement, centerX) {
@@ -78,8 +79,10 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
           bar_gap: widget.data.bar_gap,
         })
       : null
-    const minLabel = `${layout.min}`
-    const maxLabel = `${layout.max}`
+    const metricType = widget.data.value
+    const displayUnit = widget.data.display_unit
+    const minLabel = formatGaugeBoundaryLabel(metricType, layout.min, displayUnit)
+    const maxLabel = formatGaugeBoundaryLabel(metricType, layout.max, displayUnit)
     const shadow = getTextShadowParts(sceneStyle)
 
     return {

@@ -26,10 +26,10 @@ import { measurePreviewText, getPreviewTextBaseline } from '../../shared/textMea
  */
 function formatSpeed(value, unit) {
   const conversions = {
-    kmh: { units: 'KM/H', factor: 3.6 },
-    mph: { units: 'MPH', factor: 2.236936 },
-    kn: { units: 'KN', factor: 1.943844 },
-    mps: { units: 'M/S', factor: 1 },
+    kmh: { units: 'KM/H' },
+    mph: { units: 'MPH' },
+    kn: { units: 'KN' },
+    mps: { units: 'M/S' },
   }
   const selection = conversions[unit]
 
@@ -38,7 +38,7 @@ function formatSpeed(value, unit) {
   }
 
   return {
-    value: Math.round(value * selection.factor).toString(),
+    value: Math.round(convertStandardMetricValue('speed', value, unit)).toString(),
     units: selection.units,
   }
 }
@@ -58,7 +58,7 @@ function formatTemperature(value, unit, decimals) {
     }
   }
 
-  const temp = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value
+  const temp = convertStandardMetricValue('temperature', value, unit)
   const roundedValue = decimals > 0 ? temp.toFixed(decimals) : Math.round(temp).toString()
 
   return {
@@ -75,15 +75,22 @@ function formatPace(value, unit) {
     }
   }
 
-  const totalSeconds = unit === 'min_per_mi' ? value * 1.609344 : value
+  const totalSeconds = convertStandardMetricValue('pace', value, unit)
   const roundedSeconds = Math.max(Math.round(totalSeconds), 0)
-  const minutes = Math.floor(roundedSeconds / 60)
-  const seconds = roundedSeconds % 60
 
   return {
-    value: `${minutes}:${String(seconds).padStart(2, '0')}`,
+    value: `${Math.floor(roundedSeconds / 60)}:${String(roundedSeconds % 60).padStart(2, '0')}`,
     units: unit === 'min_per_mi' ? 'MIN/MI' : 'MIN/KM',
   }
+}
+
+/** Formats a finite number with fixed decimals while normalizing negative zero. */
+export function formatFixedDecimal(value, decimals) {
+  const precision = decimals > 0 ? decimals : 0
+  const factor = 10 ** precision
+  const rounded = (Math.sign(value) * Math.round(Math.abs(value) * factor)) / factor
+  const roundedValue = precision > 0 ? rounded.toFixed(precision) : rounded.toString()
+  return Number(roundedValue) === 0 ? (0).toFixed(precision) : roundedValue
 }
 
 function formatRoundedMetric(value, units, decimals) {
@@ -94,11 +101,8 @@ function formatRoundedMetric(value, units, decimals) {
     }
   }
 
-  const roundedValue = decimals > 0 ? value.toFixed(decimals) : Math.round(value).toString()
-  const normalizedValue = Number(roundedValue) === 0 ? (0).toFixed(decimals) : roundedValue
-
   return {
-    value: normalizedValue,
+    value: formatFixedDecimal(value, decimals),
     units,
   }
 }
@@ -118,8 +122,35 @@ function formatDistanceValue(value, unit, decimals, showUnits) {
   }
 }
 
-function convertStandardMetricValue(type, value, displayUnit) {
+/**
+ * Converts a raw standard-metric telemetry value through the selected display
+ * unit. Handles all metric kinds including speed, temperature, and pace that
+ * have custom conversion logic.
+ *
+ * @param {string} type - Metric type key (e.g. "speed", "distance").
+ * @param {string|null} displayUnit - Target display unit.
+ * @param {number} value - Raw telemetry value in native units.
+ * @returns {number} Converted value.
+ */
+export function convertStandardMetricValue(type, value, displayUnit) {
   switch (type) {
+    case 'speed':
+      switch (displayUnit) {
+        case 'mph':
+        case 'imperial':
+          return value * 2.23694
+        case 'kn':
+          return value * 1.943844
+        case 'mps':
+          return value
+        default:
+          return value * 3.6
+      }
+    case 'temperature':
+    case 'core_temperature':
+      return displayUnit === 'fahrenheit' ? (value * 9) / 5 + 32 : value
+    case 'pace':
+      return displayUnit === 'min_per_mi' ? value * 1.609344 : value
     case 'distance':
     case 'distance_to_home':
       switch (displayUnit) {
@@ -127,6 +158,8 @@ function convertStandardMetricValue(type, value, displayUnit) {
           return value / 1000
         case 'mi':
           return value / 1609.344
+        case 'ft':
+          return value * 3.28084
         default:
           return value
       }

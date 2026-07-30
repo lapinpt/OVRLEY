@@ -70,7 +70,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
     return () => {
       cancelled = true
     }
-  }, [geometryConfig, activity, data])
+  }, [geometryConfig, activity])
 
   if (!activity) {
     return buildPlaceholderRoutePreviewGeometry({

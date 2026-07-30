@@ -22,7 +22,6 @@ export {
   getInterpolatedTimeValue,
   getDistanceProgressAtElapsed,
   getSeriesValueAtProgress,
-  getInterpolatedSeriesValue,
 } from './utils/overlayEditorUtils'
 
 export * from './data/overlayEditorConstants'

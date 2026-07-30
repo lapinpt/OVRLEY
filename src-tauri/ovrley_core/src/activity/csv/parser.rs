@@ -19,7 +19,14 @@ use super::units::{
     declaration_compatible, parse_declared_unit, parse_units_row_unit, DeclaredUnit, Unit,
 };
 use super::Metric;
+use crate::error::{CoreError, CoreResult};
 use csv::StringRecord;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HeaderProfile {
+    Generic,
+    DjiAirData,
+}
 
 /// Parses one record as a usable telemetry-header candidate.
 ///
@@ -27,7 +34,7 @@ use csv::StringRecord;
 /// recognized non-timing metric. When explicit elapsed time is present, a bare
 /// seconds-valued `Time` column is reclassified as a paired absolute Unix-time
 /// column, matching RaceChrono's two-column export shape.
-pub(super) fn parse_header_candidate(record: &StringRecord) -> Option<HeaderLayout> {
+pub(super) fn parse_header_candidate(record: &StringRecord) -> CoreResult<Option<HeaderLayout>> {
     let gps_update_index = record
         .iter()
         .position(|value| normalize_syntax(value) == "gps update");
@@ -36,6 +43,12 @@ pub(super) fn parse_header_candidate(record: &StringRecord) -> Option<HeaderLayo
         .enumerate()
         .filter_map(|(index, value)| parse_header(index, value))
         .collect::<Vec<_>>();
+    let profile = detect_header_profile(record);
+    let has_timing = columns.iter().any(|column| column.metric.is_timing());
+    let has_telemetry = columns.iter().any(|column| !column.metric.is_timing());
+    if has_timing && has_telemetry {
+        resolve_profile_aliases(record, &mut columns, profile)?;
+    }
     let has_explicit_elapsed = columns
         .iter()
         .any(|column| column.timing == Some(TimingKind::ExplicitElapsed));
@@ -49,12 +62,71 @@ pub(super) fn parse_header_candidate(record: &StringRecord) -> Option<HeaderLayo
             }
         }
     }
-    let has_timing = columns.iter().any(|column| column.metric.is_timing());
-    let has_telemetry = columns.iter().any(|column| !column.metric.is_timing());
-    (has_timing && has_telemetry).then_some(HeaderLayout {
+    // A bare Time column paired with a Date column is a local time-of-day that
+    // needs the companion date to reconstruct an absolute timestamp.
+    let has_companion_date = columns
+        .iter()
+        .any(|column| column.metric == Metric::CompanionDate);
+    if has_companion_date {
+        for column in &mut columns {
+            if column.timing == Some(TimingKind::BareTime) {
+                column.metric = Metric::Timestamp;
+                column.timing = Some(TimingKind::TimeOfDay);
+            }
+        }
+    }
+    Ok((has_timing && has_telemetry).then_some(HeaderLayout {
         columns,
         gps_update_index,
+    }))
+}
+
+fn detect_header_profile(record: &StringRecord) -> HeaderProfile {
+    let has_distance = has_header_semantic(record, "distance");
+    let has_mileage = has_header_semantic(record, "mileage");
+    let has_airdata_marker = has_header_semantic(record, "compass heading")
+        || has_header_semantic(record, "altitude above sealevel");
+
+    if has_distance && has_mileage && has_airdata_marker {
+        HeaderProfile::DjiAirData
+    } else {
+        HeaderProfile::Generic
+    }
+}
+
+fn has_header_semantic(record: &StringRecord, semantic: &str) -> bool {
+    record.iter().any(|value| {
+        split_header(value).is_some_and(|(header_semantic, _, _)| header_semantic == semantic)
     })
+}
+
+fn resolve_profile_aliases(
+    record: &StringRecord,
+    columns: &mut [HeaderColumn],
+    profile: HeaderProfile,
+) -> CoreResult<()> {
+    let has_distance = has_header_semantic(record, "distance");
+    let has_mileage = has_header_semantic(record, "mileage");
+    if has_distance && has_mileage && profile == HeaderProfile::Generic {
+        return Err(CoreError::Activity(
+            "CSV has ambiguous Distance and Mileage headers without a recognized exporter profile"
+                .to_string(),
+        ));
+    }
+
+    if profile == HeaderProfile::DjiAirData {
+        for column in columns {
+            let is_distance_alias = record
+                .get(column.index)
+                .and_then(|value| split_header(value))
+                .is_some_and(|(semantic, _, _)| semantic == "distance");
+            if is_distance_alias {
+                column.metric = Metric::DistanceToHome;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Checks whether a record is a compatible units row for resolved headers.
@@ -99,6 +171,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
+        "date" => (
+            Metric::CompanionDate,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "timestamp" => (
             Metric::ElapsedSeconds,
             SourcePriority::Direct,
@@ -122,9 +201,25 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         ),
         "latitude" => (Metric::Latitude, SourcePriority::Direct, None, None, None),
         "longitude" => (Metric::Longitude, SourcePriority::Direct, None, None, None),
+        "gps" => (
+            Metric::GpsCoordinate,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "speed" | "kph" => (Metric::Speed, SourcePriority::Direct, None, None, None),
+        "gspd" => (Metric::Speed, SourcePriority::Direct, None, None, None),
         "vehspd1" => (Metric::Speed, SourcePriority::Vehicle, None, None, None),
         "distance" => (Metric::Distance, SourcePriority::Direct, None, None, None),
+        "mileage" => (Metric::Distance, SourcePriority::Direct, None, None, None),
+        "distance to home" | "distance from home" | "home distance" => (
+            Metric::DistanceToHome,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "distance 2d" | "distance on gps speed" => (
             Metric::Distance,
             SourcePriority::Preferred,
@@ -132,7 +227,9 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "elevation" | "altitude" => (Metric::Elevation, SourcePriority::Direct, None, None, None),
+        "elevation" | "altitude" | "alt" | "altitude above sealevel" => {
+            (Metric::Elevation, SourcePriority::Direct, None, None, None)
+        }
         "pressure altitude" | "barometric altitude" => (
             Metric::BarometricAltitude,
             SourcePriority::Direct,
@@ -140,25 +237,27 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "heading" | "bearing" => (Metric::Heading, SourcePriority::Direct, None, None, None),
+        "heading" | "bearing" | "hdg" | "compass heading" => {
+            (Metric::Heading, SourcePriority::Direct, None, None, None)
+        }
         "accel xyz" | "combined acceleration" => {
             (Metric::GForce, SourcePriority::Direct, None, None, None)
         }
-        "x" | "accel x" | "x acceleration" => (
+        "gforcex" | "x" | "accel x" | "x acceleration" => (
             Metric::GForceX,
             SourcePriority::AccelerationSensor,
             None,
             None,
             Some(AccelerationKind::Literal),
         ),
-        "y" | "accel y" | "y acceleration" => (
+        "gforcey" | "y" | "accel y" | "y acceleration" => (
             Metric::GForceY,
             SourcePriority::AccelerationSensor,
             None,
             None,
             Some(AccelerationKind::Literal),
         ),
-        "z" | "accel z" | "z acceleration" => (
+        "gforcez" | "z" | "accel z" | "z acceleration" => (
             Metric::GForceZ,
             SourcePriority::AccelerationSensor,
             None,
@@ -243,7 +342,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(ControlKind::Infer),
             None,
         ),
-        "lean angle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
+        "lean angle" | "leanangle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
         "gear" => (
             Metric::GearPosition,
             SourcePriority::Direct,
@@ -317,24 +416,25 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
 
 /// Splits a header cell into semantic name, unit annotation, and source.
 ///
-/// Supported forms include parenthetical units, a trailing percent marker,
-/// parenthetical source qualifiers, and a ` *source` suffix. Contradictory
-/// source qualifiers are rejected.
+/// Supported forms include parenthetical units with or without a leading space
+/// (`Alt(m)` and `Altitude (m)`), a trailing percent marker, parenthetical
+/// source qualifiers, and a ` *source` suffix. Contradictory source qualifiers
+/// are rejected.
 fn split_header(value: &str) -> Option<(String, Option<String>, Option<SourceQualifier>)> {
     let normalized = normalize_syntax(value);
     let (without_source, explicit_source) = match normalized.rsplit_once(" *") {
         Some((base, source)) => (base, Some(parse_source(source)?)),
         None => (normalized.as_str(), None),
     };
-    if let Some(open) = without_source.rfind(" (") {
+    if let Some(open) = without_source.rfind('(') {
         if without_source.ends_with(')') {
-            let annotation = &without_source[open + 2..without_source.len() - 1];
+            let annotation = &without_source[open + 1..without_source.len() - 1];
             if let Some(parenthetical_source) = parse_source(annotation) {
                 let source = combine_sources(explicit_source, Some(parenthetical_source))?;
-                return split_semantic_source(&without_source[..open], None, source);
+                return split_semantic_source(without_source[..open].trim(), None, source);
             }
             return split_semantic_source(
-                &without_source[..open],
+                without_source[..open].trim(),
                 Some(annotation.to_string()),
                 explicit_source,
             );

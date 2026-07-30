@@ -14,6 +14,7 @@ mod arc_gauge_segment_tests;
 mod elevation_frame_state_tests;
 mod elevation_geometry_tests;
 mod elevation_reduction_tests;
+mod g_force_frame_state_tests;
 mod gauge_metric_tests;
 mod lean_angle_geometry_tests;
 mod rdp_elevation_tests;

@@ -7,9 +7,13 @@
 mod channels;
 
 use crate::activity::finalize::{finalize_activity_columns, FinalizeActivityResponse};
-use crate::activity::schema::{ActivityColumns, RawActivityOptions};
+use crate::activity::schema::{
+    ActivityColumns, RawActivityOptions, SmoothingOption,
+};
 use crate::error::{CoreError, CoreResult};
-use crate::media::telemetry_math::lean_angle_from_lateral_g;
+use crate::media::telemetry_math::{
+    backfill_lateral_g_from_lean_angle, derive_lean_from_speed_heading, lean_angle_from_lateral_g,
+};
 use chrono::{Duration, NaiveDate, NaiveTime, SecondsFormat, Utc};
 use serde_json::json;
 use std::fs::File;
@@ -169,8 +173,14 @@ fn parse_creation_date(line: &str, line_number: usize) -> CoreResult<NaiveDate> 
     let time = tokens.next();
     let parsed = date
         .and_then(|date| NaiveDate::parse_from_str(date, "%d/%m/%Y").ok())
-        .zip(time.and_then(|time| NaiveTime::parse_from_str(time, "%H:%M:%S").ok()))
-        .filter(|_| separator == Some("at"));
+        .zip(
+            time.and_then(|time| {
+                NaiveTime::parse_from_str(time, "%H:%M:%S")
+                    .or_else(|_| NaiveTime::parse_from_str(time, "%H:%M"))
+                    .ok()
+            }),
+        )
+        .filter(|_| matches!(separator, Some("at" | "@")));
     parsed.map(|(date, _)| date).ok_or_else(|| {
         CoreError::Activity(format!(
             "VBO line {line_number} contains invalid file creation timestamp '{value}'"
@@ -228,6 +238,25 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
     validate_coordinates(&latitude, &longitude, &sections.data)?;
     let g_force_x = series(layout.g_force_x, identity);
     let g_force_y = series(layout.g_force_y, identity);
+    let mut lean_angle = series(layout.lean_angle, identity);
+    if lean_angle.iter().all(Option::is_none) {
+        let speed_mps = selected_series(&sections.data, layout.speed, |value| {
+            layout.speed_to_meters_per_second(value)
+        });
+        lean_angle = derive_lean_from_speed_heading(
+            &speed_mps,
+            &series(layout.heading, identity),
+            &elapsed_seconds,
+        );
+    }
+    if lean_angle.iter().all(Option::is_none) {
+        lean_angle = series(layout.lateral_acceleration, identity)
+            .into_iter()
+            .map(|value| value.and_then(lean_angle_from_lateral_g))
+            .collect();
+    }
+    let (g_force_x, g_force_y) =
+        backfill_lateral_g_from_lean_angle(&g_force_x, &g_force_y, &lean_angle);
     let mut g_force = series(layout.g_force, identity);
     if g_force.iter().all(Option::is_none) {
         g_force = g_force_x
@@ -236,19 +265,23 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
             .map(|(x, y)| (*x).zip(*y).map(|(x, y)| x.hypot(y)))
             .collect();
     }
-    let mut lean_angle = series(layout.lean_angle, identity);
-    if lean_angle.iter().all(Option::is_none) {
-        lean_angle = series(layout.lateral_acceleration, identity)
-            .into_iter()
-            .map(|value| value.and_then(lean_angle_from_lateral_g))
-            .collect();
-    }
 
     Ok(ActivityColumns {
         file_name: file_name.to_string(),
         file_format: "vbo".to_string(),
         metadata: json!({}),
-        options: RawActivityOptions::default(),
+        options: RawActivityOptions {
+            smoothing: [(
+                "heading".to_string(),
+                SmoothingOption {
+                    enabled: true,
+                    method: "circular_ema".to_string(),
+                    window_seconds: 0.0,
+                },
+            )]
+            .into(),
+            ..RawActivityOptions::default()
+        },
         preserve_direct_metric_gaps: Default::default(),
         timestamp,
         elapsed_seconds: elapsed_seconds.into_iter().map(Some).collect(),
@@ -268,6 +301,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         gradient: empty(),
         pace: empty(),
         distance: build_distance(&sections.data, layout.distance)?,
+        distance_to_home: empty(),
         g_force,
         g_force_x,
         g_force_y,

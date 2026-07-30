@@ -11,6 +11,7 @@
 
 import { TEXT_DEFAULTS, BACKDROP_CIRCLE_DEFAULTS, BACKDROP_RECTANGLE_DEFAULTS } from './standard-widgets'
 import { getDefaultFrameDimensions, getDisplayTypeConfigDefaults } from './standard-metrics'
+import { getLeanAngleLayout } from '@/features/widget-preview/widgets/lean-angle/geometry'
 
 // ---------------------------------------------------------------------------
 // Backdrop constants
@@ -43,14 +44,19 @@ function stripMetricSharedFields(variantConfig) {
  * @param {object} [variantConfig] - Active display variant config.
  * @param {object} [widgetData] - Top-level widget data.
  * @param {{ width: number, height: number } | null} frameDefaults - Manifest frame defaults.
- * @returns {{ width: number, height: number, rotation: number }}
+ * @returns {{ width?: number, height?: number, rotation: number }}
  */
 function resolveFrameGeometry(variantConfig, widgetData, frameDefaults) {
-  return {
-    width: widgetData?.width ?? variantConfig?.width ?? frameDefaults?.width,
-    height: widgetData?.height ?? variantConfig?.height ?? frameDefaults?.height,
+  const geometry = {
     rotation: variantConfig?.rotation ?? widgetData?.rotation ?? 0,
   }
+
+  if (frameDefaults) {
+    geometry.width = widgetData?.width ?? variantConfig?.width ?? frameDefaults.width
+    geometry.height = widgetData?.height ?? variantConfig?.height ?? frameDefaults.height
+  }
+
+  return geometry
 }
 
 // ---------------------------------------------------------------------------
@@ -150,18 +156,26 @@ export function resolveActiveMetricWidgetData(widgetData) {
 
   const variants = widgetData.display_variants || {}
   const variantConfig = variants[displayType]
+  const resolved = {
+    ...widgetData,
+    ...variantConfig,
+  }
+
+  if (displayType === 'lean_angle') {
+    const layout = getLeanAngleLayout(resolved)
+
+    return {
+      ...resolved,
+      width: layout.width,
+      height: layout.height,
+    }
+  }
+
   const frameDefaults = getDefaultFrameDimensions(displayType)
 
   return {
-    ...widgetData,
-    ...(variantConfig || {}),
+    ...resolved,
     ...resolveFrameGeometry(variantConfig, widgetData, frameDefaults),
-    id: widgetData.id,
-    value: widgetData.value,
-    x: widgetData.x,
-    y: widgetData.y,
-    opacity: widgetData.opacity,
-    display_type: displayType,
   }
 }
 
@@ -195,6 +209,9 @@ export function initDisplayVariant(widgetData, displayType) {
 
   if (!variantDefaults.min_max_label_font && widgetData.font) {
     variantDefaults.min_max_label_font = widgetData.font
+  }
+  if (displayType === 'g_force' && !variants[displayType] && widgetData.font) {
+    variantDefaults.label_font = widgetData.font
   }
 
   return {
@@ -294,6 +311,23 @@ export function buildFrameGeometryUpdate(widgetData, geometryPatch) {
   }
 
   if (displayType === 'text') return geometryPatch
+
+  if (displayType === 'lean_angle') {
+    const variants = widgetData.display_variants || {}
+    const currentVariant = variants[displayType] || {}
+    const patch = {
+      display_variants: {
+        ...variants,
+        [displayType]: {
+          ...currentVariant,
+          rotation: geometryPatch.rotation,
+        },
+      },
+    }
+    if (geometryPatch.x !== undefined) patch.x = geometryPatch.x
+    if (geometryPatch.y !== undefined) patch.y = geometryPatch.y
+    return patch
+  }
 
   const variants = widgetData.display_variants || {}
   const currentVariant = variants[displayType]

@@ -19,7 +19,14 @@ vi.mock('@/lib/file-dialog', () => ({
   openSinglePath,
   selectBrowserFile: vi.fn(),
 }))
-vi.mock('@/store/useStore', () => ({ default: { getState: () => ({}) } }))
+vi.mock('@/store/useStore', () => ({
+  default: {
+    getState: () => ({}),
+    temporal: {
+      getState: () => ({ isTracking: false }),
+    },
+  },
+}))
 
 describe('useActivityImport native picker boundary', () => {
   beforeEach(() => {

@@ -287,8 +287,9 @@ pub(super) fn draw_arc_labels(
     label_style.font_size = font_size;
     label_style.line_height = font_size * LINE_HEIGHT;
     label_style.color = parse_color(&gauge.min_max_label_color, text_style.opacity);
-    let min_label = format_gauge_label(min_value);
-    let max_label = format_gauge_label(max_value);
+    let display_unit = Some(gauge.inner_value.display_unit.as_str());
+    let min_label = format_gauge_label(gauge.metric, display_unit, min_value);
+    let max_label = format_gauge_label(gauge.metric, display_unit, max_value);
     let (min_angle, max_angle) = arc_label_angles(geometry);
 
     for (label, angle) in [(&min_label, min_angle), (&max_label, max_angle)] {

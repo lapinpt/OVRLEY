@@ -48,6 +48,52 @@ describe('render config preparation', () => {
     expect(renderConfig.values[0].color).toBe('#ffffff')
   })
 
+  test('removes lean-angle ephemeral frame dimensions from the backend payload', () => {
+    const config = {
+      scene: {
+        width: 1920,
+        height: 1080,
+        fps: 60,
+        start: 0,
+        end: 50,
+      },
+      labels: [],
+      values: [
+        {
+          id: 'lean-angle-1',
+          value: 'lean_angle',
+          x: 10,
+          y: 20,
+          font: 'Arial.ttf',
+          font_size: 60,
+          display_type: 'lean_angle',
+          display_variants: {
+            lean_angle: {
+              diameter: 180,
+              track_thickness: 24,
+            },
+          },
+        },
+      ],
+      plots: [],
+    }
+
+    const renderConfig = createRenderEffectiveConfig({
+      config,
+      globalDefaults: {},
+      updateRate: 1,
+      exportRange: { ...DEFAULT_EXPORT_RANGE },
+      exportCodec: 'prores_ks',
+      importedVideoPath: null,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.values[0]).toMatchObject({ diameter: 180, track_thickness: 24 })
+    expect(renderConfig.values[0]).not.toHaveProperty('width')
+    expect(renderConfig.values[0]).not.toHaveProperty('height')
+    expect(renderConfig.values[0]).not.toHaveProperty('display_variants')
+  })
+
   test('rehydrates scene start/end from editor timeline when durable template config omits them', () => {
     const config = {
       scene: {

@@ -26,7 +26,7 @@ export function PreviewSvgShadowOnlyFilter({ id, shadow, opacity = 1 }) {
 
   return (
     <defs>
-      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
+      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" overflow="visible" colorInterpolationFilters="sRGB">
         <feGaussianBlur in="SourceAlpha" stdDeviation={Math.max(shadow.strength, 0)} result="shadow-blur" />
         <feOffset in="shadow-blur" dx={shadow.distance} dy={shadow.distance} result="shadow-offset" />
         <feFlood floodColor={shadowColor.color} floodOpacity={shadowColor.opacity} result="shadow-color" />
@@ -52,8 +52,8 @@ export function PreviewSvgShadowBlurFilter({ id, shadow }) {
 
   return (
     <defs>
-      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
-        <feGaussianBlur stdDeviation={shadow.strength} />
+      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" overflow="visible" colorInterpolationFilters="sRGB">
+        <feGaussianBlur stdDeviation={Math.max(shadow.strength, 0)} />
       </filter>
     </defs>
   )

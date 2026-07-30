@@ -25,12 +25,8 @@ import {
   measureArcPreviewText,
   measurePreviewText,
 } from '../../shared/textMeasurement'
-import {
-  getInterpolatedActivityValue,
-  getInterpolatedSeriesValue,
-  getInterpolatedTimeValue,
-  NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
-} from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue, NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor'
+import { interpolateNumericSeries } from '@/lib/interpolation'
 import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
 const COORDINATE_DIRECTION_GAP_PX = 8
@@ -40,7 +36,7 @@ function getInterpolatedCoordinateValue(activity, componentIndex, previewSecond)
 
   const coordinateSeries = []
   for (const point of activity.course) coordinateSeries.push(point[componentIndex])
-  return getInterpolatedSeriesValue(activity.sample_elapsed_seconds, coordinateSeries, previewSecond)
+  return interpolateNumericSeries(activity.sample_elapsed_seconds, coordinateSeries, previewSecond)
 }
 
 /**

@@ -12,6 +12,7 @@ use super::interpolate::{
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
+use crate::interpolation::MissingSamplePolicy;
 use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
@@ -60,14 +61,15 @@ fn trim_numeric_series(
     end: f64,
     start_inner_index: usize,
     end_inner_index: usize,
+    missing_sample_policy: MissingSamplePolicy,
 ) -> Vec<Option<f64>> {
     if data.is_empty() {
         return Vec::new();
     }
     // Boundary interpolation preserves continuity when the trim cuts through
     // the middle of a source sampling interval.
-    let start_value = interpolate_numeric_series_value(elapsed, data, start);
-    let end_value = interpolate_numeric_series_value(elapsed, data, end);
+    let start_value = interpolate_numeric_series_value(elapsed, data, start, missing_sample_policy);
+    let end_value = interpolate_numeric_series_value(elapsed, data, end, missing_sample_policy);
     trim_series(
         data,
         start_inner_index,
@@ -176,9 +178,11 @@ pub fn trim_activity(
             .map(Some)
             .collect::<Vec<_>>();
         let start_progress =
-            interpolate_numeric_series_value(elapsed, &source, start).unwrap_or(0.0);
+            interpolate_numeric_series_value(elapsed, &source, start, MissingSamplePolicy::Bridge)
+                .unwrap_or(0.0);
         let end_progress =
-            interpolate_numeric_series_value(elapsed, &source, end).unwrap_or(start_progress);
+            interpolate_numeric_series_value(elapsed, &source, end, MissingSamplePolicy::Bridge)
+                .unwrap_or(start_progress);
         let mut trimmed = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
         trimmed.push(Some(start_progress));
         trimmed.extend(
@@ -233,6 +237,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -245,6 +250,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -257,6 +263,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -269,6 +276,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -282,6 +290,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -294,6 +303,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -306,6 +316,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -318,6 +329,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -330,6 +342,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -342,6 +355,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -354,6 +368,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -366,6 +381,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -378,6 +394,46 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
+            )
+        } else {
+            Vec::new()
+        },
+        g_force_x: if requirements.g_force_x {
+            trim_numeric_series(
+                elapsed,
+                &activity.g_force_x,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                MissingSamplePolicy::Preserve,
+            )
+        } else {
+            Vec::new()
+        },
+        g_force_y: if requirements.g_force_y {
+            trim_numeric_series(
+                elapsed,
+                &activity.g_force_y,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                MissingSamplePolicy::Preserve,
+            )
+        } else {
+            Vec::new()
+        },
+        g_force_z: if requirements.g_force_z {
+            trim_numeric_series(
+                elapsed,
+                &activity.g_force_z,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                MissingSamplePolicy::Preserve,
             )
         } else {
             Vec::new()
@@ -390,6 +446,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -402,6 +459,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -414,6 +472,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -426,6 +485,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -438,6 +498,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -450,6 +511,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -462,6 +524,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -474,6 +537,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -486,6 +550,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -498,6 +563,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -510,6 +576,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -522,6 +589,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -534,6 +602,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -546,6 +615,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -558,6 +628,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -570,6 +641,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -582,6 +654,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -607,6 +680,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -619,6 +693,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -631,6 +706,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -643,6 +719,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()
@@ -655,6 +732,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                MissingSamplePolicy::Bridge,
             )
         } else {
             Vec::new()

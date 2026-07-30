@@ -16,6 +16,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 
 pub use crate::interpolation::{
     collect_valid_numeric_points, interpolate_numeric_series_value, interpolate_points,
+    MissingSamplePolicy,
 };
 
 /// Interpolates a latitude/longitude pair at `target_x`.
@@ -38,8 +39,18 @@ pub fn interpolate_course_value(
         .map(|point| point.1)
         .collect::<Vec<_>>();
     (
-        interpolate_numeric_series_value(x_values, &latitudes, target_x),
-        interpolate_numeric_series_value(x_values, &longitudes, target_x),
+        interpolate_numeric_series_value(
+            x_values,
+            &latitudes,
+            target_x,
+            MissingSamplePolicy::Bridge,
+        ),
+        interpolate_numeric_series_value(
+            x_values,
+            &longitudes,
+            target_x,
+            MissingSamplePolicy::Bridge,
+        ),
     )
 }
 
@@ -99,12 +110,29 @@ fn interpolate_numeric_series(
     x_values: &[f64],
     y_values: &NumericSeries,
     target_x_values: &[f64],
+    missing_sample_policy: MissingSamplePolicy,
 ) -> Vec<Option<f64>> {
-    let points = collect_valid_numeric_points(x_values, y_values);
-    target_x_values
-        .iter()
-        .map(|target| interpolate_points(&points, *target))
-        .collect()
+    if y_values.is_empty() {
+        return Vec::new();
+    }
+
+    match missing_sample_policy {
+        MissingSamplePolicy::Bridge => {
+            // Build the filtered source points once. Rebuilding them for every
+            // frame makes densification quadratic for large activities.
+            let points = collect_valid_numeric_points(x_values, y_values);
+            target_x_values
+                .iter()
+                .map(|target| interpolate_points(&points, *target))
+                .collect()
+        }
+        MissingSamplePolicy::Preserve => target_x_values
+            .iter()
+            .map(|target| {
+                interpolate_numeric_series_value(x_values, y_values, *target, missing_sample_policy)
+            })
+            .collect(),
+    }
 }
 
 // Densifies a series with hold (step) interpolation.
@@ -148,7 +176,12 @@ fn densify_forward_fill_series(
         return Vec::new();
     }
     // First, do standard interpolation to get frame-aligned values
-    let interpolated = interpolate_numeric_series(x_values, y_values, target_x_values);
+    let interpolated = interpolate_numeric_series(
+        x_values,
+        y_values,
+        target_x_values,
+        MissingSamplePolicy::Bridge,
+    );
     // Then forward-fill: carry last known value across null gaps
     let mut last_known: Option<f64> = None;
     interpolated
@@ -172,8 +205,18 @@ fn interpolate_course_series(
     let latitudes = y_values.iter().map(|point| point.0).collect::<Vec<_>>();
     let longitudes = y_values.iter().map(|point| point.1).collect::<Vec<_>>();
     (
-        interpolate_numeric_series(x_values, &latitudes, target_x_values),
-        interpolate_numeric_series(x_values, &longitudes, target_x_values),
+        interpolate_numeric_series(
+            x_values,
+            &latitudes,
+            target_x_values,
+            MissingSamplePolicy::Bridge,
+        ),
+        interpolate_numeric_series(
+            x_values,
+            &longitudes,
+            target_x_values,
+            MissingSamplePolicy::Bridge,
+        ),
     )
 }
 
@@ -237,6 +280,7 @@ pub fn densify_activity(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.sample_distance_progress,
                 &frame_elapsed_seconds,
+                MissingSamplePolicy::Bridge,
             )
         };
 
@@ -276,7 +320,7 @@ pub fn densify_activity(
             }
             match standard_metric_interpolation(kind) {
                 Some(StandardMetricInterpolationKind::Hold) => densify_hold_series(x, y, target),
-                _ => interpolate_numeric_series(x, y, target),
+                _ => interpolate_numeric_series(x, y, target, MissingSamplePolicy::Bridge),
             }
         };
 
@@ -385,6 +429,36 @@ pub fn densify_activity(
                 requirements.g_force,
                 crate::MetricKind::GForce,
             ),
+            g_force_x: if requirements.g_force_x {
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.g_force_x,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
+            g_force_y: if requirements.g_force_y {
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.g_force_y,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
+            g_force_z: if requirements.g_force_z {
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.g_force_z,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
             rpm: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.rpm,

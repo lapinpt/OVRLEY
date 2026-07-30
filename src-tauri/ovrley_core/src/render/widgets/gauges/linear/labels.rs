@@ -75,8 +75,8 @@ pub(super) fn label_layout(
     let width = width as f32;
     let height = height as f32;
     let gap = label_gap(gauge.min_max_label_font_size * scale);
-    let min_label = format_gauge_label(min_value);
-    let max_label = format_gauge_label(max_value);
+    let min_label = format_gauge_label(gauge.metric, None, min_value);
+    let max_label = format_gauge_label(gauge.metric, None, max_value);
     let (_, metrics) = font.metrics();
     let (_, min_bounds) = font.measure_str(&min_label, None);
     let (_, max_bounds) = font.measure_str(&max_label, None);

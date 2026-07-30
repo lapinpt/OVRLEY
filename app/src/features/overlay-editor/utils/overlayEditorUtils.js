@@ -10,6 +10,7 @@
 import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
+import { interpolateNumericSeries } from '@/lib/interpolation'
 import { getStandardMetricDefinition, getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
 
 /**
@@ -23,115 +24,6 @@ export function getSceneSize(config) {
     width: config?.scene?.width || 1920,
     height: config?.scene?.height || 1080,
   }
-}
-
-function isValidInterpolatedSample(xValues, yValues, index) {
-  return Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])
-}
-
-function findNearestValidSampleIndex(xValues, yValues, startIndex, direction) {
-  for (let index = startIndex; index >= 0 && index < xValues.length; index += direction) {
-    if (isValidInterpolatedSample(xValues, yValues, index)) {
-      return index
-    }
-  }
-
-  return -1
-}
-
-function findFirstIndexAtOrAfter(xValues, targetX, low, high) {
-  let left = low
-  let right = high
-  let result = high
-
-  while (left <= right) {
-    const middle = Math.floor((left + right) / 2)
-    const middleX = Number(xValues[middle])
-
-    if (Number.isFinite(middleX) && middleX >= targetX) {
-      result = middle
-      right = middle - 1
-    } else {
-      left = middle + 1
-    }
-  }
-
-  return result
-}
-
-/**
- * Performs linear interpolation on a series of (x, y) values at the target X.
- * Falls back to the nearest endpoint if targetX is out of range.
- *
- * @param {number[]} xValues - X-axis sample values (monotonic).
- * @param {number[]} yValues - Y-axis sample values aligned with xValues.
- * @param {number} targetX - Requested X value to interpolate at.
- * @returns {number|null} Interpolated Y value or null if no valid samples.
- */
-export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
-  if (!Array.isArray(xValues) || !Array.isArray(yValues) || !xValues.length) {
-    return null
-  }
-
-  const safeTargetX = Number(targetX)
-  if (!Number.isFinite(safeTargetX)) {
-    return null
-  }
-
-  let firstValidIndex = -1
-  let lastValidIndex = -1
-
-  for (let index = 0; index < xValues.length; index += 1) {
-    if (Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])) {
-      firstValidIndex = index
-      break
-    }
-  }
-
-  if (firstValidIndex === -1) {
-    return null
-  }
-
-  for (let index = yValues.length - 1; index >= 0; index -= 1) {
-    if (Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])) {
-      lastValidIndex = index
-      break
-    }
-  }
-
-  if (safeTargetX <= xValues[firstValidIndex]) {
-    return Number(yValues[firstValidIndex])
-  }
-
-  if (safeTargetX >= xValues[lastValidIndex]) {
-    return Number(yValues[lastValidIndex])
-  }
-
-  const insertionIndex = findFirstIndexAtOrAfter(xValues, safeTargetX, firstValidIndex, lastValidIndex)
-  const rightIndex = findNearestValidSampleIndex(xValues, yValues, insertionIndex, 1)
-  const rightXAtInsertion = Number(xValues[rightIndex])
-  const leftIndex = findNearestValidSampleIndex(
-    xValues,
-    yValues,
-    rightXAtInsertion === safeTargetX ? rightIndex : Math.min(rightIndex - 1, lastValidIndex),
-    -1,
-  )
-
-  const leftX = Number(xValues[leftIndex])
-  const rightX = Number(xValues[rightIndex])
-  const leftY = Number(yValues[leftIndex])
-  const rightY = Number(yValues[rightIndex])
-
-  if (!Number.isFinite(leftX) || !Number.isFinite(rightX) || !Number.isFinite(leftY) || !Number.isFinite(rightY)) {
-    return null
-  }
-
-  if (rightIndex === leftIndex || rightX === leftX) {
-    return leftY
-  }
-
-  const ratio = (safeTargetX - leftX) / (rightX - leftX)
-  return leftY + (rightY - leftY) * ratio
 }
 
 /**
@@ -215,7 +107,7 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
     return heldValue ?? null
   }
 
-  const interpolatedValue = getInterpolatedSeriesValue(elapsedSeries, series, elapsedSecond)
+  const interpolatedValue = interpolateNumericSeries(elapsedSeries, series, elapsedSecond)
 
   return interpolatedValue ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
@@ -250,7 +142,7 @@ export function getInterpolatedTimeValue(activity, elapsedSecond) {
     const parsed = Date.parse(value || '')
     return Number.isFinite(parsed) ? parsed : null
   })
-  const interpolatedTimeMs = getInterpolatedSeriesValue(elapsedSeries, numericTimeSeries, elapsedSecond)
+  const interpolatedTimeMs = interpolateNumericSeries(elapsedSeries, numericTimeSeries, elapsedSecond)
 
   return Number.isFinite(interpolatedTimeMs) ? new Date(interpolatedTimeMs).toISOString() : DEFAULT_ACTIVITY_PREVIEW.time
 }
@@ -268,7 +160,7 @@ export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const distanceProgressSeries = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
 
-  const interpolatedProgress = getInterpolatedSeriesValue(elapsedSeries, distanceProgressSeries, elapsedSecond)
+  const interpolatedProgress = interpolateNumericSeries(elapsedSeries, distanceProgressSeries, elapsedSecond)
 
   if (Number.isFinite(interpolatedProgress)) {
     return clamp(interpolatedProgress, 0, 1)

@@ -38,9 +38,11 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
 const CORE_ACTIVITY_ATTRIBUTES: &[&str] = &[
+    "altitude",
     "cadence",
     "course",
     "elevation",
+    "gps_coordinates",
     "gradient",
     "heartrate",
     "power",
@@ -243,6 +245,7 @@ fn finalize_columns_with_debug(
         .collect();
     let elevation_profile_series =
         preferred_elevation_series(&barometric_altitude_series, &elevation_base_series).to_vec();
+
     let mut metric_series_map = derive_activity_metric_series(
         &course_series,
         &distance_series,
@@ -420,6 +423,7 @@ fn activity_columns_from_samples(
         gradient: collect!(gradient),
         pace: collect!(pace),
         distance: collect!(distance),
+        distance_to_home: raw_samples.iter().map(|_| None).collect(),
         g_force: collect!(g_force),
         g_force_x: raw_samples.iter().map(|_| None).collect(),
         g_force_y: raw_samples.iter().map(|_| None).collect(),
@@ -476,6 +480,7 @@ fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
         ("gradient", columns.gradient.len()),
         ("pace", columns.pace.len()),
         ("distance", columns.distance.len()),
+        ("distance_to_home", columns.distance_to_home.len()),
         ("g_force", columns.g_force.len()),
         ("g_force_x", columns.g_force_x.len()),
         ("g_force_y", columns.g_force_y.len()),
@@ -662,13 +667,16 @@ fn build_valid_attributes(
         .iter()
         .filter(|attribute| {
             let key = **attribute;
-            if key == "course" {
+            if key == "course" || key == "gps_coordinates" {
                 return course_series
                     .iter()
                     .any(|(lat, lon)| lat.is_some() && lon.is_some());
             }
             if key == "time" {
                 return time_series.iter().any(Option::is_some);
+            }
+            if key == "altitude" {
+                return coverage["elevation"].is_available();
             }
             coverage[key].is_available()
         })
@@ -734,6 +742,9 @@ fn apply_metric_smoothing(
         "speed",
         "vertical_speed",
         "g_force",
+        "g_force_x",
+        "g_force_y",
+        "g_force_z",
         "gradient",
         "pace",
     ]);

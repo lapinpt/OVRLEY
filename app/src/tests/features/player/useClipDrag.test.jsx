@@ -20,8 +20,8 @@ function createEvent(clientX, currentTarget = createTarget()) {
   }
 }
 
-function renderDrag(setVideoSyncOffset = vi.fn()) {
-  const hook = renderHook(() => useClipDrag({ setVideoSyncOffset }))
+function renderDrag(setVideoSyncOffset = vi.fn(), setVideoSyncOffsetPreview = vi.fn()) {
+  const hook = renderHook(() => useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPreview }))
   const containerElement = {
     getBoundingClientRect: () => ({ width: 250 }),
   }
@@ -38,31 +38,39 @@ function renderDrag(setVideoSyncOffset = vi.fn()) {
     })
   })
 
-  return { ...hook, setVideoSyncOffset }
+  return { ...hook, setVideoSyncOffset, setVideoSyncOffsetPreview }
 }
 
 describe('useClipDrag', () => {
   test('keeps fractional movement live and rounds the committed offset on pointer up', () => {
-    const { result, setVideoSyncOffset } = renderDrag()
+    const setVideoSyncOffset = vi.fn()
+    const setVideoSyncOffsetPreview = vi.fn()
+    const { result } = renderDrag(setVideoSyncOffset, setVideoSyncOffsetPreview)
     const target = createTarget()
 
     act(() => {
       result.current.getLaneDragProps('video').onPointerDown(createEvent(100, target))
-      result.current.getLaneDragProps('video').onPointerMove(createEvent(103, target))
     })
 
-    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(6)
+    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(5)
+
+    act(() => {
+      result.current.getLaneDragProps('video').onPointerMove(createEvent(103, target))
+    })
 
     act(() => {
       result.current.getLaneDragProps('video').onPointerUp(createEvent(103, target))
     })
 
     expect(setVideoSyncOffset).toHaveBeenLastCalledWith(6.2)
+    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
     expect(target.releasePointerCapture).toHaveBeenCalledWith(1)
   })
 
   test('snaps a clip edge to an alignment guideline within the pixel threshold', () => {
-    const { result, setVideoSyncOffset } = renderDrag()
+    const setVideoSyncOffset = vi.fn()
+    const setVideoSyncOffsetPreview = vi.fn()
+    const { result } = renderDrag(setVideoSyncOffset, setVideoSyncOffsetPreview)
     const target = createTarget()
 
     act(() => {
@@ -70,19 +78,18 @@ describe('useClipDrag', () => {
       result.current.getLaneDragProps('video').onPointerMove(createEvent(88, target))
     })
 
-    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(0)
-    expect(result.current.snapGuidelineSecond).toBe(0)
-
     act(() => {
-      result.current.getLaneDragProps('video').onPointerMove(createEvent(80, target))
+      result.current.getLaneDragProps('video').onPointerUp(createEvent(88, target))
     })
 
-    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(-3)
-    expect(result.current.snapGuidelineSecond).toBeNull()
+    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(0)
+    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
   })
 
   test('restores the initial offset when the pointer drag is cancelled', () => {
-    const { result, setVideoSyncOffset } = renderDrag()
+    const setVideoSyncOffset = vi.fn()
+    const setVideoSyncOffsetPreview = vi.fn()
+    const { result } = renderDrag(setVideoSyncOffset, setVideoSyncOffsetPreview)
     const target = createTarget()
 
     act(() => {
@@ -92,5 +99,6 @@ describe('useClipDrag', () => {
     })
 
     expect(setVideoSyncOffset).toHaveBeenLastCalledWith(5)
+    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
   })
 })

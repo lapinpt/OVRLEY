@@ -248,10 +248,10 @@ fn validate_value_widget_fields(
         )));
     }
     if value.value == MetricKind::DistanceToHome
-        && !matches!(display_unit.as_str(), "m" | "km" | "mi")
+        && !matches!(display_unit.as_str(), "m" | "km" | "mi" | "ft")
     {
         return Err(CoreError::Config(format!(
-            "{}: expected 'm', 'km', or 'mi', got '{display_unit}'",
+            "{}: expected 'm', 'km', 'mi', or 'ft', got '{display_unit}'",
             p("display_unit")
         )));
     }

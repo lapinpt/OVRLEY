@@ -52,9 +52,16 @@ vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
 }))
 
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: ({ canResizeSelected, maintainAspectRatio, moveableRef }) => {
+  default: ({ canResizeSelected, maintainAspectRatio, moveableRef, showEdgeResizeHandles }) => {
     moveableRef.current = { updateRect: moveableUpdateRectMock }
-    return <div data-testid="moveable-props" data-can-resize={String(canResizeSelected)} data-maintain-ratio={String(maintainAspectRatio)} />
+    return (
+      <div
+        data-testid="moveable-props"
+        data-can-resize={String(canResizeSelected)}
+        data-maintain-ratio={String(maintainAspectRatio)}
+        data-edge-handles={String(showEdgeResizeHandles)}
+      />
+    )
   },
 }))
 
@@ -99,6 +106,7 @@ const defaultEditorControls = {
   onZoomIn: vi.fn(),
   onZoomOut: vi.fn(),
   snapToGrid: false,
+  undoRedoControls: { canRedo: false, canUndo: false, redo: vi.fn(), undo: vi.fn() },
   zoomLevel: 1,
 }
 
@@ -414,6 +422,59 @@ describe('OverlayEditor selection flow', () => {
     expect(renderGeometry.height).toBe(80)
   })
 
+  test('uses already-resolved lean-angle dimensions without re-resolving ephemeral frame fields', () => {
+    const renderGeometry = resolveWidgetRenderGeometry(
+      {
+        id: 'lean-angle-1',
+        type: 'lean_angle',
+        category: 'values',
+        data: {
+          x: 10,
+          y: 20,
+          display_type: 'lean_angle',
+          diameter: 180,
+          track_thickness: 24,
+          font_size: 60,
+          value_offset_y: 0,
+          width: 155.88457268119896,
+          height: 117.6,
+        },
+      },
+      null,
+      1,
+    )
+
+    expect(renderGeometry.width).toBeCloseTo(155.884573, 5)
+    expect(renderGeometry.height).toBeCloseTo(117.6, 5)
+  })
+
+  test('expands and contracts the lean-angle selection frame with vertical label offset', () => {
+    const widget = {
+      id: 'lean-angle-1',
+      type: 'lean_angle',
+      category: 'values',
+      data: {
+        x: 10,
+        y: 20,
+        display_type: 'lean_angle',
+        diameter: 180,
+        track_thickness: 24,
+        font_size: 60,
+        value_offset_y: -20,
+        width: 155.88457268119896,
+        height: 117.6,
+      },
+    }
+
+    const contracted = resolveWidgetRenderGeometry(widget, null, 1)
+    expect(contracted.top).toBe(20)
+    expect(contracted.height).toBeCloseTo(97.6, 5)
+
+    const expanded = resolveWidgetRenderGeometry({ ...widget, data: { ...widget.data, value_offset_y: 100 } }, null, 1)
+    expect(expanded.top).toBe(20)
+    expect(expanded.height).toBeCloseTo(217.6, 5)
+  })
+
   test('enables resize handles for selected backdrop frames', () => {
     const config = {
       ...DEFAULT_CONFIG,
@@ -502,6 +563,60 @@ describe('OverlayEditor selection flow', () => {
 
     expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
     expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'true')
+  })
+
+  test('uses corner-only square resize handles for selected G-force widgets', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      backdrops: [],
+      labels: [],
+      plots: [],
+      values: [
+        {
+          id: 'widget-g-force',
+          value: 'g_force',
+          x: 0,
+          y: 0,
+          display_type: 'g_force',
+          display_variants: {
+            g_force: {
+              width: 220,
+              height: 220,
+              diameter: 200,
+            },
+          },
+        },
+      ],
+    }
+
+    useStore.getState().setConfig(config)
+
+    const { container, getByTestId } = render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const gForce = container.querySelector('[data-widget-id="widget-g-force"]')
+    expect(gForce).toBeTruthy()
+
+    fireEvent.mouseDown(gForce, { button: 0 })
+
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-can-resize', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-maintain-ratio', 'true')
+    expect(getByTestId('moveable-props')).toHaveAttribute('data-edge-handles', 'false')
   })
 
   test('renders the canvas toolbar centered above the preview area', () => {

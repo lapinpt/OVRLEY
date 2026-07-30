@@ -194,15 +194,3 @@ export function getLinearTranslatedFillPath({ trackRect, fillRect, orientation, 
 
   return getTranslatedTrackCapPath({ ...getLinearTrackCapGeometry(trackRect, orientation, cornerRadius), ...translatedCap })
 }
-
-/**
- * Formats a gauge label value. Integers are formatted without decimals;
- * non-integers show one decimal place.
- *
- * @param {number} value - The value to format.
- * @returns {string} Formatted label string.
- */
-export function formatLinearGaugeLabel(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
-  return Number.isInteger(value) ? `${value}` : value.toFixed(1)
-}

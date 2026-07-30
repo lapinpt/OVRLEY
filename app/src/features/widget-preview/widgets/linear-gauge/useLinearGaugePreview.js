@@ -2,7 +2,6 @@ import { useId } from 'react'
 import { getInterpolatedActivityValue } from '@/features/overlay-editor'
 import { getBarFillCount, getLinearBarRects } from '../../shared/gaugeBarGeometry'
 import {
-  formatLinearGaugeLabel,
   getLinearGaugeLabelLayout,
   getLinearGaugeLayout,
   getLinearRectCornerRadii,
@@ -13,6 +12,7 @@ import { getTextShadowParts } from '../../shared/shadow'
 import { normalizeSvgShadowColor } from '../../shared/svgPreviewUtils'
 import { getPreviewFontFamily } from '../../shared/textMeasurement'
 import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Builds all non-JSX state for a normalized linear-gauge preview. */
 export function useLinearGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
@@ -46,8 +46,10 @@ export function useLinearGaugePreviewPresentation({ widget, activity, previewSec
           cornerRadius: fillCornerRadius,
         })
       : ''
-  const minLabel = formatLinearGaugeLabel(layout.min)
-  const maxLabel = formatLinearGaugeLabel(layout.max)
+  const metricType = widget.data.value
+  const displayUnit = widget.data.display_unit
+  const minLabel = formatGaugeBoundaryLabel(metricType, layout.min, displayUnit)
+  const maxLabel = formatGaugeBoundaryLabel(metricType, layout.max, displayUnit)
 
   return {
     maskId,

@@ -236,6 +236,7 @@ fn interpolate_elevation_for_elapsed_frames(
                 elapsed_seconds,
                 elevations,
                 scene_start + *frame_elapsed,
+                crate::interpolation::MissingSamplePolicy::Bridge,
             )
             .unwrap_or(0.0)
         })

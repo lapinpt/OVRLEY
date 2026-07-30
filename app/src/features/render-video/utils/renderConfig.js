@@ -219,6 +219,10 @@ export function createRenderEffectiveConfig(options) {
   return {
     ...nextConfig,
     scene,
-    values: nextConfig.values?.map(({ display_variants: _displayVariants, ...value }) => value),
+    values: nextConfig.values?.map(({ display_variants: _displayVariants, ...value }) => {
+      if (value.display_type !== 'lean_angle') return value
+      const { width: _width, height: _height, ...renderValue } = value
+      return renderValue
+    }),
   }
 }

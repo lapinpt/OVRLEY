@@ -17,7 +17,7 @@ function scaleNumber(value, scaleFactor, { min = -Infinity, max = Infinity, roun
 }
 
 const GAUGE_DISPLAY_TYPES = new Set(['arc', 'corner', 'lean_angle'])
-const LEAN_ANGLE_FRAME_HEIGHT_RATIO = 140 / 180
+const G_FORCE_DISPLAY_TYPE = 'g_force'
 
 function isLeanAngleDisplayType(displayType) {
   return displayType === 'lean_angle'
@@ -30,21 +30,30 @@ function isLeanAngleDisplayType(displayType) {
  * @returns {boolean} Whether the display type scales its dimensional content with the frame.
  */
 export function isUniformResizeDisplayType(displayType) {
-  return GAUGE_DISPLAY_TYPES.has(displayType)
+  return GAUGE_DISPLAY_TYPES.has(displayType) || displayType === G_FORCE_DISPLAY_TYPE
 }
 
 function isGauge(widget) {
   return GAUGE_DISPLAY_TYPES.has(widget?.data?.display_type)
 }
 
-function captureGaugeResizeOrigin(widget, data) {
+function isGForce(widget) {
+  return widget?.data?.display_type === G_FORCE_DISPLAY_TYPE
+}
+
+function captureVariantResizeOrigin(widget, data) {
   const displayType = widget.data.display_type
 
   return {
     displayType,
     data,
-    variant: widget.data.display_variants?.[displayType] ?? {},
+    variant: widget.data.display_variants[displayType],
   }
+}
+
+function buildMarkerResizeContentDraft(origin, scaleFactor) {
+  if (origin.markerSize === null) return {}
+  return { marker_size: scaleNumber(origin.markerSize, scaleFactor, { min: 0, max: 400 }) }
 }
 
 function buildGaugeResizeContentDraft(origin, scaleFactor, { round = true } = {}) {
@@ -74,16 +83,47 @@ function buildGaugeResizeContentDraft(origin, scaleFactor, { round = true } = {}
 
 function buildLeanAngleResizeContentDraft(origin, scaleFactor, { round = true } = {}) {
   const { data } = origin
+  const diameter = scaleNumber(data.diameter, scaleFactor, { min: 8, max: 10_000, round })
+  const trackThickness = scaleNumber(data.track_thickness, scaleFactor, {
+    min: 1,
+    max: diameter * 0.5 - Number.EPSILON,
+    round,
+  })
+  const borderThickness = scaleNumber(data.track_border_thickness, scaleFactor, {
+    min: 0,
+    max: Math.max(0, trackThickness * 0.5 - Number.EPSILON),
+    round,
+  })
 
   return {
     font_size: scaleNumber(data.font_size, scaleFactor, { min: 8, max: 400, round }),
     display_variants: {
       [origin.displayType]: {
         ...origin.variant,
-        track_thickness: scaleNumber(data.track_thickness, scaleFactor, { min: 1, max: 100, round }),
-        track_border_thickness: scaleNumber(data.track_border_thickness, scaleFactor, { min: 0, max: 24, round }),
+        diameter,
+        track_thickness: trackThickness,
+        track_border_thickness: borderThickness,
         value_offset_x: scaleNumber(data.value_offset_x, scaleFactor, { min: -10_000, max: 10_000, round }),
         value_offset_y: scaleNumber(data.value_offset_y, scaleFactor, { min: -10_000, max: 10_000, round }),
+      },
+    },
+  }
+}
+
+function buildGForceResizeContentDraft(origin, scaleFactor, { round = true } = {}) {
+  const { data } = origin
+  const diameter = scaleNumber(data.diameter, scaleFactor, { min: 8, max: 10_000, round })
+
+  return {
+    display_variants: {
+      [origin.displayType]: {
+        ...origin.variant,
+        diameter,
+        border_thickness: scaleNumber(data.border_thickness, scaleFactor, { min: 0, max: (diameter - 1) * 0.5, round }),
+        marker_size: scaleNumber(data.marker_size, scaleFactor, { min: 1, max: diameter, round }),
+        label_font_size: scaleNumber(data.label_font_size, scaleFactor, { min: 8, max: 400, round }),
+        label_offset_x: scaleNumber(data.label_offset_x, scaleFactor, { min: -10_000, max: 10_000, round }),
+        label_offset_y: scaleNumber(data.label_offset_y, scaleFactor, { min: -10_000, max: 10_000, round }),
       },
     },
   }
@@ -95,17 +135,21 @@ function getResizeScaleFactor(origin, width, height) {
 }
 
 function buildResizeContentDraft(origin, scaleFactor, options) {
+  if (origin.displayType === G_FORCE_DISPLAY_TYPE) return buildGForceResizeContentDraft(origin, scaleFactor, options)
   if (isLeanAngleDisplayType(origin.displayType)) return buildLeanAngleResizeContentDraft(origin, scaleFactor, options)
-  return GAUGE_DISPLAY_TYPES.has(origin.displayType) ? buildGaugeResizeContentDraft(origin, scaleFactor, options) : {}
+  if (GAUGE_DISPLAY_TYPES.has(origin.displayType)) return buildGaugeResizeContentDraft(origin, scaleFactor, options)
+  return buildMarkerResizeContentDraft(origin, scaleFactor)
 }
 
 function lockResizeFrame(origin, framePatch, { round = false } = {}) {
-  if (!isLeanAngleDisplayType(origin.displayType)) return framePatch
-
-  return {
-    ...framePatch,
-    height: round ? Math.round(framePatch.width * LEAN_ANGLE_FRAME_HEIGHT_RATIO) : framePatch.width * LEAN_ANGLE_FRAME_HEIGHT_RATIO,
+  if (origin.displayType === G_FORCE_DISPLAY_TYPE) {
+    return {
+      ...framePatch,
+      height: round ? Math.round(framePatch.width) : framePatch.width,
+    }
   }
+
+  return framePatch
 }
 
 /**
@@ -120,17 +164,19 @@ export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidge
 
   const origin = {
     widgetData: widget.data,
-    width: frameData?.width ?? widget.data.width ?? 0,
-    height: frameData?.height ?? widget.data.height ?? 0,
+    width: frameData.width,
+    height: frameData.height,
+    markerSize: widget.data.marker_size ?? null,
   }
 
-  return isGauge(widget) ? { ...origin, ...captureGaugeResizeOrigin(widget, frameData) } : origin
+  if (isGauge(widget) || isGForce(widget)) return { ...origin, ...captureVariantResizeOrigin(widget, frameData) }
+  return origin
 }
 
 /**
  * Merges a content draft with the normal frame update while preserving the
- * durable display-variant shape. Frame geometry wins when both drafts contain
- * width, height, or rotation.
+ * durable display-variant shape. Lean-angle frame dimensions remain derived
+ * and therefore are never included in the commit patch.
  *
  * @param {object|null} widgetData - Current stored widget data.
  * @param {object} framePatch - Position/frame update.
@@ -138,7 +184,8 @@ export function captureResizeOrigin(widget, frameData = resolveActiveMetricWidge
  * @returns {object} Commit-ready widget update patch.
  */
 function mergeResizeUpdate(widgetData, framePatch, contentDraft = {}) {
-  const frameUpdate = buildFrameGeometryUpdate(widgetData, framePatch)
+  const frameUpdate =
+    widgetData.display_type === 'lean_angle' ? { x: framePatch.x, y: framePatch.y } : buildFrameGeometryUpdate(widgetData, framePatch)
   const { display_variants: contentVariants, ...topLevelContent } = contentDraft
 
   if (!contentVariants) {
@@ -201,24 +248,16 @@ export function buildResizeUpdate(origin, framePatch, { round = false } = {}) {
  */
 export function buildUniformResizeUpdate(widget, size) {
   const origin = captureResizeOrigin(widget)
-  const nextWidth = Number(size)
+  if (!origin || !Number.isFinite(size)) return null
 
-  if (
-    !origin ||
-    !Number.isFinite(origin.width) ||
-    !Number.isFinite(origin.height) ||
-    origin.width <= 0 ||
-    origin.height <= 0 ||
-    !Number.isFinite(nextWidth)
-  ) {
-    return null
+  if (origin.displayType === 'lean_angle') {
+    const contentDraft = buildLeanAngleResizeContentDraft(origin, size / origin.data.diameter, { round: true })
+    return mergeResizeUpdate(origin.widgetData, { x: origin.widgetData.x, y: origin.widgetData.y }, contentDraft)
   }
 
   const framePatch = {
-    width: Math.round(nextWidth),
-    height: isLeanAngleDisplayType(origin.displayType)
-      ? Math.round(nextWidth * LEAN_ANGLE_FRAME_HEIGHT_RATIO)
-      : Math.round(origin.height * (nextWidth / origin.width)),
+    width: Math.round(size),
+    height: origin.displayType === G_FORCE_DISPLAY_TYPE ? Math.round(size) : Math.round(origin.height * (size / origin.width)),
   }
 
   return buildResizeUpdate(origin, framePatch, { round: true })
@@ -236,6 +275,30 @@ export function buildUniformResizeUpdate(widget, size) {
  * @returns {object} Draft with scaled properties.
  */
 export function buildScaleDraft(data, scaleFactor, widget, { round = true } = {}) {
+  if (widget?.data?.display_type === G_FORCE_DISPLAY_TYPE) {
+    const origin = {
+      displayType: G_FORCE_DISPLAY_TYPE,
+      data,
+      variant: widget.data.display_variants?.[G_FORCE_DISPLAY_TYPE] ?? {},
+    }
+    const contentDraft = buildGForceResizeContentDraft(origin, scaleFactor, { round })
+    const width = scaleNumber(data.width, scaleFactor, { min: 8, max: 10_000, round })
+    const height = scaleNumber(data.height, scaleFactor, { min: 8, max: 10_000, round })
+
+    return {
+      width,
+      height,
+      display_variants: {
+        ...(widget.data.display_variants || {}),
+        [G_FORCE_DISPLAY_TYPE]: {
+          ...contentDraft.display_variants[G_FORCE_DISPLAY_TYPE],
+          width,
+          height,
+        },
+      },
+    }
+  }
+
   const nextFontSize = scaleNumber(data.font_size, scaleFactor, { min: 8, max: 400, round })
   const nextDraft = {
     font_size: nextFontSize,

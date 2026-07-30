@@ -132,20 +132,7 @@ export function useScaleHandlers({
         commitWidgetUpdate(origin.id, {
           x: Math.round(finalX),
           y: Math.round(finalY),
-          font_size: scaledDraft.font_size,
-          ...(selectedWidget?.category === 'values' && selectedWidget.type !== 'gradient'
-            ? {
-                icon_size: scaledDraft.icon_size,
-                icon_offset_x: scaledDraft.icon_offset_x,
-                icon_offset_y: scaledDraft.icon_offset_y,
-              }
-            : {}),
-          ...(selectedWidget?.type === 'gradient'
-            ? {
-                triangle_width: scaledDraft.triangle_width,
-                value_offset: scaledDraft.value_offset,
-              }
-            : {}),
+          ...scaledDraft,
         })
       }
 

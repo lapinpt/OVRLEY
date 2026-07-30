@@ -622,14 +622,7 @@ pub fn derive_activity_metric_series(
     );
     map.insert(
         "distance_to_home".to_string(),
-        MetricDescriptor {
-            source: if derived_distance_to_home.iter().any(Option::is_some) {
-                MetricSource::Derived
-            } else {
-                MetricSource::Missing
-            },
-            series: MetricSeries::Numeric(derived_distance_to_home),
-        },
+        select_series(&direct["distance_to_home"], &derived_distance_to_home),
     );
     map.insert(
         "total_ascent".to_string(),
@@ -740,6 +733,7 @@ fn direct_metrics(
     collect!("calories", calories);
     collect!("core_temperature", core_temperature);
     direct.insert("distance", distance_series.clone());
+    collect!("distance_to_home", distance_to_home);
     direct.insert("elevation", elevation_base_series.clone());
     collect!("brake_position", brake_position);
     collect!("g_force", g_force);
