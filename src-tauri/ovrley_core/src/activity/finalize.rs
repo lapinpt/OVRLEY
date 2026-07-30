@@ -31,7 +31,7 @@ use crate::activity::schema::{
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{finite_f64, round_f64};
 use crate::media::timezone::timezone_for_coordinates;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -224,7 +224,7 @@ fn finalize_columns_with_debug(
         .map_err(|_| {
             CoreError::Activity("Timezone finder returned an invalid IANA timezone".into())
         })?;
-    let time_series = build_time_series(columns);
+    let time_series = build_time_series(columns, timezone_tz);
     let elapsed_series = build_elapsed_series(columns, &time_series);
     let direct_distance_series: Vec<Option<f64>> = columns
         .distance
@@ -571,19 +571,39 @@ fn validate_course_coordinate_ranges(
 /// The frontend historically emitted `Date#toISOString()` values. Normalizing
 /// here keeps backend-created payloads byte-stable enough for diagnostics and
 /// avoids leaking local time-zone formatting into render data.
-fn build_time_series(columns: &ActivityColumns) -> Vec<Option<String>> {
+///
+/// When a timestamp has no timezone offset (naive local time such as SRT
+/// camera timestamps), it is interpreted in the GPS-derived activity timezone
+/// and converted to UTC. Without a timezone, naive timestamps are treated as
+/// UTC.
+fn build_time_series(
+    columns: &ActivityColumns,
+    timezone: Option<Tz>,
+) -> Vec<Option<String>> {
     columns
         .timestamp
         .iter()
         .map(|timestamp| {
-            timestamp
-                .as_deref()
-                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-                .map(|value| {
-                    value
+            let value = timestamp.as_deref()?;
+            if let Ok(parsed) = DateTime::parse_from_rfc3339(value) {
+                return Some(
+                    parsed
                         .with_timezone(&Utc)
-                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
-                })
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                );
+            }
+            let naive =
+                NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S%.f")
+                    .or_else(|_| NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S"))
+                    .ok()?;
+            let utc = match timezone {
+                Some(tz) => tz
+                    .from_local_datetime(&naive)
+                    .single()
+                    .map(|dt| dt.with_timezone(&Utc)),
+                None => Some(Utc.from_utc_datetime(&naive)),
+            }?;
+            Some(utc.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
         })
         .collect()
 }

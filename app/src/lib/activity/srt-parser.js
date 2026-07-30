@@ -59,19 +59,20 @@ function extractFormatATimestamp(bodyLines) {
 }
 
 /**
- * Convert a DJI-style timestamp to ISO 8601.
+ * Convert a DJI-style timestamp to ISO 8601 local-time string.
+ * DJI cameras record timestamps in their local timezone, so the
+ * backend interprets the naive string using the GPS-derived timezone.
  * Input: `2025-07-23 10:21:41.694`
- * Output: `2025-07-23T10:21:41.694Z` (best-effort, assumes UTC)
+ * Output: `2025-07-23T10:21:41.694`
  * @param {string} ts
  * @returns {string|null}
  */
 function toIsoTimestamp(ts) {
   if (!ts) return null
   try {
-    const replaced = ts.replace(' ', 'T') + '.000Z'
-    // If original already has fractional seconds, use them
-    const withFraction = ts.replace(' ', 'T').replace(/\.(\d{3})$/, '.$1Z')
-    if (withFraction.includes('Z')) return withFraction
+    const replaced = ts.replace(' ', 'T') + '.000'
+    const withFraction = ts.replace(' ', 'T').replace(/\.(\d{3})$/, '.$1')
+    if (withFraction.includes('T')) return withFraction
     return replaced
   } catch {
     return null
@@ -160,8 +161,8 @@ function extractFormatBTimestamp(line) {
 }
 
 /**
- * Convert Format B timestamp to ISO 8601.
- * Input: `2017.08.05 14:12:00` → Output: `2017-08-05T14:12:00.000Z`
+ * Convert Format B timestamp to ISO 8601 local-time string.
+ * Input: `2017.08.05 14:12:00` → Output: `2017-08-05T14:12:00.000`
  * @param {string} ts
  * @returns {string|null}
  */
@@ -170,7 +171,7 @@ function toFormatBIso(ts) {
   try {
     const [datePart, timePart] = ts.split(' ')
     const isoDate = datePart.replace(/\./g, '-')
-    return isoDate + 'T' + timePart + '.000Z'
+    return isoDate + 'T' + timePart + '.000'
   } catch {
     return null
   }
