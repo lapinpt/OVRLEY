@@ -201,6 +201,12 @@ fn parse_absolute_timestamp(
     if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f") {
         return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
     }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f") {
+        return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S") {
+        return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
+    }
     let seconds = convert(parse_number(Some(value))?, numeric_unit?);
     unix_timestamp(seconds)
 }

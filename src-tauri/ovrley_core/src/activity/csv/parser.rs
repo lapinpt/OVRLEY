@@ -164,6 +164,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         .map(parse_declared_unit)
         .unwrap_or(DeclaredUnit::Absent);
     let (metric, alias_priority, timing, mut control, acceleration) = match semantic.as_str() {
+        "datetime" => (
+            Metric::Timestamp,
+            SourcePriority::Direct,
+            Some(TimingKind::ExplicitUtc),
+            None,
+            None,
+        ),
         "time" => (
             Metric::ElapsedSeconds,
             SourcePriority::Direct,
@@ -359,6 +366,14 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         ),
         _ => return None,
     };
+    let mut declared_unit = declared_unit;
+    if metric == Metric::Timestamp
+        && annotation.as_deref().is_some_and(|ann| {
+            ann.eq_ignore_ascii_case("utc") || ann.eq_ignore_ascii_case("gmt") || ann.eq_ignore_ascii_case("z")
+        })
+    {
+        declared_unit = DeclaredUnit::Absent;
+    }
     if matches!(
         (metric, declared_unit),
         (

@@ -1134,3 +1134,20 @@ fn local_transition_examples() -> (bool, Vec<LocalTransitionExample>) {
     }
     (has_transition, examples)
 }
+
+#[test]
+fn airdata_datetime_utc_column_is_parsed_as_absolute_timestamps() {
+    let csv = "time(millisecond),datetime(utc),latitude,longitude,altitude_above_seaLevel(feet),speed(mph),distance(feet),mileage(feet),compass_heading(degrees)\n\
+0,,53.4881644,-1.2102215,100,0,10,100,90\n\
+100,2026-07-14 11:45:06,53.4881645,-1.2102216,101,1,20,130,100\n\
+200,2026-07-14 11:45:06,53.4881646,-1.2102217,102,2,30,160,110\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "airdata-datetime.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.time.len(), 3);
+    assert_eq!(activity.time[0], None);
+    assert_eq!(activity.time[1].as_deref(), Some("2026-07-14T11:45:06.000Z"));
+    assert_eq!(activity.time[2].as_deref(), Some("2026-07-14T11:45:06.000Z"));
+}
