@@ -1,29 +1,32 @@
 # Lap Timing Extraction Strategy
 
 ## Goal
+
 Fold lap timing into the existing native activity parsing pipeline so the canonical `ParsedActivity` output gains the minimum lap-timing data needed for live overlay:
 
 - Current lap live timing (`lap_time_seconds`)
 - Live delta of the current lap versus the current best lap (`delta_to_best_lap_seconds`)
 - Session-best lap duration as a single scalar (`best_lap_time_seconds`)
+- Compact per-lap metadata so both renderer and frontend can read best-lap-so-far and lap-log values without repeated per-frame scans (`lap_durations_seconds`, `lap_durations_best_so_far_seconds`)
 
-The output remains the same JSON `ParsedActivity` shape the renderer already consumes; lap data is added as new aligned arrays plus one metadata field.
+The output remains the same JSON `ParsedActivity` shape the renderer already consumes; lap data is added as new aligned arrays plus compact metadata.
 
 ## Scope
+
 Only the CSV and VBO fixtures under `src-tauri/ovrley_core/tests/fixtures/activity/`.
 
 ## Fixture inventory
 
-| File | Format | Time column(s) | Lap boundary source | Notes |
-|------|--------|----------------|---------------------|-------|
-| `VBO-test.vbo` | RaceChrono Pro VBO | `time` (HHMMSS.ss) | `[laptiming]` start/split markers + interpolation of start/finish crossing | No per-row lap number. Time is GPS time-of-day. |
-| `Amozoc - TrackAddict.csv` | TrackAddict | `Time` (session elapsed, s), `UTC Time` | Explicit `Lap` column + `Start Point` comment | Also has `Predicted Lap Time` and `Predicted vs Best Lap`; we ignore those and compute our own best lap. |
-| `sample AiM.csv` | AiM | `Time` (session elapsed, s) | `Beacon Markers` header values are elapsed times of lap boundaries | `Segment Times` header gives per-lap durations; ignored. |
-| `sample LapLegend.csv` | Lap Legend | `Time` (session elapsed, s) | Explicit `Lap` column | Also has `Lap Number` and `Sector Number`; sector is ignored. |
-| `sample Racebox.csv` | RaceBox | `Time` (session elapsed, s) | Explicit `Lap` column | Single lap visible in sample. |
-| `sample RaceChrono.csv` | RaceChrono Pro v9.1.3 | `Time (s)` (absolute epoch-ish), `Elapsed time (s)` (session elapsed) | Explicit `Lap #` column | Dynamic columns; `Trap name` marks splits but is ignored. |
-| `session_20260713_185859_v1.csv` | RaceChrono v10.2.3 (per-lap) | `Timestamp (s)` (time-of-day in seconds) | Explicit `Lap #` column | `Lap #` is `N/A` before first lap. `Trap name` ignored. |
-| `session_20260713_185859_v2.csv` | RaceChrono v10.2.3 (format 2) | `Time (s)` (absolute), `Elapsed time (s)` (session elapsed) | Explicit `Lap #` column | `Lap #` is blank before first lap. |
+| File                             | Format                        | Time column(s)                                                        | Lap boundary source                                                        | Notes                                                                                                    |
+| -------------------------------- | ----------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `VBO-test.vbo`                   | RaceChrono Pro VBO            | `time` (HHMMSS.ss)                                                    | `[laptiming]` start/split markers + interpolation of start/finish crossing | No per-row lap number. Time is GPS time-of-day.                                                          |
+| `Amozoc - TrackAddict.csv`       | TrackAddict                   | `Time` (session elapsed, s), `UTC Time`                               | Explicit `Lap` column + `Start Point` comment                              | Also has `Predicted Lap Time` and `Predicted vs Best Lap`; we ignore those and compute our own best lap. |
+| `sample AiM.csv`                 | AiM                           | `Time` (session elapsed, s)                                           | `Beacon Markers` header values are elapsed times of lap boundaries         | `Segment Times` header gives per-lap durations; ignored.                                                 |
+| `sample LapLegend.csv`           | Lap Legend                    | `Time` (session elapsed, s)                                           | Explicit `Lap` column                                                      | Also has `Lap Number` and `Sector Number`; sector is ignored.                                            |
+| `sample Racebox.csv`             | RaceBox                       | `Time` (session elapsed, s)                                           | Explicit `Lap` column                                                      | Single lap visible in sample.                                                                            |
+| `sample RaceChrono.csv`          | RaceChrono Pro v9.1.3         | `Time (s)` (absolute epoch-ish), `Elapsed time (s)` (session elapsed) | Explicit `Lap #` column                                                    | Dynamic columns; `Trap name` marks splits but is ignored.                                                |
+| `session_20260713_185859_v1.csv` | RaceChrono v10.2.3 (per-lap)  | `Timestamp (s)` (time-of-day in seconds)                              | Explicit `Lap #` column                                                    | `Lap #` is `N/A` before first lap. `Trap name` ignored.                                                  |
+| `session_20260713_185859_v2.csv` | RaceChrono v10.2.3 (format 2) | `Time (s)` (absolute), `Elapsed time (s)` (session elapsed)           | Explicit `Lap #` column                                                    | `Lap #` is blank before first lap.                                                                       |
 
 ## Observations
 
@@ -40,7 +43,7 @@ Only the CSV and VBO fixtures under `src-tauri/ovrley_core/tests/fixtures/activi
 3. **Best-lap data is sometimes already hinted.**
    - TrackAddict has `Predicted vs Best Lap`.
    - AiM has `Segment Times` (lap durations).
-   We still compute best lap ourselves from completed laps so the overlay is consistent across formats.
+     We still compute best lap ourselves from completed laps so the overlay is consistent across formats.
 
 ## Integration with the existing pipeline
 
@@ -103,15 +106,17 @@ New aligned arrays (same length as `sample_elapsed_seconds`):
 }
 ```
 
-New metadata field:
+New metadata fields:
 
 ```json
 {
-  "best_lap_time_seconds": 93.456
+  "best_lap_time_seconds": 93.456,
+  "lap_durations_seconds": [94.12, 93.456, 95.002],
+  "lap_durations_best_so_far_seconds": [94.12, 93.456, 93.456]
 }
 ```
 
-The live best-lap-so-far can be derived by the consumer from `lap_number` transitions and `lap_time_seconds` if needed; we only store the final session best as a scalar.
+`lap_durations_seconds` is the duration of each completed lap (0-based lap index). `lap_durations_best_so_far_seconds` is the prefix-min of that array, giving the best completed lap duration up to and including each lap. Both arrays are scoped to the active trim window so that partial out-laps and in-laps are excluded. Consumers use these compact arrays for best-lap-so-far and lap-log lookups instead of scanning per-sample series.
 
 ### `TrimmedActivity` and `DenseSeriesReport`
 
@@ -119,22 +124,24 @@ Add matching `lap_number`, `lap_time_seconds`, and `delta_to_best_lap_seconds` f
 
 ## Column semantics
 
-| Column | Meaning | Nullability |
-|--------|---------|-------------|
-| `lap_number` | Lap number, 0-based. Records before the first start/finish crossing are `-1` (out-lap). | Never null. |
-| `lap_time_seconds` | Seconds since the start of the current `lap_number`. Null during out-lap (`lap_number == -1`). | Nullable. |
-| `delta_to_best_lap_seconds` | `lap_time_seconds - reference_best_lap_time_at_this_distance`. Null until at least one lap is completed and a reference path exists. | Nullable. |
+| Column                      | Meaning                                                                                                                              | Nullability |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| `lap_number`                | Lap number, 0-based. Records before the first start/finish crossing are `-1` (out-lap).                                              | Never null. |
+| `lap_time_seconds`          | Seconds since the start of the current `lap_number`. Null during out-lap (`lap_number == -1`).                                       | Nullable.   |
+| `delta_to_best_lap_seconds` | `lap_time_seconds - reference_best_lap_time_at_this_distance`. Null until at least one lap is completed and a reference path exists. | Nullable.   |
 
-| Metadata | Meaning | Nullability |
-|----------|---------|-------------|
-| `best_lap_time_seconds` | Duration of the fastest completed lap in the whole session. | Nullable if no lap completes. |
+| Metadata                            | Meaning                                                                                            | Nullability                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `best_lap_time_seconds`             | Duration of the fastest completed lap in the whole session.                                        | Nullable if no lap completes. |
+| `lap_durations_seconds`             | Array of completed-lap durations, indexed by 0-based lap number. Scoped to the active trim window. | Empty if no lap completes.    |
+| `lap_durations_best_so_far_seconds` | Prefix-min of `lap_durations_seconds`; `best_so_far[n]` is the fastest lap among laps `0..=n`.     | Empty if no lap completes.    |
 
 ## Delta computation
 
 The preferred reference is **distance**, which the finalizer already computes from source distance or from GPS course:
 
 1. For each completed lap, build a function `lap_time_for_distance(d)`.
-2. The *best lap* is the completed lap with the minimum total duration.
+2. The _best lap_ is the completed lap with the minimum total duration.
 3. At every record, `delta = lap_time_seconds - interpolate(best_lap_path, distance)`.
 
 If the current distance exceeds the best lap's max distance, delta is `null`. Before any lap completes, delta is `null`.
@@ -168,7 +175,7 @@ A new `derive_lap_timing` step runs after the existing elapsed/distance series a
 ```
 input: elapsed_seconds[], distance[], course[], lap_number_source[], lap_markers
 output: lap_number[], lap_time_seconds[], delta_to_best_lap_seconds[]
-        + metadata best_lap_time_seconds
+        + metadata best_lap_time_seconds, lap_durations_seconds, lap_durations_best_so_far_seconds
 
 1. Resolve lap_number[]:
    - If lap_number_source has any Some values, use it directly.
@@ -185,10 +192,14 @@ output: lap_number[], lap_time_seconds[], delta_to_best_lap_seconds[]
 3. Resolve completed lap durations:
    - For each lap n >= 0, duration = elapsed[last_index_of_lap_n] - elapsed[first_index_of_lap_n].
 
-4. Metadata best_lap_time_seconds:
-   - Minimum completed-lap duration across the whole session.
+4. Metadata lap_durations_seconds and lap_durations_best_so_far_seconds:
+   - `lap_durations_seconds[n]` = duration of lap n.
+   - `lap_durations_best_so_far_seconds[n]` = min(`lap_durations_seconds[0..=n]`).
 
-5. Compute delta_to_best_lap_seconds[]:
+5. Metadata best_lap_time_seconds:
+   - Minimum completed-lap duration across the whole session (= last element of `lap_durations_best_so_far_seconds`, or None if empty).
+
+6. Compute delta_to_best_lap_seconds[]:
    - For the best completed lap so far, build (distance, lap_time_seconds) points.
    - For each sample with lap_number >= 0, if distance is Some and within best-lap distance range,
      delta = current lap_time_seconds - interpolated best-lap lap_time_seconds at that distance.
@@ -197,14 +208,15 @@ output: lap_number[], lap_time_seconds[], delta_to_best_lap_seconds[]
 
 ## Trim/densify propagation
 
-- `trim.rs`: add `lap_number`, `lap_time_seconds`, and `delta_to_best_lap_seconds` to `TrimmedActivity`. Trim them alongside other numeric series. `lap_number` uses hold interpolation.
-- `interpolate.rs`: add the three series to `DenseSeriesReport` and wire them through `densify_activity` using the existing `RenderDataRequirements` gating pattern.
+- `trim.rs`: add `lap_number`, `lap_time_seconds`, and `delta_to_best_lap_seconds` to `TrimmedActivity`. Trim them alongside other numeric series. `lap_number` uses hold interpolation. Also scope the per-lap metadata arrays to the active trim window: omit laps that do not fully complete inside the trim.
+- `interpolate.rs`: add the three series to `DenseSeriesReport` and wire them through `densify_activity` using the existing `RenderDataRequirements` gating pattern. Carry the scoped per-lap metadata through so the renderer receives it.
 - `normalize/mod.rs`: add boolean flags to `RenderDataRequirements` for the new lap series.
 
 ## Suggested implementation order
 
 1. **Schema plumbing**
    - Add fields to `RawSample`, `ActivityColumns`, `ParsedActivity`, `TrimmedActivity`, `DenseSeriesReport`, and `RenderDataRequirements`.
+   - Add compact per-lap metadata to `ParsedActivity` and `DenseSeriesReport`.
 2. **CSV header alias**
    - Teach `csv/parser.rs` to recognize `lap`/`lap #`/`lap number`.
    - Populate `ActivityColumns.lap_number` in `csv/columns.rs`.
@@ -220,10 +232,10 @@ output: lap_number[], lap_time_seconds[], delta_to_best_lap_seconds[]
    - Carry the new series through `trim.rs` and `interpolate.rs`.
 7. **Tests**
    - Add unit tests for `derive_lap_timing` with synthetic data.
-   - Add integration tests in `csv_activity.rs` and `vbo_activity.rs` asserting correct lap fields for each fixture.
+   - Add integration tests in `csv_activity.rs` and `vbo_activity.rs` asserting correct `lap_number`, `lap_time_seconds`, `delta_to_best_lap_seconds`, `lap_durations_seconds`, and `lap_durations_best_so_far_seconds` for each fixture.
 
 ## Open questions
 
-1. Should partial first/last laps (out-lap, in-lap) be eligible for "session best"?
-2. If a source already provides a predicted-vs-best value (TrackAddict), should the overlay ever prefer it over our own computed delta?
-3. How should the VBO crossing detector treat markers with the same lat/lon duplicated on consecutive `[laptiming]` rows?
+1. Should partial first/last laps (out-lap, in-lap) be eligible for "session best"? _(Resolved: no. The per-lap metadata arrays are scoped to the active trim window; only laps that fully complete within the trim are included.)_
+2. If a source already provides a predicted-vs-best value (TrackAddict), should the overlay ever prefer it over our own computed delta? _(Resolved: yes)_
+3. How should the VBO crossing detector treat markers with the same lat/lon duplicated on consecutive `[laptiming]` rows? _(Unclear question; elaborate with example prior to implementation.)_

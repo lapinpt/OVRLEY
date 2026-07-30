@@ -1,4 +1,4 @@
-Four display_types for lap timer:
+A single display_type of lap_timer. All settings live under the lap_timer display_type. Preview/renderer utilizes only the required keys:
 
 **Current Lap Time**
 
