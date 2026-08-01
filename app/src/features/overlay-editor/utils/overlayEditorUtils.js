@@ -83,6 +83,20 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
 }
 
 /**
+ * Returns the canonical activity series for a metric type.
+ * Standard metrics use their manifest dataSource; altitude uses the preferred
+ * barometric series when present and otherwise falls back to elevation.
+ *
+ * @param {object|null} activity - Parsed activity data.
+ * @param {string} metricType - Metric or raw activity series key.
+ * @returns {Array<unknown>|undefined} The selected series, or undefined when absent.
+ */
+export function getMetricSeries(activity, metricType) {
+  const activityKey = getStandardMetricDefinition(metricType)?.dataSource ?? metricType
+  return metricType === 'altitude' ? getPreferredElevationSeries(activity) : activity?.[activityKey]
+}
+
+/**
  * Interpolates an activity metric series (speed, heartrate, etc.) at the
  * given elapsed second. Falls back to DEFAULT_ACTIVITY_PREVIEW values.
  *
@@ -93,8 +107,7 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
  */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-  const activityKey = getStandardMetricDefinition(key)?.dataSource ?? key
-  const series = key === 'altitude' ? getPreferredElevationSeries(activity) : activity?.[activityKey]
+  const series = getMetricSeries(activity, key)
 
   if (!Array.isArray(series) || !series.length || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null

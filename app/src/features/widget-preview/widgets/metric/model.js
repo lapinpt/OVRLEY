@@ -25,7 +25,12 @@ import {
   measureArcPreviewText,
   measurePreviewText,
 } from '../../shared/textMeasurement'
-import { getInterpolatedActivityValue, getInterpolatedTimeValue, NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor'
+import {
+  getInterpolatedActivityValue,
+  getInterpolatedTimeValue,
+  getMetricSeries,
+  NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
+} from '@/features/overlay-editor'
 import { interpolateNumericSeries } from '@/lib/interpolation'
 import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 
@@ -65,7 +70,7 @@ export function formatDistancePreviewDisplay(activity, previewSecond, widgetData
   const current = formatStandardMetricDisplay('distance', currentDistance, widgetData)
   if (!widgetData.show_full_distance || activity === null) return current
 
-  const totalDistance = getLastFiniteValue(activity.distance)
+  const totalDistance = getLastFiniteValue(getMetricSeries(activity, 'distance') ?? [])
   if (totalDistance === null) return current
 
   const total = formatStandardMetricDisplay('distance', totalDistance, {
@@ -91,7 +96,7 @@ export function formatTotalAscentPreviewDisplay(activity, previewSecond, widgetD
   const current = formatStandardMetricDisplay('total_ascent', currentAscent, widgetData)
   if (!widgetData.show_full_ascent || activity === null) return current
 
-  const totalAscent = getLastFiniteValue(activity.total_ascent)
+  const totalAscent = getLastFiniteValue(getMetricSeries(activity, 'total_ascent') ?? [])
   if (totalAscent === null) return current
 
   const total = formatStandardMetricDisplay('total_ascent', totalAscent, {

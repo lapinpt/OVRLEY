@@ -1,4 +1,5 @@
 import { formatFixedDecimal } from '../metric/format'
+import { getMetricSeries } from '@/features/overlay-editor'
 import { interpolateNumericSeries, MISSING_SAMPLE_POLICY } from '@/lib/interpolation'
 
 const AXIS_SERIES_KEYS = {
@@ -11,7 +12,7 @@ function readOrientedSeries(activity, axis, invert) {
   if (!activity) return null
   const key = AXIS_SERIES_KEYS[axis]
   if (!key) throw new Error(`Unknown G-force axis: ${axis}`)
-  const values = activity[key]
+  const values = getMetricSeries(activity, key)
   if (values === undefined) return null
   const multiplier = invert ? -1 : 1
   return values.map((value) => (value === null ? null : value * multiplier))

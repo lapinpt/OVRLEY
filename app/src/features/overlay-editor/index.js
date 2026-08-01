@@ -18,6 +18,7 @@ export {
 } from './utils/exportRange'
 
 export {
+  getMetricSeries,
   getInterpolatedActivityValue,
   getInterpolatedTimeValue,
   getDistanceProgressAtElapsed,

@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { getContainerFps } from '@/lib/update-rate'
-import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue, getMetricSeries } from '@/features/overlay-editor'
 
 describe('getContainerFps', () => {
   test('returns a number for common FPS and update rate combinations', () => {
@@ -32,6 +32,22 @@ describe('getContainerFps', () => {
   test('handles edge case with FPS 0', () => {
     const result = getContainerFps(0, 1)
     expect(typeof result).toBe('number')
+  })
+})
+
+describe('getMetricSeries', () => {
+  test('uses manifest data sources and prefers barometric altitude when present', () => {
+    const barometricAltitude = [null, 101]
+    const elevation = [10, 20]
+    const activity = {
+      barometric_altitude: barometricAltitude,
+      elevation,
+      distance: [0, 5],
+    }
+
+    expect(getMetricSeries(activity, 'altitude')).toBe(barometricAltitude)
+    expect(getMetricSeries(activity, 'distance')).toBe(activity.distance)
+    expect(getMetricSeries({ elevation }, 'altitude')).toBe(elevation)
   })
 })
 

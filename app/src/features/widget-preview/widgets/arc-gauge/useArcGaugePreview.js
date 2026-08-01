@@ -1,5 +1,5 @@
 import { useId, useMemo } from 'react'
-import { getInterpolatedActivityValue } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getMetricSeries } from '@/features/overlay-editor'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from './geometry'
 import { getArcInnerWidgetLayout } from './arcGaugeInnerLayout'
 import { getArcFilledTrackRevealSpec, getArcPoint } from './trackPath'
@@ -47,7 +47,7 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
 
   return useMemo(() => {
     const value = getInterpolatedActivityValue(activity, widget.data.value, previewSecond)
-    const values = activity?.[widget.data.value] ?? []
+    const values = getMetricSeries(activity, widget.data.value) ?? []
     const layout =
       widget.data.display_type === 'corner' ? getCornerGaugeLayout(widget.data, value, values) : getArcGaugeLayout(widget.data, value, values)
     const trackGeometry = {

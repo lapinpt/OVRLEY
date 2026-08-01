@@ -19,24 +19,24 @@ pub use crate::interpolation::{
     MissingSamplePolicy,
 };
 
-/// Resolves the interpolation engine policy for a metric.
-///
-/// The manifest owns standard widget metrics' interpolation modes. Hold
-/// interpolation has its own densification path, so this helper maps it to
-/// bridge semantics for linear/preserve modes centrally. Elevation and
-/// gradient are internal derived series rather than manifest metrics and use
-/// their documented bridge behavior here.
-pub(crate) fn metric_missing_sample_policy(
-    kind: crate::MetricKind,
-) -> MissingSamplePolicy {
+#[derive(Clone, Copy)]
+pub(crate) enum InterpolationStrategy {
+    Hold,
+    Numeric(MissingSamplePolicy),
+}
+
+pub(crate) fn interpolation_strategy(kind: crate::MetricKind) -> InterpolationStrategy {
     match standard_metric_interpolation(kind) {
-        Some(StandardMetricInterpolationKind::Preserve) => MissingSamplePolicy::Preserve,
-        Some(
-            StandardMetricInterpolationKind::Linear | StandardMetricInterpolationKind::Hold,
-        ) => MissingSamplePolicy::Bridge,
+        Some(StandardMetricInterpolationKind::Hold) => InterpolationStrategy::Hold,
+        Some(StandardMetricInterpolationKind::Preserve) => {
+            InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve)
+        }
+        Some(StandardMetricInterpolationKind::Linear) => {
+            InterpolationStrategy::Numeric(MissingSamplePolicy::Bridge)
+        }
         None => match kind {
             crate::MetricKind::Elevation | crate::MetricKind::Gradient => {
-                MissingSamplePolicy::Bridge
+                InterpolationStrategy::Numeric(MissingSamplePolicy::Bridge)
             }
             _ => panic!("standard metric has no interpolation policy: {kind:?}"),
         },
@@ -344,21 +344,18 @@ pub fn densify_activity(
     // ── Phase 3: densify each requested numeric series ───────────────────
     // Empty vectors signal to render code that the series is not needed,
     // avoiding wasted per-frame lookups and allocations.
-    // Interpolation mode (linear, hold, or preserve) is read from the manifest
-    // per metric.
+    // Resolve each metric's manifest strategy once per series; internal
+    // derived series use their explicit bridge default.
     let densify =
         |x: &[f64], y: &NumericSeries, target: &[f64], enabled: bool, kind: crate::MetricKind| {
             if !enabled || y.is_empty() {
                 return Vec::new();
             }
-            match standard_metric_interpolation(kind) {
-                Some(StandardMetricInterpolationKind::Hold) => densify_hold_series(x, y, target),
-                _ => interpolate_numeric_series(
-                    x,
-                    y,
-                    target,
-                    metric_missing_sample_policy(kind),
-                ),
+            match interpolation_strategy(kind) {
+                InterpolationStrategy::Hold => densify_hold_series(x, y, target),
+                InterpolationStrategy::Numeric(policy) => {
+                    interpolate_numeric_series(x, y, target, policy)
+                }
             }
         };
 
