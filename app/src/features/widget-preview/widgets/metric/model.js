@@ -26,6 +26,7 @@ import {
   measurePreviewText,
 } from '../../shared/textMeasurement'
 import {
+  getPreviewActivity,
   getInterpolatedActivityValue,
   getInterpolatedTimeValue,
   getMetricSeries,
@@ -254,6 +255,8 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
   // Boxed display types use their own presentation-specific preview path.
   if (isBoxedDisplayType(widget.data.display_type)) return null
 
+  const displayActivity = getPreviewActivity(activity, previewSecond)
+
   // Resolve display_variants for non-text display types
   const fontFamily = getPreviewFontFamily(widget.data.font)
 
@@ -262,7 +265,7 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
   let unitText
 
   if (isStandardMetricWidgetType(widget.type)) {
-    const formatted = formatMetricWidgetValue({ widget, activity, previewSecond })
+    const formatted = formatMetricWidgetValue({ widget, activity: displayActivity, previewSecond })
     if (widget.type === 'gps_coordinates') {
       const coordinateLayout = buildCoordinateLayout({ widget, formatted, fontFamily })
       return {
@@ -277,11 +280,7 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
     valueText = formatted.value
     unitText = formatted.units
   } else if (widget.type === 'time') {
-    valueText = formatTimeValue(
-      widget.data.format,
-      getInterpolatedTimeValue(activity, previewSecond),
-      activity?.metadata?.timezone,
-    )
+    valueText = formatTimeValue(widget.data.format, getInterpolatedTimeValue(displayActivity, previewSecond), displayActivity?.metadata?.timezone)
   } else {
     throw new Error(`Cannot build intrinsic metric preview for widget type: ${widget.type}`)
   }

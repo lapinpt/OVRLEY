@@ -53,7 +53,19 @@ export function prepareGForcePreview(activity, config) {
 }
 
 /** Builds the current G-force value and marker state from canonical activity series. */
-export function buildGForceFrameState(prepared, config, previewSecond, centerX, centerY, radius) {
+export function buildGForceFrameState(prepared, config, previewSecond, centerX, centerY, radius, activity) {
+  if (activity === null) {
+    return {
+      markerX: centerX,
+      markerY: centerY,
+      magnitude: null,
+      valueText: '--',
+      unitText: '',
+      coordinateText: '[--, --]',
+      componentText: 'X --  Y --  Z --',
+    }
+  }
+
   const horizontal = interpolateNumericSeries(prepared.times, prepared.horizontal, previewSecond, MISSING_SAMPLE_POLICY.PRESERVE)
   const vertical = interpolateNumericSeries(prepared.times, prepared.vertical, previewSecond, MISSING_SAMPLE_POLICY.PRESERVE)
   const x = interpolateNumericSeries(prepared.times, prepared.components.x, previewSecond, MISSING_SAMPLE_POLICY.PRESERVE)

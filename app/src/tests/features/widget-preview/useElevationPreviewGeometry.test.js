@@ -137,7 +137,6 @@ describe('useElevationPreviewGeometry', () => {
     renderHook(() =>
       useElevationPreviewGeometry({
         activity,
-        sourceActivity: activity,
         data: makeData(),
         exportRange: null,
         previewSecond: 15,
@@ -162,7 +161,6 @@ describe('useElevationPreviewGeometry', () => {
     const { result } = renderHook(() =>
       useElevationPreviewGeometry({
         activity: makeActivity(),
-        sourceActivity: makeActivity(),
         data: makeData(),
         exportRange: null,
         previewSecond: 15,
@@ -211,7 +209,6 @@ describe('useElevationPreviewGeometry', () => {
     const { result } = renderHook(() =>
       useElevationPreviewGeometry({
         activity,
-        sourceActivity: activity,
         data: makeData(),
         exportRange: null,
         previewSecond: 5,
@@ -232,7 +229,6 @@ describe('useElevationPreviewGeometry', () => {
     renderHook(() =>
       useElevationPreviewGeometry({
         activity: makeActivity(),
-        sourceActivity: makeActivity(),
         data: {
           ...makeData(),
           show_full_activity: false,
@@ -260,7 +256,6 @@ describe('useElevationPreviewGeometry', () => {
     const { result } = renderHook(() =>
       useElevationPreviewGeometry({
         activity: makeActivity(),
-        sourceActivity: makeActivity(),
         data: makeData(),
         exportRange: null,
         previewSecond: 15,

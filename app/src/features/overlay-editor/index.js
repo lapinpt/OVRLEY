@@ -19,6 +19,7 @@ export {
 
 export {
   getMetricSeries,
+  getPreviewActivity,
   getInterpolatedActivityValue,
   getInterpolatedTimeValue,
   getDistanceProgressAtElapsed,

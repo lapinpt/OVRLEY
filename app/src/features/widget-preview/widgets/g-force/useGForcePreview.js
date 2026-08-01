@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { getPreviewActivity } from '@/features/overlay-editor'
 import { getTextShadowParts } from '../../shared/shadow'
 import {
   getPreviewFontFamily,
@@ -33,7 +34,8 @@ export function useGForcePreviewModel({ widget, activity, previewSecond, globalO
     const centerX = config.width / 2
     const centerY = config.height / 2
     const radius = config.diameter / 2
-    const frame = buildGForceFrameState(prepared, config, previewSecond, centerX, centerY, radius)
+    const displayActivity = getPreviewActivity(activity, previewSecond)
+    const frame = buildGForceFrameState(prepared, config, previewSecond, centerX, centerY, radius, displayActivity)
     const lineHeight = config.label_font_size * 0.92
     const margin = config.label_font_size * 0.05
     const top = centerY + radius - lineHeight - margin + config.label_offset_y
@@ -66,5 +68,5 @@ export function useGForcePreviewModel({ widget, activity, previewSecond, globalO
       borderShadowFilterId: sanitizeSvgId(`${widget.id}-g-force-border-shadow`),
       labelShadowFilterId: sanitizeSvgId(`${widget.id}-g-force-label-shadow`),
     }
-  }, [config, fontFamily, fontMetricsVersion, globalOpacity, globalScale, prepared, previewSecond, sceneStyle, widget.id])
+  }, [activity, config, fontFamily, fontMetricsVersion, globalOpacity, globalScale, prepared, previewSecond, sceneStyle, widget.id])
 }

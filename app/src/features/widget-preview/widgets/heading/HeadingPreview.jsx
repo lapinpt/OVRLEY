@@ -159,7 +159,16 @@ function HeadingTapeCopies({ model, config, filterId }) {
 }
 
 export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle }) {
-  const model = useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle })
+  const model = useHeadingPreviewModel({
+    widget,
+    activity,
+    previewSecond,
+    globalOpacity,
+    globalScale,
+    sceneFont,
+    valueFont,
+    sceneStyle,
+  })
 
   return (
     <svg

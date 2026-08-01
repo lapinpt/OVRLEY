@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { getInterpolatedActivityValue, getMetricSeries } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor'
 import { getBarFillCount, getLinearBarRects } from '../../shared/gaugeBarGeometry'
 import {
   getLinearGaugeLabelLayout,
@@ -20,9 +20,10 @@ export function useLinearGaugePreviewPresentation({ widget, activity, previewSec
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
   useFontMetricsVersion(labelFontFamily, widget.data.min_max_label_font_size)
 
+  const displayActivity = getPreviewActivity(activity, previewSecond)
   const layout = getLinearGaugeLayout({
-    value: getInterpolatedActivityValue(activity, widget.data.value, previewSecond),
-    values: getMetricSeries(activity, widget.data.value) ?? [],
+    value: getInterpolatedActivityValue(displayActivity, widget.data.value, previewSecond),
+    values: getMetricSeries(displayActivity, widget.data.value) ?? [],
     width: widget.data.width,
     height: widget.data.height,
     orientation: widget.data.orientation,

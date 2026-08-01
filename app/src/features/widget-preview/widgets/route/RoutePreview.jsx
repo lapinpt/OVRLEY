@@ -6,7 +6,7 @@
  *
  * @param {object} props
  * @param {object} props.widget - Widget configuration object.
- * @param {object} props.activity - Activity data with route samples.
+ * @param {object|null} props.activity - Stable parsed activity used to prepare geometry and display activity data.
  * @param {number} props.previewSecond - Current preview time in seconds.
  * @param {number} props.globalOpacity - Global opacity multiplier.
  * @param {number} props.globalScale - Global scale multiplier.
@@ -21,8 +21,8 @@ import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
 import { PreviewMarkerLayers, PreviewPolylineShadow, PreviewSvgShadowBlurFilter } from '../../shared/PreviewSvgComponents'
 import { useRoutePreview } from './useRoutePreview'
 
-export function OverlayRouteWidget({ widget, activity, sourceActivity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
-  const previewModel = useRoutePreview({ widget, activity, sourceActivity, previewSecond, globalScale, sceneStyle, exportRange })
+export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
+  const previewModel = useRoutePreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange })
 
   if (!previewModel) {
     return null

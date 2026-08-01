@@ -1,5 +1,5 @@
-import { useId, useMemo } from 'react'
-import { getInterpolatedActivityValue, getMetricSeries } from '@/features/overlay-editor'
+import { useMemo } from 'react'
+import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from './geometry'
 import { getArcInnerWidgetLayout } from './arcGaugeInnerLayout'
 import { getArcFilledTrackRevealSpec, getArcPoint } from './trackPath'
@@ -46,8 +46,9 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
   useFontMetricsVersion(labelFontFamily, widget.data.min_max_label_font_size)
 
   return useMemo(() => {
-    const value = getInterpolatedActivityValue(activity, widget.data.value, previewSecond)
-    const values = getMetricSeries(activity, widget.data.value) ?? []
+    const displayActivity = getPreviewActivity(activity, previewSecond)
+    const value = getInterpolatedActivityValue(displayActivity, widget.data.value, previewSecond)
+    const values = getMetricSeries(displayActivity, widget.data.value) ?? []
     const layout =
       widget.data.display_type === 'corner' ? getCornerGaugeLayout(widget.data, value, values) : getArcGaugeLayout(widget.data, value, values)
     const trackGeometry = {
@@ -58,7 +59,7 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
       sweepAngle: layout.sweepAngle,
       trackThickness: layout.trackThickness,
     }
-    const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond })
+    const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity: displayActivity, previewSecond })
     const opacity = widget.data.opacity * globalOpacity
     const segmented = widget.data.track_fill_style === 'bars'
     const fillEndCornerRadius = widget.data.track_fill_flat ? 0 : widget.data.track_corner_radius

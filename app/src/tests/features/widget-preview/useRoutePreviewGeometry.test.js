@@ -136,7 +136,6 @@ describe('useRoutePreviewGeometry', () => {
     renderHook(() =>
       useRoutePreviewGeometry({
         activity,
-        sourceActivity: activity,
         data: makeData(),
         exportRange: null,
         previewSecond: 15,
@@ -164,7 +163,6 @@ describe('useRoutePreviewGeometry', () => {
     const { result } = renderHook(() =>
       useRoutePreviewGeometry({
         activity: makeActivity(),
-        sourceActivity: makeActivity(),
         data: makeData(),
         exportRange: null,
         previewSecond: 15,
@@ -193,7 +191,6 @@ describe('useRoutePreviewGeometry', () => {
     const { result } = renderHook(() =>
       useRoutePreviewGeometry({
         activity: makeActivity(),
-        sourceActivity: makeActivity(),
         data: makeData(),
         exportRange: null,
         previewSecond: 15,

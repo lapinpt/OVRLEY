@@ -77,16 +77,12 @@ describe('WidgetPreview dispatch by display_type', () => {
   })
 
   test('course widgets use the route renderer', () => {
-    const { getByTestId } = render(
-      <WidgetPreview widget={{ type: 'course', category: 'plots', data: { x: 0, y: 0 } }} activity={ACTIVITY} sourceActivity={ACTIVITY} />,
-    )
+    const { getByTestId } = render(<WidgetPreview widget={{ type: 'course', category: 'plots', data: { x: 0, y: 0 } }} activity={ACTIVITY} />)
     expect(getByTestId('route-renderer')).toBeTruthy()
   })
 
   test('elevation widgets use the elevation renderer', () => {
-    const { getByTestId } = render(
-      <WidgetPreview widget={{ type: 'elevation', category: 'plots', data: { x: 0, y: 0 } }} activity={ACTIVITY} sourceActivity={ACTIVITY} />,
-    )
+    const { getByTestId } = render(<WidgetPreview widget={{ type: 'elevation', category: 'plots', data: { x: 0, y: 0 } }} activity={ACTIVITY} />)
     expect(getByTestId('elevation-renderer')).toBeTruthy()
   })
 

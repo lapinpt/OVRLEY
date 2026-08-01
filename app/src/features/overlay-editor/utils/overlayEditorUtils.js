@@ -120,8 +120,9 @@ export function getPreviewActivity(activity, previewSecond) {
  * @returns {number|string|null} Interpolated value or preview default.
  */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-  const series = getMetricSeries(activity, key)
+  const previewActivity = getPreviewActivity(activity, elapsedSecond)
+  const elapsedSeries = Array.isArray(previewActivity?.sample_elapsed_seconds) ? previewActivity.sample_elapsed_seconds : []
+  const series = getMetricSeries(previewActivity, key)
 
   if (!Array.isArray(series) || !series.length || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
@@ -161,8 +162,11 @@ function getPreferredElevationSeries(activity) {
  * @returns {string} ISO timestamp string.
  */
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-  const timeSeries = Array.isArray(activity?.time) ? activity.time : []
+  const previewActivity = getPreviewActivity(activity, elapsedSecond)
+  if (previewActivity === null) return DEFAULT_ACTIVITY_PREVIEW.time
+
+  const elapsedSeries = Array.isArray(previewActivity.sample_elapsed_seconds) ? previewActivity.sample_elapsed_seconds : []
+  const timeSeries = Array.isArray(previewActivity.time) ? previewActivity.time : []
   const numericTimeSeries = timeSeries.map((value) => {
     const parsed = Date.parse(value || '')
     return Number.isFinite(parsed) ? parsed : null
@@ -174,7 +178,7 @@ export function getInterpolatedTimeValue(activity, elapsedSecond) {
   }
 
   if (numericTimeSeries.every((value) => value === null)) {
-    const syncTimeMs = Date.parse(activity?.sync_time || '')
+    const syncTimeMs = Date.parse(previewActivity.sync_time || '')
     if (Number.isFinite(syncTimeMs)) {
       return new Date(syncTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
     }

@@ -9,16 +9,16 @@ import { useRoutePreviewGeometry } from './useRoutePreviewGeometry'
  *
  * @param {object} params
  * @param {object} params.widget - Widget configuration object.
- * @param {object} params.activity - Activity data with route samples.
+ * @param {object|null} params.activity - Stable parsed activity used to prepare geometry and display activity data.
  * @param {number} params.previewSecond - Current preview time in seconds.
  * @param {number} params.globalScale - Global scale multiplier.
  * @param {object} params.sceneStyle - Scene style object.
  * @param {object} params.exportRange - Export range configuration.
  * @returns {object|null} Preview model for the renderer, or null while loading.
  */
-export function useRoutePreview({ widget, activity, sourceActivity, previewSecond, globalScale, exportRange }) {
+export function useRoutePreview({ widget, activity, previewSecond, globalScale, exportRange }) {
   const style = getRoutePreviewStyle(widget.data, globalScale)
-  const geometry = useRoutePreviewGeometry({ activity, sourceActivity, data: widget.data, exportRange, previewSecond, style })
+  const geometry = useRoutePreviewGeometry({ activity, data: widget.data, exportRange, previewSecond, style })
 
   if (!geometry) return null
 

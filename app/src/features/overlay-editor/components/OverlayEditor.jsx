@@ -276,7 +276,11 @@ function OverlayEditor({
         }
 
         const preview = overlayState.liveWidgetPreviews[widgetId] ?? null
-        const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond: overlayState.previewSecond })
+        const metricPreviewModel = buildMetricWidgetPreviewModel({
+          widget,
+          activity,
+          previewSecond: overlayState.previewSecond,
+        })
         const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
 
@@ -349,18 +353,10 @@ function OverlayEditor({
       widgets: overlayState.renderedWidgets,
       widgetPreviews: overlayState.liveWidgetPreviews,
       activity,
-      sourceActivity: overlayState.sourceActivity,
       previewSecond: overlayState.previewSecond,
       exportRange: overlayState.previewExportRange,
     }),
-    [
-      overlayState.liveWidgetPreviews,
-      overlayState.renderedWidgets,
-      activity,
-      overlayState.sourceActivity,
-      overlayState.previewSecond,
-      overlayState.previewExportRange,
-    ],
+    [overlayState.liveWidgetPreviews, overlayState.renderedWidgets, activity, overlayState.previewSecond, overlayState.previewExportRange],
   )
   const canvasCallbacks = useMemo(
     () => ({

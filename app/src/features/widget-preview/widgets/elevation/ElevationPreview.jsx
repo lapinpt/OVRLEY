@@ -7,7 +7,7 @@
  *
  * @param {object} props
  * @param {object} props.widget - Widget configuration object.
- * @param {object} props.activity - Activity data with elevation series.
+ * @param {object|null} props.activity - Stable parsed activity used to prepare geometry and display activity data.
  * @param {number} props.previewSecond - Current preview time in seconds.
  * @param {number} props.globalOpacity - Global opacity multiplier.
  * @param {number} props.globalScale - Global scale multiplier.
@@ -20,8 +20,8 @@ import { getWidgetOpacity } from '../../shared/textMeasurement'
 import { PreviewMarkerLayers, PreviewPolylineShadow, PreviewSvgShadowBlurFilter, PreviewSvgText } from '../../shared/PreviewSvgComponents'
 import { useElevationPreview } from './useElevationPreview'
 
-export function OverlayElevationWidget({ widget, activity, sourceActivity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
-  const previewModel = useElevationPreview({ widget, activity, sourceActivity, previewSecond, globalScale, sceneStyle, exportRange })
+export function OverlayElevationWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
+  const previewModel = useElevationPreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange })
 
   if (!previewModel) return null
 

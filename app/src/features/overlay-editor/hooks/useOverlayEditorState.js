@@ -20,7 +20,7 @@ import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
-import { getPreviewActivity, getSceneSize } from '../utils/overlayEditorUtils'
+import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'
 
 function materializeWidgets(rawWidgets, globalDefaults) {
@@ -40,7 +40,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
   const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
-  const sourceActivity = useStore((state) => state.parsedActivity)
+  const activity = useStore((state) => state.parsedActivity)
 
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
@@ -76,7 +76,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     }),
     [globalDefaults, config?.scene],
   )
-  const activity = useMemo(() => getPreviewActivity(sourceActivity, selectedSecond), [selectedSecond, sourceActivity])
   const previewExportRange = useMemo(() => {
     if (!importedVideoPath || exportRange.type === 'custom') return exportRange
     return {
@@ -138,7 +137,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     globalOpacity,
     globalScale,
     activity,
-    sourceActivity,
     interactionStartRef,
     liveWidgetDrafts,
     liveWidgetPreviews,

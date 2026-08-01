@@ -131,7 +131,6 @@ const OverlayCanvasWidget = memo(
     globalScale,
     globalOpacity,
     activity,
-    sourceActivity,
     previewSecond,
     sceneFont,
     sceneFontSize,
@@ -192,7 +191,6 @@ const OverlayCanvasWidget = memo(
         <WidgetPreview
           widget={widget}
           activity={activity}
-          sourceActivity={sourceActivity}
           previewSecond={previewSecond}
           globalOpacity={globalOpacity}
           globalScale={globalScale}
@@ -213,7 +211,6 @@ const OverlayCanvasWidget = memo(
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.activity === nextProps.activity &&
-    previousProps.sourceActivity === nextProps.sourceActivity &&
     previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.sceneFont === nextProps.sceneFont &&
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
@@ -232,14 +229,14 @@ const OverlayCanvasWidget = memo(
  * @param {object} props
  * @param {object} props.sceneProps - { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize }
  * @param {object} props.displayProps - { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }
- * @param {object} props.dataProps - { widgets, activity, sourceActivity, previewSecond, exportRange }
+ * @param {object} props.dataProps - { widgets, activity, previewSecond, exportRange }
  * @param {object} props.callbacks - { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
  * @returns {JSX.Element} Rendered component output.
  */
 export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
-  const { widgets, activity, sourceActivity, previewSecond, exportRange } = dataProps
+  const { widgets, activity, previewSecond, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
@@ -302,7 +299,6 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
               globalScale={globalScale}
               globalOpacity={globalOpacity}
               activity={activity}
-              sourceActivity={sourceActivity}
               previewSecond={previewSecond}
               sceneFont={sceneFont}
               sceneFontSize={sceneFontSize}

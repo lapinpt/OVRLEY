@@ -64,8 +64,7 @@ describe('useOverlayEditorState module contract', () => {
     })
 
     expect(result.current.previewSecond).toBe(9)
-    expect(result.current.activity).toBeNull()
-    expect(result.current.sourceActivity).toEqual({
+    expect(result.current.activity).toEqual({
       trim_end_seconds: 3,
       metadata: { duration_seconds: 3 },
     })
