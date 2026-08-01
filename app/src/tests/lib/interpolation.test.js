@@ -9,9 +9,15 @@ describe('interpolateNumericSeries', () => {
     expect(interpolateNumericSeries(elapsed, values, 1)).toBe(2)
   })
 
-  test('preserves exact and bounded missing samples', () => {
+  test('preserves exact missing samples and interpolates around zero', () => {
     expect(interpolateNumericSeries(elapsed, values, 1, MISSING_SAMPLE_POLICY.PRESERVE)).toBeNull()
-    expect(interpolateNumericSeries(elapsed, values, 1.5, MISSING_SAMPLE_POLICY.PRESERVE)).toBeNull()
+    expect(interpolateNumericSeries(elapsed, values, 1.5, MISSING_SAMPLE_POLICY.PRESERVE)).toBe(2)
+  })
+
+  test('ramps down to and up from a preserved zero without bridging across it', () => {
+    const sparseValues = [10, null, 30]
+    expect(interpolateNumericSeries([0, 1, 2], sparseValues, 0.5, MISSING_SAMPLE_POLICY.PRESERVE)).toBe(5)
+    expect(interpolateNumericSeries([0, 1, 2], sparseValues, 1.5, MISSING_SAMPLE_POLICY.PRESERVE)).toBe(15)
   })
 
   test('interpolates adjacent present samples with the preserve policy', () => {

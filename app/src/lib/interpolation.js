@@ -34,6 +34,7 @@ function findFirstIndexAtOrAfter(elapsedSeries, targetSecond, low, high) {
 }
 
 function interpolatePreservingMissing(elapsedSeries, values, targetSecond) {
+  // Preserve gaps as zero endpoints without bridging directly across them.
   if (targetSecond <= elapsedSeries[0]) return values[0]
   const lastIndex = elapsedSeries.length - 1
   if (targetSecond >= elapsedSeries[lastIndex]) return values[lastIndex]
@@ -43,10 +44,11 @@ function interpolatePreservingMissing(elapsedSeries, values, targetSecond) {
   const leftIndex = rightIndex - 1
   const leftValue = values[leftIndex]
   const rightValue = values[rightIndex]
-  if (leftValue === null || rightValue === null) return null
 
   const ratio = (targetSecond - elapsedSeries[leftIndex]) / (elapsedSeries[rightIndex] - elapsedSeries[leftIndex])
-  return leftValue + (rightValue - leftValue) * ratio
+  const leftDisplayValue = leftValue === null || leftValue === undefined ? 0 : leftValue
+  const rightDisplayValue = rightValue === null || rightValue === undefined ? 0 : rightValue
+  return leftDisplayValue + (rightDisplayValue - leftDisplayValue) * ratio
 }
 
 function interpolateBridgingMissing(elapsedSeries, values, targetSecond) {

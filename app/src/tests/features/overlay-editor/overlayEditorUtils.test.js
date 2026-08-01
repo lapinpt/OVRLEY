@@ -3,8 +3,8 @@
  * playback clock. Covers the same behavior previously tested through
  * getEffectivePreviewFps before it was inlined.
  *
- * Also tests interpolated activity value retrieval with linear and hold
- * interpolation modes.
+ * Also tests interpolated activity value retrieval with linear, hold, and
+ * preserve interpolation modes.
  */
 
 import { describe, expect, test } from 'vitest'
@@ -87,6 +87,19 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
   test('hold metric returns null when series key is missing from activity', () => {
     const emptyActivity = { sample_elapsed_seconds: [0, 1] }
     expect(getInterpolatedActivityValue(emptyActivity, 'iso', 1)).toBeNull()
+  })
+
+  test('preserve metric with an unavailable empty series remains missing', () => {
+    expect(
+      getInterpolatedActivityValue(
+        {
+          sample_elapsed_seconds: [0, 1],
+          cadence: [],
+        },
+        'cadence',
+        0.5,
+      ),
+    ).toBeNull()
   })
 
   test('hold metric with sparse data returns last known value skipping nulls', () => {

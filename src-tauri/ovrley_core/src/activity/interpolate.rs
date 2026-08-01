@@ -3,8 +3,8 @@
 //! Source activities usually contain unevenly spaced samples, while the renderer
 //! needs values at exact frame times. This module converts trimmed samples into
 //! frame-aligned series using linear interpolation and conservative edge
-//! clamping. Missing values are filtered out before interpolation so sparse
-//! telemetry can still render wherever enough valid samples exist.
+//! clamping. Missing-value behavior is selected per metric: bridge policies
+//! filter gaps, while preserve policies retain missing frame samples.
 
 use super::schema::{
     CourseSeries, DenseActivityReport, DenseSeriesReport, NumericSeries, TimeSeries,
@@ -18,6 +18,30 @@ pub use crate::interpolation::{
     collect_valid_numeric_points, interpolate_numeric_series_value, interpolate_points,
     MissingSamplePolicy,
 };
+
+/// Resolves the interpolation engine policy for a metric.
+///
+/// The manifest owns standard widget metrics' interpolation modes. Hold
+/// interpolation has its own densification path, so this helper maps it to
+/// bridge semantics for linear/preserve modes centrally. Elevation and
+/// gradient are internal derived series rather than manifest metrics and use
+/// their documented bridge behavior here.
+pub(crate) fn metric_missing_sample_policy(
+    kind: crate::MetricKind,
+) -> MissingSamplePolicy {
+    match standard_metric_interpolation(kind) {
+        Some(StandardMetricInterpolationKind::Preserve) => MissingSamplePolicy::Preserve,
+        Some(
+            StandardMetricInterpolationKind::Linear | StandardMetricInterpolationKind::Hold,
+        ) => MissingSamplePolicy::Bridge,
+        None => match kind {
+            crate::MetricKind::Elevation | crate::MetricKind::Gradient => {
+                MissingSamplePolicy::Bridge
+            }
+            _ => panic!("standard metric has no interpolation policy: {kind:?}"),
+        },
+    }
+}
 
 /// Interpolates a latitude/longitude pair at `target_x`.
 ///
@@ -320,7 +344,8 @@ pub fn densify_activity(
     // ── Phase 3: densify each requested numeric series ───────────────────
     // Empty vectors signal to render code that the series is not needed,
     // avoiding wasted per-frame lookups and allocations.
-    // Interpolation mode (linear vs hold) is read from the manifest per metric.
+    // Interpolation mode (linear, hold, or preserve) is read from the manifest
+    // per metric.
     let densify =
         |x: &[f64], y: &NumericSeries, target: &[f64], enabled: bool, kind: crate::MetricKind| {
             if !enabled || y.is_empty() {
@@ -328,7 +353,12 @@ pub fn densify_activity(
             }
             match standard_metric_interpolation(kind) {
                 Some(StandardMetricInterpolationKind::Hold) => densify_hold_series(x, y, target),
-                _ => interpolate_numeric_series(x, y, target, MissingSamplePolicy::Bridge),
+                _ => interpolate_numeric_series(
+                    x,
+                    y,
+                    target,
+                    metric_missing_sample_policy(kind),
+                ),
             }
         };
 

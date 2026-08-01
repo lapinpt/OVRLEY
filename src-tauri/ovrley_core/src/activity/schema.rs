@@ -8,7 +8,7 @@
 //!       trimming (see [`crate::activity::trim`]), interpolation (see
 //!       [`crate::activity::interpolate`] and [`crate::interpolation`]).
 //!
-//! Allowed dependencies: `chrono-tz`, `serde`, `serde_json`.
+//! Allowed dependencies: `chrono-tz`, `serde`, `serde_json`, and activity metric contracts.
 //! Forbidden dependencies: `render`, `encode`, `commands`.
 //!
 //! Related modules: [`crate::activity::interpolate`] (consumes these types for
@@ -26,6 +26,8 @@
 //! parse-and-prepare phase. The `DenseActivityReport` is read heavily during
 //! per-frame rendering (O(1) lookup via `frame_index`).
 
+use super::elevation::preferred_elevation_series;
+use crate::MetricKind;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use chrono_tz::Tz;
@@ -34,8 +36,8 @@ use std::collections::BTreeMap;
 /// Numeric telemetry series aligned with `sample_elapsed_seconds`.
 ///
 /// `None` means the source file had no valid value for that sample. Consumers
-/// interpolate through available values and preserve empty vectors for series
-/// that a template did not request.
+/// apply the metric's interpolation policy and preserve empty vectors for
+/// series that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
 
 /// Canonical string gear observations aligned with `sample_elapsed_seconds`.
@@ -606,6 +608,59 @@ pub struct DenseSeriesReport {
     pub course_lon: Vec<Option<f64>>,
     /// Absolute RFC 3339 timestamps.
     pub time: Vec<Option<String>>,
+}
+
+impl DenseSeriesReport {
+    /// Returns the canonical numeric dense series for a metric.
+    ///
+    /// `None` means the metric has no numeric dense series. A returned empty
+    /// slice therefore continues to distinguish an unavailable metric from a
+    /// present series containing missing frame samples.
+    pub(crate) fn numeric_series_for(&self, metric: MetricKind) -> Option<&[Option<f64>]> {
+        match metric {
+            MetricKind::Speed => Some(&self.speed),
+            MetricKind::Distance => Some(&self.distance),
+            MetricKind::Elevation => Some(&self.elevation),
+            MetricKind::Gradient => Some(&self.gradient),
+            MetricKind::Heartrate => Some(&self.heartrate),
+            MetricKind::Cadence => Some(&self.cadence),
+            MetricKind::Power => Some(&self.power),
+            MetricKind::Temperature => Some(&self.temperature),
+            MetricKind::Calories => Some(&self.calories),
+            MetricKind::Pace => Some(&self.pace),
+            MetricKind::GForce => Some(&self.g_force),
+            MetricKind::AirPressure => Some(&self.air_pressure),
+            MetricKind::GroundContactTime => Some(&self.ground_contact_time),
+            MetricKind::LeftRightBalance => Some(&self.left_right_balance),
+            MetricKind::StrideLength => Some(&self.stride_length),
+            MetricKind::StrokeRate => Some(&self.stroke_rate),
+            MetricKind::Torque => Some(&self.torque),
+            MetricKind::VerticalSpeed => Some(&self.vertical_speed),
+            MetricKind::VerticalRatio => Some(&self.vertical_ratio),
+            MetricKind::VerticalOscillation => Some(&self.vertical_oscillation),
+            MetricKind::CoreTemperature => Some(&self.core_temperature),
+            MetricKind::Heading => Some(&self.heading),
+            MetricKind::Altitude => Some(preferred_elevation_series(
+                &self.barometric_altitude,
+                &self.elevation,
+            )),
+            MetricKind::Iso => Some(&self.iso),
+            MetricKind::Aperture => Some(&self.aperture),
+            MetricKind::ShutterSpeed => Some(&self.shutter_speed),
+            MetricKind::FocalLength => Some(&self.focal_length),
+            MetricKind::Ev => Some(&self.ev),
+            MetricKind::ColorTemperature => Some(&self.color_temperature),
+            MetricKind::Rpm => Some(&self.rpm),
+            MetricKind::ThrottlePosition => Some(&self.throttle_position),
+            MetricKind::BrakePosition => Some(&self.brake_position),
+            MetricKind::LeanAngle => Some(&self.lean_angle),
+            MetricKind::DistanceToHome => Some(&self.distance_to_home),
+            MetricKind::TotalAscent => Some(&self.total_ascent),
+            MetricKind::GearPosition
+            | MetricKind::GpsCoordinates
+            | MetricKind::Time => None,
+        }
+    }
 }
 
 /// Activity samples after applying a scene trim but before per-frame densifying.

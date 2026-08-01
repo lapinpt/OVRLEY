@@ -34,6 +34,7 @@ pub enum StandardMetricFormatterKind {
 pub enum StandardMetricInterpolationKind {
     Linear,
     Hold,
+    Preserve,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]

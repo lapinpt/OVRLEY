@@ -24,7 +24,9 @@ use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
-use crate::render::format::format_validated_metric_parts;
+use crate::render::format::{
+    format_validated_metric_parts, resolve_metric_display_value,
+};
 use crate::render::surface::create_surface;
 use crate::render::text::{
     draw_text, draw_text_with_vertical_metrics_text, origin_x_for_centered_text, parse_color,
@@ -92,7 +94,8 @@ pub fn prepare_arc_gauge_cache(
             .iter()
             .enumerate()
             .map(|(frame_index, raw_value)| {
-                let value = raw_value.unwrap_or(min_value);
+                let value = resolve_metric_display_value(gauge.metric, *raw_value, dense_activity)
+                    .unwrap_or(min_value);
                 let parts =
                     format_validated_metric_parts(&gauge.inner_value, dense_activity, frame_index)
                         .expect("validated arc gauge metric must have a formatter");

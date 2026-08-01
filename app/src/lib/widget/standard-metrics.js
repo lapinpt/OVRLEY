@@ -180,7 +180,7 @@ export function getDisplayTypeDefaultFontSize(displayType) {
 /**
  * Look up the interpolation policy for a standard metric type.
  * @param {string} type - metric type string
- * @returns {'linear' | 'hold' | null} the interpolation mode, or `null` if not found
+ * @returns {'linear' | 'hold' | 'preserve' | null} the interpolation mode, or `null` if not found
  */
 export function getStandardMetricInterpolation(type) {
   const definition = getStandardMetricDefinition(type)

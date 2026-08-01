@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { resolvePreviewSecond } from '@/lib/preview-timing'
+import { buildPreviewFrameWindow, resolvePreviewSecond } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
@@ -318,9 +318,18 @@ export default function useRenderWorkflow({ backendStatus }) {
         sourceActivity: parsedActivity,
       })
       const previewSecond = Math.min(Math.max(resolvedPreviewSecond, nextConfig.scene.start ?? 0), nextConfig.scene.end ?? resolvedPreviewSecond)
+      const sceneStart = nextConfig.scene.start ?? 0
+      const sceneEnd = nextConfig.scene.end ?? sceneStart
+      const previewWindow = buildPreviewFrameWindow({
+        activityDuration: sceneEnd - sceneStart,
+        previewSecond: previewSecond - sceneStart,
+        sceneFps: previewFps,
+      })
 
       nextConfig.scene = {
         ...nextConfig.scene,
+        start: sceneStart + previewWindow.start,
+        end: sceneStart + previewWindow.end,
         fps: previewFps,
         update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
       }

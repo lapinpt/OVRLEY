@@ -8,7 +8,7 @@
 
 use super::interpolate::{
     densify_hold_series, interpolate_course_value, interpolate_numeric_series_value,
-    interpolate_time_series_value,
+    interpolate_time_series_value, metric_missing_sample_policy,
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
@@ -237,7 +237,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Elevation),
             )
         } else {
             Vec::new()
@@ -250,7 +250,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Calories),
             )
         } else {
             Vec::new()
@@ -263,7 +263,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::DistanceToHome),
             )
         } else {
             Vec::new()
@@ -276,7 +276,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::TotalAscent),
             )
         } else {
             Vec::new()
@@ -290,7 +290,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Elevation),
             )
         } else {
             Vec::new()
@@ -303,7 +303,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Speed),
             )
         } else {
             Vec::new()
@@ -316,7 +316,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Distance),
             )
         } else {
             Vec::new()
@@ -329,7 +329,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Heartrate),
             )
         } else {
             Vec::new()
@@ -342,7 +342,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Cadence),
             )
         } else {
             Vec::new()
@@ -355,7 +355,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Power),
             )
         } else {
             Vec::new()
@@ -368,7 +368,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Temperature),
             )
         } else {
             Vec::new()
@@ -381,7 +381,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Pace),
             )
         } else {
             Vec::new()
@@ -394,7 +394,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::GForce),
             )
         } else {
             Vec::new()
@@ -446,7 +446,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Rpm),
             )
         } else {
             Vec::new()
@@ -459,7 +459,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::ThrottlePosition),
             )
         } else {
             Vec::new()
@@ -472,7 +472,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::BrakePosition),
             )
         } else {
             Vec::new()
@@ -485,7 +485,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::LeanAngle),
             )
         } else {
             Vec::new()
@@ -498,7 +498,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::AirPressure),
             )
         } else {
             Vec::new()
@@ -511,7 +511,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::GroundContactTime),
             )
         } else {
             Vec::new()
@@ -524,7 +524,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::LeftRightBalance),
             )
         } else {
             Vec::new()
@@ -537,7 +537,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::StrideLength),
             )
         } else {
             Vec::new()
@@ -550,7 +550,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::StrokeRate),
             )
         } else {
             Vec::new()
@@ -563,7 +563,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Torque),
             )
         } else {
             Vec::new()
@@ -576,7 +576,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::VerticalSpeed),
             )
         } else {
             Vec::new()
@@ -589,7 +589,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Iso),
             )
         } else {
             Vec::new()
@@ -602,7 +602,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Aperture),
             )
         } else {
             Vec::new()
@@ -615,7 +615,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::ShutterSpeed),
             )
         } else {
             Vec::new()
@@ -628,7 +628,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::FocalLength),
             )
         } else {
             Vec::new()
@@ -641,7 +641,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Ev),
             )
         } else {
             Vec::new()
@@ -654,7 +654,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::ColorTemperature),
             )
         } else {
             Vec::new()
@@ -680,7 +680,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::VerticalRatio),
             )
         } else {
             Vec::new()
@@ -693,7 +693,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::VerticalOscillation),
             )
         } else {
             Vec::new()
@@ -706,7 +706,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::CoreTemperature),
             )
         } else {
             Vec::new()
@@ -719,7 +719,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Gradient),
             )
         } else {
             Vec::new()
@@ -732,7 +732,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-                MissingSamplePolicy::Bridge,
+                metric_missing_sample_policy(crate::MetricKind::Heading),
             )
         } else {
             Vec::new()

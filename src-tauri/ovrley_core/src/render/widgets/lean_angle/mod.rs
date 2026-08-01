@@ -7,7 +7,7 @@ use crate::normalize::{
     lean_angle_layout, LeanAngleLayout, ValidatedLeanAngleWidget, ValidatedSceneConfig,
     LEAN_ANGLE_MAX_FILL_SWEEP,
 };
-use crate::render::format::format_lean_angle_value;
+use crate::render::format::{format_lean_angle_value, resolve_metric_display_value};
 use crate::render::surface::create_surface;
 use crate::render::text::{
     draw_text_with_vertical_metrics_text, measure_text, parse_color, ResolvedTextStyle,
@@ -209,7 +209,9 @@ pub fn draw_lean_angle_widget(
             .get(frame_index)
             .copied()
             .flatten();
-        let fill_sweep = lean_angle_fill_sweep(raw);
+        let display_value =
+            resolve_metric_display_value(MetricKind::LeanAngle, raw, dense_activity);
+        let fill_sweep = lean_angle_fill_sweep(display_value);
         let center_x = cache.x + cache.layout.center_x;
         let center_y = cache.y + cache.layout.center_y;
 
@@ -239,7 +241,16 @@ pub fn draw_lean_angle_widget(
             canvas.restore();
         }
 
-        draw_lean_angle_value(canvas, cache, raw, center_x, center_y, scale, font_dirs).ok()?;
+        draw_lean_angle_value(
+            canvas,
+            cache,
+            display_value,
+            center_x,
+            center_y,
+            scale,
+            font_dirs,
+        )
+        .ok()?;
 
         let marker = polar_point(
             center_x,

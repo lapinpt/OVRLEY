@@ -5,14 +5,14 @@
 //! icon selection, and missing-value fallbacks so drawing code can stay focused
 //! on layout.
 
-use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::DenseActivityReport;
 use crate::normalize::{
     ValidatedGradientWidget, ValidatedTimeFormatting, ValidatedTimeValue, ValidatedValueFormatting,
     ValidatedValueWidget,
 };
 use crate::standard_metrics::{
-    standard_metric_formatter, standard_metric_unit_label, StandardMetricFormatterKind,
+    standard_metric_formatter, standard_metric_interpolation, standard_metric_unit_label,
+    StandardMetricFormatterKind, StandardMetricInterpolationKind,
 };
 use crate::MetricKind;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
@@ -133,216 +133,32 @@ fn raw_value(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> Option<f64> {
-    match key {
-        MetricKind::Speed => dense_activity
-            .series
-            .speed
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Distance => dense_activity
-            .series
-            .distance
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Elevation => dense_activity
-            .series
-            .elevation
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Gradient => dense_activity
-            .series
-            .gradient
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Heartrate => dense_activity
-            .series
-            .heartrate
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Cadence => dense_activity
-            .series
-            .cadence
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Power => dense_activity
-            .series
-            .power
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Temperature => dense_activity
-            .series
-            .temperature
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Pace => dense_activity
-            .series
-            .pace
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::GForce => dense_activity
-            .series
-            .g_force
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::AirPressure => dense_activity
-            .series
-            .air_pressure
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::GroundContactTime => dense_activity
-            .series
-            .ground_contact_time
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::LeftRightBalance => dense_activity
-            .series
-            .left_right_balance
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::StrideLength => dense_activity
-            .series
-            .stride_length
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::StrokeRate => dense_activity
-            .series
-            .stroke_rate
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Torque => dense_activity
-            .series
-            .torque
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::VerticalSpeed => dense_activity
-            .series
-            .vertical_speed
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::GearPosition => None,
-        MetricKind::VerticalRatio => dense_activity
-            .series
-            .vertical_ratio
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::VerticalOscillation => dense_activity
-            .series
-            .vertical_oscillation
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::CoreTemperature => dense_activity
-            .series
-            .core_temperature
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Heading => dense_activity
-            .series
-            .heading
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Altitude => preferred_elevation_series(
-            &dense_activity.series.barometric_altitude,
-            &dense_activity.series.elevation,
-        )
-        .get(frame_index)
-        .copied()
-        .flatten(),
-        MetricKind::Iso => dense_activity
-            .series
-            .iso
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Aperture => dense_activity
-            .series
-            .aperture
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::ShutterSpeed => dense_activity
-            .series
-            .shutter_speed
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::FocalLength => dense_activity
-            .series
-            .focal_length
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Ev => dense_activity.series.ev.get(frame_index).copied().flatten(),
-        MetricKind::ColorTemperature => dense_activity
-            .series
-            .color_temperature
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Rpm => dense_activity
-            .series
-            .rpm
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::ThrottlePosition => dense_activity
-            .series
-            .throttle_position
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::BrakePosition => dense_activity
-            .series
-            .brake_position
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::LeanAngle => dense_activity
-            .series
-            .lean_angle
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::DistanceToHome => dense_activity
-            .series
-            .distance_to_home
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::Calories => dense_activity
-            .series
-            .calories
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::TotalAscent => dense_activity
-            .series
-            .total_ascent
-            .get(frame_index)
-            .copied()
-            .flatten(),
-        MetricKind::GpsCoordinates => None,
-        MetricKind::Time => None,
+    dense_activity
+        .series
+        .numeric_series_for(key)
+        .and_then(|series| series.get(frame_index).copied().flatten())
+}
+
+/// Resolves the numeric value shown by text and numeric gauge widgets.
+///
+/// Preserve gaps remain `None` in the dense series and therefore do not affect
+/// ranges or geometry. Once a present preserve series reaches display, its gap
+/// is the documented numeric zero. An empty series remains unavailable.
+pub(crate) fn resolve_metric_display_value(
+    kind: MetricKind,
+    raw: Option<f64>,
+    dense_activity: &DenseActivityReport,
+) -> Option<f64> {
+    if raw.is_some() {
+        return raw;
+    }
+
+    if standard_metric_interpolation(kind) == Some(StandardMetricInterpolationKind::Preserve)
+        && dense_metric_series_is_available(kind, dense_activity)
+    {
+        Some(0.0)
+    } else {
+        None
     }
 }
 
@@ -499,6 +315,7 @@ fn format_validated_standard_metric_parts<'a>(
         MetricValue::Gear(gear) => (None, gear),
     };
     let kind = validated.metric;
+    let raw = resolve_metric_display_value(kind, raw, dense_activity);
     let display_unit = Some(validated.display_unit.as_str());
     let decimals = validated_decimals(&validated.formatting);
     let show_units = validated.show_units;
@@ -616,6 +433,21 @@ fn format_validated_standard_metric_parts<'a>(
     };
 
     (value_text, unit_text)
+}
+
+/// Returns whether the finalized metric has any dense samples.
+///
+/// Finalization represents an unavailable metric with an empty series, so this
+/// remains an O(1) distinction between an unavailable metric and a preserve
+/// gap at the current frame.
+fn dense_metric_series_is_available(
+    kind: MetricKind,
+    dense_activity: &DenseActivityReport,
+) -> bool {
+    dense_activity
+        .series
+        .numeric_series_for(kind)
+        .is_some_and(|series| !series.is_empty())
 }
 
 fn validated_decimals(formatting: &ValidatedValueFormatting) -> usize {

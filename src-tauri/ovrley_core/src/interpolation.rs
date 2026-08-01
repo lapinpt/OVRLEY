@@ -62,7 +62,9 @@ pub fn interpolate_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
 
 /// Linearly interpolates an optional numeric series at `target_x`.
 ///
-/// Filters out `None` values, then delegates to [`interpolate_points`].
+/// `Bridge` filters out `None` values and delegates to [`interpolate_points`].
+/// `Preserve` treats missing samples as zero endpoints without bridging
+/// directly between the surrounding valid samples.
 pub fn interpolate_numeric_series_value(
     x_values: &[f64],
     y_values: &[Option<f64>],
@@ -89,11 +91,10 @@ pub fn interpolate_numeric_series_value(
             return y_values[y_values.len() - 1];
         }
         let left = right - 1;
+        let left_value = y_values[left].unwrap_or(0.0);
+        let right_value = y_values[right].unwrap_or(0.0);
         return interpolate_points(
-            &[
-                (x_values[left], y_values[left]?),
-                (x_values[right], y_values[right]?),
-            ],
+            &[(x_values[left], left_value), (x_values[right], right_value)],
             target_x,
         );
     }

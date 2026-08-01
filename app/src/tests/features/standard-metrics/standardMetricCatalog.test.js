@@ -192,7 +192,7 @@ describe('standard metric widget catalog', () => {
     for (const type of vehicleTypes) {
       expect(isStandardMetricWidgetType(type)).toBe(true)
       expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')
-      expect(getStandardMetricInterpolation(type)).toBe('linear')
+      expect(getStandardMetricInterpolation(type)).toBe(type === 'rpm' ? 'preserve' : 'linear')
       expect(getStandardMetricUnitsMode(type)).toBe('selectable')
     }
 
@@ -214,9 +214,14 @@ describe('standard metric widget catalog', () => {
   })
 
   test('existing metrics carry interpolation and unitsMode defaults', () => {
-    const existingTypes = ['speed', 'distance', 'heartrate', 'cadence', 'power', 'temperature', 'pace', 'heading']
-    for (const type of existingTypes) {
+    const linearTypes = ['speed', 'distance', 'heartrate', 'temperature', 'heading']
+    const preserveTypes = ['cadence', 'power', 'pace']
+    for (const type of linearTypes) {
       expect(getStandardMetricInterpolation(type)).toBe('linear')
+      expect(getStandardMetricUnitsMode(type)).toBe('selectable')
+    }
+    for (const type of preserveTypes) {
+      expect(getStandardMetricInterpolation(type)).toBe('preserve')
       expect(getStandardMetricUnitsMode(type)).toBe('selectable')
     }
   })

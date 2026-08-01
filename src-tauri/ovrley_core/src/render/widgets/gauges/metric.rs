@@ -5,7 +5,6 @@
 //! fill quantization and boundary-label formatting identical across arc and
 //! linear renderers.
 
-use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::DenseSeriesReport;
 use crate::render::format::convert_standard_metric_value;
 use crate::types::MetricKind;
@@ -50,46 +49,13 @@ pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f
 /// presentation range consequently follows [`metric_range`]'s neutral range.
 pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &[Option<f64>] {
     match metric {
-        MetricKind::Speed => &series.speed,
-        MetricKind::Distance => &series.distance,
-        MetricKind::DistanceToHome => &series.distance_to_home,
-        MetricKind::Elevation => &series.elevation,
-        MetricKind::Heartrate => &series.heartrate,
-        MetricKind::Cadence => &series.cadence,
-        MetricKind::Power => &series.power,
-        MetricKind::Temperature => &series.temperature,
-        MetricKind::Calories => &series.calories,
-        MetricKind::Pace => &series.pace,
-        MetricKind::GForce => &series.g_force,
-        MetricKind::Rpm => &series.rpm,
-        MetricKind::ThrottlePosition => &series.throttle_position,
-        MetricKind::BrakePosition => &series.brake_position,
-        MetricKind::LeanAngle => &series.lean_angle,
-        MetricKind::AirPressure => &series.air_pressure,
-        MetricKind::GroundContactTime => &series.ground_contact_time,
-        MetricKind::StrideLength => &series.stride_length,
-        MetricKind::StrokeRate => &series.stroke_rate,
-        MetricKind::Torque => &series.torque,
-        MetricKind::VerticalSpeed => &series.vertical_speed,
-        MetricKind::Altitude => {
-            preferred_elevation_series(&series.barometric_altitude, &series.elevation)
-        }
-        MetricKind::Iso => &series.iso,
-        MetricKind::Aperture => &series.aperture,
-        MetricKind::ShutterSpeed => &series.shutter_speed,
-        MetricKind::FocalLength => &series.focal_length,
-        MetricKind::Ev => &series.ev,
-        MetricKind::ColorTemperature => &series.color_temperature,
-        MetricKind::VerticalRatio => &series.vertical_ratio,
-        MetricKind::VerticalOscillation => &series.vertical_oscillation,
-        MetricKind::CoreTemperature => &series.core_temperature,
-        MetricKind::Heading => &series.heading,
         MetricKind::GearPosition
         | MetricKind::LeftRightBalance
-        | MetricKind::Gradient
         | MetricKind::GpsCoordinates
+        | MetricKind::Gradient
         | MetricKind::TotalAscent
         | MetricKind::Time => &[],
+        metric => series.numeric_series_for(metric).unwrap_or(&[]),
     }
 }
 

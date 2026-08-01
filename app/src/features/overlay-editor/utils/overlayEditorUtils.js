@@ -10,7 +10,7 @@
 import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
-import { interpolateNumericSeries } from '@/lib/interpolation'
+import { interpolateNumericSeries, MISSING_SAMPLE_POLICY } from '@/lib/interpolation'
 import { getStandardMetricDefinition, getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
 
 /**
@@ -96,7 +96,7 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const activityKey = getStandardMetricDefinition(key)?.dataSource ?? key
   const series = key === 'altitude' ? getPreferredElevationSeries(activity) : activity?.[activityKey]
 
-  if (!Array.isArray(series) || !elapsedSeries.length) {
+  if (!Array.isArray(series) || !series.length || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
   }
 
@@ -107,9 +107,12 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
     return heldValue ?? null
   }
 
-  const interpolatedValue = interpolateNumericSeries(elapsedSeries, series, elapsedSecond)
+  const policy = interpolationMode === 'preserve' ? MISSING_SAMPLE_POLICY.PRESERVE : MISSING_SAMPLE_POLICY.BRIDGE
+  const interpolatedValue = interpolateNumericSeries(elapsedSeries, series, elapsedSecond, policy)
 
-  return interpolatedValue ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+  if (interpolatedValue !== null) return interpolatedValue
+  if (interpolationMode === 'preserve') return 0
+  return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
 
 function getPreferredElevationSeries(activity) {
