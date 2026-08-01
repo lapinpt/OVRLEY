@@ -19,14 +19,15 @@ import useStore from '@/store/useStore'
  * injects pre-computed Rust geometry so Skia and SVG use identical data.
  *
  * @param {object} params
- * @param {object} params.activity - Activity data with route samples.
+ * @param {object|null} params.activity - Frame activity, null when placeholder data is displayed.
+ * @param {object|null} params.sourceActivity - Stable parsed activity used to prepare geometry.
  * @param {object} params.data - Effective route widget data.
  * @param {object} params.exportRange - Active export-range selection.
  * @param {number} params.previewSecond - Current preview timestamp in seconds.
  * @param {object} params.style - Style model returned by useRoutePreviewStyle.
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
-export function useRoutePreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
+export function useRoutePreviewGeometry({ activity, sourceActivity, data, exportRange, previewSecond, style }) {
   const [rustGeometry, setRustGeometry] = useState(null)
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
@@ -36,9 +37,9 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   // (scale, shadow, border) — globalDefaults fills them. start/end are
   // overridden when an export window is active so Rust trims source points.
   const geometryConfig = useMemo(() => {
-    if (!config || !activity || !hasTauriRuntime()) return null
-    const duration = activity?.trim_end_seconds ?? 0
-    const exportWindow = resolveExportRangeWindow(activity, exportRange, data.show_full_activity)
+    if (!config || !sourceActivity || !hasTauriRuntime()) return null
+    const duration = sourceActivity.trim_end_seconds
+    const exportWindow = resolveExportRangeWindow(sourceActivity, exportRange, data.show_full_activity)
     const { updateRate, start, end, ...sceneRest } = config.scene
 
     return {
@@ -53,7 +54,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
         custom_export_range_active: exportWindow.active,
       },
     }
-  }, [config, globalDefaults, activity, exportRange, style.globalScale, data.show_full_activity])
+  }, [config, globalDefaults, sourceActivity, exportRange, style.globalScale, data.show_full_activity])
 
   useEffect(() => {
     if (!geometryConfig) return
@@ -64,13 +65,13 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
     }
 
     let cancelled = false
-    buildRouteGeometry(geometryConfig, activity).then((geometry) => {
+    buildRouteGeometry(geometryConfig, sourceActivity).then((geometry) => {
       if (!cancelled) setRustGeometry(geometry)
     })
     return () => {
       cancelled = true
     }
-  }, [geometryConfig, activity])
+  }, [geometryConfig, sourceActivity])
 
   if (!activity) {
     return buildPlaceholderRoutePreviewGeometry({
@@ -89,10 +90,10 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
 
   // progress01 drives marker placement and completed polyline. Export
   // window normalizes it to 0..1 within the trimmed range.
-  const exportWindow = resolveExportRangeWindow(activity, exportRange, data.show_full_activity)
+  const exportWindow = resolveExportRangeWindow(sourceActivity, exportRange, data.show_full_activity)
   const progress01 = exportWindow.active
-    ? (getWindowProgressAtTime(activity, exportWindow, previewSecond) ?? 0)
-    : getDistanceProgressAtElapsed(activity, previewSecond)
+    ? (getWindowProgressAtTime(sourceActivity, exportWindow, previewSecond) ?? 0)
+    : getDistanceProgressAtElapsed(sourceActivity, previewSecond)
 
   const { markerPoint, completedPoints } = buildRouteFramePreview(points, rustGeometry.progressValues, progress01)
 

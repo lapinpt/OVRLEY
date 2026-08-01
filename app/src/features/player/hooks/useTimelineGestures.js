@@ -31,6 +31,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
   const metricsRef = useRef({
     containerElement: null,
     panBy: null,
+    timelineMinimum: 0,
     totalDuration: 0,
     viewEnd: 0,
     viewStart: 0,
@@ -56,6 +57,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
       viewStart: metrics.viewStart,
       viewEnd: metrics.viewEnd,
       widthPx: metrics.widthPx,
+      timelineMinimum: metrics.timelineMinimum,
       totalDuration: metrics.totalDuration,
     })
   }, [])

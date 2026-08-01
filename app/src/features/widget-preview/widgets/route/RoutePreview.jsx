@@ -21,8 +21,8 @@ import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
 import { PreviewMarkerLayers, PreviewPolylineShadow, PreviewSvgShadowBlurFilter } from '../../shared/PreviewSvgComponents'
 import { useRoutePreview } from './useRoutePreview'
 
-export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
-  const previewModel = useRoutePreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange })
+export function OverlayRouteWidget({ widget, activity, sourceActivity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
+  const previewModel = useRoutePreview({ widget, activity, sourceActivity, previewSecond, globalScale, sceneStyle, exportRange })
 
   if (!previewModel) {
     return null

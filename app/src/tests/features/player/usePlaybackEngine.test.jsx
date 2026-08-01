@@ -81,6 +81,36 @@ describe('usePlaybackEngine', () => {
     })
   })
 
+  test('starts at the negative video beginning once, then resumes from paused activity time zero', () => {
+    const options = createOptions({
+      backgroundMode: 'video',
+      importedVideoDuration: 10,
+      selectedSecond: 0,
+      videoSyncOffsetSeconds: -5,
+    })
+    const { result, rerender } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: options,
+    })
+
+    expect(options.setSelectedSecond).toHaveBeenCalledWith(-5)
+    rerender({ ...options, selectedSecond: -5 })
+
+    act(() => {
+      result.current.play()
+    })
+    expect(options.startPreviewPlayback).toHaveBeenLastCalledWith({
+      source: 'video',
+      second: -5,
+    })
+
+    rerender({ ...options, selectedSecond: 0 })
+    act(() => result.current.play())
+    expect(options.startPreviewPlayback).toHaveBeenLastCalledWith({
+      source: 'video',
+      second: 0,
+    })
+  })
+
   test('hands playback back to the timeline when the playhead leaves the imported video range', () => {
     const options = createOptions({
       backgroundMode: 'video',

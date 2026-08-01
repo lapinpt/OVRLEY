@@ -97,6 +97,20 @@ export function getMetricSeries(activity, metricType) {
 }
 
 /**
+ * Supplies activity data only while the current preview second belongs to it.
+ *
+ * @param {object|null} activity - Parsed activity data.
+ * @param {number} previewSecond - Current preview second.
+ * @returns {object|null} Activity data available at the preview second.
+ */
+export function getPreviewActivity(activity, previewSecond) {
+  if (activity === null) return null
+
+  const activityEnd = activity.trim_end_seconds
+  return previewSecond >= 0 && previewSecond <= activityEnd ? activity : null
+}
+
+/**
  * Interpolates an activity metric series (speed, heartrate, etc.) at the
  * given elapsed second. Falls back to DEFAULT_ACTIVITY_PREVIEW values.
  *

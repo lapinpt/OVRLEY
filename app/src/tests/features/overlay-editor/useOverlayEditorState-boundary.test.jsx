@@ -29,7 +29,11 @@ describe('useOverlayEditorState module contract', () => {
     expect(useOverlayEditorState.length).toBe(1)
   })
 
-  test('reacts when parsedActivity is replaced after async telemetry load', () => {
+  test('keeps widgets and interaction refs available after the playhead leaves activity data', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      values: [{ id: 'speed-widget', value: 'speed', x: 0, y: 0, display_type: 'text' }],
+    }
     useStore.setState({
       fallbackDurationSeconds: 10,
       parsedActivity: null,
@@ -38,7 +42,7 @@ describe('useOverlayEditorState module contract', () => {
 
     const { result } = renderHook(() =>
       useOverlayEditorState({
-        config: DEFAULT_CONFIG,
+        config,
         globalDefaults: {},
         onConfigChange: vi.fn(),
         zoomLevel: 1,
@@ -47,6 +51,8 @@ describe('useOverlayEditorState module contract', () => {
     )
 
     expect(result.current.previewSecond).toBe(9)
+    expect(result.current.renderedWidgets).toHaveLength(1)
+    expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
 
     act(() => {
       useStore.setState({
@@ -57,7 +63,14 @@ describe('useOverlayEditorState module contract', () => {
       })
     })
 
-    expect(result.current.previewSecond).toBe(3)
+    expect(result.current.previewSecond).toBe(9)
+    expect(result.current.activity).toBeNull()
+    expect(result.current.sourceActivity).toEqual({
+      trim_end_seconds: 3,
+      metadata: { duration_seconds: 3 },
+    })
+    expect(result.current.renderedWidgets).toHaveLength(1)
+    expect(result.current.widgetRefCallbacks['speed-widget']).toEqual(expect.any(Function))
   })
 })
 

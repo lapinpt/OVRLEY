@@ -5,7 +5,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getContainerFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
-import { createPlaybackAnchor, getTimelinePlaybackSecond, getTotalPlaybackDuration, resolvePlaybackSource } from '../utils/playerTiming'
+import {
+  createPlaybackAnchor,
+  getTimelineMinimum,
+  getTimelinePlaybackSecond,
+  getTotalPlaybackDuration,
+  resolvePlaybackSource,
+} from '../utils/playerTiming'
 
 /**
  * Manages the player clock and exposes direct second-based playback commands.
@@ -54,6 +60,7 @@ export default function usePlaybackEngine({
 
   // Imperative playback refs - RAF reads these without forcing React renders every frame.
   const playbackAnchorRef = useRef({ startedAtMs: 0, startedSecond: 0 })
+  const previousTimelineMinimumRef = useRef(0)
   const totalDurationRef = useRef(0)
   const previewFrameRef = useRef(-1)
 
@@ -74,8 +81,9 @@ export default function usePlaybackEngine({
   const shouldUseVideoPlayback = backgroundMode === 'video' && Boolean(importedVideoPath)
   const isPlaying = previewPlaybackState === 'playing'
   const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
-  const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
-  const displayedPlayhead = clamp(dragSecond === null ? clampedPlayhead : dragSecond, 0, totalDuration)
+  const timelineMinimum = getTimelineMinimum({ hasVideo: Boolean(importedVideoPath), videoSyncOffsetSeconds })
+  const clampedPlayhead = clamp(selectedSecond, timelineMinimum, totalDuration)
+  const displayedPlayhead = clamp(dragSecond === null ? clampedPlayhead : dragSecond, timelineMinimum, totalDuration)
   const effectivePreviewFps = useMemo(() => getContainerFps(sceneFps, updateRate), [sceneFps, updateRate])
 
   // Shared reset path - any explicit playback command clears transient drag/frame ownership.
@@ -102,21 +110,32 @@ export default function usePlaybackEngine({
     [pausePreviewPlayback, resetPlaybackOrchestration, setPlaybackAnchor],
   )
 
-  // Duration ref sync - keeps the RAF loop on latest bounds without restarting it every render.
+  // Duration sync - keeps the RAF loop current without changing paused playback ownership.
   useEffect(() => {
     totalDurationRef.current = totalDuration
   }, [totalDuration])
 
+  // Timeline-start sync - a playhead at the previous start follows a newly imported negative video start.
+  useEffect(() => {
+    const previousTimelineMinimum = previousTimelineMinimumRef.current
+    if (timelineMinimum === previousTimelineMinimum) return
+
+    previousTimelineMinimumRef.current = timelineMinimum
+    if (selectedSecond === previousTimelineMinimum) {
+      setSelectedSecond(timelineMinimum)
+    }
+  }, [selectedSecond, setSelectedSecond, timelineMinimum])
+
   // Playhead bounds sync - clamps stale store values when media duration changes under the player.
   useEffect(() => {
     if (!hasActivity) {
-      playbackAnchorRef.current = { startedAtMs: 0, startedSecond: 0 }
+      playbackAnchorRef.current = { startedAtMs: 0, startedSecond: timelineMinimum }
       return
     }
     if (clampedPlayhead !== selectedSecond) {
       setSelectedSecond(clampedPlayhead)
     }
-  }, [clampedPlayhead, hasActivity, selectedSecond, setSelectedSecond])
+  }, [clampedPlayhead, hasActivity, selectedSecond, setSelectedSecond, timelineMinimum])
 
   // Video availability guard - if video playback is no longer possible, hand ownership back to a paused state.
   useEffect(() => {
@@ -182,23 +201,24 @@ export default function usePlaybackEngine({
         previewFrameRef.current = -1
         return
       }
-      const frameIndex = Math.floor(timelineSecond * effectivePreviewFps)
+      const frameIndex = Math.floor((timelineSecond - timelineMinimum) * effectivePreviewFps)
       if (frameIndex !== previewFrameRef.current) {
         previewFrameRef.current = frameIndex
-        setSelectedSecond(clamp(frameIndex / effectivePreviewFps, 0, safeDuration))
+        setSelectedSecond(clamp(timelineMinimum + frameIndex / effectivePreviewFps, timelineMinimum, safeDuration))
       }
       animationFrameId = window.requestAnimationFrame(tick)
     }
     animationFrameId = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(animationFrameId)
-  }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setSelectedSecond])
+  }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setSelectedSecond, timelineMinimum])
 
-  // Play command - restart from zero at the end and choose the active clock from the starting second.
+  // Play command - restart from the timeline start at the end and otherwise resume the current playhead.
   const play = useCallback(() => {
     if (!hasActivity) {
       return
     }
-    const initialSecond = clampedPlayhead >= totalDuration ? 0 : clampedPlayhead
+    let initialSecond = clampedPlayhead
+    if (clampedPlayhead >= totalDuration) initialSecond = timelineMinimum
     const nextSource = resolvePlaybackSource({
       shouldUseVideoPlayback,
       playheadSecond: initialSecond,
@@ -221,6 +241,7 @@ export default function usePlaybackEngine({
     shouldUseVideoPlayback,
     startPreviewPlayback,
     totalDuration,
+    timelineMinimum,
     videoSyncOffsetSeconds,
   ])
 
@@ -230,21 +251,21 @@ export default function usePlaybackEngine({
   }, [clampedPlayhead, pauseAtSecond])
 
   const resetToStart = useCallback(() => {
-    pauseAtSecond(0)
-  }, [pauseAtSecond])
+    pauseAtSecond(timelineMinimum)
+  }, [pauseAtSecond, timelineMinimum])
 
   const stepBySeconds = useCallback(
     (deltaSeconds) => {
-      const targetSecond = clamp(clampedPlayhead + deltaSeconds, 0, totalDuration)
+      const targetSecond = clamp(clampedPlayhead + deltaSeconds, timelineMinimum, totalDuration)
       pauseAtSecond(targetSecond)
     },
-    [clampedPlayhead, pauseAtSecond, totalDuration],
+    [clampedPlayhead, pauseAtSecond, timelineMinimum, totalDuration],
   )
 
   const scrubTo = useCallback(
     (second) => {
       // Scrub preview - updates drag ownership and store preview state without leaving the scrub interaction.
-      const scrubSecond = clamp(second, 0, totalDuration)
+      const scrubSecond = clamp(second, timelineMinimum, totalDuration)
       setPlaybackAnchor('video', scrubSecond)
       setDragSecond(scrubSecond)
       previewFrameRef.current = -1
@@ -254,19 +275,19 @@ export default function usePlaybackEngine({
       }
       updatePreviewScrub(scrubSecond)
     },
-    [beginPreviewScrub, previewPlaybackState, setPlaybackAnchor, totalDuration, updatePreviewScrub],
+    [beginPreviewScrub, previewPlaybackState, setPlaybackAnchor, timelineMinimum, totalDuration, updatePreviewScrub],
   )
 
   const commitScrub = useCallback(
     (second) => {
       // Scrub commit - stores the final paused playhead and releases temporary drag ownership.
-      const scrubSecond = clamp(second, 0, totalDuration)
+      const scrubSecond = clamp(second, timelineMinimum, totalDuration)
       setPlaybackAnchor('video', scrubSecond)
       previewFrameRef.current = -1
       setDragSecond(null)
       commitPreviewScrub(scrubSecond)
     },
-    [commitPreviewScrub, setPlaybackAnchor, totalDuration],
+    [commitPreviewScrub, setPlaybackAnchor, timelineMinimum, totalDuration],
   )
 
   const jumpToEnd = useCallback(() => {
@@ -288,6 +309,7 @@ export default function usePlaybackEngine({
     scrubTo,
     stepBySeconds,
     totalDuration,
+    timelineMinimum,
     videoSyncOffsetSeconds,
   }
 }

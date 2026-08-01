@@ -18,6 +18,30 @@ describe('timelineGeometry utilities', () => {
     expect(pointerToSecond({ clientX: 999, rect: { left: 0 }, viewStart: 0, viewEnd: 100, widthPx: 500, totalDuration: 100 })).toBe(100)
   })
 
+  test('maps pointers and export markers to a negative timeline minimum', () => {
+    expect(
+      pointerToSecond({
+        clientX: 0,
+        rect: { left: 0, width: 400 },
+        viewStart: -5,
+        viewEnd: 25,
+        widthPx: 400,
+        timelineMinimum: -5,
+        totalDuration: 25,
+      }),
+    ).toBe(-5)
+    expect(
+      clampExportRangeMarkerSecond({
+        marker: 'from',
+        second: -20,
+        fromSecond: -5,
+        toSecond: 25,
+        timelineMinimum: -5,
+        totalDuration: 25,
+      }),
+    ).toBe(-5)
+  })
+
   test('maps timeline seconds to viewport pixels', () => {
     expect(secondsToViewPx({ second: 50, viewStart: 0, viewEnd: 100, widthPx: 500 })).toBe(250)
     expect(secondsToViewPx({ second: 5, viewStart: 10, viewEnd: 10, widthPx: 500 })).toBe(0)

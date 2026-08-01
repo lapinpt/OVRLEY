@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { roundToDevicePixel } from '../utils/timelineGeometry'
+import { getTimelineMinimum } from '../utils/playerTiming'
 import {
   buildFitTargets,
   clampToView,
@@ -30,7 +31,8 @@ function getLeftPercent(x, widthPx) {
  * @param {object} options Timeline viewport inputs.
  * @param {number} options.totalDuration Total playable duration.
  * @param {boolean} [options.hasVideo=false] Whether a video lane is present.
- * @param {number} [options.videoSyncOffsetSeconds=0] Timeline second where the video starts.
+ * @param {number} [options.videoSyncOffsetSeconds=0] Committed timeline second where the video starts.
+ * @param {number} [options.videoSyncOffsetPreviewSeconds] Transient timeline second used during drag preview.
  * @param {number} [options.importedVideoDuration=0] Imported video duration in seconds.
  * @param {boolean} [options.hasActivityData=false] Whether activity metadata is loaded.
  * @param {number} [options.activityDurationSeconds=0] Activity duration in seconds.
@@ -44,6 +46,7 @@ export default function useTimelineViewport({
   totalDuration,
   hasVideo = false,
   videoSyncOffsetSeconds = 0,
+  videoSyncOffsetPreviewSeconds = videoSyncOffsetSeconds,
   importedVideoDuration = 0,
   hasActivityData = false,
   activityDurationSeconds = 0,
@@ -52,13 +55,20 @@ export default function useTimelineViewport({
   playheadSecond = 0,
   isDragging = false,
 }) {
+  const committedTimelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds })
+  const timelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds: videoSyncOffsetPreviewSeconds })
   // Duration ref - viewport actions use the latest duration without recreating every callback.
   const totalDurationRef = useRef(totalDuration)
+  const timelineMinimumRef = useRef(timelineMinimum)
   const [containerElement, setContainerElement] = useState(null)
   const [widthPx, setWidthPx] = useState(0)
-  const [viewport, setViewport] = useState(() => fitToFull(totalDuration))
+  const [viewport, setViewport] = useState(() => fitToFull(totalDuration, timelineMinimum))
   const viewportRef = useRef(viewport)
-  viewportRef.current = viewport
+
+  // Stable follow callbacks read this ref synchronously while returning viewport deltas.
+  useEffect(() => {
+    viewportRef.current = viewport
+  }, [viewport])
 
   // Callback ref - measurement starts when the timeline actually mounts, including after hidden initial renders.
   const containerRef = useCallback((element) => {
@@ -66,21 +76,34 @@ export default function useTimelineViewport({
   }, [])
 
   // Media identity - any structural media change should reset stale zoom/pan state to the full range.
-  const mediaIdentity = [hasVideo, importedVideoDuration, hasActivityData, activityDurationSeconds, fallbackDurationSeconds].join('|')
+  const mediaIdentity = [
+    hasVideo,
+    importedVideoDuration,
+    hasActivityData,
+    activityDurationSeconds,
+    fallbackDurationSeconds,
+    committedTimelineMinimum,
+  ].join('|')
 
   useEffect(() => {
     totalDurationRef.current = totalDuration
   }, [totalDuration])
 
+  useEffect(() => {
+    timelineMinimumRef.current = timelineMinimum
+  }, [timelineMinimum])
+
   // Full-range reset - loading different media should never leave the user stranded in an old viewport.
   useEffect(() => {
-    setViewport(fitToFull(totalDurationRef.current))
+    setViewport(fitToFull(totalDurationRef.current, timelineMinimumRef.current))
   }, [mediaIdentity])
 
-  // Sync-offset changes can extend or shorten the playable range without changing the loaded media.
+  // Duration changes can shorten the current viewport without changing its zoom level.
   useEffect(() => {
     if (isDragging) return
-    setViewport((previousViewport) => clampToView(previousViewport.viewStart, previousViewport.viewEnd, totalDuration))
+    setViewport((previousViewport) =>
+      clampToView(previousViewport.viewStart, previousViewport.viewEnd, totalDurationRef.current, timelineMinimumRef.current),
+    )
   }, [isDragging, totalDuration])
 
   // Width measurement - immediate rect reads avoid invisible geometry before ResizeObserver fires.
@@ -123,6 +146,7 @@ export default function useTimelineViewport({
     setViewport((previousViewport) =>
       followPlayhead({
         playheadSecond,
+        timelineMinimum: timelineMinimumRef.current,
         viewStart: previousViewport.viewStart,
         viewEnd: previousViewport.viewEnd,
         totalDuration: totalDurationRef.current,
@@ -171,7 +195,7 @@ export default function useTimelineViewport({
 
   // Reset command - toolbar reset always returns to the latest full timeline duration.
   const resetView = useCallback(() => {
-    setViewport(fitToFull(totalDurationRef.current))
+    setViewport(fitToFull(totalDurationRef.current, timelineMinimumRef.current))
   }, [])
 
   // Follow command - reuses playhead-follow behavior for active edge scrolling during a drag.
@@ -179,6 +203,7 @@ export default function useTimelineViewport({
     const previousViewport = viewportRef.current
     const nextViewport = followPlayhead({
       playheadSecond: second,
+      timelineMinimum: timelineMinimumRef.current,
       viewStart: previousViewport.viewStart,
       viewEnd: previousViewport.viewEnd,
       totalDuration: totalDurationRef.current,
@@ -203,6 +228,7 @@ export default function useTimelineViewport({
           viewEnd: previousViewport.viewEnd,
           pivot,
           direction,
+          timelineMinimum: timelineMinimumRef.current,
           totalDuration: totalDurationRef.current,
           widthPx,
         }),
@@ -226,6 +252,7 @@ export default function useTimelineViewport({
         viewStart: previousViewport.viewStart,
         viewEnd: previousViewport.viewEnd,
         deltaSeconds,
+        timelineMinimum: timelineMinimumRef.current,
         totalDuration: totalDurationRef.current,
       }),
     )
@@ -283,6 +310,7 @@ export default function useTimelineViewport({
     panBy,
     resetView,
     ticks,
+    timelineMinimum,
     viewport,
     widthPx,
     zoomIn,

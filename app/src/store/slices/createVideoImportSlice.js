@@ -1,6 +1,7 @@
 import { detectCodecs } from '@/api/backend'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
+import { videoOverlapsActivity } from '@/lib/video-timing'
 
 /**
  * Converts a timestamp to the comparison clock used for activity sync.
@@ -62,6 +63,24 @@ function validateImportedVideoTiming(metadata) {
   if (!Number.isFinite(metadata.fps) || metadata.fps <= 0) {
     throw new Error('Imported video metadata contains an invalid frame rate')
   }
+}
+
+function validateVideoSyncOffset(seconds, videoDuration, label = 'Video sync offset') {
+  if (!Number.isFinite(seconds)) {
+    throw new Error(`${label} must be a finite number`)
+  }
+  if (videoDuration === null) return
+  if (!videoOverlapsActivity({ videoStart: seconds, videoDuration })) {
+    throw new Error(`${label} must leave a positive overlap with the imported video`)
+  }
+}
+
+function videoTimestampOverlapsActivity(timestamp, videoDuration, activityStart, activityEnd) {
+  return videoOverlapsActivity({
+    videoStart: (timestamp - activityStart) / 1000,
+    videoDuration,
+    activityEnd: (activityEnd - activityStart) / 1000,
+  })
 }
 
 export const createVideoImportSlice = (set, get) => ({
@@ -172,18 +191,14 @@ export const createVideoImportSlice = (set, get) => ({
   },
 
   setVideoSyncOffset: (seconds) => {
-    if (!Number.isFinite(seconds)) {
-      throw new Error('Video sync offset must be a finite number')
-    }
+    validateVideoSyncOffset(seconds, get().importedVideoDuration)
     set({
       videoSyncOffsetSeconds: seconds,
     })
   },
 
   setVideoSyncOffsetPreview: (seconds) => {
-    if (seconds !== null && !Number.isFinite(seconds)) {
-      throw new Error('Video sync offset preview must be null or a finite number')
-    }
+    if (seconds !== null) validateVideoSyncOffset(seconds, get().importedVideoDuration, 'Video sync offset preview')
     set({
       videoSyncOffsetPreviewSeconds: seconds,
     })
@@ -260,6 +275,7 @@ export const createVideoImportSlice = (set, get) => ({
 
       let videoStart = null
       let timezoneMode = null
+      const videoDuration = state.importedVideoDuration
 
       if (state.importedVideoTimeSource === 'ffprobe') {
         // An ffprobe `creation_time` tag cannot reliably identify its timezone.
@@ -269,11 +285,10 @@ export const createVideoImportSlice = (set, get) => ({
         // stored mode selects one and the UI exposes the alternate choice.
         const withoutTimezone = parseSyncTimestamp(state.importedVideoCreationTime, 'ffprobe', timezone)
         const withTimezone = parseSyncTimestamp(state.importedVideoCreationTime, 'gps', timezone)
-        const isWithinActivity = (timestamp) => timestamp >= activityStart && timestamp <= activityEnd
         const candidates = [
           { timestamp: withoutTimezone, timezoneApplied: false },
           { timestamp: withTimezone, timezoneApplied: true },
-        ].filter(({ timestamp }) => timestamp !== null && isWithinActivity(timestamp))
+        ].filter(({ timestamp }) => timestamp !== null && videoTimestampOverlapsActivity(timestamp, videoDuration, activityStart, activityEnd))
 
         if (withoutTimezone === null || withTimezone === null) {
           return {
@@ -311,7 +326,7 @@ export const createVideoImportSlice = (set, get) => ({
 
       const offsetSeconds = (videoStart - activityStart) / 1000
 
-      if (videoStart < activityStart || videoStart > activityEnd) {
+      if (!videoTimestampOverlapsActivity(videoStart, videoDuration, activityStart, activityEnd)) {
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Video could not be synced with activity',

@@ -30,30 +30,31 @@ function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) 
  * injects pre-computed Rust geometry so Skia and SVG use identical data.
  *
  * @param {object} params
- * @param {object} params.activity - Activity data with elevation samples.
+ * @param {object|null} params.activity - Frame activity, null when placeholder data is displayed.
+ * @param {object|null} params.sourceActivity - Stable parsed activity used to prepare geometry.
  * @param {object} params.data - Effective elevation widget data.
  * @param {object} params.exportRange - Active export-range selection.
  * @param {number} params.previewSecond - Current preview timestamp in seconds.
  * @param {object} params.style - Style model returned by buildElevationPreviewStyle.
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
-export function useElevationPreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
+export function useElevationPreviewGeometry({ activity, sourceActivity, data, exportRange, previewSecond, style }) {
   const [rustGeometry, setRustGeometry] = useState(null)
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
   const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
 
   const exportWindow = useMemo(
-    () => resolveExportRangeWindow(activity, exportRange, data.show_full_activity),
-    [activity, exportRange, data.show_full_activity],
+    () => resolveExportRangeWindow(sourceActivity, exportRange, data.show_full_activity),
+    [sourceActivity, exportRange, data.show_full_activity],
   )
 
   // Build the config Rust needs. The store scene lacks non-durable fields
   // (scale, shadow, border); globalDefaults fills them. start/end are
   // overridden when an export window is active so Rust trims source points.
   const geometryConfig = useMemo(() => {
-    if (!config || !activity || !hasTauriRuntime()) return null
-    const duration = activity?.trim_end_seconds ?? 0
+    if (!config || !sourceActivity || !hasTauriRuntime()) return null
+    const duration = sourceActivity.trim_end_seconds
     const { updateRate, start, end, ...sceneRest } = config.scene
 
     return {
@@ -68,7 +69,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
         custom_export_range_active: exportWindow.active,
       },
     }
-  }, [config, globalDefaults, activity, exportWindow, style.globalScale])
+  }, [config, globalDefaults, sourceActivity, exportWindow, style.globalScale])
 
   useEffect(() => {
     if (!geometryConfig) return
@@ -79,13 +80,13 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
     }
 
     let cancelled = false
-    buildElevationGeometry(geometryConfig, activity).then((geometry) => {
+    buildElevationGeometry(geometryConfig, sourceActivity).then((geometry) => {
       if (!cancelled) setRustGeometry(geometry)
     })
     return () => {
       cancelled = true
     }
-  }, [geometryConfig, activity])
+  }, [geometryConfig, sourceActivity])
 
   if (!activity) {
     return buildPlaceholderElevationPreviewGeometry({
@@ -103,18 +104,18 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
 
   // Keep marker x distance-based so it stays put during hover/stop segments.
   const progress01 = exportWindow.active
-    ? (getWindowProgressAtTime(activity, exportWindow, previewSecond) ?? 0)
-    : getDistanceProgressAtElapsed(activity, previewSecond)
+    ? (getWindowProgressAtTime(sourceActivity, exportWindow, previewSecond) ?? 0)
+    : getDistanceProgressAtElapsed(sourceActivity, previewSecond)
 
   // Completed profile fill is chronological, normalized to the same scoped duration
   // Rust used when building elapsedFractions.
-  const sourceDuration = exportWindow.active ? exportWindow.end - exportWindow.start : activity.sample_elapsed_seconds?.at(-1) || 1
+  const sourceDuration = exportWindow.active ? exportWindow.end - exportWindow.start : sourceActivity.sample_elapsed_seconds.at(-1) || 1
   const elapsedWindowStart = exportWindow.active ? exportWindow.start : 0
   const frameElapsedFraction = Math.min(Math.max((previewSecond - elapsedWindowStart) / Math.max(sourceDuration, 1e-9), 0), 1)
 
   const metricHit = findPointAtProgress(points, rustGeometry.progressValues, progress01)
-  const elevationSeries = activity.sample_elevations.length ? activity.sample_elevations : activity.elevation
-  const elevationValue = interpolateNumericSeries(activity.sample_elapsed_seconds, elevationSeries, previewSecond)
+  const elevationSeries = sourceActivity.sample_elevations.length ? sourceActivity.sample_elevations : sourceActivity.elevation
+  const elevationValue = interpolateNumericSeries(sourceActivity.sample_elapsed_seconds, elevationSeries, previewSecond)
   const markerY = projectElevationValueToSvgY(elevationValue, rustGeometry.dataRange, data.height, data.y_scale)
   const markerPoint = markerY === null ? null : [metricHit.point[0], markerY]
   const completedPoints = buildElevationCompletedPoints(

@@ -16,12 +16,12 @@ function getMarkerLabel(marker) {
 /**
  * Owns custom export-range state, marker preview, clamping, snapping, and store writes.
  *
- * @param {{ totalDuration: number, defaultEndSecond?: number }} options Export timeline inputs.
+ * @param {{ totalDuration: number, timelineMinimum?: number, defaultEndSecond?: number }} options Export timeline inputs.
  * @param {number} options.totalDuration Total playable duration used to clamp markers.
  * @param {number} [options.defaultEndSecond=totalDuration] End used when enabling a new custom range.
  * @returns {object} Export range timeline state and commands.
  */
-export default function useExportRangeTimeline({ totalDuration, defaultEndSecond = totalDuration }) {
+export default function useExportRangeTimeline({ totalDuration, timelineMinimum = 0, defaultEndSecond = totalDuration }) {
   // Store selector - export range inputs remain the source of truth outside active drag preview.
   const { exportRange, setExportRange } = useStore(
     useShallow((state) => ({
@@ -49,8 +49,8 @@ export default function useExportRangeTimeline({ totalDuration, defaultEndSecond
 
   // Displayed seconds - preview state temporarily overrides the persisted marker being dragged.
   const isCustom = exportRange.type === 'custom'
-  const fromSecond = clamp(exportRange.from, 0, totalDuration)
-  const toSecond = clamp(exportRange.to, 0, totalDuration)
+  const fromSecond = clamp(exportRange.from, timelineMinimum, totalDuration)
+  const toSecond = clamp(exportRange.to, timelineMinimum, totalDuration)
   const displayedFromSecond = dragPreview?.marker === 'from' ? dragPreview.second : fromSecond
   const displayedToSecond = dragPreview?.marker === 'to' ? dragPreview.second : toSecond
 
@@ -63,6 +63,7 @@ export default function useExportRangeTimeline({ totalDuration, defaultEndSecond
         marker,
         second,
         fromSecond: displayedFromSecond,
+        timelineMinimum,
         toSecond: displayedToSecond,
         totalDuration,
       })
@@ -72,7 +73,7 @@ export default function useExportRangeTimeline({ totalDuration, defaultEndSecond
         second: previewSecond,
       })
     },
-    [displayedFromSecond, displayedToSecond, isCustom, totalDuration],
+    [displayedFromSecond, displayedToSecond, isCustom, timelineMinimum, totalDuration],
   )
 
   // Commit command - persist the exact fractional marker position.
@@ -84,6 +85,7 @@ export default function useExportRangeTimeline({ totalDuration, defaultEndSecond
         marker,
         second,
         fromSecond: displayedFromSecond,
+        timelineMinimum,
         toSecond: displayedToSecond,
         totalDuration,
       })
@@ -98,7 +100,7 @@ export default function useExportRangeTimeline({ totalDuration, defaultEndSecond
       }
       setExportRange({ [field]: nextSecond })
     },
-    [displayedFromSecond, displayedToSecond, isCustom, setExportRange, totalDuration],
+    [displayedFromSecond, displayedToSecond, isCustom, setExportRange, timelineMinimum, totalDuration],
   )
 
   // Cancel command - pointer cancellation drops transient preview without touching store state.
@@ -109,12 +111,13 @@ export default function useExportRangeTimeline({ totalDuration, defaultEndSecond
   // Toolbar command - enable the range and set the requested bound to the playhead.
   const setBoundary = useCallback(
     (marker, second) => {
-      const currentFromSecond = isCustom ? fromSecond : 0
+      const currentFromSecond = isCustom ? fromSecond : timelineMinimum
       const currentToSecond = isCustom ? toSecond : defaultEndSecond
       const boundarySecond = clampExportRangeMarkerSecond({
         marker,
         second,
         fromSecond: currentFromSecond,
+        timelineMinimum,
         toSecond: currentToSecond,
         totalDuration,
       })
@@ -126,7 +129,7 @@ export default function useExportRangeTimeline({ totalDuration, defaultEndSecond
         to: marker === 'to' ? boundarySecond : currentToSecond,
       })
     },
-    [defaultEndSecond, fromSecond, isCustom, setExportRange, toSecond, totalDuration],
+    [defaultEndSecond, fromSecond, isCustom, setExportRange, timelineMinimum, toSecond, totalDuration],
   )
 
   const clear = useCallback(() => {

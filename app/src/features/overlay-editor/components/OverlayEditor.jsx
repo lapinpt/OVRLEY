@@ -349,10 +349,18 @@ function OverlayEditor({
       widgets: overlayState.renderedWidgets,
       widgetPreviews: overlayState.liveWidgetPreviews,
       activity,
+      sourceActivity: overlayState.sourceActivity,
       previewSecond: overlayState.previewSecond,
       exportRange: overlayState.previewExportRange,
     }),
-    [overlayState.liveWidgetPreviews, overlayState.renderedWidgets, activity, overlayState.previewSecond, overlayState.previewExportRange],
+    [
+      overlayState.liveWidgetPreviews,
+      overlayState.renderedWidgets,
+      activity,
+      overlayState.sourceActivity,
+      overlayState.previewSecond,
+      overlayState.previewExportRange,
+    ],
   )
   const canvasCallbacks = useMemo(
     () => ({

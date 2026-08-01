@@ -171,4 +171,56 @@ describe('render config preparation', () => {
     expect(renderConfig.scene).not.toHaveProperty('composite_video_path')
     expect(renderConfig.scene).not.toHaveProperty('composite_render_duration')
   })
+
+  test('preserves a negative composite offset for the full video export', () => {
+    const renderConfig = createRenderEffectiveConfig({
+      config: {
+        scene: { width: 1920, height: 1080, fps: 60 },
+        labels: [],
+        values: [],
+        plots: [],
+      },
+      globalDefaults: {},
+      updateRate: 1,
+      exportRange: { ...DEFAULT_EXPORT_RANGE },
+      exportCodec: 'libx264',
+      importedVideoPath: 'C:\\clip.mp4',
+      importedVideoDuration: 30,
+      importedVideoFps: 30,
+      importedVideoFpsNum: 30,
+      importedVideoFpsDen: 1,
+      importedVideoResolution: { width: 1920, height: 1080 },
+      timelineStart: 0,
+      timelineEnd: 25,
+      videoSyncOffsetSeconds: -5,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.scene.composite_sync_offset).toBe(-5)
+    expect(renderConfig.scene.composite_render_duration).toBe(30)
+    expect(renderConfig.scene.start).toBe(0)
+    expect(renderConfig.scene.end).toBe(25)
+  })
+
+  test('rejects composite ranges with no activity overlap', () => {
+    expect(() =>
+      createRenderEffectiveConfig({
+        config: { scene: { width: 1920, height: 1080, fps: 60 }, labels: [], values: [], plots: [] },
+        globalDefaults: {},
+        updateRate: 1,
+        exportRange: { ...DEFAULT_EXPORT_RANGE },
+        exportCodec: 'libx264',
+        importedVideoPath: 'C:\\clip.mp4',
+        importedVideoDuration: 10,
+        importedVideoFps: 30,
+        importedVideoFpsNum: 30,
+        importedVideoFpsDen: 1,
+        importedVideoResolution: { width: 1920, height: 1080 },
+        timelineStart: 0,
+        timelineEnd: 25,
+        videoSyncOffsetSeconds: -10,
+        availableCodecs: null,
+      }),
+    ).toThrow(/positive overlap/)
+  })
 })

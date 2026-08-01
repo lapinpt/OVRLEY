@@ -20,8 +20,8 @@ import { getWidgetOpacity } from '../../shared/textMeasurement'
 import { PreviewMarkerLayers, PreviewPolylineShadow, PreviewSvgShadowBlurFilter, PreviewSvgText } from '../../shared/PreviewSvgComponents'
 import { useElevationPreview } from './useElevationPreview'
 
-export function OverlayElevationWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
-  const previewModel = useElevationPreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange })
+export function OverlayElevationWidget({ widget, activity, sourceActivity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
+  const previewModel = useElevationPreview({ widget, activity, sourceActivity, previewSecond, globalScale, sceneStyle, exportRange })
 
   if (!previewModel) return null
 

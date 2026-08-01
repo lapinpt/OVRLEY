@@ -156,8 +156,13 @@ pub fn render_video(
     // ── PHASE 2: BUILD SKIA ASSETS — pre-render maps, fonts, and label cache ──
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
-    let renderer =
-        VideoFrameRenderer::new(paths, dense_activity, &prepared_preview_assets, frame_size)?;
+    let renderer = VideoFrameRenderer::new(
+        paths,
+        dense_activity,
+        &prepared_preview_assets,
+        frame_size,
+        0,
+    )?;
     write_prepare_summary(
         &debug_dir,
         prepare_total_ms,

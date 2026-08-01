@@ -18,6 +18,22 @@ describe('timelineViewport utilities', () => {
     expect(fitToFull(2.509)).toEqual({ viewStart: 0, viewEnd: 2.509 })
   })
 
+  test('keeps negative video lead-in inside the viewport bounds', () => {
+    expect(fitToFull(25, -5)).toEqual({ viewStart: -5, viewEnd: 25 })
+    expect(clampToView(-20, 0, 25, -5)).toEqual({ viewStart: -5, viewEnd: 15 })
+    expect(
+      buildFitTargets({
+        activityDurationSeconds: 25,
+        fallbackDurationSeconds: 25,
+        hasActivityData: true,
+        hasVideo: true,
+        importedVideoDuration: 30,
+        totalDuration: 25,
+        videoSyncOffsetSeconds: -5,
+      })[0].viewport,
+    ).toEqual({ viewStart: -5, viewEnd: 25 })
+  })
+
   test('zooms around a pivot and clamps to the duration', () => {
     const result = zoomRange({ direction: 1, pivot: 50, totalDuration: 200, viewEnd: 100, viewStart: 0 })
 

@@ -49,6 +49,23 @@ describe('useRenderWorkflow', () => {
     })
   })
 
+  test('keeps PNG preview enabled without rerendering as the playhead crosses activity boundaries', () => {
+    let renderCount = 0
+    const { result } = renderHook(() => {
+      renderCount += 1
+      return useRenderWorkflow({ backendStatus: 'connected' })
+    })
+    const initialRenderCount = renderCount
+
+    act(() => {
+      useStore.getState().setSelectedSecond(-1)
+      useStore.getState().setSelectedSecond(74)
+    })
+
+    expect(result.current.renderPreviewFrameDisabled).toBe(false)
+    expect(renderCount).toBe(initialRenderCount)
+  })
+
   test('dispatches transparent override without imported-video compositing inputs and persists transparent settings', async () => {
     useStore.setState({
       importedVideoPath: 'C:\\video.mp4',

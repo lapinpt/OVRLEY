@@ -70,6 +70,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     : playback.displayedPlayhead
   const exportTimeline = useExportRangeTimeline({
     defaultEndSecond: playback.importedVideoPath ? playback.videoSyncOffsetSeconds + playback.importedVideoDuration : playback.totalDuration,
+    timelineMinimum: playback.timelineMinimum,
     totalDuration: playback.totalDuration,
   })
   const gestures = useTimelineGestures({
@@ -107,7 +108,8 @@ export default function useOverlayPlayer({ backgroundMode }) {
     isPlaying: playback.isPlaying,
     playheadSecond: playback.clampedPlayhead,
     totalDuration: playback.totalDuration,
-    videoSyncOffsetSeconds: timelineVideoSyncOffsetSeconds,
+    videoSyncOffsetPreviewSeconds: timelineVideoSyncOffsetSeconds,
+    videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
   })
 
   // Gesture metrics sync - pointer math uses the latest measured element and viewport without re-rendering on every move.
@@ -116,6 +118,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
       containerElement: viewport.containerElement,
       followSecond: viewport.followSecond,
       panBy: viewport.panBy,
+      timelineMinimum: viewport.timelineMinimum,
       totalDuration: playback.totalDuration,
       viewEnd: viewport.viewport.viewEnd,
       viewStart: viewport.viewport.viewStart,
@@ -135,6 +138,8 @@ export default function useOverlayPlayer({ backgroundMode }) {
     playback.videoSyncOffsetSeconds,
     viewport.containerElement,
     viewport.containerRef,
+    viewport.followSecond,
+    viewport.timelineMinimum,
     viewport.panBy,
     viewport.viewport.viewEnd,
     viewport.viewport.viewStart,

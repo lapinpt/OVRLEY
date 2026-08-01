@@ -93,6 +93,7 @@ describe('OverlayElevationWidget', () => {
       <OverlayElevationWidget
         widget={widget}
         activity={makeActivity()}
+        sourceActivity={makeActivity()}
         previewSecond={15}
         globalOpacity={1}
         globalScale={1}

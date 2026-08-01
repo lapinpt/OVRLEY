@@ -303,6 +303,8 @@ mod tests {
                 overlay_pipe_fps: Fps::new(30, 1).unwrap(),
                 overlay_frame_count: 30,
                 output_frame_count: 30,
+                activity_overlap_duration: 1.0,
+                blank_leading_frame_count: 0,
                 requested_codec_id: codec_id,
                 qsv_full_init_args: Vec::new(),
             };

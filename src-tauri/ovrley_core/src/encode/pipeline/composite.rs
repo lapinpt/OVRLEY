@@ -291,9 +291,15 @@ pub fn render_composite_video(
     let task_count = usize::try_from(plan.render.overlay_frame_count).map_err(|_| {
         CoreError::Encode("Composite overlay frame count exceeds usize".to_string())
     })?;
-    if dense_activity.frame_count != task_count {
+    let expected_activity_frame_count = usize::try_from(
+        plan.render
+            .overlay_pipe_fps
+            .frame_count_for_duration(plan.render.activity_overlap_duration)?,
+    )
+    .map_err(|_| CoreError::Encode("Composite activity frame count exceeds usize".to_string()))?;
+    if dense_activity.frame_count != expected_activity_frame_count {
         return Err(CoreError::Encode(format!(
-            "Composite dense activity contains {} frames; source-video timeline requires {task_count}",
+            "Composite dense activity contains {} frames; activity overlap requires {expected_activity_frame_count}",
             dense_activity.frame_count
         )));
     }
@@ -319,6 +325,7 @@ pub fn render_composite_video(
         dense_activity,
         &prepared_preview_assets,
         plan.frame_size,
+        plan.render.blank_leading_frame_count,
     )?;
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
 

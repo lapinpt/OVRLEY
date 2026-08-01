@@ -12,6 +12,7 @@
  * @param {object} props
  * @param {object} props.widget - Widget configuration object.
  * @param {object} [props.activity] - Activity data.
+ * @param {object|null} props.sourceActivity - Stable parsed activity used to prepare plot geometry.
  * @param {number} [props.previewSecond] - Current preview time in seconds.
  * @param {number} [props.globalOpacity] - Global opacity multiplier.
  * @param {number} [props.globalScale] - Global scale multiplier.
@@ -60,6 +61,7 @@ function getBoxedPreviewComponent(displayType) {
 function WidgetPreview({
   widget,
   activity,
+  sourceActivity,
   previewSecond,
   globalOpacity,
   globalScale,
@@ -84,6 +86,7 @@ function WidgetPreview({
       <OverlayRouteWidget
         widget={widget}
         activity={activity}
+        sourceActivity={sourceActivity}
         previewSecond={previewSecond}
         globalOpacity={globalOpacity}
         globalScale={globalScale}
@@ -98,6 +101,7 @@ function WidgetPreview({
       <OverlayElevationWidget
         widget={widget}
         activity={activity}
+        sourceActivity={sourceActivity}
         previewSecond={previewSecond}
         globalOpacity={globalOpacity}
         globalScale={globalScale}
@@ -149,6 +153,7 @@ export default memo(
   (previousProps, nextProps) =>
     previousProps.widget === nextProps.widget &&
     previousProps.activity === nextProps.activity &&
+    previousProps.sourceActivity === nextProps.sourceActivity &&
     previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.globalScale === nextProps.globalScale &&

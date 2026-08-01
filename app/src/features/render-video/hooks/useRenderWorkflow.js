@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { buildPreviewFrameWindow, resolvePreviewSecond } from '@/lib/preview-timing'
+import { buildPreviewFrameWindow } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
@@ -59,7 +59,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     }
     return null
   }, [backendStatus, config, hasParsedActivity, renderingVideo])
-  const renderPreviewFrameDisabled = !canRender || renderingVideo || renderingPreviewFrame || backendStatus !== 'connected'
+  const renderPreviewFrameDisabled = renderDisabled || renderingPreviewFrame
 
   const buildRenderSettingsDraft = useCallback(() => {
     const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
@@ -284,8 +284,8 @@ export default function useRenderWorkflow({ backendStatus }) {
     }
 
     try {
-      const parsedActivity = useStore.getState().parsedActivity
-      if (!parsedActivity) {
+      const nextParsedActivity = useStore.getState().parsedActivity
+      if (!nextParsedActivity) {
         throw new Error('No parsed activity available')
       }
 
@@ -310,19 +310,12 @@ export default function useRenderWorkflow({ backendStatus }) {
       })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
 
-      const fallbackDurationSeconds = useStore.getState().fallbackDurationSeconds
       const selectedSecond = useStore.getState().selectedSecond
-      const resolvedPreviewSecond = resolvePreviewSecond({
-        fallbackDurationSeconds,
-        selectedSecond,
-        sourceActivity: parsedActivity,
-      })
-      const previewSecond = Math.min(Math.max(resolvedPreviewSecond, nextConfig.scene.start ?? 0), nextConfig.scene.end ?? resolvedPreviewSecond)
       const sceneStart = nextConfig.scene.start ?? 0
       const sceneEnd = nextConfig.scene.end ?? sceneStart
       const previewWindow = buildPreviewFrameWindow({
         activityDuration: sceneEnd - sceneStart,
-        previewSecond: previewSecond - sceneStart,
+        previewSecond: selectedSecond - sceneStart,
         sceneFps: previewFps,
       })
 
@@ -335,7 +328,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       }
       delete nextConfig.scene.updateRate
 
-      const result = await backend.renderPreviewFrame(nextConfig, parsedActivity, previewSecond)
+      const result = await backend.renderPreviewFrame(nextConfig, nextParsedActivity, selectedSecond)
       if (result?.filename) {
         try {
           await backend.openVideo(result.filename)

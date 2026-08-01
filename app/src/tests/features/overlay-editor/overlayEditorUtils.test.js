@@ -10,6 +10,7 @@
 import { describe, expect, test } from 'vitest'
 import { getContainerFps } from '@/lib/update-rate'
 import { getInterpolatedActivityValue, getInterpolatedTimeValue, getMetricSeries } from '@/features/overlay-editor'
+import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 
 describe('getContainerFps', () => {
   test('returns a number for common FPS and update rate combinations', () => {
@@ -73,8 +74,8 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     expect(getInterpolatedActivityValue(baseActivity, 'altitude', 1.2)).toBe(22)
   })
 
-  test('hold metric clamps to the first sample before the first sample time', () => {
-    expect(getInterpolatedActivityValue(baseActivity, 'iso', -1)).toBe(100)
+  test('activity-backed values use the default before the activity starts', () => {
+    expect(getInterpolatedActivityValue(getPreviewActivity(baseActivity, -1), 'iso', -1)).toBeNull()
     expect(
       getInterpolatedActivityValue(
         {
@@ -87,8 +88,8 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     ).toBe(100)
   })
 
-  test('hold metric returns last sample for elapsedSecond beyond last sample', () => {
-    expect(getInterpolatedActivityValue(baseActivity, 'iso', 5)).toBe(1600)
+  test('activity-backed values use the default after the activity ends', () => {
+    expect(getInterpolatedActivityValue(getPreviewActivity(baseActivity, 5), 'iso', 5)).toBeNull()
   })
 
   test('hold metric returns null when series missing', () => {
@@ -129,6 +130,14 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
 })
 
 describe('getInterpolatedTimeValue', () => {
+  test('exposes activity only for elapsed seconds inside its preview range', () => {
+    const activity = { trim_end_seconds: 4 }
+
+    expect(getPreviewActivity(activity, -1)).toBeNull()
+    expect(getPreviewActivity(activity, 4)).toBe(activity)
+    expect(getPreviewActivity(activity, 5)).toBeNull()
+  })
+
   test('uses the source time series before sync_time', () => {
     const activity = {
       sample_elapsed_seconds: [0, 60],

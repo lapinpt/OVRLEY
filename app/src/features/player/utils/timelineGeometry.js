@@ -22,16 +22,16 @@ export function roundToDevicePixel(value, pixelRatio = 1) {
 /**
  * Converts a pointer's clientX to a clamped timeline second.
  *
- * @param {{ clientX: number, rect: DOMRect|{ left?: number, width?: number }, viewStart: number, viewEnd: number, widthPx: number, totalDuration: number }} options
+ * @param {{ clientX: number, rect: DOMRect|{ left?: number, width?: number }, viewStart: number, viewEnd: number, widthPx: number, timelineMinimum?: number, totalDuration: number }} options
  * @returns {number} Clamped timeline second.
  */
-export function pointerToSecond({ clientX, rect, viewStart, viewEnd, widthPx, totalDuration }) {
+export function pointerToSecond({ clientX, rect, viewStart, viewEnd, widthPx, timelineMinimum = 0, totalDuration }) {
   const span = viewEnd - viewStart
   const effectiveWidth = rect?.width || widthPx
-  if (span <= 0 || effectiveWidth <= 0) return clamp(0, 0, totalDuration)
+  if (span <= 0 || effectiveWidth <= 0) return clamp(timelineMinimum, timelineMinimum, totalDuration)
   const ratio = (clientX - (rect?.left || 0)) / effectiveWidth
   const second = viewStart + ratio * span
-  return clamp(second, 0, totalDuration)
+  return clamp(second, timelineMinimum, totalDuration)
 }
 
 /**
@@ -78,15 +78,15 @@ export function getClipGeometry({ startSecond, durationSeconds, viewStart, viewE
 /**
  * Clamps a dragged export marker to the legal export window.
  *
- * @param {{ marker: 'from'|'to', second: number, fromSecond: number, toSecond: number, totalDuration: number }} options
+ * @param {{ marker: 'from'|'to', second: number, fromSecond: number, toSecond: number, timelineMinimum?: number, totalDuration: number }} options
  * @returns {number} Clamped marker second.
  */
-export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSecond, totalDuration }) {
-  const from = clamp(fromSecond, 0, totalDuration)
-  const to = clamp(toSecond, 0, totalDuration)
+export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSecond, timelineMinimum = 0, totalDuration }) {
+  const from = clamp(fromSecond, timelineMinimum, totalDuration)
+  const to = clamp(toSecond, timelineMinimum, totalDuration)
 
   if (marker === 'from') {
-    return clamp(second, 0, Math.max(0, to - EXPORT_RANGE_MIN_GAP_SECONDS))
+    return clamp(second, timelineMinimum, Math.max(timelineMinimum, to - EXPORT_RANGE_MIN_GAP_SECONDS))
   }
 
   return clamp(second, Math.min(totalDuration, from + EXPORT_RANGE_MIN_GAP_SECONDS), totalDuration)

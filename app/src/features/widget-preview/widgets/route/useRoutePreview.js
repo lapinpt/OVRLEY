@@ -16,9 +16,9 @@ import { useRoutePreviewGeometry } from './useRoutePreviewGeometry'
  * @param {object} params.exportRange - Export range configuration.
  * @returns {object|null} Preview model for the renderer, or null while loading.
  */
-export function useRoutePreview({ widget, activity, previewSecond, globalScale, exportRange }) {
+export function useRoutePreview({ widget, activity, sourceActivity, previewSecond, globalScale, exportRange }) {
   const style = getRoutePreviewStyle(widget.data, globalScale)
-  const geometry = useRoutePreviewGeometry({ activity, data: widget.data, exportRange, previewSecond, style })
+  const geometry = useRoutePreviewGeometry({ activity, sourceActivity, data: widget.data, exportRange, previewSecond, style })
 
   if (!geometry) return null
 

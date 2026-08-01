@@ -203,7 +203,13 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const handleOffsetBlur = (val) => {
     const parsed = timeToSeconds(val)
     const rounded = Math.round(parsed * 10) / 10
-    setVideoSyncOffset(rounded)
+    try {
+      setVideoSyncOffset(rounded)
+    } catch (error) {
+      setVideoSyncWarning(error.message)
+      setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
+      return
+    }
     setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1))
   }
@@ -211,7 +217,13 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const handleIncrement = (amount) => {
     const current = timeToSeconds(offsetInput)
     const newOffset = Math.round((current + amount) * 10) / 10
-    setVideoSyncOffset(newOffset)
+    try {
+      setVideoSyncOffset(newOffset)
+    } catch (error) {
+      setVideoSyncWarning(error.message)
+      return
+    }
+    setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
   }
 

@@ -247,7 +247,7 @@ fn start_composite_render(
         &parsed_activity,
         &validated,
         plan.overlay_pipe_fps
-            .timeline_for_duration(plan.render_duration)?,
+            .timeline_for_duration(plan.activity_overlap_duration)?,
     )?;
 
     let render_id = controller.try_start(plan.output_frame_count, "Compositing video...")?;

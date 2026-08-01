@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { videoOverlapsActivity } from '@/lib/video-timing'
 import { pointerToSecond, snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
 
 const AUTO_SCROLL_EDGE_RATIO = 0.15
@@ -30,6 +31,7 @@ function getAutoScrollPointerSecond(metrics, clientX) {
     viewStart: metrics.viewStart,
     viewEnd: metrics.viewEnd,
     widthPx,
+    timelineMinimum: metrics.timelineMinimum,
     totalDuration: metrics.totalDuration,
   })
 }
@@ -48,6 +50,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
 
   const dragRef = useRef(null)
   const autoScrollFrameRef = useRef(null)
+  const autoScrollTickRef = useRef(null)
   const offsetFrameRef = useRef(null)
   const pendingOffsetRef = useRef(null)
 
@@ -55,6 +58,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
     viewStart: 0,
     viewEnd: 0,
     widthPx: 0,
+    timelineMinimum: 0,
     videoSyncOffsetSeconds: 0,
     activityDurationSeconds: 0,
     importedVideoDuration: 0,
@@ -122,6 +126,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
         widthPx,
       })
       const nextOffset = snap.offset
+      if (!videoOverlapsActivity({ videoStart: nextOffset, videoDuration: metrics.importedVideoDuration })) return
       if (nextOffset === drag.currentOffset && snap.guidelineSecond === drag.guidelineSecond) return
 
       drag.currentOffset = nextOffset
@@ -149,8 +154,13 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
     metrics.viewStart = followResult.viewport.viewStart
     metrics.viewEnd = followResult.viewport.viewEnd
     updateDragOffset(drag.pointerClientX)
-    autoScrollFrameRef.current = window.requestAnimationFrame(autoScrollTick)
+    autoScrollFrameRef.current = window.requestAnimationFrame(() => autoScrollTickRef.current?.())
   }, [updateDragOffset])
+
+  // A queued RAF must call the newest tick callback after dependencies change.
+  useEffect(() => {
+    autoScrollTickRef.current = autoScrollTick
+  }, [autoScrollTick])
 
   const scheduleAutoScroll = useCallback(() => {
     if (autoScrollFrameRef.current !== null || typeof window.requestAnimationFrame !== 'function') return
@@ -177,7 +187,10 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
         viewStart: metrics.viewStart,
         widthPx: getTimelineWidth(metrics),
       })
-      const nextOffset = commit ? Math.round(snap.offset * 10) / 10 : drag.initialOffset
+      const requestedOffset = commit ? Math.round(snap.offset * 10) / 10 : drag.initialOffset
+      const nextOffset = videoOverlapsActivity({ videoStart: requestedOffset, videoDuration: metrics.importedVideoDuration })
+        ? requestedOffset
+        : drag.currentOffset
       setSnapGuidelineSecond(null)
       setVideoSyncOffset(nextOffset)
       setVideoSyncOffsetPreview(null)

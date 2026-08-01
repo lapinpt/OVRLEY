@@ -18,10 +18,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
-import { resolvePreviewSecond } from '@/lib/preview-timing'
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
-import { getSceneSize } from '../utils/overlayEditorUtils'
+import { getPreviewActivity, getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'
 
 function materializeWidgets(rawWidgets, globalDefaults) {
@@ -37,7 +36,6 @@ function applyWidgetDrafts(widgets, liveWidgetDrafts) {
 
 export default function useOverlayEditorState({ config, globalDefaults, onConfigChange }) {
   const selectedSecond = useStore((state) => state.selectedSecond)
-  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
   const exportRange = useStore((state) => state.exportRange)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
@@ -78,10 +76,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     }),
     [globalDefaults, config?.scene],
   )
-  const previewSecond = useMemo(
-    () => resolvePreviewSecond({ fallbackDurationSeconds, selectedSecond, sourceActivity }),
-    [fallbackDurationSeconds, selectedSecond, sourceActivity],
-  )
+  const activity = useMemo(() => getPreviewActivity(sourceActivity, selectedSecond), [selectedSecond, sourceActivity])
   const previewExportRange = useMemo(() => {
     if (!importedVideoPath || exportRange.type === 'custom') return exportRange
     return {
@@ -93,7 +88,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
 
   useEffect(() => {
     incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
-  }, [previewSecond])
+  }, [selectedSecond])
 
   useEffect(() => {
     resetWidgetDrafts()
@@ -142,7 +137,8 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     globalDefaults,
     globalOpacity,
     globalScale,
-    activity: sourceActivity,
+    activity,
+    sourceActivity,
     interactionStartRef,
     liveWidgetDrafts,
     liveWidgetPreviews,
@@ -150,7 +146,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     onConfigChange,
     orderedWidgetIds,
     previewExportRange,
-    previewSecond,
+    previewSecond: selectedSecond,
     renderedWidgetMap,
     renderedWidgets,
     sceneElement,
