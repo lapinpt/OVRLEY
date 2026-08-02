@@ -29,9 +29,15 @@ pub(crate) fn draw_route_widget(
             canvas,
             route_cache.plot.x,
             route_cache.plot.y,
+            0.0,
+            |canvas| draw_static_layer(canvas, route_cache.remaining_layer.as_ref()),
+        );
+        with_widget_transform(
+            canvas,
+            route_cache.plot.x,
+            route_cache.plot.y,
             route_cache.plot.rotation,
             |canvas| {
-                draw_static_layer(canvas, route_cache.remaining_layer.as_ref());
                 draw_polyline(
                     canvas,
                     &prefix_points,
