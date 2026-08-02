@@ -53,6 +53,9 @@ function installRafHarness() {
       callbacks.delete(id)
       callback(now)
     },
+    pendingFrameCount() {
+      return callbacks.size
+    },
   }
 }
 
@@ -173,7 +176,8 @@ describe('usePlaybackEngine', () => {
     expect(options.pausePreviewPlayback).toHaveBeenCalledWith(3)
   })
 
-  test('scrubs and commits with direct second values', () => {
+  test('coalesces scrub samples and publishes one preview update per RAF', () => {
+    const raf = installRafHarness()
     const options = createOptions()
     const { result, rerender } = renderHook((props) => usePlaybackEngine(props), {
       initialProps: options,
@@ -181,22 +185,58 @@ describe('usePlaybackEngine', () => {
 
     act(() => {
       result.current.scrubTo(2.25)
+      result.current.scrubTo(3.5)
+      result.current.scrubTo(4.75)
     })
 
-    expect(options.beginPreviewScrub).toHaveBeenCalledWith(2.25)
+    expect(raf.pendingFrameCount()).toBe(1)
+    expect(options.beginPreviewScrub).not.toHaveBeenCalled()
+
+    act(() => {
+      raf.fireNextFrame(1000)
+    })
+
+    expect(options.beginPreviewScrub).toHaveBeenCalledTimes(1)
+    expect(options.beginPreviewScrub).toHaveBeenCalledWith(4.75)
 
     rerender({
       ...options,
       previewPlaybackState: 'scrubbing',
+      selectedSecond: 4.75,
     })
 
     act(() => {
-      result.current.scrubTo(3.5)
+      result.current.scrubTo(5.25)
+      result.current.scrubTo(6.5)
+    })
+
+    expect(raf.pendingFrameCount()).toBe(1)
+
+    act(() => {
+      raf.fireNextFrame(1016)
+    })
+
+    expect(options.updatePreviewScrub).toHaveBeenCalledTimes(1)
+    expect(options.updatePreviewScrub).toHaveBeenCalledWith(6.5)
+  })
+
+  test('commits scrub immediately and cancels stale preview work', () => {
+    const raf = installRafHarness()
+    const options = createOptions()
+    const { result } = renderHook((props) => usePlaybackEngine(props), {
+      initialProps: options,
+    })
+
+    act(() => {
+      result.current.scrubTo(2.25)
       result.current.commitScrub(3.5)
     })
 
-    expect(options.updatePreviewScrub).toHaveBeenCalledWith(3.5)
+    expect(options.beginPreviewScrub).not.toHaveBeenCalled()
+    expect(options.updatePreviewScrub).not.toHaveBeenCalled()
+    expect(options.commitPreviewScrub).toHaveBeenCalledTimes(1)
     expect(options.commitPreviewScrub).toHaveBeenCalledWith(3.5)
+    expect(raf.pendingFrameCount()).toBe(0)
   })
 
   test('jumpToEnd pauses at total duration without slider-shaped arguments', () => {

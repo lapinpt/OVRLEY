@@ -2,7 +2,7 @@
  * Orchestrates playback state, scrub state, and timeline-driven animation frames.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getContainerFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
 import {
@@ -55,12 +55,11 @@ export default function usePlaybackEngine({
   updateRate,
   videoSyncOffsetSeconds,
 }) {
-  // Local scrub state - lets the dragged playhead render immediately before the store commit lands.
-  const [dragSecond, setDragSecond] = useState(null)
-
   // Imperative playback refs - RAF reads these without forcing React renders every frame.
   const playbackAnchorRef = useRef({ startedAtMs: 0, startedSecond: 0 })
   const previousTimelineMinimumRef = useRef(0)
+  const scrubFrameRef = useRef(null)
+  const latestScrubSecondRef = useRef(null)
   const totalDurationRef = useRef(0)
   const previewFrameRef = useRef(-1)
 
@@ -83,14 +82,44 @@ export default function usePlaybackEngine({
   const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
   const timelineMinimum = getTimelineMinimum({ hasVideo: Boolean(importedVideoPath), videoSyncOffsetSeconds })
   const clampedPlayhead = clamp(selectedSecond, timelineMinimum, totalDuration)
-  const displayedPlayhead = clamp(dragSecond === null ? clampedPlayhead : dragSecond, timelineMinimum, totalDuration)
   const effectivePreviewFps = useMemo(() => getContainerFps(sceneFps, updateRate), [sceneFps, updateRate])
+
+  const cancelScrub = useCallback(() => {
+    latestScrubSecondRef.current = null
+    if (scrubFrameRef.current === null) return
+
+    window.cancelAnimationFrame(scrubFrameRef.current)
+    scrubFrameRef.current = null
+  }, [])
+
+  const scheduleScrub = useCallback(
+    (scrubSecond) => {
+      latestScrubSecondRef.current = scrubSecond
+      if (scrubFrameRef.current !== null) return
+
+      scrubFrameRef.current = window.requestAnimationFrame(() => {
+        scrubFrameRef.current = null
+        const latestScrubSecond = latestScrubSecondRef.current
+        latestScrubSecondRef.current = null
+
+        if (latestScrubSecond === null) return
+        if (previewPlaybackState !== 'scrubbing') {
+          beginPreviewScrub(latestScrubSecond)
+          return
+        }
+        updatePreviewScrub(latestScrubSecond)
+      })
+    },
+    [beginPreviewScrub, previewPlaybackState, updatePreviewScrub],
+  )
+
+  useEffect(() => cancelScrub, [cancelScrub])
 
   // Shared reset path - any explicit playback command clears transient drag/frame ownership.
   const resetPlaybackOrchestration = useCallback(() => {
     previewFrameRef.current = -1
-    setDragSecond(null)
-  }, [])
+    cancelScrub()
+  }, [cancelScrub])
 
   const setPlaybackAnchor = useCallback((source, second) => {
     playbackAnchorRef.current = createPlaybackAnchor({
@@ -264,30 +293,25 @@ export default function usePlaybackEngine({
 
   const scrubTo = useCallback(
     (second) => {
-      // Scrub preview - updates drag ownership and store preview state without leaving the scrub interaction.
+      // Scrub preview - retain only the latest pointer sample until the next animation frame.
       const scrubSecond = clamp(second, timelineMinimum, totalDuration)
       setPlaybackAnchor('video', scrubSecond)
-      setDragSecond(scrubSecond)
       previewFrameRef.current = -1
-      if (previewPlaybackState !== 'scrubbing') {
-        beginPreviewScrub(scrubSecond)
-        return
-      }
-      updatePreviewScrub(scrubSecond)
+      scheduleScrub(scrubSecond)
     },
-    [beginPreviewScrub, previewPlaybackState, setPlaybackAnchor, timelineMinimum, totalDuration, updatePreviewScrub],
+    [scheduleScrub, setPlaybackAnchor, timelineMinimum, totalDuration],
   )
 
   const commitScrub = useCallback(
     (second) => {
-      // Scrub commit - stores the final paused playhead and releases temporary drag ownership.
+      // Scrub commit - cancels queued preview work and stores the final paused playhead synchronously.
       const scrubSecond = clamp(second, timelineMinimum, totalDuration)
+      cancelScrub()
       setPlaybackAnchor('video', scrubSecond)
       previewFrameRef.current = -1
-      setDragSecond(null)
       commitPreviewScrub(scrubSecond)
     },
-    [commitPreviewScrub, setPlaybackAnchor, timelineMinimum, totalDuration],
+    [cancelScrub, commitPreviewScrub, setPlaybackAnchor, timelineMinimum, totalDuration],
   )
 
   const jumpToEnd = useCallback(() => {
@@ -296,8 +320,9 @@ export default function usePlaybackEngine({
 
   return {
     clampedPlayhead,
+    cancelScrub,
     commitScrub,
-    displayedPlayhead,
+    displayedPlayhead: clampedPlayhead,
     hasActivity,
     importedVideoDuration,
     importedVideoPath,

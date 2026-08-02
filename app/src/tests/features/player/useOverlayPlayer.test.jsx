@@ -60,7 +60,7 @@ describe('useOverlayPlayer', () => {
     expect(useStore.getState().previewPlaybackState).toBe('paused')
   })
 
-  test('measures timeline after mount, shows clip geometry, and drags the playhead by timeline coordinates', () => {
+  test('measures timeline after mount, shows clip geometry, and drags the playhead by timeline coordinates', async () => {
     const { result } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
 
     expect(result.current.timeline.widthPx).toBe(0)
@@ -86,6 +86,10 @@ describe('useOverlayPlayer', () => {
         pointerId: 1,
         stopPropagation: () => {},
       })
+    })
+
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve))
     })
 
     expect(useStore.getState().selectedSecond).toBe(50)

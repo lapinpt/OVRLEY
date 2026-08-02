@@ -75,6 +75,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
   })
   const gestures = useTimelineGestures({
     cancelMarkerPreview: exportTimeline.cancelMarkerPreview,
+    cancelScrub: playback.cancelScrub,
     commitMarker: exportTimeline.commitMarker,
     commitScrub: playback.commitScrub,
     previewMarker: exportTimeline.previewMarker,

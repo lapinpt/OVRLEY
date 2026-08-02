@@ -31,6 +31,10 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
   const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
+  const exportWindow = useMemo(
+    () => resolveExportRangeWindow(activity, exportRange, data.show_full_activity),
+    [activity, exportRange, data.show_full_activity],
+  )
 
   // Build the config Rust needs. The store scene lacks non-durable fields
   // (scale, shadow, border) — globalDefaults fills them. start/end are
@@ -38,7 +42,6 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   const geometryConfig = useMemo(() => {
     if (!config || !activity || !hasTauriRuntime()) return null
     const duration = activity.trim_end_seconds
-    const exportWindow = resolveExportRangeWindow(activity, exportRange, data.show_full_activity)
     const { updateRate, start, end, ...sceneRest } = config.scene
 
     return {
@@ -53,7 +56,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
         custom_export_range_active: exportWindow.active,
       },
     }
-  }, [config, globalDefaults, activity, exportRange, style.globalScale, data.show_full_activity])
+  }, [config, globalDefaults, activity, exportWindow, style.globalScale])
 
   useEffect(() => {
     if (!geometryConfig) return
@@ -72,6 +75,14 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
     }
   }, [geometryConfig, activity])
 
+  // Rust computes at scaled resolution (scene.width × scale), but SVG
+  // needs unscaled widget-local coordinates.
+  const points = useMemo(
+    () => (rustGeometry ? rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale]) : null),
+    [rustGeometry, style.globalScale],
+  )
+  const remainingSvgPoints = useMemo(() => (points ? pointsToSvg(points) : null), [points])
+
   if (getPreviewActivity(activity, previewSecond) === null) {
     return buildPlaceholderRoutePreviewGeometry({
       width: data.width,
@@ -83,13 +94,8 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
 
   if (!rustGeometry) return null
 
-  // Rust computes at scaled resolution (scene.width × scale), but SVG
-  // needs unscaled widget-local coordinates.
-  const points = rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale])
-
   // progress01 drives marker placement and completed polyline. Export
   // window normalizes it to 0..1 within the trimmed range.
-  const exportWindow = resolveExportRangeWindow(activity, exportRange, data.show_full_activity)
   const progress01 = exportWindow.active
     ? (getWindowProgressAtTime(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
@@ -98,7 +104,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
 
   return {
     markerPoint,
-    remainingSvgPoints: pointsToSvg(points),
+    remainingSvgPoints,
     completedSvgPoints: pointsToSvg(completedPoints),
   }
 }

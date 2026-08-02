@@ -25,6 +25,7 @@ function createEvent(overrides = {}) {
 function renderGestures() {
   const commands = {
     cancelMarkerPreview: vi.fn(),
+    cancelScrub: vi.fn(),
     commitMarker: vi.fn(),
     commitScrub: vi.fn(),
     previewMarker: vi.fn(),
@@ -64,6 +65,14 @@ describe('useTimelineGestures', () => {
     })
 
     expect(commands.commitScrub).toHaveBeenCalledWith(30)
+    expect(result.current.isTimelineDragging).toBe(false)
+
+    act(() => {
+      result.current.axisProps.onPointerDown(createEvent({ clientX: 35 }))
+      result.current.axisProps.onPointerCancel(createEvent({ clientX: 35 }))
+    })
+
+    expect(commands.cancelScrub).toHaveBeenCalledTimes(1)
     expect(result.current.isTimelineDragging).toBe(false)
   })
 

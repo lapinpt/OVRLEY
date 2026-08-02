@@ -87,6 +87,14 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
     }
   }, [geometryConfig, activity])
 
+  // Rust computes at scaled resolution, but SVG needs widget-local coordinates.
+  const points = useMemo(
+    () => (rustGeometry ? rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale]) : null),
+    [rustGeometry, style.globalScale],
+  )
+  const remainingSvgPoints = useMemo(() => (points ? pointsToSvg(points) : null), [points])
+  const areaSvgPoints = useMemo(() => (points ? areaToSvg(points, data.width, data.height, null) : null), [points, data.width, data.height])
+
   if (getPreviewActivity(activity, previewSecond) === null) {
     return buildPlaceholderElevationPreviewGeometry({
       width: data.width,
@@ -97,9 +105,6 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   }
 
   if (!rustGeometry) return null
-
-  // Rust computes at scaled resolution, but SVG needs widget-local coordinates.
-  const points = rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale])
 
   // Keep marker x distance-based so it stays put during hover/stop segments.
   const progress01 = exportWindow.active
@@ -128,9 +133,9 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   return {
     markerPoint,
     elevationValue,
-    remainingSvgPoints: pointsToSvg(points),
+    remainingSvgPoints,
     completedSvgPoints: pointsToSvg(completedPoints),
-    areaSvgPoints: areaToSvg(points, data.width, data.height, null),
+    areaSvgPoints,
     completedAreaSvgPoints: areaToSvg(completedPoints, data.width, data.height, null),
   }
 }

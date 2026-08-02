@@ -15,12 +15,13 @@ function isPrimaryButton(event) {
  * @param {object} options Gesture command inputs.
  * @param {function} options.scrubTo Preview-scrub command that accepts a timeline second.
  * @param {function} options.commitScrub Final scrub command that accepts a timeline second.
+ * @param {function} options.cancelScrub Scrub cancellation command for pending preview work.
  * @param {function} options.previewMarker Export-marker preview command.
  * @param {function} options.commitMarker Export-marker commit command.
  * @param {function} options.cancelMarkerPreview Export-marker cancellation command.
  * @returns {object} Drag state, event props, and metric sync command.
  */
-export default function useTimelineGestures({ scrubTo, commitScrub, previewMarker, commitMarker, cancelMarkerPreview }) {
+export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub, previewMarker, commitMarker, cancelMarkerPreview }) {
   // Drag state - one flag suspends viewport auto-follow during any timeline pointer interaction.
   const [isTimelineDragging, setIsTimelineDragging] = useState(false)
 
@@ -107,9 +108,10 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
     onPointerCancel: useCallback(
       (event) => {
         if (dragRef.current?.type !== 'scrub') return
+        cancelScrub()
         releaseCapturedDrag(event)
       },
-      [releaseCapturedDrag],
+      [cancelScrub, releaseCapturedDrag],
     ),
   }
 
@@ -183,9 +185,10 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
       (event) => {
         if (dragRef.current?.type !== 'playhead') return
         event.stopPropagation()
+        cancelScrub()
         releaseCapturedDrag(event)
       },
-      [releaseCapturedDrag],
+      [cancelScrub, releaseCapturedDrag],
     ),
   }
 
