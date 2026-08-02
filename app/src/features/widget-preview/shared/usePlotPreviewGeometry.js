@@ -112,11 +112,19 @@ export function usePlotPreviewGeometry({ activity, data, exportRange, style, plo
     () => (rustGeometry ? rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale]) : null),
     [rustGeometry, style.globalScale],
   )
+  const geometryWidth = rustGeometry ? rustGeometry.widgetWidth / style.globalScale : data.width
+  const geometryHeight = rustGeometry ? rustGeometry.widgetHeight / style.globalScale : data.height
+  const contentScale = rustGeometry
+    ? {
+        x: data.width / geometryWidth,
+        y: data.height / geometryHeight,
+      }
+    : null
   const remainingSvgPoints = useMemo(() => (points ? pointsToSvg(points) : null), [points])
   const areaSvgPoints = useMemo(
-    () => (includeArea && points ? areaToSvg(points, data.width, data.height, null) : null),
-    [data.height, data.width, includeArea, points],
+    () => (includeArea && points ? areaToSvg(points, geometryWidth, geometryHeight, null) : null),
+    [geometryHeight, geometryWidth, includeArea, points],
   )
 
-  return { areaSvgPoints, exportWindow, fallbackDurationSeconds, points, remainingSvgPoints, rustGeometry }
+  return { areaSvgPoints, contentScale, exportWindow, fallbackDurationSeconds, geometryHeight, points, remainingSvgPoints, rustGeometry }
 }

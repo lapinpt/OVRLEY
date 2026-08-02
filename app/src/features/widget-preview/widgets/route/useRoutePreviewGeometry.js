@@ -27,7 +27,7 @@ import { usePlotPreviewGeometry } from '../../shared/usePlotPreviewGeometry'
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
 export function useRoutePreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
-  const { exportWindow, fallbackDurationSeconds, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
+  const { contentScale, exportWindow, fallbackDurationSeconds, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
     activity,
     data,
     exportRange,
@@ -63,6 +63,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   const { markerPoint, completedPoints } = buildRouteFramePreview(points, rustGeometry.progressValues, progress01)
 
   return {
+    contentScale,
     markerPoint,
     remainingSvgPoints,
     completedSvgPoints: pointsToSvg(completedPoints),
