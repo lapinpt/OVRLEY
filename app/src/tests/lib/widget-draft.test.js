@@ -1,7 +1,47 @@
 import { describe, expect, test } from 'vitest'
-import { applyWidgetDraftsForCanvas } from '@/lib/widget/widget-draft'
+import { applyWidgetDrafts, applyWidgetDraftsForCanvas } from '@/lib/widget/widget-draft'
 
 describe('widget draft projection', () => {
+  test('keeps scale values live in the editor while the interaction layout owns canvas geometry', () => {
+    const widget = {
+      id: 'speed-widget',
+      category: 'values',
+      type: 'speed',
+      data: {
+        display_type: 'text',
+        x: 100,
+        y: 200,
+        font_size: 40,
+        icon_size: 20,
+        icon_offset_x: 2,
+        icon_offset_y: -4,
+      },
+    }
+    const drafts = {
+      [widget.id]: {
+        data: {
+          x: 112.5,
+          y: 216.5,
+          font_size: 60,
+          icon_size: 30,
+          icon_offset_x: 3,
+          icon_offset_y: -6,
+        },
+        layout: { mode: 'scale', scaleFactor: 1.5 },
+      },
+    }
+
+    const [editorWidget] = applyWidgetDrafts([widget], drafts)
+    const [canvasWidget] = applyWidgetDraftsForCanvas([widget], drafts)
+    const [sliderCanvasWidget] = applyWidgetDraftsForCanvas([widget], {
+      [widget.id]: { ...drafts[widget.id], layout: null },
+    })
+
+    expect(editorWidget.data).toMatchObject({ font_size: 60, icon_size: 30, icon_offset_x: 3, icon_offset_y: -6 })
+    expect(canvasWidget).toBe(widget)
+    expect(sliderCanvasWidget.data).toMatchObject({ font_size: 60, icon_size: 30, icon_offset_x: 3, icon_offset_y: -6 })
+  })
+
   test('projects metric display variant geometry into the live canvas widget', () => {
     const widget = {
       id: 'linear-widget',

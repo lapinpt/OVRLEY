@@ -5,7 +5,6 @@
 import { getWidgetVisualBoundsFromTarget, updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
 import { buildScaleDraft } from '../utils/widgetResizeScaling'
 import { buildScaleInteractionLayout, captureWidgetLayout } from '../utils/widgetInteractionGeometry'
-import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
 
 /**
  * Creates scale-related moveable handlers.
@@ -75,7 +74,6 @@ export function useScaleHandlers({
       const nextY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - uniformScale)
 
       const scaledData = buildScaleDraft(origin.data, uniformScale, selectedWidget, { round: false })
-      const isTextMetricWidget = selectedWidget.category === 'values' && selectedWidget.type !== 'gradient' && isTextDisplayType(selectedWidget.data.display_type)
       const liveLayout = buildScaleInteractionLayout(origin.layout, {
         scaleFactor: uniformScale,
         globalScale,
@@ -87,7 +85,7 @@ export function useScaleHandlers({
         setLiveWidgetDraft,
         widgetId: origin.id,
         widget: selectedWidget,
-        updates: { ...(isTextMetricWidget ? {} : scaledData), x: nextX, y: nextY },
+        updates: { ...scaledData, x: nextX, y: nextY },
         target: target ?? selectedTarget,
         globalScale,
         layout: liveLayout,

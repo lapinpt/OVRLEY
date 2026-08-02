@@ -39,6 +39,7 @@ function resolveDraftData(widget, draftData) {
 }
 
 function getCanvasDraftData(draft) {
+  if (draft.layout?.mode === 'scale') return null
   if (!draft.layout) return draft.data
 
   const renderData = Object.fromEntries(Object.entries(draft.data).filter(([key]) => key !== 'x' && key !== 'y'))
@@ -62,8 +63,9 @@ export function applyWidgetDrafts(widgets, liveWidgetDrafts) {
 /**
  * Applies render-relevant live data drafts to canvas widgets. Direct
  * interaction layouts continue to own the outer DOM geometry, while preview
- * components still need live dimensions and display settings. Position-only
- * drafts are omitted because the DOM layout already owns that movement.
+ * components still need live dimensions and display settings for direct frame
+ * changes. Scale layouts own the complete canvas preview until commit, while
+ * other layouts omit position because the DOM layout owns that movement.
  *
  * @param {Array<object>} widgets - Resolved widget definitions.
  * @param {Object<string, object>} liveWidgetDrafts - Drafts keyed by widget ID.
