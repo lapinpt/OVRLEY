@@ -293,11 +293,19 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         "-ss",
         "300"
     ));
-    assert_argument_pair(&plan.ffmpeg_settings.input_2_args, "-t", "0.2");
+    assert_argument_pair(
+        &plan.ffmpeg_settings.input_2_args,
+        "-i",
+        "tmp/test-1080p.mp4",
+    );
     assert!(plan
         .ffmpeg_settings
         .filter_complex
         .contains("trim=start=0:end=0.2,setpts=PTS-STARTPTS,"));
+    assert!(plan
+        .ffmpeg_settings
+        .filter_complex
+        .contains("[2:a]atrim=start=0:duration=0.2,asetpts=N/SR/TB[aout]"));
 }
 
 /// Fractional render durations (0.101s) must use the overrun guard so that

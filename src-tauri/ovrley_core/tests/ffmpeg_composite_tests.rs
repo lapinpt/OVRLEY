@@ -4,7 +4,7 @@
 //! arrays for every codec path: software (libx264, libx265), hardware
 //! (NVENC, QSV, AMF, VideoToolbox), automatic fallback, and full-CUDA/QSV
 //! filter stacks. Covers FPS preservation with rational values, trim/seeking,
-//! audio copy, filter-graph labeling, bitrate overrides, and clear errors
+//! filtered audio encoding, filter-graph labeling, bitrate overrides, and clear errors
 //! for unavailable encoders.
 //!
 //! ## Type
@@ -169,7 +169,7 @@ fn test_2_3_sync_offset_is_not_used_as_seek_argument() {
 }
 
 #[test]
-fn test_2_4_video_trim_uses_filter_side_cut_and_audio_seek_input() {
+fn test_2_4_video_trim_uses_filter_side_cut_and_filtered_audio_input() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -177,12 +177,15 @@ fn test_2_4_video_trim_uses_filter_side_cut_and_audio_seek_input() {
     );
 
     assert_argument_pair(&built.input_0_args, "-i", "test.mp4");
-    assert_argument_pair(&built.input_2_args, "-ss", "10");
-    assert_argument_pair(&built.input_2_args, "-t", "10");
     assert_argument_pair(&built.input_2_args, "-i", "test.mp4");
+    assert!(!has_argument_pair(&built.input_2_args, "-ss", "10"));
+    assert!(!has_argument_pair(&built.input_2_args, "-t", "10"));
     assert!(built
         .filter_complex
         .contains("trim=start=10:end=20,setpts=PTS-STARTPTS,"));
+    assert!(built
+        .filter_complex
+        .contains("[2:a]atrim=start=10:duration=10,asetpts=N/SR/TB[aout]"));
 }
 
 #[test]
@@ -244,15 +247,16 @@ fn test_2_6_filter_graph_labels_and_maps_output() {
 }
 
 #[test]
-fn test_2_7_optional_audio_map_and_copy_are_present() {
+fn test_2_7_filtered_audio_map_and_encoding_are_present() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
         0.0,
     );
 
-    assert_argument_pair(&built.output_args, "-map", "2:a?");
-    assert_argument_pair(&built.output_args, "-c:a", "copy");
+    assert_argument_pair(&built.output_args, "-map", "[aout]");
+    assert_argument_pair(&built.output_args, "-c:a", "aac");
+    assert_argument_pair(&built.output_args, "-b:a", "192k");
 }
 
 #[test]

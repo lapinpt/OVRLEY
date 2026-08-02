@@ -56,7 +56,7 @@ pub struct CompositeProfile {
 /// Composite mode currently uses three inputs:
 /// - input 0: unseeked source video for frame-accurate filter-side video trim
 /// - input 1: raw RGBA overlay frames from stdin (`pipe:0`)
-/// - input 2: separately trimmed source media for audio stream copy
+/// - input 2: untrimmed source media for filtered audio encoding
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
     pub codec_id: CompositeCodecId,
@@ -190,24 +190,14 @@ pub fn build_composite_ffmpeg_settings(
         "pipe:0".to_string(),
     ];
 
-    // ── PHASE 5: BUILD INPUT 2 ARGS (trimmed audio source for stream copy) ──
+    // ── PHASE 5: BUILD INPUT 2 ARGS (untrimmed source for filtered audio) ──
     let mut input_2_args = Vec::new();
     if include_audio {
-        if render.trim_start > 0.0 {
-            input_2_args.push("-ss".to_string());
-            input_2_args.push(format_seconds_arg(render.trim_start));
-        }
-        input_2_args.extend([
-            source_autorotate_arg.to_string(),
-            "-t".to_string(),
-            format_seconds_arg(render.render_duration),
-            "-i".to_string(),
-            video_path,
-        ]);
+        input_2_args.extend(["-i".to_string(), video_path]);
     }
 
     // ── PHASE 6: BUILD FILTER COMPLEX (video trim + scale + overlay + format) ──
-    let filter_complex = composite_filter_complex(
+    let mut filter_complex = composite_filter_complex(
         width,
         height,
         render.trim_start,
@@ -217,11 +207,18 @@ pub fn build_composite_ffmpeg_settings(
         source_rotation_filter,
         qsv_overlay_cpu_rotation_filter,
     )?;
+    if include_audio {
+        filter_complex.push_str(&format!(
+            ";[2:a]atrim=start={}:duration={},asetpts=N/SR/TB[aout]",
+            format_seconds_arg(render.trim_start),
+            format_seconds_arg(render.render_duration),
+        ));
+    }
 
-    // ── PHASE 7: BUILD OUTPUT ARGS (map, codec, bitrate, audio copy, mux flags) ──
+    // ── PHASE 7: BUILD OUTPUT ARGS (map, codecs, bitrate, audio encode, mux flags) ──
     let mut output_args = vec!["-map".to_string(), "[out]".to_string()];
     if include_audio {
-        output_args.extend(["-map".to_string(), "2:a?".to_string()]);
+        output_args.extend(["-map".to_string(), "[aout]".to_string()]);
     }
     output_args.extend(["-r".to_string(), render.source_fps.ffmpeg_arg()]);
     output_args.extend([
@@ -247,7 +244,12 @@ pub fn build_composite_ffmpeg_settings(
     }
     output_args.extend(["-b:v".to_string(), render.bitrate.clone()]);
     if include_audio {
-        output_args.extend(["-c:a".to_string(), "copy".to_string()]);
+        output_args.extend([
+            "-c:a".to_string(),
+            "aac".to_string(),
+            "-b:a".to_string(),
+            "192k".to_string(),
+        ]);
     }
     output_args.extend(["-movflags".to_string(), "faststart".to_string()]);
     // Physical-rotation profiles clear the now-stale display matrix. QSV-full
