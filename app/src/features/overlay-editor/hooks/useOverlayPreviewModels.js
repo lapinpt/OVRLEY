@@ -1,6 +1,34 @@
 import { useMemo } from 'react'
-import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel } from '@/features/widget-preview'
-import { useFontMetricsEpoch } from '@/features/widget-preview/shared/useFontMetrics'
+import { buildMetricWidgetPreviewModel } from '@/features/widget-preview/widgets/metric/model'
+import { buildTextWidgetPreviewModel } from '@/features/widget-preview/widgets/text/model'
+import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
+import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
+import { useFontMetrics } from '@/features/widget-preview/shared/useFontMetrics'
+
+const EMPTY_PREVIEW_MODELS = {}
+
+function buildPreviewModels({ renderedWidgets, category, activity, previewSecond }) {
+  const models = {}
+
+  for (const widget of renderedWidgets) {
+    if (widget.category !== category) continue
+
+    const model = category === 'values' ? buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) : buildTextWidgetPreviewModel({ widget })
+
+    if (model) models[widget.id] = model
+  }
+
+  return Object.keys(models).length ? models : EMPTY_PREVIEW_MODELS
+}
+
+function buildFontRequests(renderedWidgets) {
+  return renderedWidgets
+    .filter(
+      (widget) =>
+        widget.category === 'labels' || (widget.category === 'values' && widget.type !== 'gradient' && !isBoxedDisplayType(widget.data.display_type)),
+    )
+    .map((widget) => ({ fontFamily: getPreviewFontFamily(widget.data.font), fontSize: widget.data.font_size }))
+}
 
 /**
  * Builds the shared preview models used by the editor canvas, badges, and
@@ -13,30 +41,22 @@ import { useFontMetricsEpoch } from '@/features/widget-preview/shared/useFontMet
  * @returns {{ metricPreviewModels: object, textPreviewModels: object }} Models keyed by widget id.
  */
 export default function useOverlayPreviewModels({ renderedWidgets, activity, previewSecond }) {
-  const fontMetricsEpoch = useFontMetricsEpoch()
+  const fontRequests = useMemo(() => buildFontRequests(renderedWidgets), [renderedWidgets])
+  const fontMetricsVersion = useFontMetrics(fontRequests)
 
-  const metricPreviewModels = useMemo(() => {
-    void fontMetricsEpoch
-    const models = {}
-    for (const widget of renderedWidgets) {
-      if (widget.category !== 'values') continue
+  const metricPreviewModels = useMemo(
+    () => buildPreviewModels({ renderedWidgets, category: 'values', activity, previewSecond }),
+    // Font readiness changes canvas measurements without changing the model inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activity, fontMetricsVersion, previewSecond, renderedWidgets],
+  )
 
-      const model = buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
-      if (model) models[widget.id] = model
-    }
-    return models
-  }, [activity, fontMetricsEpoch, previewSecond, renderedWidgets])
-
-  const textPreviewModels = useMemo(() => {
-    void fontMetricsEpoch
-    const models = {}
-    for (const widget of renderedWidgets) {
-      if (widget.category !== 'labels') continue
-
-      models[widget.id] = buildTextWidgetPreviewModel({ widget })
-    }
-    return models
-  }, [fontMetricsEpoch, renderedWidgets])
+  const textPreviewModels = useMemo(
+    () => buildPreviewModels({ renderedWidgets, category: 'labels' }),
+    // Font readiness changes canvas measurements without changing the model inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fontMetricsVersion, renderedWidgets],
+  )
 
   return { metricPreviewModels, textPreviewModels }
 }

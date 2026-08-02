@@ -25,6 +25,7 @@ function makeMetricWidget(type, data = {}) {
 
 function makeActivity(type, value) {
   return {
+    trim_end_seconds: 0,
     sample_elapsed_seconds: [0],
     [type]: [value],
   }
@@ -83,7 +84,7 @@ describe('Wave 2 metric formatting', () => {
   test('vertical_oscillation shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('vertical_oscillation', { display_unit: 'mm' }),
-      activity: { sample_elapsed_seconds: [0], vertical_oscillation: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], vertical_oscillation: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -100,6 +101,7 @@ describe('total ascent and GPS coordinate formatting', () => {
         show_units: true,
       }),
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0, 10, 20],
         total_ascent: [0, 12, 25],
       },
@@ -179,6 +181,7 @@ describe('total ascent and GPS coordinate formatting', () => {
         show_units: false,
       }),
       activity: {
+        trim_end_seconds: 0,
         sample_elapsed_seconds: [0],
         course: [[40.446111, -73.987222]],
       },
@@ -200,6 +203,7 @@ describe('total ascent and GPS coordinate formatting', () => {
         show_units: false,
       }),
       activity: {
+        trim_end_seconds: 0,
         sample_elapsed_seconds: [0],
         course: [[8.1, -73.987222]],
       },
@@ -341,7 +345,7 @@ describe('Wave 1 metric formatting', () => {
   test('gear_position shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('gear_position', { display_unit: 'gear' }),
-      activity: { sample_elapsed_seconds: [0], gear_position: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], gear_position: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -394,7 +398,7 @@ describe('Wave 1 placeholder behavior', () => {
   test('g_force shows placeholder when data missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('g_force', { display_unit: 'g' }),
-      activity: { sample_elapsed_seconds: [0], g_force: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], g_force: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -403,7 +407,7 @@ describe('Wave 1 placeholder behavior', () => {
   test('air_pressure shows placeholder when data missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('air_pressure', { display_unit: 'hpa' }),
-      activity: { sample_elapsed_seconds: [0], air_pressure: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], air_pressure: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -413,7 +417,7 @@ describe('Wave 1 placeholder behavior', () => {
   test('left_right_balance shows placeholder when data missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('left_right_balance', { display_unit: 'percent' }),
-      activity: { sample_elapsed_seconds: [0], left_right_balance: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--/--')
@@ -465,7 +469,7 @@ describe('left_right_balance format variants', () => {
   test('placeholder uses --/-- for all formats', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('left_right_balance', { display_unit: 'percent', balance_format: 'percent_label' }),
-      activity: { sample_elapsed_seconds: [0], left_right_balance: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--/--')
@@ -497,7 +501,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('aperture shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('aperture', {}),
-      activity: { sample_elapsed_seconds: [0], aperture: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], aperture: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -537,7 +541,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('shutter_speed shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('shutter_speed', {}),
-      activity: { sample_elapsed_seconds: [0], shutter_speed: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], shutter_speed: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -577,7 +581,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('ev shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('ev', {}),
-      activity: { sample_elapsed_seconds: [0], ev: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], ev: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')

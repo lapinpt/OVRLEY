@@ -29,7 +29,7 @@ const DEFAULT_WIDGET = {
   },
 }
 
-const ACTIVITY = { sample_elapsed_seconds: [0], lean_angle: [30] }
+const ACTIVITY = { trim_end_seconds: 0, sample_elapsed_seconds: [0], lean_angle: [30] }
 
 describe('OverlayLeanAngleWidget', () => {
   test('derives the default logical frame from diameter, track thickness, and font size', () => {
@@ -78,7 +78,7 @@ describe('OverlayLeanAngleWidget', () => {
     rerender(
       <OverlayLeanAngleWidget
         widget={DEFAULT_WIDGET}
-        activity={{ sample_elapsed_seconds: [0], lean_angle: [-70] }}
+        activity={{ trim_end_seconds: 0, sample_elapsed_seconds: [0], lean_angle: [-70] }}
         previewSecond={0}
         globalOpacity={1}
         globalScale={1}
@@ -94,7 +94,7 @@ describe('OverlayLeanAngleWidget', () => {
     render(
       <OverlayLeanAngleWidget
         widget={DEFAULT_WIDGET}
-        activity={{ sample_elapsed_seconds: [0], lean_angle: [null] }}
+        activity={{ trim_end_seconds: 0, sample_elapsed_seconds: [0], lean_angle: [null] }}
         previewSecond={0}
         globalOpacity={1}
         globalScale={1}

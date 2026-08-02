@@ -4,12 +4,12 @@
  */
 
 import {
-  FONT_FAMILY_MAP,
   METRIC_WIDGET_LINE_HEIGHT,
   METRIC_WIDGET_OUTER_GAP_PX,
   METRIC_WIDGET_UNITS_GAP_PX,
   NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
-} from '@/features/overlay-editor'
+} from '@/features/overlay-editor/data/overlayEditorConstants'
+import { FONT_FAMILY_MAP } from '@/features/overlay-editor/data/overlayEditorConfig'
 import { getFontFamilyName } from '@/lib/fonts'
 import { clamp } from '@/lib/utils'
 

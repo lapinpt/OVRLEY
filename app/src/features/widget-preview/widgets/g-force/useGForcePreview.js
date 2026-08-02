@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { getPreviewActivity } from '@/features/overlay-editor'
+import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getTextShadowParts } from '../../shared/shadow'
 import {
   getPreviewFontFamily,
@@ -9,13 +9,13 @@ import {
   measurePreviewText,
 } from '../../shared/textMeasurement'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
 import { buildGForceFrameState, prepareGForcePreview } from './model'
 
 /** Builds the complete SVG presentation model for the current G-force frame. */
 export function useGForcePreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const fontFamily = getPreviewFontFamily(widget.data.label_font)
-  const fontMetricsVersion = useFontMetricsVersion(fontFamily, widget.data.label_font_size)
+  const fontMetricsVersion = useFontMetrics([{ fontFamily, fontSize: widget.data.label_font_size }])
   const config = widget.data
   const { axis_horizontal, axis_vertical, clip_percentile, invert_horizontal, invert_vertical } = config
   const prepared = useMemo(

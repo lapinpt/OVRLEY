@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
-import { getInterpolatedActivityValue } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getPreviewFontFamily, getWidgetOpacity } from '../../shared/textMeasurement'
 import { headingOffset, headingTapeLayout, visibleLabels, visibleTicks } from './geometry'
 import { getTextShadowParts } from '../../shared/shadow'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
 
 /**
  * Builds the preview model for the heading-tape renderer.
@@ -32,7 +32,7 @@ import { useFontMetricsVersion } from '../../shared/useFontMetrics'
 export function useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle }) {
   // Typography: heading labels need font metrics ready before the tape is drawn.
   const labelFontFamily = getPreviewFontFamily(widget.data.label_font ?? valueFont ?? sceneFont)
-  useFontMetricsVersion(labelFontFamily, widget.data.label_font_size)
+  useFontMetrics([{ fontFamily: labelFontFamily, fontSize: widget.data.label_font_size }])
 
   return useMemo(() => {
     // Viewport and opacity: boxed heading widgets guarantee geometry; clamp only invalid transient values.

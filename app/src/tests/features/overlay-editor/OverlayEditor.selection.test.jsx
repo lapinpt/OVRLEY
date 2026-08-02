@@ -52,9 +52,16 @@ vi.mock('@/features/widget-preview', () => ({
   buildTextWidgetPreviewModel: previewMocks.buildTextWidgetPreviewModel,
 }))
 
+vi.mock('@/features/widget-preview/widgets/metric/model', () => ({
+  buildMetricWidgetPreviewModel: previewMocks.buildMetricWidgetPreviewModel,
+}))
+
+vi.mock('@/features/widget-preview/widgets/text/model', () => ({
+  buildTextWidgetPreviewModel: previewMocks.buildTextWidgetPreviewModel,
+}))
+
 vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetricsEpoch: () => 0,
-  useFontMetricsVersion: () => 0,
+  useFontMetrics: () => 0,
 }))
 
 vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({

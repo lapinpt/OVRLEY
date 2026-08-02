@@ -8,7 +8,7 @@ import {
   GRADIENT_WIDGET_TRIANGLE_GAP_PX,
   MAX_GRADIENT_ABS_PERCENT,
   GRADIENT_ZERO_EPSILON,
-} from '@/features/overlay-editor'
+} from '@/features/overlay-editor/data/overlayEditorConstants'
 import {
   getStandardMetricDefinition,
   getStandardMetricDisplayUnit,

@@ -54,6 +54,7 @@ describe('getMetricSeries', () => {
 
 describe('getInterpolatedActivityValue — hold interpolation', () => {
   const baseActivity = {
+    trim_end_seconds: 4,
     sample_elapsed_seconds: [0, 1, 2, 3, 4],
     iso: [100, 200, 400, 800, 1600],
     elevation: [10, 20, 30, 40, 50],
@@ -79,6 +80,7 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     expect(
       getInterpolatedActivityValue(
         {
+          trim_end_seconds: 0.5,
           sample_elapsed_seconds: [0.110097, 0.5],
           iso: [100, 200],
         },
@@ -102,7 +104,7 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
   })
 
   test('hold metric returns null when series key is missing from activity', () => {
-    const emptyActivity = { sample_elapsed_seconds: [0, 1] }
+    const emptyActivity = { trim_end_seconds: 1, sample_elapsed_seconds: [0, 1] }
     expect(getInterpolatedActivityValue(emptyActivity, 'iso', 1)).toBeNull()
   })
 
@@ -110,6 +112,7 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     expect(
       getInterpolatedActivityValue(
         {
+          trim_end_seconds: 1,
           sample_elapsed_seconds: [0, 1],
           cadence: [],
         },
@@ -121,6 +124,7 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
 
   test('hold metric with sparse data returns last known value skipping nulls', () => {
     const sparseActivity = {
+      trim_end_seconds: 4,
       sample_elapsed_seconds: [0, 1, 2, 3, 4],
       iso: [100, null, null, 800, null],
     }
@@ -140,6 +144,7 @@ describe('getInterpolatedTimeValue', () => {
 
   test('uses the source time series before sync_time', () => {
     const activity = {
+      trim_end_seconds: 60,
       sample_elapsed_seconds: [0, 60],
       sync_time: '2026-07-18T08:20:03.000Z',
       time: ['2026-07-18T07:20:03.000Z', '2026-07-18T07:21:03.000Z'],

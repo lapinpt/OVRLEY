@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
-import { getDistanceProgressAtElapsed, getPreviewActivity, getWindowProgressAtTime, resolveExportRangeWindow } from '@/features/overlay-editor'
-import { buildElevationGeometry, hasTauriRuntime } from '@/api/backend'
+import { useMemo } from 'react'
+import { getDistanceProgressAtElapsed, getPreviewActivity, getWindowProgressAtTime } from '@/features/overlay-editor'
+import { buildElevationGeometry } from '@/api/backend'
 import { areaToSvg, findPointAtProgress, pointsToSvg } from '@/lib/geometryUtils'
-import { buildPlaceholderElevationPreviewGeometry } from '../../shared/plotGeometry'
+import { buildPlaceholderElevationPreviewGeometry, buildPlaceholderElevationStaticGeometry } from '../../shared/plotPlaceholderGeometry'
 import { buildElevationCompletedPoints } from '../../shared/svgPreviewUtils'
 import { interpolateNumericSeries } from '@/lib/interpolation'
-import useStore from '@/store/useStore'
+import { usePlotPreviewGeometry } from '../../shared/usePlotPreviewGeometry'
 
 function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) {
   if (elevationValue === null) return null
@@ -38,69 +38,29 @@ function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) 
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
 export function useElevationPreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
-  const [rustGeometry, setRustGeometry] = useState(null)
-  const config = useStore((state) => state.config)
-  const globalDefaults = useStore((state) => state.globalDefaults)
-  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
-
-  const exportWindow = useMemo(
-    () => resolveExportRangeWindow(activity, exportRange, data.show_full_activity),
-    [activity, exportRange, data.show_full_activity],
+  const { areaSvgPoints, exportWindow, fallbackDurationSeconds, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
+    activity,
+    data,
+    exportRange,
+    style,
+    plotType: 'elevation',
+    buildGeometry: buildElevationGeometry,
+    mockGeometryKey: '__OVRLEY_MOCK_ELEVATION_GEOMETRY',
+    includeArea: true,
+  })
+  const isPlaceholder = getPreviewActivity(activity, previewSecond) === null
+  const placeholderStaticGeometry = useMemo(
+    () => (isPlaceholder ? buildPlaceholderElevationStaticGeometry({ width: data.width, height: data.height }) : null),
+    [data.height, data.width, isPlaceholder],
   )
 
-  // Build the config Rust needs. The store scene lacks non-durable fields
-  // (scale, shadow, border); globalDefaults fills them. start/end are
-  // overridden when an export window is active so Rust trims source points.
-  const geometryConfig = useMemo(() => {
-    if (!config || !activity || !hasTauriRuntime()) return null
-    const duration = activity.trim_end_seconds
-    const { updateRate, start, end, ...sceneRest } = config.scene
-
-    return {
-      ...config,
-      scene: {
-        ...globalDefaults,
-        ...sceneRest,
-        scale: style.globalScale,
-        update_rate: updateRate,
-        start: exportWindow.active ? exportWindow.start : (start ?? 0),
-        end: exportWindow.active ? exportWindow.end : (end ?? duration),
-        custom_export_range_active: exportWindow.active,
-      },
-    }
-  }, [config, globalDefaults, activity, exportWindow, style.globalScale])
-
-  useEffect(() => {
-    if (!geometryConfig) return
-
-    if (typeof window !== 'undefined' && window.__OVRLEY_MOCK_ELEVATION_GEOMETRY) {
-      setRustGeometry(window.__OVRLEY_MOCK_ELEVATION_GEOMETRY)
-      return
-    }
-
-    let cancelled = false
-    buildElevationGeometry(geometryConfig, activity).then((geometry) => {
-      if (!cancelled) setRustGeometry(geometry)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [geometryConfig, activity])
-
-  // Rust computes at scaled resolution, but SVG needs widget-local coordinates.
-  const points = useMemo(
-    () => (rustGeometry ? rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale]) : null),
-    [rustGeometry, style.globalScale],
-  )
-  const remainingSvgPoints = useMemo(() => (points ? pointsToSvg(points) : null), [points])
-  const areaSvgPoints = useMemo(() => (points ? areaToSvg(points, data.width, data.height, null) : null), [points, data.width, data.height])
-
-  if (getPreviewActivity(activity, previewSecond) === null) {
+  if (isPlaceholder) {
     return buildPlaceholderElevationPreviewGeometry({
       width: data.width,
       height: data.height,
       previewSecond,
       fallbackDurationSeconds,
+      staticGeometry: placeholderStaticGeometry,
     })
   }
 

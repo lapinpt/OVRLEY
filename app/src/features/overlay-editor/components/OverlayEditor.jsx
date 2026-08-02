@@ -24,19 +24,10 @@ import { useResizeHandlers } from '../hooks/useResizeHandlers'
 import { useScaleHandlers } from '../hooks/useScaleHandlers'
 import { useRotateHandlers } from '../hooks/useRotateHandlers'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { buildRenderedGeometrySignature, resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
+import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 
-function WidgetBadgeLayer({
-  displayScale,
-  globalScale,
-  hoveredWidgetId,
-  metricPreviewModels,
-  selectedWidgetIds,
-  textPreviewModels,
-  widgetPreviews,
-  widgets,
-}) {
+function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
     if (hoveredWidgetId) visibleIds.add(hoveredWidgetId)
@@ -49,10 +40,8 @@ function WidgetBadgeLayer({
     <div data-testid="widget-badge-layer" className="pointer-events-none absolute inset-0 z-50 overflow-visible">
       {visibleWidgets.map((widget) => {
         const Icon = WIDGET_ICONS[widget.type] || Tag
-        const metricPreviewModel = metricPreviewModels[widget.id] ?? null
-        const textPreviewModel = textPreviewModels[widget.id] ?? null
-        const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
-        const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null)
+        const renderGeometryModel = renderGeometryModels[widget.id]
+        const { renderGeometry } = renderGeometryModel
         const left = renderGeometry.badgeLeft * displayScale - 2
         const top = Math.max(renderGeometry.badgeTop * displayScale - 20, 0)
 
@@ -158,6 +147,18 @@ function OverlayEditor({
     renderedWidgets: overlayState.renderedWidgets,
   })
 
+  const renderGeometryModels = useMemo(
+    () =>
+      buildWidgetRenderGeometryModels({
+        widgets: overlayState.renderedWidgets,
+        metricPreviewModels,
+        textPreviewModels,
+        globalScale: overlayState.globalScale,
+        widgetPreviews: overlayState.liveWidgetPreviews,
+      }),
+    [metricPreviewModels, overlayState.globalScale, overlayState.liveWidgetPreviews, overlayState.renderedWidgets, textPreviewModels],
+  )
+
   // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
   const selection = useWidgetSelection({
     orderedWidgetIds: overlayState.orderedWidgetIds,
@@ -188,7 +189,6 @@ function OverlayEditor({
   // Pointer handlers
   const { handleSceneMouseDown, handleWidgetMouseDown } = useOverlayPointerHandlers({
     commitSelection: selection.commitSelection,
-    displayScale,
     moveableRef: overlayState.moveableRef,
     marqueeCleanupRef,
     marqueeSelectionRef,
@@ -214,15 +214,11 @@ function OverlayEditor({
     commitWidgetUpdate: overlayState.commitWidgetUpdate,
     commitWidgetUpdates: overlayState.commitWidgetUpdates,
     draftWidgetsRef: overlayState.draftWidgetsRef,
-    activity,
     effectiveSelectedWidgetIds,
     globalScale: overlayState.globalScale,
     groupDragSelectionIds,
     interactionStartRef: overlayState.interactionStartRef,
     renderedWidgetMap: overlayState.renderedWidgetMap,
-    previewSecond: overlayState.previewSecond,
-    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
-    selectedTarget: selection.selectedTarget,
     selectedWidget: selection.selectedWidget,
     selectedWidgets: selection.selectedWidgets,
     setGroupDragSelectionIds,
@@ -235,14 +231,8 @@ function OverlayEditor({
     clearWidgetDraft: overlayState.clearWidgetDraft,
     commitWidgetUpdate: overlayState.commitWidgetUpdate,
     draftWidgetsRef: overlayState.draftWidgetsRef,
-    activity,
-    effectiveSelectedWidgetIds,
     globalScale: overlayState.globalScale,
     interactionStartRef: overlayState.interactionStartRef,
-    renderedWidgetMap: overlayState.renderedWidgetMap,
-    previewSecond: overlayState.previewSecond,
-    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
-    selectedTarget: selection.selectedTarget,
     selectedWidget: selection.selectedWidget,
     setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
   })
@@ -253,7 +243,6 @@ function OverlayEditor({
     draftWidgetsRef: overlayState.draftWidgetsRef,
     globalScale: overlayState.globalScale,
     interactionStartRef: overlayState.interactionStartRef,
-    renderedWidgetMap: overlayState.renderedWidgetMap,
     scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
     selectedTarget: selection.selectedTarget,
     selectedWidget: selection.selectedWidget,
@@ -264,14 +253,8 @@ function OverlayEditor({
     clearWidgetDraft: overlayState.clearWidgetDraft,
     commitWidgetUpdate: overlayState.commitWidgetUpdate,
     draftWidgetsRef: overlayState.draftWidgetsRef,
-    activity,
-    effectiveSelectedWidgetIds,
     globalScale: overlayState.globalScale,
     interactionStartRef: overlayState.interactionStartRef,
-    renderedWidgetMap: overlayState.renderedWidgetMap,
-    previewSecond: overlayState.previewSecond,
-    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
-    selectedTarget: selection.selectedTarget,
     selectedWidget: selection.selectedWidget,
     setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
   })
@@ -289,22 +272,10 @@ function OverlayEditor({
           return 'missing'
         }
 
-        const preview = overlayState.liveWidgetPreviews[widgetId] ?? null
-        const metricPreviewModel = metricPreviewModels[widget.id] ?? null
-        const textPreviewModel = textPreviewModels[widget.id] ?? null
-        const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
-
-        return buildRenderedGeometrySignature(widget, visualBounds, overlayState.globalScale, preview)
+        return buildRenderedGeometrySignature(widget, renderGeometryModels[widgetId])
       })
       .join('|')
-  }, [
-    overlayState.globalScale,
-    overlayState.liveWidgetPreviews,
-    overlayState.renderedWidgetMap,
-    metricPreviewModels,
-    selection.effectiveSelectedWidgetIds,
-    textPreviewModels,
-  ])
+  }, [overlayState.renderedWidgetMap, renderGeometryModels, selection.effectiveSelectedWidgetIds])
 
   // Capability flags
   const selectedWidget = selection.selectedWidget
@@ -354,20 +325,20 @@ function OverlayEditor({
   const canvasDataProps = useMemo(
     () => ({
       widgets: overlayState.renderedWidgets,
-      widgetPreviews: overlayState.liveWidgetPreviews,
       activity,
       previewSecond: overlayState.previewSecond,
       metricPreviewModels,
       textPreviewModels,
+      renderGeometryModels,
       exportRange: overlayState.previewExportRange,
     }),
     [
       activity,
       metricPreviewModels,
-      overlayState.liveWidgetPreviews,
       overlayState.previewExportRange,
       overlayState.previewSecond,
       overlayState.renderedWidgets,
+      renderGeometryModels,
       textPreviewModels,
     ],
   )
@@ -443,12 +414,9 @@ function OverlayEditor({
             </div>
             <WidgetBadgeLayer
               displayScale={displayScale}
-              globalScale={overlayState.globalScale}
               hoveredWidgetId={hoveredWidgetId}
-              metricPreviewModels={metricPreviewModels}
+              renderGeometryModels={renderGeometryModels}
               selectedWidgetIds={selection.selectedWidgetIds}
-              textPreviewModels={textPreviewModels}
-              widgetPreviews={overlayState.liveWidgetPreviews}
               widgets={overlayState.renderedWidgets}
             />
           </div>

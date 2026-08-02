@@ -322,7 +322,6 @@ export default function usePlaybackEngine({
     clampedPlayhead,
     cancelScrub,
     commitScrub,
-    displayedPlayhead: clampedPlayhead,
     hasActivity,
     importedVideoDuration,
     importedVideoPath,

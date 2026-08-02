@@ -20,7 +20,7 @@ vi.mock('@/features/widget-preview', () => ({
 }))
 
 vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetricsVersion: () => 0,
+  useFontMetrics: () => 0,
 }))
 
 vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({

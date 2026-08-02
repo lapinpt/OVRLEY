@@ -1,5 +1,5 @@
 import { formatFixedDecimal } from '../metric/format'
-import { getMetricSeries } from '@/features/overlay-editor'
+import { getMetricSeries } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { interpolateNumericSeries, MISSING_SAMPLE_POLICY } from '@/lib/interpolation'
 
 const AXIS_SERIES_KEYS = {

@@ -22,7 +22,7 @@ import { PreviewMarkerLayers, PreviewPolylineShadow, PreviewSvgShadowBlurFilter 
 import { useRoutePreview } from './useRoutePreview'
 
 export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
-  const previewModel = useRoutePreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange })
+  const previewModel = useRoutePreview({ widget, activity, previewSecond, globalScale, exportRange })
 
   if (!previewModel) {
     return null

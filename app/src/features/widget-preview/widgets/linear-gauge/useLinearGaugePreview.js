@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getBarFillCount, getLinearBarRects } from '../../shared/gaugeBarGeometry'
 import {
   getLinearGaugeLabelLayout,
@@ -11,14 +11,14 @@ import {
 import { getTextShadowParts } from '../../shared/shadow'
 import { normalizeSvgShadowColor } from '../../shared/svgPreviewUtils'
 import { getPreviewFontFamily } from '../../shared/textMeasurement'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
 import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Builds all non-JSX state for a normalized linear-gauge preview. */
 export function useLinearGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
   const maskId = useId()
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
-  useFontMetricsVersion(labelFontFamily, widget.data.min_max_label_font_size)
+  useFontMetrics([{ fontFamily: labelFontFamily, fontSize: widget.data.min_max_label_font_size }])
 
   const displayActivity = getPreviewActivity(activity, previewSecond)
   const layout = getLinearGaugeLayout({

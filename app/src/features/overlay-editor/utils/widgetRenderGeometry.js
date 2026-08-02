@@ -66,12 +66,29 @@ export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, p
   }
 }
 
-export function buildRenderedGeometrySignature(widget, visualBounds, globalScale, preview = null) {
+export function buildWidgetRenderGeometryModels({ widgets, metricPreviewModels, textPreviewModels, globalScale, widgetPreviews }) {
+  const models = {}
+
+  for (const widget of widgets) {
+    const metricPreviewModel = metricPreviewModels[widget.id] ?? null
+    const textPreviewModel = textPreviewModels[widget.id] ?? null
+    const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
+
+    models[widget.id] = {
+      renderGeometry: resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null),
+      visualBounds,
+    }
+  }
+
+  return models
+}
+
+export function buildRenderedGeometrySignature(widget, geometryModel) {
   if (!widget) {
     return 'none'
   }
 
-  const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview)
+  const { renderGeometry, visualBounds } = geometryModel
 
   return JSON.stringify({
     id: widget.id,

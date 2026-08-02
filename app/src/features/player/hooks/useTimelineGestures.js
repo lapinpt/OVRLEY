@@ -9,6 +9,10 @@ function isPrimaryButton(event) {
   return event.button === undefined || event.button === 0
 }
 
+function isDragType(dragRef, dragType) {
+  return dragRef.current?.type === dragType
+}
+
 /**
  * Owns timeline pointer interactions for scrub, pan, playhead, and export marker drags.
  *
@@ -92,14 +96,14 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
     ),
     onPointerMove: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'scrub') return
+        if (!isDragType(dragRef, 'scrub')) return
         scrubTo(readSecond(event))
       },
       [readSecond, scrubTo],
     ),
     onPointerUp: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'scrub') return
+        if (!isDragType(dragRef, 'scrub')) return
         commitScrub(readSecond(event))
         releaseCapturedDrag(event)
       },
@@ -107,7 +111,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
     ),
     onPointerCancel: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'scrub') return
+        if (!isDragType(dragRef, 'scrub')) return
         cancelScrub()
         releaseCapturedDrag(event)
       },
@@ -166,7 +170,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
     ),
     onPointerMove: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'playhead') return
+        if (!isDragType(dragRef, 'playhead')) return
         event.stopPropagation()
         scrubTo(readSecond(event))
       },
@@ -174,7 +178,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
     ),
     onPointerUp: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'playhead') return
+        if (!isDragType(dragRef, 'playhead')) return
         event.stopPropagation()
         commitScrub(readSecond(event))
         releaseCapturedDrag(event)
@@ -183,7 +187,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
     ),
     onPointerCancel: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'playhead') return
+        if (!isDragType(dragRef, 'playhead')) return
         event.stopPropagation()
         cancelScrub()
         releaseCapturedDrag(event)

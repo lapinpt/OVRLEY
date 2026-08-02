@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from './geometry'
 import { getArcInnerWidgetLayout } from './arcGaugeInnerLayout'
 import { getArcFilledTrackRevealSpec, getArcPoint } from './trackPath'
@@ -7,7 +7,7 @@ import { getArcBarSegments, getBarFillCount } from '../../shared/gaugeBarGeometr
 import { buildArcGaugeInnerWidgetModel } from '../metric/model'
 import { getTextShadowParts } from '../../shared/shadow'
 import { getPreviewFontFamily, measureArcPreviewText } from '../../shared/textMeasurement'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
 import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Returns the SVG text origin that centers measured text around an x-coordinate. */
@@ -42,8 +42,10 @@ function getLabelLayout(layout, minLabel, maxLabel, fontFamily, fontSize) {
 export function useArcGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
   const valueFontFamily = getPreviewFontFamily(widget.data.font)
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
-  useFontMetricsVersion(valueFontFamily, widget.data.font_size)
-  useFontMetricsVersion(labelFontFamily, widget.data.min_max_label_font_size)
+  useFontMetrics([
+    { fontFamily: valueFontFamily, fontSize: widget.data.font_size },
+    { fontFamily: labelFontFamily, fontSize: widget.data.min_max_label_font_size },
+  ])
 
   return useMemo(() => {
     const displayActivity = getPreviewActivity(activity, previewSecond)

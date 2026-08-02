@@ -43,6 +43,7 @@ function makeWidget() {
 }
 
 const ACTIVITY = {
+  trim_end_seconds: 5,
   sample_elapsed_seconds: [0, 1, 2, 3, 4, 5],
   g_force_x: [0, 3, 0, null, 8, 0],
   g_force_y: [0, 4, 2, 1, 6, 0],
@@ -86,7 +87,7 @@ describe('OverlayGForceWidget', () => {
     const { getByTestId, queryByTestId } = render(
       <OverlayGForceWidget
         widget={makeWidget()}
-        activity={{ sample_elapsed_seconds: [0, 1] }}
+        activity={{ trim_end_seconds: 1, sample_elapsed_seconds: [0, 1] }}
         previewSecond={0.5}
         globalOpacity={1}
         globalScale={1}

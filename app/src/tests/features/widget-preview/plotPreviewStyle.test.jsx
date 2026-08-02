@@ -3,7 +3,7 @@ import { getRoutePreviewStyle } from '@/features/widget-preview/widgets/route/st
 import { buildElevationPreviewStyle } from '@/features/widget-preview/widgets/elevation/style'
 
 vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetricsVersion: () => 0,
+  useFontMetrics: () => 0,
 }))
 
 vi.mock('@/features/widget-preview/shared/textMeasurement', async () => {

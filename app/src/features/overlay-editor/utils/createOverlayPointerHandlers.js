@@ -42,13 +42,12 @@ function getElementPoint(element, clientX, clientY) {
  * clamped to the scene bounds.
  *
  * @param {HTMLElement|null} sceneElement - The scene container DOM element.
- * @param {number} displayScale - Current display scale factor.
  * @param {{ width: number, height: number }} sceneSize - Scene dimensions.
  * @param {number} clientX - Client-space X.
  * @param {number} clientY - Client-space Y.
  * @returns {{ x: number, y: number }|null} Scene-space point or null.
  */
-function getScenePoint(sceneElement, displayScale, sceneSize, clientX, clientY) {
+function getScenePoint(sceneElement, sceneSize, clientX, clientY) {
   if (!sceneElement) {
     return null
   }
@@ -66,7 +65,6 @@ function getScenePoint(sceneElement, displayScale, sceneSize, clientX, clientY) 
  * scene-space selection rectangle. Used for marquee/selection box.
  *
  * @param {object} options
- * @param {number} options.displayScale - Display scale for coordinate conversion.
  * @param {{ x: number, y: number, width: number, height: number }} options.nextSelectionRect - Selection rect in scene coords.
  * @param {string[]} options.orderedWidgetIds - Ordered list of all widget IDs.
  * @param {HTMLElement|null} options.sceneElement - Scene container element.
@@ -105,7 +103,6 @@ function getIntersectedWidgetIds({ nextSelectionRect, orderedWidgetIds, sceneEle
  *
  * @param {object} options
  * @param {Function} options.commitSelection - Commits a selection set to state and store.
- * @param {number} options.displayScale - Current display scale.
  * @param {React.RefObject} options.moveableRef - Ref to Moveable instance for programmatic dragStart.
  * @param {React.MutableRefObject} options.marqueeCleanupRef - Ref for cleanup function.
  * @param {React.MutableRefObject} options.marqueeSelectionRef - Ref for marquee gesture state.
@@ -124,7 +121,6 @@ function getIntersectedWidgetIds({ nextSelectionRect, orderedWidgetIds, sceneEle
  */
 export default function useOverlayPointerHandlers({
   commitSelection,
-  displayScale,
   moveableRef,
   marqueeCleanupRef,
   marqueeSelectionRef,
@@ -196,7 +192,7 @@ export default function useOverlayPointerHandlers({
         return
       }
 
-      const startScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, event.clientX, event.clientY)
+      const startScenePoint = getScenePoint(sceneElement, sceneSize, event.clientX, event.clientY)
       const startStagePoint = getElementPoint(stageElement, event.clientX, event.clientY)
       if (!startScenePoint || !startStagePoint) {
         return
@@ -224,7 +220,7 @@ export default function useOverlayPointerHandlers({
       })
 
       const handleWindowMouseMove = (moveEvent) => {
-        const nextScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, moveEvent.clientX, moveEvent.clientY)
+        const nextScenePoint = getScenePoint(sceneElement, sceneSize, moveEvent.clientX, moveEvent.clientY)
         const nextStagePoint = getElementPoint(stageElement, moveEvent.clientX, moveEvent.clientY)
         const gesture = marqueeSelectionRef.current
         if (!nextScenePoint || !nextStagePoint || !gesture) {
@@ -236,7 +232,6 @@ export default function useOverlayPointerHandlers({
         const hasMoved = nextStageRect.width > 2 || nextStageRect.height > 2
         const hitIds = hasMoved
           ? getIntersectedWidgetIds({
-              displayScale,
               nextSelectionRect: nextSceneRect,
               orderedWidgetIds,
               sceneElement,
@@ -287,7 +282,6 @@ export default function useOverlayPointerHandlers({
     },
     [
       commitSelection,
-      displayScale,
       marqueeCleanupRef,
       marqueeSelectionRef,
       orderedWidgetIds,

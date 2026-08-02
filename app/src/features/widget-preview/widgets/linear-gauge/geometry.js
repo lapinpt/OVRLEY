@@ -1,7 +1,7 @@
 /** Pure presentation geometry and label formatting for linear gauge previews. */
 
 import { getTranslatedTrackCapPath, getTranslatedTrackCapReveal } from '../../shared/trackPathGeometry'
-import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor'
+import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { measurePreviewText } from '../../shared/textMeasurement'
 
 const LINEAR_GAUGE_LABEL_GAP_PX = 8

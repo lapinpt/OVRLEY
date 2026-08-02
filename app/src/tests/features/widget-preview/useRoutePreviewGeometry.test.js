@@ -81,6 +81,7 @@ import { useRoutePreviewGeometry } from '@/features/widget-preview/widgets/route
 
 function makeActivity() {
   return {
+    trim_end_seconds: 30,
     sample_elapsed_seconds: [0, 10, 20, 30],
     sample_distance_progress: [0, 0.33, 0.66, 1],
     sample_course_points: [

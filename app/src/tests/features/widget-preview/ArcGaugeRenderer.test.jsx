@@ -45,6 +45,7 @@ function makeWidget(overrides = {}) {
 }
 
 const activity = {
+  trim_end_seconds: 1,
   sample_elapsed_seconds: [0, 1],
   speed: [0, 100],
 }

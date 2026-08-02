@@ -1,11 +1,13 @@
 import { useMemo } from 'react'
-import { getInterpolatedActivityValue, GRADIENT_ZERO_LINE_WIDTH_PX, METRIC_ICON_SVGS } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue } from '@/features/overlay-editor/utils/overlayEditorUtils'
+import { GRADIENT_ZERO_LINE_WIDTH_PX } from '@/features/overlay-editor/data/overlayEditorConstants'
+import { METRIC_ICON_SVGS } from '@/lib/widget/widget-icon-data'
 import { buildGradientTrianglePath, formatGradientValue, getGradientWidgetLayout } from './format'
 import { buildMetricWidgetPreviewModel } from './model'
 import { getPreviewFontFamily, getWidgetOpacity, measurePreviewText } from '../../shared/textMeasurement'
 import { getTextShadowParts } from '../../shared/shadow'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
 
 function splitGradientUnitSuffix(text) {
   return text.endsWith('%') ? [text.slice(0, -1), '%'] : [text, '']
@@ -92,7 +94,7 @@ function buildMetricTextRuns({ widget, content, visualBounds, shadowFilterIds })
 export function useMetricPreviewPresentation({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
   // Typography: ensure font metrics are loaded before layout-dependent rendering.
   const fontFamily = getPreviewFontFamily(widget.data.font)
-  useFontMetricsVersion(fontFamily, widget.data.font_size)
+  useFontMetrics([{ fontFamily, fontSize: widget.data.font_size }])
 
   return useMemo(() => {
     // Shared presentation: these values apply to both metric and gradient modes.

@@ -15,6 +15,7 @@ describe('core_temperature widget preview', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         core_temperature: [38.5],
       },
@@ -37,6 +38,7 @@ describe('core_temperature widget preview', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         core_temperature: [37],
       },
@@ -59,6 +61,7 @@ describe('core_temperature widget preview', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
       },
       previewSecond: 0,
@@ -81,6 +84,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         speed: [10],
       },
@@ -105,6 +109,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0, 10, 20],
         distance: [0, 22100, 35700],
       },
@@ -129,6 +134,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0, 10, 20],
         distance: [0, 1609.344, 3218.688],
       },
@@ -152,6 +158,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         elevation: [100],
       },
@@ -175,6 +182,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         calories: [742],
       },
@@ -199,6 +207,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0, 10, 20],
         distance: [0, 2300, 5000],
       },
@@ -221,6 +230,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         temperature: [20],
       },
@@ -243,6 +253,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         pace: [275],
       },
@@ -266,6 +277,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         vertical_speed: [2],
       },
@@ -288,6 +300,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         gear_position: ['5'],
       },
@@ -310,6 +323,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         gear_position: [null],
       },
@@ -330,6 +344,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         heading: [90],
       },
@@ -368,7 +383,7 @@ describe('metric widget preview model standard metric units', () => {
         type: 'speed',
         data: { display_type: 'linear' },
       },
-      activity: { sample_elapsed_seconds: [0], speed: [25] },
+      activity: { trim_end_seconds: 20, sample_elapsed_seconds: [0], speed: [25] },
       previewSecond: 0,
     })
     expect(linearModel).toBeNull()
@@ -379,7 +394,7 @@ describe('metric widget preview model standard metric units', () => {
         type: 'power',
         data: { display_type: 'arc' },
       },
-      activity: { sample_elapsed_seconds: [0], power: [200] },
+      activity: { trim_end_seconds: 20, sample_elapsed_seconds: [0], power: [200] },
       previewSecond: 0,
     })
     expect(arcModel).toBeNull()

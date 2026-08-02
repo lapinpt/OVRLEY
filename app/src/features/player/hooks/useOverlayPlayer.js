@@ -65,9 +65,10 @@ export default function useOverlayPlayer({ backgroundMode }) {
 
   // Durable domains - each hook owns behavior for one player concern, while this hook wires them together.
   const playback = usePlaybackEngine({ ...playerStore, backgroundMode })
+  const { hasActivity, isPlaying, pause, play, stepBySeconds } = playback
   const exportBoundarySecond = playback.importedVideoPath
-    ? snapTimelineSecondToFrame(playback.displayedPlayhead, playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
-    : playback.displayedPlayhead
+    ? snapTimelineSecondToFrame(playback.clampedPlayhead, playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
+    : playback.clampedPlayhead
   const exportTimeline = useExportRangeTimeline({
     defaultEndSecond: playback.importedVideoPath ? playback.videoSyncOffsetSeconds + playback.importedVideoDuration : playback.totalDuration,
     timelineMinimum: playback.timelineMinimum,
@@ -81,7 +82,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     previewMarker: exportTimeline.previewMarker,
     scrubTo: playback.scrubTo,
   })
-  const { updateTimelineMetrics } = gestures
+  const { getExportMarkerProps, updateTimelineMetrics } = gestures
 
   // Media flags - downstream hooks need explicit availability booleans, not inferred path/summary checks.
   const hasVideo = Boolean(playback.importedVideoPath)
@@ -112,6 +113,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     videoSyncOffsetPreviewSeconds: timelineVideoSyncOffsetSeconds,
     videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
   })
+  const { displayedFitTargetId, fitTarget, fitTargets: viewportFitTargets, viewport: timelineViewport, widthPx } = viewport
 
   // Gesture metrics sync - pointer math uses the latest measured element and viewport without re-rendering on every move.
   useEffect(() => {
@@ -152,14 +154,14 @@ export default function useOverlayPlayer({ backgroundMode }) {
   // Keyboard shortcuts - global commands route through the same playback API as toolbar buttons.
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !playback.hasActivity) {
+      if (event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !hasActivity) {
         return
       }
 
       if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
         if (isInteractiveElement(event.target)) return
         event.preventDefault()
-        playback.stepBySeconds(event.code === 'ArrowRight' ? 1 : -1)
+        stepBySeconds(event.code === 'ArrowRight' ? 1 : -1)
         return
       }
 
@@ -168,17 +170,17 @@ export default function useOverlayPlayer({ backgroundMode }) {
       }
 
       event.preventDefault()
-      if (playback.isPlaying) {
-        playback.pause()
+      if (isPlaying) {
+        pause()
         return
       }
 
-      playback.play()
+      play()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [playback])
+  }, [hasActivity, isPlaying, pause, play, stepBySeconds])
 
   // Lane models - clip geometry and tooltip state are prepared before presentational rendering.
   const lanes = useTimelineClips({
@@ -200,7 +202,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
   const pixelRatio = getDevicePixelRatio()
   const playheadLeft = roundToDevicePixel(
     secondsToViewPx({
-      second: playback.displayedPlayhead,
+      second: playback.clampedPlayhead,
       viewStart: viewport.viewport.viewStart,
       viewEnd: viewport.viewport.viewEnd,
       widthPx: viewport.widthPx,
@@ -226,19 +228,19 @@ export default function useOverlayPlayer({ backgroundMode }) {
       exportTimeline.markers
         .map((marker) => {
           const isVisible =
-            marker.second >= viewport.viewport.viewStart &&
-            marker.second <= viewport.viewport.viewEnd &&
-            viewport.widthPx > 0 &&
-            viewport.viewport.viewEnd > viewport.viewport.viewStart
+            marker.second >= timelineViewport.viewStart &&
+            marker.second <= timelineViewport.viewEnd &&
+            widthPx > 0 &&
+            timelineViewport.viewEnd > timelineViewport.viewStart
 
           if (!isVisible) return null
 
           const left = roundToDevicePixel(
             secondsToViewPx({
               second: marker.second,
-              viewStart: viewport.viewport.viewStart,
-              viewEnd: viewport.viewport.viewEnd,
-              widthPx: viewport.widthPx,
+              viewStart: timelineViewport.viewStart,
+              viewEnd: timelineViewport.viewEnd,
+              widthPx,
             }),
             pixelRatio,
           )
@@ -247,24 +249,24 @@ export default function useOverlayPlayer({ backgroundMode }) {
             ...marker,
             handleClassName: getMarkerClassName(marker.marker),
             lineStyle: { left },
-            markerProps: gestures.getExportMarkerProps(marker.marker),
+            markerProps: getExportMarkerProps(marker.marker),
             style: { left },
           }
         })
         .filter(Boolean),
-    [exportTimeline.markers, gestures, pixelRatio, viewport.viewport.viewEnd, viewport.viewport.viewStart, viewport.widthPx],
+    [exportTimeline.markers, getExportMarkerProps, pixelRatio, timelineViewport.viewEnd, timelineViewport.viewStart, widthPx],
   )
 
   // Fit target commands - presentational tabs only need active state, labels, and a command callback.
   const fitTargets = useMemo(
     () =>
-      viewport.fitTargets.map((target) => ({
+      viewportFitTargets.map((target) => ({
         id: target.id,
-        isActive: viewport.displayedFitTargetId === target.id,
+        isActive: displayedFitTargetId === target.id,
         label: target.label,
-        onSelect: () => viewport.fitTarget(target.id),
+        onSelect: () => fitTarget(target.id),
       })),
-    [viewport],
+    [displayedFitTargetId, fitTarget, viewportFitTargets],
   )
 
   // View model - components receive only render-ready state and callbacks, not store or calculation details.
@@ -304,7 +306,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
         onClick: viewport.resetView,
       },
       timeLabel: {
-        current: formatTimelineTime(playback.displayedPlayhead),
+        current: formatTimelineTime(playback.clampedPlayhead),
         total: formatTimelineTime(playback.totalDuration),
       },
       isMuted: playerStore.isVideoMuted,
