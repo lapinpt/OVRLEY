@@ -21,7 +21,7 @@ const COORDINATE_FORMAT_OPTIONS = [
  * @param {Function} props.updateWidgetData - Updates widget data.
  * @param {Function} props.setNumericField - Sets a numeric field.
  */
-export default function TextDisplaySection({ widget, updateWidgetData, setNumericField }) {
+export default function TextDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const definition = getStandardMetricDefinition(widget.type)
   const unitsMode = getStandardMetricUnitsMode(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)
@@ -39,7 +39,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
 
   return (
     <>
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} />
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
 
       {hasDecimalControl ? (
         <SliderField
@@ -106,6 +106,8 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
       <IconSection
         widget={widget}
         updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
         setNumericField={setNumericField}
         showUnitsToggle={unitsMode !== 'hidden'}
         unitsField={

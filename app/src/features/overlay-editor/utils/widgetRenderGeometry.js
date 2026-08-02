@@ -2,6 +2,7 @@ import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { getLeanAngleSelectionFrame } from '@/features/widget-preview/widgets/lean-angle/geometry'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
+import { getLiveWidgetTransform } from './widgetInteractionGeometry'
 
 function buildScaleTranslate(tx, ty) {
   if (!tx && !ty) {
@@ -13,6 +14,7 @@ function buildScaleTranslate(tx, ty) {
 
 export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview = null) {
   const isFramed = isFramedWidget(widget)
+  const hasDirectLayout = preview?.mode === 'frame' || preview?.mode === 'drag'
   const scaleFactor = preview?.scaleFactor
   const isScaling = Number.isFinite(scaleFactor)
   const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
@@ -43,6 +45,21 @@ export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, p
   const transformParts = []
   const translate = buildScaleTranslate(translateX, translateY)
 
+  if (hasDirectLayout) {
+    return {
+      badgeLeft: preview.left,
+      badgeTop: preview.top,
+      height: preview.height,
+      isScaling: false,
+      left: preview.left,
+      top: preview.top,
+      transform: getLiveWidgetTransform(preview, globalScale),
+      translateX: 0,
+      translateY: 0,
+      width: preview.width,
+    }
+  }
+
   if (translate) {
     transformParts.push(translate)
   }
@@ -66,7 +83,7 @@ export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, p
   }
 }
 
-export function buildWidgetRenderGeometryModels({ widgets, metricPreviewModels, textPreviewModels, globalScale, widgetPreviews }) {
+export function buildWidgetRenderGeometryModels({ widgets, metricPreviewModels, textPreviewModels, globalScale, liveWidgetDrafts = {} }) {
   const models = {}
 
   for (const widget of widgets) {
@@ -75,7 +92,7 @@ export function buildWidgetRenderGeometryModels({ widgets, metricPreviewModels, 
     const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
 
     models[widget.id] = {
-      renderGeometry: resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null),
+      renderGeometry: resolveWidgetRenderGeometry(widget, visualBounds, globalScale, liveWidgetDrafts[widget.id]?.layout ?? null),
       visualBounds,
     }
   }

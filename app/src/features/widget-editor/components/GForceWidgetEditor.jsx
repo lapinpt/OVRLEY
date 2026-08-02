@@ -52,7 +52,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
 }
 
 /** Renders G-force display controls and axis mapping controls. */
-export default function GForceWidgetEditor({ widget, updateWidgetData }) {
+export default function GForceWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const data = widget.data.display_variants.g_force
   const updateGForce = useDisplayVariantUpdater(widget, 'g_force', data, updateWidgetData)
   const selectHorizontalAxis = (axis_horizontal) => {
@@ -64,7 +64,12 @@ export default function GForceWidgetEditor({ widget, updateWidgetData }) {
 
   return (
     <>
-      <GForceDisplaySection widget={widget} updateWidgetData={updateWidgetData} />
+      <GForceDisplaySection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+      />
       <div className="space-y-4">
         <SectionHeading icon={CircleGauge} title="Axis Mapping" />
         <div className="grid grid-cols-1 gap-4">

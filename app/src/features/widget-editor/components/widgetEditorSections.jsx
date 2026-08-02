@@ -5,7 +5,7 @@
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
-import { ColorField, NumberField, SelectField, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
+import { ColorField, NumberField, SelectField, SizeSlider, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
@@ -91,6 +91,8 @@ export function DimensionsSection({ widget, setNumericField }) {
  * @param {object} props - Component props.
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {*} props.updateWidgetSize - Live size updater.
+ * @param {*} props.commitWidgetSize - Commits a live size update.
  * @param {*} props.title - Value for title.
  * @param {*} props.showTextInput - Boolean flag for show text input.
  * @param {*} props.fontSizeLabel - Value for font size label.
@@ -103,6 +105,8 @@ export function DimensionsSection({ widget, setNumericField }) {
 export function FontSection({
   widget,
   updateWidgetData,
+  updateWidgetSize,
+  commitWidgetSize,
   title = 'Typography',
   showTextInput = false,
   fontSizeLabel = 'Font Size',
@@ -131,14 +135,15 @@ export function FontSection({
         />
       ) : null}
 
-      <SliderField
+      <SizeSlider
         label={fontSizeLabel}
         value={fontSize}
         min={sizeMin}
         max={sizeMax}
         step={1}
         valueDisplay={`${fontSize}px`}
-        onSliderChange={(value) => updateWidgetData(widget.id, { font_size: value })}
+        onChange={(value) => updateWidgetSize(widget.id, { font_size: value })}
+        onCommit={() => commitWidgetSize(widget.id)}
       />
       <div className="grid grid-cols-2 gap-4 items-end">
         <FontSelectField
@@ -166,15 +171,25 @@ export function FontSection({
  * @param {object} props - Component props.
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {*} props.updateWidgetSize - Live size updater.
+ * @param {*} props.commitWidgetSize - Commits a live size update.
  * @param {*} props.setNumericField - Value for set numeric field.
  * @param {*} props.title - Value for title.
  * @param {*} props.showUnitsToggle - Boolean flag for show units toggle.
  * @param {*} props.unitsField - Value for units field.
  * @returns {JSX.Element} Rendered component output.
  */
-export function IconSection({ widget, updateWidgetData, setNumericField, title = 'Icon', showUnitsToggle = false, unitsField = null }) {
+export function IconSection({
+  widget,
+  updateWidgetData,
+  updateWidgetSize,
+  commitWidgetSize,
+  setNumericField,
+  title = 'Icon',
+  showUnitsToggle = false,
+  unitsField = null,
+}) {
   const iconSize = widget.data.icon_size
-
   return (
     <div className="space-y-4">
       <div className="flex w-full items-center gap-3">
@@ -190,7 +205,7 @@ export function IconSection({ widget, updateWidgetData, setNumericField, title =
           value={widget.data.icon_color || getThemeColor('aqua')}
           onChange={(value) => updateWidgetData(widget.id, { icon_color: value })}
         />
-        <SliderField
+        <SizeSlider
           label="Size"
           value={iconSize}
           disabled={!widget.data.show_icon}
@@ -198,7 +213,8 @@ export function IconSection({ widget, updateWidgetData, setNumericField, title =
           max={100}
           step={1}
           valueDisplay={`${iconSize}px`}
-          onSliderChange={(value) => updateWidgetData(widget.id, { icon_size: value })}
+          onChange={(value) => updateWidgetSize(widget.id, { icon_size: value })}
+          onCommit={() => commitWidgetSize(widget.id)}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">

@@ -2,7 +2,8 @@
  * Resize handler group for OverlayMoveable.
  */
 
-import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
+import { updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
+import { buildFrameInteractionLayout, captureWidgetLayout, getWidgetInteractionPosition } from '../utils/widgetInteractionGeometry'
 import { buildResizeUpdate, captureResizeOrigin } from '../utils/widgetResizeScaling'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
@@ -18,6 +19,8 @@ import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
  * @param {Function} ctx.setLiveWidgetDraft
  * @param {Function} ctx.commitWidgetUpdate
  * @param {Function} ctx.clearWidgetDraft
+ * @param {Function} ctx.beginWidgetInteraction
+ * @param {Function} ctx.endWidgetInteraction
  * @returns {object} Resize handler methods.
  */
 export function useResizeHandlers({
@@ -28,10 +31,12 @@ export function useResizeHandlers({
   setLiveWidgetDraft,
   commitWidgetUpdate,
   clearWidgetDraft,
+  beginWidgetInteraction,
+  endWidgetInteraction,
 }) {
   // Resize handlers — captures origin dimensions, computes scaled size, commits on end
   return {
-    onResizeStart: ({ dragStart }) => {
+    onResizeStart: ({ dragStart, target }) => {
       if (!selectedWidget) return
 
       if (dragStart) {
@@ -40,14 +45,17 @@ export function useResizeHandlers({
 
       const frameData = selectedWidget.data
       const resizeOrigin = captureResizeOrigin(selectedWidget, frameData)
+      const layout = captureWidgetLayout(target ?? dragStart?.target, selectedWidget, globalScale)
+      const position = getWidgetInteractionPosition(selectedWidget, layout)
       interactionStartRef.current = {
         id: selectedWidget.id,
-        x: selectedWidget.data.x ?? 0,
-        y: selectedWidget.data.y ?? 0,
+        x: position.x,
+        y: position.y,
         type: 'resize',
+        layout,
         ...resizeOrigin,
       }
-      draftWidgetsRef.current[selectedWidget.id] = {}
+      beginWidgetInteraction(selectedWidget.id, 'resize')
     },
     onResize: ({ width, height, drag, target }) => {
       const origin = interactionStartRef.current
@@ -62,22 +70,29 @@ export function useResizeHandlers({
       const liveResizeUpdate = isBackdropWidget(selectedWidget)
         ? { ...resizeUpdate, width: nextWidth, height: nextHeight }
         : resolveActiveMetricWidgetData({ ...origin.widgetData, ...resizeUpdate })
+      const liveLayout = buildFrameInteractionLayout(origin.layout, {
+        width: nextWidth * (globalScale || 1),
+        height: nextHeight * (globalScale || 1),
+        translateX: drag.beforeTranslate[0],
+        translateY: drag.beforeTranslate[1],
+      })
 
-      const nextDraft = {
-        ...draftWidgetsRef.current[origin.id],
-        ...liveResizeUpdate,
-      }
-
-      setLiveWidgetDraft(origin.id, nextDraft)
-      if (isFramedWidget(selectedWidget)) {
-        applyLiveWidgetStyles(target ?? drag.target, selectedWidget, nextDraft, globalScale)
-      }
+      updateLiveWidgetDraft({
+        draftWidgetsRef,
+        setLiveWidgetDraft,
+        widgetId: origin.id,
+        widget: selectedWidget,
+        updates: liveResizeUpdate,
+        target: isFramedWidget(selectedWidget) ? (target ?? drag.target) : null,
+        globalScale,
+        layout: liveLayout,
+      })
     },
     onResizeEnd: () => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
-      const draft = draftWidgetsRef.current[origin.id]
+      const draft = draftWidgetsRef.current[origin.id]?.data
       if (draft) {
         const geometryPatch = {
           x: Math.round(draft.x ?? origin.x),
@@ -89,6 +104,7 @@ export function useResizeHandlers({
       }
 
       clearWidgetDraft(origin.id)
+      endWidgetInteraction(origin.id)
       interactionStartRef.current = null
     },
   }

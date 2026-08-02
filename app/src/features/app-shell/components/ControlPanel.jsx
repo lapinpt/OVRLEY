@@ -13,9 +13,10 @@ import { SidebarWidgetsTab } from '@/features/widget-editor'
  * @param {object} props - Component props.
  * @param {*} props.config - Overlay template configuration data.
  * @param {*} props.onConfigChange - Callback invoked to config change.
+ * @param {object} props.widgetLiveEdits - Shared live widget edit controller.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function ControlPanel({ config, onConfigChange }) {
+export default function ControlPanel({ config, onConfigChange, widgetLiveEdits }) {
   return (
     <div className="flex flex-col h-full bg-card">
       <Tabs defaultValue="settings" className="flex-1 flex flex-col min-h-0">
@@ -38,7 +39,7 @@ export default function ControlPanel({ config, onConfigChange }) {
           </TabsContent>
 
           <TabsContent value="widgets" className="mt-4 outline-none">
-            <SidebarWidgetsTab />
+            <SidebarWidgetsTab widgetLiveEdits={widgetLiveEdits} />
           </TabsContent>
         </div>
       </Tabs>

@@ -70,8 +70,17 @@ describe('BackdropWidgetEditor', () => {
   test('updates shared rectangle styling fields without touching general opacity', async () => {
     const user = userEvent.setup()
     const updateWidgetData = vi.fn()
+    const updateWidgetSize = vi.fn()
+    const commitWidgetSize = vi.fn()
 
-    render(<BackdropWidgetEditor widget={makeBackdropWidget()} updateWidgetData={updateWidgetData} />)
+    render(
+      <BackdropWidgetEditor
+        widget={makeBackdropWidget()}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+      />,
+    )
 
     await user.click(screen.getByRole('button', { name: 'Fill Color' }))
     await user.click(screen.getByRole('button', { name: 'Fill Opacity' }))
@@ -83,15 +92,24 @@ describe('BackdropWidgetEditor', () => {
     expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { fill_opacity: 0.55 })
     expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { border_color: '#123456' })
     expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { border_opacity: 0.3 })
-    expect(updateWidgetData).toHaveBeenCalledWith('backdrop-1', { border_thickness: 3 })
+    expect(updateWidgetSize).toHaveBeenCalledWith('backdrop-1', { border_thickness: 3 })
     expect(updateWidgetData).not.toHaveBeenCalledWith('backdrop-1', expect.objectContaining({ opacity: expect.any(Number) }))
   })
 
   test('updates rectangle dimensions and corner radius inside the active variant', async () => {
     const user = userEvent.setup()
     const updateWidgetData = vi.fn()
+    const updateWidgetSize = vi.fn()
+    const commitWidgetSize = vi.fn()
 
-    render(<BackdropWidgetEditor widget={makeBackdropWidget()} updateWidgetData={updateWidgetData} />)
+    render(
+      <BackdropWidgetEditor
+        widget={makeBackdropWidget()}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+      />,
+    )
 
     fireEvent.change(screen.getByLabelText('Width'), { target: { value: '300' } })
     fireEvent.change(screen.getByLabelText('Height'), { target: { value: '160' } })
@@ -113,7 +131,7 @@ describe('BackdropWidgetEditor', () => {
         }),
       }),
     )
-    expect(updateWidgetData).toHaveBeenCalledWith(
+    expect(updateWidgetSize).toHaveBeenCalledWith(
       'backdrop-1',
       expect.objectContaining({
         display_variants: expect.objectContaining({

@@ -3,7 +3,7 @@
  */
 
 import { Map, Palette } from 'lucide-react'
-import { ColorField, SelectField, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
@@ -23,7 +23,7 @@ const MARKER_VARIANT_OPTIONS = [
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNumericField }) {
+export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const completedLineOpacity = widget.data.completed_line_opacity
   const remainingLineOpacity = widget.data.remaining_line_opacity
@@ -48,12 +48,8 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
         max={180}
         step={1}
         valueDisplay={`${rotation}°`}
-        onSliderChange={(rawValue) =>
-          setNumericField(widget.id, 'rotation', rawValue, {
-            min: -180,
-            max: 180,
-          })
-        }
+        onSliderChange={(rawValue) => updateWidgetSize(widget.id, { rotation: rawValue })}
+        onSliderCommit={() => commitWidgetSize(widget.id)}
       />
 
       <div className="space-y-4">
@@ -64,13 +60,15 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
           min={0}
           max={20}
           step={1}
+          integerDisplay
           valueDisplay={`${lineWidth}px`}
           onSliderChange={(value) =>
-            updateWidgetData(widget.id, {
+            updateWidgetSize(widget.id, {
               completed_line_width: value,
               remaining_line_width: value,
             })
           }
+          onSliderCommit={() => commitWidgetSize(widget.id)}
         />
         <div className="grid grid-cols-2 gap-4">
           <SliderField
@@ -81,10 +79,11 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
             step={0.05}
             valueDisplay={`${simplifyTolerance.toFixed(2)}px`}
             onSliderChange={(value) =>
-              updateWidgetData(widget.id, {
+              updateWidgetSize(widget.id, {
                 simplify_tolerance_px: Number(value.toFixed(2)),
               })
             }
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
             label="Route Detail"
@@ -94,10 +93,11 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
             step={0.05}
             valueDisplay={`${targetDensity.toFixed(2)}x`}
             onSliderChange={(value) =>
-              updateWidgetData(widget.id, {
+              updateWidgetSize(widget.id, {
                 target_density: Number(value.toFixed(2)),
               })
             }
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -172,24 +172,26 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <SliderField
+          <SizeSlider
             label=" Size"
             value={markerSize}
             min={0}
             max={50}
             step={1}
             valueDisplay={`${markerSize}px`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
+            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
           />
           {showVariantDiameter ? (
-            <SliderField
+            <SizeSlider
               label={variantDiameterLabel}
               value={markerVariantDiameter}
               min={Math.max(Math.round(markerSize * 2), 4)}
               max={120}
               step={1}
               valueDisplay={`${markerVariantDiameter}px`}
-              onSliderChange={(value) => updateWidgetData(widget.id, { marker_variant_diameter: value })}
+              onChange={(value) => updateWidgetSize(widget.id, { marker_variant_diameter: value })}
+              onCommit={() => commitWidgetSize(widget.id)}
             />
           ) : null}
         </div>

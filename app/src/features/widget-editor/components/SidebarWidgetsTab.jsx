@@ -44,24 +44,54 @@ const WIDGET_EDITOR_MAP = {
  * @param {number} [sceneFontSize] - Scene fallback font size.
  * @returns {JSX.Element|null} Rendered editor component or null.
  */
-function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFontSize) {
+function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, sceneFontSize) {
   // Specialized editors take priority over the generic metric editor
   const Editor = WIDGET_EDITOR_MAP[widget.type]
   if (Editor) {
-    return <Editor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
+    return (
+      <Editor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        setNumericField={setNumericField}
+        sceneFontSize={sceneFontSize}
+      />
+    )
   }
   if (isStandardMetricWidgetType(widget.type)) {
-    return <MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
+    return (
+      <MetricWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        setNumericField={setNumericField}
+      />
+    )
   }
   return null
 }
 
 /**
  * Renders the sidebar widgets tab component.
+ * @param {object} props - Component props.
+ * @param {object} props.widgetLiveEdits - Shared live widget edit controller.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function SidebarWidgetsTab() {
-  const { config, widgets, selectedWidgetId, updateWidgetData, setNumericField, deleteWidget, resetWidget, setSelectedWidgetId } = useWidgetManager()
+export default function SidebarWidgetsTab({ widgetLiveEdits }) {
+  const {
+    config,
+    widgets,
+    selectedWidgetId,
+    updateWidgetData,
+    updateWidgetSize,
+    commitWidgetSize,
+    setNumericField,
+    deleteWidget,
+    resetWidget,
+    setSelectedWidgetId,
+  } = useWidgetManager({ widgetLiveEdits })
 
   if (!config) return null
 
@@ -134,7 +164,7 @@ export default function SidebarWidgetsTab() {
                             </Button>
                           }
                         />
-                        {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
+                        {renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, config?.scene?.font_size)}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

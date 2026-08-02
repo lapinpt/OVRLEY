@@ -4,6 +4,7 @@
 
 import { AXIS_LOCK_THRESHOLD } from '../data/overlayEditorConstants'
 import { applyLiveWidgetStyles, getWidgetIdFromTarget } from '../utils/widgetDomHelpers'
+import { buildDragInteractionLayout, captureWidgetLayout, getWidgetInteractionPosition } from '../utils/widgetInteractionGeometry'
 
 function getAxisLockedTranslate(origin, beforeTranslate, inputEvent) {
   if (!inputEvent?.ctrlKey) {
@@ -47,6 +48,8 @@ function getAxisLockedTranslate(origin, beforeTranslate, inputEvent) {
  * @param {Function} ctx.clearWidgetDrafts
  * @param {Function} ctx.setIsGroupDragActive
  * @param {Function} ctx.setGroupDragSelectionIds
+ * @param {Function} ctx.beginWidgetInteraction
+ * @param {Function} ctx.endWidgetInteraction
  * @returns {object} Drag handler methods.
  */
 export function useDragHandlers({
@@ -66,19 +69,24 @@ export function useDragHandlers({
   clearWidgetDrafts,
   setIsGroupDragActive,
   setGroupDragSelectionIds,
+  beginWidgetInteraction,
+  endWidgetInteraction,
 }) {
   // Drag handlers — single and group drag with axis lock via Ctrl key
   return {
-    onDragStart: () => {
+    onDragStart: ({ target }) => {
       if (!selectedWidget) return
 
+      const layout = captureWidgetLayout(target, selectedWidget, globalScale)
+      const position = getWidgetInteractionPosition(selectedWidget, layout)
       interactionStartRef.current = {
         id: selectedWidget.id,
-        x: selectedWidget.data.x ?? 0,
-        y: selectedWidget.data.y ?? 0,
+        x: position.x,
+        y: position.y,
+        layout,
         type: 'single-drag',
       }
-      draftWidgetsRef.current[selectedWidget.id] = {}
+      beginWidgetInteraction(selectedWidget.id, 'drag')
     },
     onDrag: ({ beforeTranslate, inputEvent, target }) => {
       const origin = interactionStartRef.current
@@ -86,19 +94,20 @@ export function useDragHandlers({
       const lockedTranslate = getAxisLockedTranslate(origin, beforeTranslate, inputEvent)
 
       const nextDraft = {
-        ...draftWidgetsRef.current[origin.id],
+        ...(draftWidgetsRef.current[origin.id]?.data ?? {}),
         x: origin.x + lockedTranslate[0],
         y: origin.y + lockedTranslate[1],
       }
+      const layout = buildDragInteractionLayout(origin.layout, lockedTranslate[0], lockedTranslate[1])
 
-      setLiveWidgetDraft(origin.id, nextDraft)
-      applyLiveWidgetStyles(target, selectedWidget, nextDraft, globalScale)
+      setLiveWidgetDraft(origin.id, nextDraft, layout)
+      applyLiveWidgetStyles(target, layout, globalScale)
     },
     onDragEnd: () => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
-      const draft = draftWidgetsRef.current[origin.id]
+      const draft = draftWidgetsRef.current[origin.id]?.data
       if (draft) {
         commitWidgetUpdate(origin.id, {
           x: Math.round(draft.x ?? origin.x),
@@ -107,9 +116,10 @@ export function useDragHandlers({
       }
 
       clearWidgetDraft(origin.id)
+      endWidgetInteraction(origin.id)
       interactionStartRef.current = null
     },
-    onDragGroupStart: () => {
+    onDragGroupStart: ({ events = [] } = {}) => {
       if (!selectedWidgets.length) return
 
       const draggedWidgetIds = [...effectiveSelectedWidgetIds]
@@ -119,19 +129,18 @@ export function useDragHandlers({
         type: 'group-drag',
         widgetIds: draggedWidgetIds,
         widgetsById: Object.fromEntries(
-          selectedWidgets.map((widget) => [
-            widget.id,
-            {
-              x: widget.data.x ?? 0,
-              y: widget.data.y ?? 0,
-            },
-          ]),
+          selectedWidgets.map((widget) => {
+            const layout = captureWidgetLayout(events.find((event) => getWidgetIdFromTarget(event.target) === widget.id)?.target, widget, globalScale)
+            const position = getWidgetInteractionPosition(widget, layout)
+            return [widget.id, { x: position.x, y: position.y, layout }]
+          }),
         ),
       }
 
       draggedWidgetIds.forEach((widgetId) => {
-        draftWidgetsRef.current[widgetId] = {}
+        draftWidgetsRef.current[widgetId] = { data: {}, layout: null }
       })
+      beginWidgetInteraction(draggedWidgetIds[0], 'group-drag')
     },
     onDragGroup: ({ events, inputEvent }) => {
       const origin = interactionStartRef.current
@@ -150,13 +159,14 @@ export function useDragHandlers({
         }
 
         const nextDraft = {
-          ...draftWidgetsRef.current[widgetId],
+          ...(draftWidgetsRef.current[widgetId]?.data ?? {}),
           x: widgetOrigin.x + lockedTranslate[0],
           y: widgetOrigin.y + lockedTranslate[1],
         }
 
-        nextDraftsById[widgetId] = nextDraft
-        applyLiveWidgetStyles(childEvent.target, widget, nextDraft, globalScale)
+        const layout = buildDragInteractionLayout(widgetOrigin.layout, lockedTranslate[0], lockedTranslate[1])
+        nextDraftsById[widgetId] = { data: nextDraft, layout }
+        applyLiveWidgetStyles(childEvent.target, layout, globalScale)
       })
 
       if (Object.keys(nextDraftsById).length) {
@@ -169,7 +179,7 @@ export function useDragHandlers({
 
       const draggedWidgetIds = origin.widgetIds?.length ? [...origin.widgetIds] : [...groupDragSelectionIds]
       const updatesById = draggedWidgetIds.reduce((accumulator, widgetId) => {
-        const draft = draftWidgetsRef.current[widgetId]
+        const draft = draftWidgetsRef.current[widgetId]?.data
         const widgetOrigin = origin.widgetsById[widgetId]
 
         if (!draft || !widgetOrigin) {
@@ -188,6 +198,7 @@ export function useDragHandlers({
       }
 
       clearWidgetDrafts(draggedWidgetIds)
+      endWidgetInteraction(draggedWidgetIds[0])
       setIsGroupDragActive(false)
       setGroupDragSelectionIds([])
       interactionStartRef.current = null

@@ -13,7 +13,7 @@ import EditorToolbar from '@/features/app-shell/components/EditorToolbar'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
 import { WIDGET_ICONS } from '../data/overlayEditorConfig'
-import useOverlayEditorState from '../hooks/useOverlayEditorState'
+import { useOverlayEditorStateWithLiveEdits } from '../hooks/useOverlayEditorState'
 import useOverlayPreviewModels from '../hooks/useOverlayPreviewModels'
 import useWidgetSelection from '../hooks/useWidgetSelection'
 import { useEditorViewport } from '../hooks/useEditorViewport'
@@ -114,7 +114,7 @@ function EmptyOverlayState() {
   )
 }
 
-function OverlayEditor({
+function OverlayEditorContent({
   editorControls,
   config,
   globalDefaults,
@@ -128,6 +128,7 @@ function OverlayEditor({
   importedVideoFilename,
   showTemplateStatus,
   templateStatus,
+  widgetLiveEdits,
 }) {
   const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
   const [isGroupDragActive, setIsGroupDragActive] = useState(false)
@@ -139,24 +140,24 @@ function OverlayEditor({
   const marqueeSelectionRef = useRef(null)
 
   // Derived state hook — widgets, scene, preview, drafts
-  const overlayState = useOverlayEditorState({ config, globalDefaults, onConfigChange })
+  const overlayState = useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits)
   const activity = overlayState.activity
   const { metricPreviewModels, textPreviewModels } = useOverlayPreviewModels({
     activity,
     previewSecond: overlayState.previewSecond,
-    renderedWidgets: overlayState.renderedWidgets,
+    renderedWidgets: overlayState.canvasWidgets,
   })
 
   const renderGeometryModels = useMemo(
     () =>
       buildWidgetRenderGeometryModels({
-        widgets: overlayState.renderedWidgets,
+        widgets: overlayState.canvasWidgets,
         metricPreviewModels,
         textPreviewModels,
         globalScale: overlayState.globalScale,
-        widgetPreviews: overlayState.liveWidgetPreviews,
+        liveWidgetDrafts: overlayState.liveWidgetDrafts,
       }),
-    [metricPreviewModels, overlayState.globalScale, overlayState.liveWidgetPreviews, overlayState.renderedWidgets, textPreviewModels],
+    [metricPreviewModels, overlayState.canvasWidgets, overlayState.globalScale, overlayState.liveWidgetDrafts, textPreviewModels],
   )
 
   // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
@@ -214,6 +215,8 @@ function OverlayEditor({
     commitWidgetUpdate: overlayState.commitWidgetUpdate,
     commitWidgetUpdates: overlayState.commitWidgetUpdates,
     draftWidgetsRef: overlayState.draftWidgetsRef,
+    beginWidgetInteraction: overlayState.beginWidgetInteraction,
+    endWidgetInteraction: overlayState.endWidgetInteraction,
     effectiveSelectedWidgetIds,
     globalScale: overlayState.globalScale,
     groupDragSelectionIds,
@@ -235,6 +238,8 @@ function OverlayEditor({
     interactionStartRef: overlayState.interactionStartRef,
     selectedWidget: selection.selectedWidget,
     setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+    beginWidgetInteraction: overlayState.beginWidgetInteraction,
+    endWidgetInteraction: overlayState.endWidgetInteraction,
   })
 
   const scaleHandlers = useScaleHandlers({
@@ -243,10 +248,11 @@ function OverlayEditor({
     draftWidgetsRef: overlayState.draftWidgetsRef,
     globalScale: overlayState.globalScale,
     interactionStartRef: overlayState.interactionStartRef,
-    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
     selectedTarget: selection.selectedTarget,
     selectedWidget: selection.selectedWidget,
-    setLiveWidgetPreview: overlayState.setLiveWidgetPreview,
+    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+    beginWidgetInteraction: overlayState.beginWidgetInteraction,
+    endWidgetInteraction: overlayState.endWidgetInteraction,
   })
 
   const rotateHandlers = useRotateHandlers({
@@ -257,6 +263,8 @@ function OverlayEditor({
     interactionStartRef: overlayState.interactionStartRef,
     selectedWidget: selection.selectedWidget,
     setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+    beginWidgetInteraction: overlayState.beginWidgetInteraction,
+    endWidgetInteraction: overlayState.endWidgetInteraction,
   })
 
   const handlers = { ...dragHandlers, ...resizeHandlers, ...scaleHandlers, ...rotateHandlers }
@@ -324,7 +332,7 @@ function OverlayEditor({
   )
   const canvasDataProps = useMemo(
     () => ({
-      widgets: overlayState.renderedWidgets,
+      widgets: overlayState.canvasWidgets,
       activity,
       previewSecond: overlayState.previewSecond,
       metricPreviewModels,
@@ -337,7 +345,7 @@ function OverlayEditor({
       metricPreviewModels,
       overlayState.previewExportRange,
       overlayState.previewSecond,
-      overlayState.renderedWidgets,
+      overlayState.canvasWidgets,
       renderGeometryModels,
       textPreviewModels,
     ],
@@ -410,6 +418,7 @@ function OverlayEditor({
                 sceneSize={overlayState.sceneSize}
                 snapToGrid={snapToGrid}
                 handlers={handlers}
+                interactionType={overlayState.activeWidgetInteraction?.type ?? null}
               />
             </div>
             <WidgetBadgeLayer
@@ -417,7 +426,7 @@ function OverlayEditor({
               hoveredWidgetId={hoveredWidgetId}
               renderGeometryModels={renderGeometryModels}
               selectedWidgetIds={selection.selectedWidgetIds}
-              widgets={overlayState.renderedWidgets}
+              widgets={overlayState.canvasWidgets}
             />
           </div>
           {selectionRect ? (
@@ -436,6 +445,10 @@ function OverlayEditor({
       </div>
     </div>
   )
+}
+
+function OverlayEditor(props) {
+  return <OverlayEditorContent {...props} />
 }
 
 export default memo(OverlayEditor)

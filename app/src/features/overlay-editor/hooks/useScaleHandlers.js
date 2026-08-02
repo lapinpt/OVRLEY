@@ -2,9 +2,10 @@
  * Scale handler group for OverlayMoveable.
  */
 
-import { applyLiveScalePositionStyles, getWidgetVisualBoundsFromTarget } from '../utils/widgetDomHelpers'
+import { getWidgetVisualBoundsFromTarget, updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
 import { buildScaleDraft } from '../utils/widgetResizeScaling'
-import { flushSync } from 'react-dom'
+import { buildScaleInteractionLayout, captureWidgetLayout } from '../utils/widgetInteractionGeometry'
+import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
 
 /**
  * Creates scale-related moveable handlers.
@@ -12,11 +13,11 @@ import { flushSync } from 'react-dom'
  * @param {object} ctx - Shared handler context.
  * @param {object} ctx.interactionStartRef
  * @param {object} ctx.draftWidgetsRef
- * @param {object} ctx.scalePreviewFrameRef
  * @param {object} ctx.selectedWidget
  * @param {object} ctx.selectedTarget
  * @param {number} ctx.globalScale
- * @param {Function} ctx.setLiveWidgetPreview
+ * @param {Function} ctx.beginWidgetInteraction
+ * @param {Function} ctx.endWidgetInteraction
  * @param {Function} ctx.commitWidgetUpdate
  * @param {Function} ctx.clearWidgetDraft
  * @returns {object} Scale handler methods.
@@ -24,15 +25,16 @@ import { flushSync } from 'react-dom'
 export function useScaleHandlers({
   interactionStartRef,
   draftWidgetsRef,
-  scalePreviewFrameRef,
   selectedWidget,
   selectedTarget,
   globalScale,
-  setLiveWidgetPreview,
+  setLiveWidgetDraft,
   commitWidgetUpdate,
   clearWidgetDraft,
+  beginWidgetInteraction,
+  endWidgetInteraction,
 }) {
-  // Scale handlers — uniform scaling of metric widget properties (font, icon, triangle), uses rAF for final position
+  // Scale handlers — uniform scaling of intrinsic widget data and layout.
   return {
     onScaleStart: ({ dragStart, target }) => {
       if (!selectedWidget) return
@@ -43,25 +45,20 @@ export function useScaleHandlers({
 
       const currentBounds = getWidgetVisualBoundsFromTarget(target ?? selectedTarget)
       const startTarget = target ?? selectedTarget
-      const renderedLeft = startTarget ? parseFloat(startTarget.style.left) || 0 : 0
-      const renderedTop = startTarget ? parseFloat(startTarget.style.top) || 0 : 0
 
       interactionStartRef.current = {
         id: selectedWidget.id,
         data: selectedWidget.data,
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
-        renderedWidth: startTarget?.offsetWidth ?? 0,
-        renderedHeight: startTarget?.offsetHeight ?? 0,
+        layout: captureWidgetLayout(startTarget, selectedWidget, globalScale),
         renderedMinX: currentBounds?.minX ?? 0,
         renderedMinY: currentBounds?.minY ?? 0,
         renderedMaxX: currentBounds?.maxX ?? 0,
         renderedMaxY: currentBounds?.maxY ?? 0,
-        renderedLeft,
-        renderedTop,
         type: 'scale',
       }
-      draftWidgetsRef.current[selectedWidget.id] = {}
+      beginWidgetInteraction(selectedWidget.id, 'scale')
     },
     onScale: ({ scale, drag, target }) => {
       const origin = interactionStartRef.current
@@ -77,54 +74,37 @@ export function useScaleHandlers({
       const nextX = origin.x + tx + origin.renderedMinX * (1 - uniformScale) * globalScale
       const nextY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - uniformScale)
 
-      const preview = {
-        left: origin.renderedLeft,
-        top: origin.renderedTop,
-        width: origin.renderedWidth,
-        height: origin.renderedHeight,
+      const scaledData = buildScaleDraft(origin.data, uniformScale, selectedWidget, { round: false })
+      const isTextMetricWidget = selectedWidget.category === 'values' && selectedWidget.type !== 'gradient' && isTextDisplayType(selectedWidget.data.display_type)
+      const liveLayout = buildScaleInteractionLayout(origin.layout, {
         scaleFactor: uniformScale,
+        globalScale,
         translateX: tx,
         translateY: ty,
-      }
-      const nextDraft = {
-        scaleFactor: uniformScale,
-        translateX: tx,
-        translateY: ty,
-        x: nextX,
-        y: nextY,
-      }
-
-      draftWidgetsRef.current[origin.id] = nextDraft
-      flushSync(() => {
-        setLiveWidgetPreview(origin.id, preview)
       })
-
-      if (scalePreviewFrameRef.current) {
-        cancelAnimationFrame(scalePreviewFrameRef.current)
-      }
-
-      scalePreviewFrameRef.current = requestAnimationFrame(() => {
-        const targetNode = target ?? selectedTarget
-        if (!targetNode) return
-        applyLiveScalePositionStyles(targetNode, selectedWidget, preview, globalScale)
+      updateLiveWidgetDraft({
+        draftWidgetsRef,
+        setLiveWidgetDraft,
+        widgetId: origin.id,
+        widget: selectedWidget,
+        updates: { ...(isTextMetricWidget ? {} : scaledData), x: nextX, y: nextY },
+        target: target ?? selectedTarget,
+        globalScale,
+        layout: liveLayout,
       })
     },
     onScaleEnd: () => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
-      if (scalePreviewFrameRef.current) {
-        cancelAnimationFrame(scalePreviewFrameRef.current)
-        scalePreviewFrameRef.current = null
-      }
-
-      const draft = draftWidgetsRef.current[origin.id]
+      const draft = draftWidgetsRef.current[origin.id]?.data
       if (draft) {
-        const finalScale = draft.scaleFactor ?? 1
+        const liveLayout = draftWidgetsRef.current[origin.id]?.layout
+        const finalScale = liveLayout?.scaleFactor ?? 1
         const scaledDraft = buildScaleDraft(origin.data, finalScale, selectedWidget, { round: true })
 
-        const tx = draft.translateX ?? 0
-        const ty = draft.translateY ?? 0
+        const tx = liveLayout?.translateX ?? 0
+        const ty = liveLayout?.translateY ?? 0
         const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.data.value_offset) : 0
         const finalX = origin.x + tx + origin.renderedMinX * (1 - finalScale) * globalScale
         const finalY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - finalScale)
@@ -137,6 +117,7 @@ export function useScaleHandlers({
       }
 
       clearWidgetDraft(origin.id)
+      endWidgetInteraction(origin.id)
       interactionStartRef.current = null
     },
   }

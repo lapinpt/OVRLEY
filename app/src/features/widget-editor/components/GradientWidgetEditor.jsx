@@ -2,7 +2,7 @@
  * Supports widget editing flows related to gradient widget editor.
  */
 
-import { ColorField, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
 import { Label } from '@/components/ui/label'
 import { FontSection, SectionHeading, UnitsControlRow } from './widgetEditorSections'
 import { TrendingUp } from 'lucide-react'
@@ -16,14 +16,22 @@ import { getThemeColor } from '@/lib/theme'
  * @param {*} props.updateWidgetData - Value for update widget data.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function GradientWidgetEditor({ widget, updateWidgetData }) {
+export default function GradientWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const valueOffset = widget.data.value_offset
   const decimals = widget.data.decimals
   const triangleWidth = widget.data.triangle_width
 
   return (
     <>
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Typography" fontSizeLabel="Font Size" colorLabel="Value Color" />
+      <FontSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        title="Typography"
+        fontSizeLabel="Font Size"
+        colorLabel="Value Color"
+      />
 
       <SliderField
         label="Value Offset"
@@ -31,8 +39,10 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         min={-200}
         max={200}
         step={1}
+        integerDisplay
         valueDisplay={`${valueOffset}px`}
-        onSliderChange={(value) => updateWidgetData(widget.id, { value_offset: value })}
+        onSliderChange={(value) => updateWidgetSize(widget.id, { value_offset: value })}
+        onSliderCommit={() => commitWidgetSize(widget.id)}
       />
       <div className="grid grid-cols-2 gap-4">
         <SliderField
@@ -71,7 +81,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
           />
         </div>
 
-        <SliderField
+        <SizeSlider
           label="Width"
           disabled={!widget.data.show_triangle}
           value={triangleWidth}
@@ -79,7 +89,8 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
           max={240}
           step={1}
           valueDisplay={`${triangleWidth}px`}
-          onSliderChange={(value) => updateWidgetData(widget.id, { triangle_width: value })}
+          onChange={(value) => updateWidgetSize(widget.id, { triangle_width: value })}
+          onCommit={() => commitWidgetSize(widget.id)}
         />
         <UnitsControlRow
           widget={widget}

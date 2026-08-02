@@ -14,27 +14,21 @@
  * @module useOverlayEditorState
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
+import { applyWidgetDrafts, applyWidgetDraftsForCanvas } from '@/lib/widget/widget-draft'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import { getSceneSize } from '../utils/overlayEditorUtils'
-import useWidgetDraftState from './useWidgetDraftState'
+import useWidgetDraftState, { useWidgetDraftView } from './useWidgetDraftState'
 
 function materializeWidgets(rawWidgets, globalDefaults) {
   return rawWidgets.map((widget) => ({ ...widget, data: getEffectiveWidgetData(widget, globalDefaults) }))
 }
 
-function applyWidgetDrafts(widgets, liveWidgetDrafts) {
-  return widgets.map((widget) => {
-    const draft = liveWidgetDrafts[widget.id]
-    return draft ? { ...widget, data: { ...widget.data, ...draft } } : widget
-  })
-}
-
-export default function useOverlayEditorState({ config, globalDefaults, onConfigChange }) {
+export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits) {
   const selectedSecond = useStore((state) => state.selectedSecond)
   const exportRange = useStore((state) => state.exportRange)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
@@ -44,22 +38,38 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
 
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
-  const scalePreviewFrameRef = useRef(null)
 
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
-
+  const liveDraftState = useWidgetDraftView(widgetLiveEdits)
   const {
+    activeWidgetInteraction,
+    beginWidgetInteraction,
     clearWidgetDraft,
     clearWidgetDrafts,
     draftWidgetsRef,
     liveWidgetDrafts,
-    liveWidgetPreviews,
     resetWidgetDrafts,
     setLiveWidgetDraft,
     setLiveWidgetDraftsBatch,
-    setLiveWidgetPreview,
-  } = useWidgetDraftState()
+    endWidgetInteraction,
+  } = liveDraftState
+
+  const setWidgetNode = useCallback(
+    (widgetId, node) => {
+      widgetLiveEdits.setWidgetNode(widgetId, node)
+      setWidgetNodes((current) => {
+        if (node && current[widgetId] === node) return current
+        if (!node && !current[widgetId]) return current
+
+        const next = { ...current }
+        if (node) next[widgetId] = node
+        else delete next[widgetId]
+        return next
+      })
+    },
+    [widgetLiveEdits],
+  )
 
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
   const widgets = useMemo(() => materializeWidgets(rawWidgets, globalDefaults), [globalDefaults, rawWidgets])
@@ -94,6 +104,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   }, [config, resetWidgetDrafts])
 
   const renderedWidgets = useMemo(() => applyWidgetDrafts(widgets, liveWidgetDrafts), [liveWidgetDrafts, widgets])
+  const canvasWidgets = useMemo(() => applyWidgetDraftsForCanvas(widgets, liveWidgetDrafts), [liveWidgetDrafts, widgets])
   const renderedWidgetMap = useMemo(() => Object.fromEntries(renderedWidgets.map((w) => [w.id, w])), [renderedWidgets])
   const orderedWidgetIds = useMemo(() => renderedWidgets.map((w) => w.id), [renderedWidgets])
 
@@ -103,18 +114,11 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
         widgets.map((widget) => [
           widget.id,
           (node) => {
-            setWidgetNodes((current) => {
-              if (node && current[widget.id] === node) return current
-              if (!node && !current[widget.id]) return current
-              const next = { ...current }
-              if (node) next[widget.id] = node
-              else delete next[widget.id]
-              return next
-            })
+            setWidgetNode(widget.id, node)
           },
         ]),
       ),
-    [widgets],
+    [setWidgetNode, widgets],
   )
 
   const commitWidgetUpdate = (widgetId, updates) => {
@@ -127,11 +131,14 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   }
 
   return {
+    activeWidgetInteraction,
+    beginWidgetInteraction,
     clearWidgetDraft,
     clearWidgetDrafts,
     commitWidgetUpdate,
     commitWidgetUpdates,
     config,
+    canvasWidgets,
     draftWidgetsRef,
     globalDefaults,
     globalOpacity,
@@ -139,7 +146,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     activity,
     interactionStartRef,
     liveWidgetDrafts,
-    liveWidgetPreviews,
     moveableRef,
     onConfigChange,
     orderedWidgetIds,
@@ -150,13 +156,17 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     sceneElement,
     sceneSize,
     sceneStyle,
-    scalePreviewFrameRef,
     setLiveWidgetDraft,
     setLiveWidgetDraftsBatch,
-    setLiveWidgetPreview,
+    endWidgetInteraction,
     setSceneElement,
     widgetNodes,
     widgetRefCallbacks,
     widgets,
   }
+}
+
+export default function useOverlayEditorState(options) {
+  const widgetLiveEdits = useWidgetDraftState()
+  return useOverlayEditorStateWithLiveEdits(options, widgetLiveEdits)
 }

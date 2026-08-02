@@ -103,7 +103,7 @@ export default function VideoSyncSection({
           <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
         </div>
       )}
-      {activitySummary?.syncTime && (
+      {activitySummary && (
         <div className="space-y-1">
           <div className="flex items-center justify-between pt-2">
             <Label className="text-[10px] text-muted-foreground uppercase font-bold">Sync Offset</Label>

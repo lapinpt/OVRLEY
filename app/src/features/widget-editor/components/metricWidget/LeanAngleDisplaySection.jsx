@@ -3,7 +3,7 @@ import { SlidersHorizontal, Type } from 'lucide-react'
 import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { SectionHeading } from '../widgetEditorSections'
-import { ColorField, SliderField } from '../widgetFormControls'
+import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 
@@ -15,9 +15,10 @@ import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts
  * @param {Function} props.updateWidgetData - Updates widget data.
  * @returns {JSX.Element}
  */
-export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
+export default function LeanAngleDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const leanVariant = useMemo(() => widget.data.display_variants?.lean_angle ?? {}, [widget.data.display_variants?.lean_angle])
   const updateLean = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetData)
+  const updateLeanSize = useDisplayVariantUpdater(widget, 'lean_angle', leanVariant, updateWidgetSize)
 
   const diameter = leanVariant.diameter
   const trackThicknessMax = Math.floor((diameter - 1) / 2)
@@ -26,7 +27,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
 
   const handleDiameterChange = (nextDiameter) => {
     const update = buildUniformResizeUpdate(widget, nextDiameter)
-    if (update) updateWidgetData(widget.id, update)
+    if (update) updateWidgetSize(widget.id, update)
   }
 
   return (
@@ -34,14 +35,15 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
       <div className="space-y-4">
         <SectionHeading icon={SlidersHorizontal} title="Angle Track" />
         <div className="grid grid-cols-2 gap-4">
-          <SliderField
+          <SizeSlider
             label="Size"
             value={diameter}
             min={30}
             max={600}
             step={1}
             valueDisplay={`${Math.round(diameter)}px`}
-            onSliderChange={handleDiameterChange}
+            onChange={handleDiameterChange}
+            onCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
             label="Thickness"
@@ -49,8 +51,10 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
             min={1}
             max={trackThicknessMax}
             step={1}
+            integerDisplay
             valueDisplay={`${leanVariant.track_thickness}px`}
-            onSliderChange={(track_thickness) => updateLean({ track_thickness })}
+            onSliderChange={(track_thickness) => updateLeanSize({ track_thickness })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -93,8 +97,10 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
             min={0}
             max={borderThicknessMax}
             step={1}
+            integerDisplay
             valueDisplay={`${leanVariant.track_border_thickness}px`}
-            onSliderChange={(track_border_thickness) => updateLean({ track_border_thickness })}
+            onSliderChange={(track_border_thickness) => updateLeanSize({ track_border_thickness })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
       </div>
@@ -110,13 +116,14 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
             labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
           />
-          <SliderField
+          <SizeSlider
             label="Font Size"
             value={widget.data.font_size}
             min={6}
             max={200}
             valueDisplay={`${widget.data.font_size}px`}
-            onSliderChange={(font_size) => updateWidgetData(widget.id, { font_size })}
+            onChange={(font_size) => updateWidgetSize(widget.id, { font_size })}
+            onCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -130,8 +137,10 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
             min={-50}
             max={50}
             step={1}
+            integerDisplay
             valueDisplay={`${leanVariant.value_offset_x}px`}
-            onSliderChange={(value_offset_x) => updateLean({ value_offset_x })}
+            onSliderChange={(value_offset_x) => updateLeanSize({ value_offset_x })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
             label="Vertical Offset"
@@ -139,8 +148,10 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData }) {
             min={-50}
             max={50}
             step={1}
+            integerDisplay
             valueDisplay={`${leanVariant.value_offset_y}px`}
-            onSliderChange={(value_offset_y) => updateLean({ value_offset_y })}
+            onSliderChange={(value_offset_y) => updateLeanSize({ value_offset_y })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
       </div>

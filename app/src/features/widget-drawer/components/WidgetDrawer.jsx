@@ -11,10 +11,10 @@ import { useEffect } from 'react'
  * Provides widget drawer.
  * @returns {JSX.Element} Rendered React element.
  */
-export function WidgetDrawer() {
+export function WidgetDrawer({ widgetLiveEdits }) {
   const { closeWidgetDrawer, widgetDrawerOpen, toggleWidgetDrawer } = useLayoutStore()
   const { activitySummary } = useActivityStore()
-  const { addWidget } = useWidgetManager()
+  const { addWidget } = useWidgetManager({ widgetLiveEdits })
 
   const handleAddWidget = (type, displayType) => {
     addWidget(type, displayType)

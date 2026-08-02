@@ -40,7 +40,14 @@ const DISPLAY_SECTION = {
  * @param {boolean} props.showDisplayControls - Whether to show the display type header + dropdown.
  * @returns {JSX.Element}
  */
-export default function MetricWidgetEditor({ widget, updateWidgetData, setNumericField, showDisplayControls = true }) {
+export default function MetricWidgetEditor({
+  widget,
+  updateWidgetData,
+  updateWidgetSize,
+  commitWidgetSize,
+  setNumericField,
+  showDisplayControls = true,
+}) {
   const displayType = widget.data.display_type || 'text'
   const displayOptions = getDisplayTypeOptions(widget.type)
 
@@ -68,9 +75,15 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
       ) : null}
 
       {isTextDisplayType(displayType) ? (
-        <TextDisplaySection widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
+        <TextDisplaySection
+          widget={widget}
+          updateWidgetData={updateWidgetData}
+          updateWidgetSize={updateWidgetSize}
+          commitWidgetSize={commitWidgetSize}
+          setNumericField={setNumericField}
+        />
       ) : DisplaySection ? (
-        <DisplaySection widget={widget} updateWidgetData={updateWidgetData} />
+        <DisplaySection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
       ) : null}
     </>
   )

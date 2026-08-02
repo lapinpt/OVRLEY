@@ -8,7 +8,8 @@
 import { useEffect } from 'react'
 import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import OverlayEditor from '@/features/overlay-editor/components/OverlayEditor'
+import OverlayEditorView from '@/features/overlay-editor/components/OverlayEditor'
+import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
 import { createBackdropDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import useStore from '@/store/useStore'
@@ -29,6 +30,11 @@ const previewMocks = vi.hoisted(() => ({
   })),
   widgetPreview: vi.fn(),
 }))
+
+function OverlayEditor(props) {
+  const widgetLiveEdits = useWidgetDraftState()
+  return <OverlayEditorView {...props} widgetLiveEdits={widgetLiveEdits} />
+}
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path) => path,

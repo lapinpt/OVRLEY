@@ -38,7 +38,7 @@ export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
   )
 }
 
-export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updateVariant }) {
+export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updateVariant, updateVariantSize, commitWidgetSize, widgetId }) {
   if (data.track_fill_style !== 'bars') {
     return (
       <div className="flex items-center justify-between gap-2 px-1 pb-2 pt-2">
@@ -56,8 +56,10 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         min={2}
         max={BAR_COUNT_MAX}
         step={1}
+        integerDisplay
         valueDisplay={`${data.bar_count}`}
-        onSliderChange={(bar_count) => updateVariant(buildBarGeometryUpdate(data, { bar_count }, getCornerRadiusMax))}
+        onSliderChange={(bar_count) => updateVariantSize(buildBarGeometryUpdate(data, { bar_count }, getCornerRadiusMax))}
+        onSliderCommit={() => commitWidgetSize(widgetId)}
       />
       <SliderField
         label="Bar Gap"
@@ -65,8 +67,10 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         min={0}
         max={barGapMax}
         step={1}
+        integerDisplay
         valueDisplay={`${data.bar_gap}px`}
-        onSliderChange={(bar_gap) => updateVariant(buildBarGeometryUpdate(data, { bar_gap }, getCornerRadiusMax))}
+        onSliderChange={(bar_gap) => updateVariantSize(buildBarGeometryUpdate(data, { bar_gap }, getCornerRadiusMax))}
+        onSliderCommit={() => commitWidgetSize(widgetId)}
       />
     </>
   )

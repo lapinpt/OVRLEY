@@ -13,11 +13,23 @@ import { FontSection, IconSection } from './widgetEditorSections'
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function TimeWidgetEditor({ widget, updateWidgetData, setNumericField }) {
+export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   return (
     <>
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} showFormatSelect />
-      <IconSection widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
+      <FontSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        showFormatSelect
+      />
+      <IconSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        setNumericField={setNumericField}
+      />
     </>
   )
 }

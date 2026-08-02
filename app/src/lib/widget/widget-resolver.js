@@ -333,13 +333,20 @@ export function buildFrameGeometryUpdate(widgetData, geometryPatch) {
   const currentVariant = variants[displayType]
   if (!currentVariant) return geometryPatch
 
+  const variantPatch = {}
+  for (const key of ['width', 'height', 'rotation']) {
+    if (geometryPatch[key] !== undefined) {
+      variantPatch[key] = geometryPatch[key]
+    }
+  }
+
   return {
     ...geometryPatch,
     display_variants: {
       ...variants,
       [displayType]: {
         ...currentVariant,
-        ...geometryPatch,
+        ...variantPatch,
       },
     },
   }

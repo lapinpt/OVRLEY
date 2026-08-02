@@ -3,10 +3,8 @@
  * used during drag, resize, and scale interactions.
  */
 
-import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { getWidgetSceneOrigin } from './overlayEditorHelpers'
-import { resolveWidgetRenderGeometry } from './widgetRenderGeometry'
+import { getLiveWidgetTransform } from './widgetInteractionGeometry'
 
 /**
  * Removes a single widget's draft from the mutable ref.
@@ -83,67 +81,76 @@ export function getWidgetVisualBoundsFromTarget(target) {
 }
 
 /**
- * Applies live widget position and dimension styles directly to the DOM
- * during drag/resize/rotate interactions — bypasses React re-render for
- * responsive feedback.
+ * Applies a captured live layout directly to the DOM. The layout is calculated
+ * from the interaction origin, so changing visual bounds cannot move the
+ * widget's anchor during the interaction.
  *
  * @param {HTMLElement|null} target - Widget DOM element.
- * @param {object} widget - Widget definition (used for fallback values).
- * @param {object} draft - Live draft with x, y, width, height, rotation.
+ * @param {object|null} layout - Live interaction layout.
  * @param {number} globalScale - Global scale factor.
  */
-export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
-  if (!target || !widget) {
+export function applyLiveWidgetStyles(target, layout, globalScale) {
+  if (!target || !layout) {
     return
   }
 
-  const visualBounds = getWidgetVisualBoundsFromTarget(target)
-  const isFramed = isFramedWidget(widget)
-  const origin = getWidgetSceneOrigin(widget, draft, visualBounds, {
-    boundsScale: isFramed ? 1 : globalScale,
-  })
-  const nextWidth = draft.width ?? widget.data.width
-  const nextHeight = draft.height ?? widget.data.height
-  const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const renderScale = isFramed ? globalScale || 1 : 1
-  const nextScale = (draft.scale ?? 1) * (isFramed ? 1 : globalScale)
+  target.style.left = `${layout.left}px`
+  target.style.top = `${layout.top}px`
+  target.style.width = `${layout.width}px`
+  target.style.height = `${layout.height}px`
+  target.style.transform = getLiveWidgetTransform(layout, globalScale)
 
-  target.style.left = `${origin.x}px`
-  target.style.top = `${origin.y}px`
-
-  if (typeof nextWidth === 'number') {
-    target.style.width = `${nextWidth * renderScale}px`
+  if (layout.mode === 'frame' && target.firstElementChild) {
+    target.firstElementChild.style.width = '100%'
+    target.firstElementChild.style.height = '100%'
   }
-
-  if (typeof nextHeight === 'number') {
-    target.style.height = `${nextHeight * renderScale}px`
-  }
-
-  target.style.transform =
-    buildWidgetTransform({
-      rotation: nextRotation,
-      scale: nextScale,
-    }) || ''
 }
 
 /**
- * Applies live position styles after a scale interaction — updates left/top
- * and transform on the DOM element directly.
+ * Applies only data-driven dimension styles without deriving position from
+ * current visual bounds. This is used by sidebar size controls.
  *
  * @param {HTMLElement|null} target - Widget DOM element.
  * @param {object} widget - Widget definition.
- * @param {object} draft - Live draft with position overrides.
+ * @param {object} draft - Live data draft.
  * @param {number} globalScale - Global scale factor.
  */
-export function applyLiveScalePositionStyles(target, widget, preview, globalScale, visualBoundsOverride = null) {
-  if (!target || !widget) {
-    return
+export function applyLiveWidgetDataStyles(target, widget, draft, globalScale) {
+  if (!target || !widget) return
+
+  const isFramed = isFramedWidget(widget)
+  const renderScale = isFramed ? globalScale || 1 : 1
+  const nextWidth = draft.width ?? widget.data.width
+  const nextHeight = draft.height ?? widget.data.height
+
+  if (typeof nextWidth === 'number') target.style.width = `${nextWidth * renderScale}px`
+  if (typeof nextHeight === 'number') target.style.height = `${nextHeight * renderScale}px`
+}
+
+/**
+ * Stores a live widget data update and applies its geometry immediately.
+ * Interaction handlers and sidebar size controls use the same path so config
+ * remains untouched until the interaction commits.
+ *
+ * @param {object} options - Live update options.
+ * @param {React.MutableRefObject<Object<string, Object>>} options.draftWidgetsRef - Draft ref to mutate.
+ * @param {Function} options.setLiveWidgetDraft - Draft state updater.
+ * @param {string} options.widgetId - Widget ID being updated.
+ * @param {object} options.updates - Partial widget data update.
+ * @param {HTMLElement|null} options.target - Widget DOM element.
+ * @param {number} options.globalScale - Global scene scale.
+ * @param {object|null} [options.layout] - Captured live interaction layout.
+ * @returns {object} Merged live draft.
+ */
+export function updateLiveWidgetDraft({ draftWidgetsRef, setLiveWidgetDraft, widgetId, widget, updates, target, globalScale, layout = undefined }) {
+  const currentDraft = draftWidgetsRef.current[widgetId]?.data ?? {}
+  const nextDraft = {
+    ...currentDraft,
+    ...updates,
   }
 
-  const visualBounds = visualBoundsOverride ?? getWidgetVisualBoundsFromTarget(target)
-  const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview)
-
-  target.style.left = `${renderGeometry.left}px`
-  target.style.top = `${renderGeometry.top}px`
-  target.style.transform = renderGeometry.transform
+  setLiveWidgetDraft(widgetId, nextDraft, layout)
+  if (layout) applyLiveWidgetStyles(target, layout, globalScale)
+  else applyLiveWidgetDataStyles(target, widget, nextDraft, globalScale)
+  return nextDraft
 }

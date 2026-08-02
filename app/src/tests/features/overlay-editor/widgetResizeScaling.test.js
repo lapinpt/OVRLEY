@@ -5,6 +5,12 @@ import {
   buildUniformResizeUpdate,
   captureResizeOrigin,
 } from '@/features/overlay-editor/utils/widgetResizeScaling'
+import {
+  buildDragInteractionLayout,
+  buildFrameInteractionLayout,
+  captureWidgetLayout,
+  getLiveWidgetTransform,
+} from '@/features/overlay-editor/utils/widgetInteractionGeometry'
 
 function makeGaugeWidget(displayType = 'arc') {
   return {
@@ -97,6 +103,35 @@ function makeGForceWidget() {
 }
 
 describe('widgetResizeScaling', () => {
+  test('preserves a route rotation while producing a live resize layout', () => {
+    const widget = {
+      id: 'course-1',
+      type: 'course',
+      category: 'plots',
+      data: { x: 20, y: 30, width: 200, height: 100, rotation: 27 },
+    }
+    const originLayout = captureWidgetLayout(null, widget, 1)
+    const layout = buildFrameInteractionLayout(originLayout, { width: 300, height: 150 })
+
+    expect(layout).toMatchObject({ left: 20, top: 30, width: 300, height: 150, rotation: 27 })
+    expect(getLiveWidgetTransform(layout, 1)).toBe('rotate(27deg)')
+  })
+
+  test('preserves global scale while dragging an intrinsic metric widget', () => {
+    const originLayout = {
+      left: 20,
+      top: 30,
+      width: 100,
+      height: 24,
+      rotation: 0,
+      transform: 'scale(1.5)',
+    }
+    const layout = buildDragInteractionLayout(originLayout, 12, 8)
+
+    expect(layout).toMatchObject({ left: 32, top: 38, width: 100, height: 24 })
+    expect(getLiveWidgetTransform(layout, 1.5)).toBe('scale(1.5)')
+  })
+
   test('owns generic marker scaling outside the resize handler', () => {
     const widget = {
       id: 'course-1',

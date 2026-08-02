@@ -137,7 +137,7 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
       <BlurInput
         type="number"
         disabled={disabled}
-        value={value}
+        value={value === null || value === undefined || value === '' ? value : Math.round(value)}
         min={min}
         max={max}
         step={step}
@@ -177,18 +177,33 @@ export function ColorField({ label, value, onChange, disabled = false }) {
  * @param {*} props.min - Lower bound used by the calculation.
  * @param {*} props.max - Upper bound used by the calculation.
  * @param {*} props.step - Value for step.
+ * @param {boolean} props.integerDisplay - Whether to round the displayed value.
  * @param {*} props.onSliderChange - Callback invoked to slider change.
+ * @param {*} props.onSliderCommit - Callback invoked when slider interaction ends.
  * @param {*} props.valueDisplay - Value for value display.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SliderField({ label, value, min, max, step = 1, disabled = false, onSliderChange, valueDisplay }) {
+export function SliderField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  disabled = false,
+  onSliderChange,
+  onSliderCommit,
+  valueDisplay,
+  integerDisplay = false,
+}) {
+  const displayValue = integerDisplay ? valueDisplay.replace(/^-?\d+(?:\.\d+)?/, String(Math.round(value))) : valueDisplay
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
           {label}
         </Label>
-        <span className="text-[10px] font-mono text-muted-foreground">{valueDisplay}</span>
+        <span className="text-[10px] font-mono text-muted-foreground">{displayValue}</span>
       </div>
       <div className="flex items-center gap-3 px-1">
         <Slider
@@ -198,11 +213,24 @@ export function SliderField({ label, value, min, max, step = 1, disabled = false
           disabled={disabled}
           value={[value]}
           onValueChange={([nextValue]) => onSliderChange(nextValue)}
+          onValueCommit={onSliderCommit ? ([nextValue]) => onSliderCommit(nextValue) : undefined}
           className="flex-1 py-2"
         />
       </div>
     </div>
   )
+}
+
+/**
+ * Renders a size slider with a separate interaction commit callback.
+ *
+ * @param {object} props - Slider props.
+ * @param {Function} props.onChange - Live size callback.
+ * @param {Function} [props.onCommit] - Size commit callback.
+ * @returns {JSX.Element} Rendered size slider.
+ */
+export function SizeSlider({ onChange, onCommit, ...props }) {
+  return <SliderField {...props} integerDisplay onSliderChange={onChange} onSliderCommit={onCommit} />
 }
 
 /**
