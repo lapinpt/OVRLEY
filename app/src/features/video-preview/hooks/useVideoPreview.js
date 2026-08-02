@@ -33,6 +33,7 @@ export function useVideoPreview(videoRef, isActive = true) {
   const selectedSecond = useStore((state) => state.selectedSecond)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
+  const pausePreviewPlayback = useStore((state) => state.pausePreviewPlayback)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
   const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
@@ -129,6 +130,30 @@ export function useVideoPreview(videoRef, isActive = true) {
 
       const desiredVideoSecond = selectedSecond - videoSyncOffsetSeconds
 
+      const handlePlaybackFailure = (error) => {
+        const currentState = useStore.getState()
+        const isCurrentVideoPlayback =
+          videoRef.current === video && currentState.previewPlaybackState === 'playing' && currentState.previewPlaybackSource === 'video'
+
+        if (!isCurrentVideoPlayback) {
+          return
+        }
+
+        if (error?.name !== 'AbortError' && error?.name !== 'NotAllowedError') {
+          console.error('[useVideoPreview] Failed to start playback', error)
+        }
+
+        pausePreviewPlayback(currentState.selectedSecond)
+      }
+
+      const startVideoPlayback = () => {
+        const playPromise = video.play()
+
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(handlePlaybackFailure)
+        }
+      }
+
       if (isVideoPlaybackMode) {
         scrubSchedulerRef.current?.clear()
         const owner = videoPlaybackOwnerRef.current
@@ -138,15 +163,7 @@ export function useVideoPreview(videoRef, isActive = true) {
         }
 
         if (video.paused) {
-          const playPromise = video.play()
-
-          if (playPromise && typeof playPromise.catch === 'function') {
-            playPromise.catch((error) => {
-              if (error?.name !== 'AbortError' && error?.name !== 'NotAllowedError') {
-                console.error('[useVideoPreview] Failed to start playback', error)
-              }
-            })
-          }
+          startVideoPlayback()
         }
 
         return
@@ -177,7 +194,7 @@ export function useVideoPreview(videoRef, isActive = true) {
     return () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
     }
-  }, [isActive, isVideoPlaybackMode, previewPlaybackState, selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds, videoSyncOffsetSeconds])
+  }, [isActive, isVideoPlaybackMode, pausePreviewPlayback, previewPlaybackState, selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds, videoSyncOffsetSeconds])
 
   // Derived return values - aggregate imported-video warnings with local preview messages.
   const isOutOfRange = isVideoPreviewOutOfRange({

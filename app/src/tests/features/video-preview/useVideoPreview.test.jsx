@@ -84,4 +84,26 @@ describe('useVideoPreview', () => {
 
     expect(result.current.frozenFrameSecond).toBe(30)
   })
+
+  test('pauses playback when the active video rejects the play request', async () => {
+    useStore.setState({
+      previewPlaybackSource: 'video',
+      previewPlaybackState: 'playing',
+    })
+
+    const playError = Object.assign(new Error('Autoplay was blocked'), { name: 'NotAllowedError' })
+    const video = createVideoStub({
+      play: vi.fn(() => Promise.reject(playError)),
+    })
+    const videoRef = { current: video }
+
+    renderHook(() => useVideoPreview(videoRef, true))
+
+    await waitFor(() => {
+      expect(useStore.getState().previewPlaybackState).toBe('paused')
+    })
+
+    expect(useStore.getState().previewPlaybackSource).toBe('video')
+    expect(useStore.getState().selectedSecond).toBe(8)
+  })
 })
