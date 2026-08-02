@@ -336,14 +336,14 @@ fn vertical_oscillation_converts_to_cm() {
 }
 
 #[test]
-fn vertical_oscillation_shows_placeholder_when_missing() {
+fn vertical_oscillation_preserves_gap_as_zero_when_series_is_available() {
     let (value, _) = format_parts(
         "vertical_oscillation",
         "vertical_oscillation",
         None,
         &[("display_unit", r#""mm""#)],
     );
-    assert_eq!(value, "--");
+    assert_eq!(value, "0");
 }
 
 #[test]
@@ -475,14 +475,14 @@ fn balance_formats_l_suffix() {
 }
 
 #[test]
-fn balance_placeholder_shows_dashes() {
+fn balance_preserves_gap_as_zero_when_series_is_available() {
     let (value, _) = format_parts(
         "left_right_balance",
         "left_right_balance",
         None,
         &[("display_unit", r#""percent""#)],
     );
-    assert_eq!(value, "--");
+    assert_eq!(value, "0/100");
 }
 
 // ── New camera metric formatting ──────────────────────────────────────────
