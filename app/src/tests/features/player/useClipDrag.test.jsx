@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import useClipDrag from '@/features/player/hooks/useClipDrag'
 
 function createTarget() {
@@ -30,7 +30,10 @@ function renderDrag(setVideoSyncOffset = vi.fn(), setVideoSyncOffsetPreview = vi
     hook.result.current.updateMetrics({
       activityDurationSeconds: 100,
       containerElement,
+      hasVideo: true,
       importedVideoDuration: 20,
+      timelineMinimum: 0,
+      totalDuration: 100,
       videoSyncOffsetSeconds: 5,
       viewEnd: 100,
       viewStart: 0,
@@ -42,6 +45,10 @@ function renderDrag(setVideoSyncOffset = vi.fn(), setVideoSyncOffsetPreview = vi
 }
 
 describe('useClipDrag', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   test('keeps fractional movement live and rounds the committed offset on pointer up', () => {
     const setVideoSyncOffset = vi.fn()
     const setVideoSyncOffsetPreview = vi.fn()
@@ -100,5 +107,28 @@ describe('useClipDrag', () => {
 
     expect(setVideoSyncOffset).toHaveBeenLastCalledWith(5)
     expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
+  })
+
+  test('reduces autoscroll edge penetration when the timeline is zoomed in', () => {
+    const animationFrames = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      animationFrames.push(callback)
+      return animationFrames.length
+    })
+    const followSecond = vi.fn(() => null)
+    const { result } = renderDrag()
+    const target = createTarget()
+
+    act(() => {
+      result.current.updateMetrics({ followSecond, viewStart: 40, viewEnd: 60 })
+      result.current.getLaneDragProps('video').onPointerDown(createEvent(125, target))
+      result.current.getLaneDragProps('video').onPointerMove(createEvent(25, target))
+      animationFrames[1](16)
+    })
+
+    const targetSecond = followSecond.mock.calls[0][0]
+    expect(targetSecond).toBeGreaterThan(42)
+    expect(targetSecond).toBeLessThan(43)
+    expect(followSecond).toHaveBeenCalledWith(targetSecond, -3)
   })
 })

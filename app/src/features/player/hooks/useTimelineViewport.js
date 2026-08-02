@@ -55,7 +55,6 @@ export default function useTimelineViewport({
   playheadSecond = 0,
   isDragging = false,
 }) {
-  const committedTimelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds })
   const timelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds: videoSyncOffsetPreviewSeconds })
   // Duration ref - viewport actions use the latest duration without recreating every callback.
   const totalDurationRef = useRef(totalDuration)
@@ -75,14 +74,13 @@ export default function useTimelineViewport({
     setContainerElement(element)
   }, [])
 
-  // Media identity - any structural media change should reset stale zoom/pan state to the full range.
+  // Media identity - structural media changes reset stale zoom/pan state, while sync timing changes preserve it.
   const mediaIdentity = [
     hasVideo,
     importedVideoDuration,
     hasActivityData,
     activityDurationSeconds,
     fallbackDurationSeconds,
-    committedTimelineMinimum,
   ].join('|')
 
   useEffect(() => {
@@ -104,7 +102,7 @@ export default function useTimelineViewport({
     setViewport((previousViewport) =>
       clampToView(previousViewport.viewStart, previousViewport.viewEnd, totalDurationRef.current, timelineMinimumRef.current),
     )
-  }, [isDragging, totalDuration])
+  }, [isDragging, timelineMinimum, totalDuration])
 
   // Width measurement - immediate rect reads avoid invisible geometry before ResizeObserver fires.
   useEffect(() => {
@@ -199,11 +197,11 @@ export default function useTimelineViewport({
   }, [])
 
   // Follow command - reuses playhead-follow behavior for active edge scrolling during a drag.
-  const followSecond = useCallback((second) => {
+  const followSecond = useCallback((second, timelineMinimum) => {
     const previousViewport = viewportRef.current
     const nextViewport = followPlayhead({
       playheadSecond: second,
-      timelineMinimum: timelineMinimumRef.current,
+      timelineMinimum,
       viewStart: previousViewport.viewStart,
       viewEnd: previousViewport.viewEnd,
       totalDuration: totalDurationRef.current,

@@ -4,9 +4,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { videoOverlapsActivity } from '@/lib/video-timing'
-import { pointerToSecond, snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
+import { getTimelineMinimum } from '../utils/playerTiming'
+import { snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
 
 const AUTO_SCROLL_EDGE_RATIO = 0.15
+const AUTO_SCROLL_MIN_ZOOM_SCALE = 0.1
+const AUTO_SCROLL_MAX_VIEW_SPANS_PER_SECOND = 3
+const AUTO_SCROLL_MAX_FRAME_SECONDS = 0.05
 
 function isPrimaryButton(event) {
   return event.button === undefined || event.button === 0
@@ -17,7 +21,7 @@ function getTimelineWidth(metrics) {
   return rectWidth > 0 ? rectWidth : metrics.widthPx
 }
 
-function getAutoScrollPointerSecond(metrics, clientX) {
+function getAutoScrollPointerSecond(metrics, clientX, elapsedSeconds) {
   const rect = metrics.containerElement?.getBoundingClientRect?.()
   const widthPx = rect?.width > 0 ? rect.width : metrics.widthPx
   if (widthPx <= 0) return null
@@ -25,15 +29,16 @@ function getAutoScrollPointerSecond(metrics, clientX) {
   const right = left + widthPx
   const edgeWidth = widthPx * AUTO_SCROLL_EDGE_RATIO
   if (clientX >= left + edgeWidth && clientX <= right - edgeWidth) return null
-  return pointerToSecond({
-    clientX,
-    rect: { left, width: widthPx },
-    viewStart: metrics.viewStart,
-    viewEnd: metrics.viewEnd,
-    widthPx,
-    timelineMinimum: metrics.timelineMinimum,
-    totalDuration: metrics.totalDuration,
-  })
+  const viewSpan = metrics.viewEnd - metrics.viewStart
+  const timelineSpan = metrics.totalDuration - metrics.timelineMinimum
+  const zoomScale = Math.max(AUTO_SCROLL_MIN_ZOOM_SCALE, Math.min(1, viewSpan / timelineSpan))
+  const isLeftEdge = clientX < left + edgeWidth
+  const edgeIntensity = Math.min(1, (isLeftEdge ? left + edgeWidth - clientX : clientX - (right - edgeWidth)) / edgeWidth)
+  const direction = isLeftEdge ? -1 : 1
+  const edgeSecond = isLeftEdge ? metrics.viewStart + viewSpan * AUTO_SCROLL_EDGE_RATIO : metrics.viewEnd - viewSpan * AUTO_SCROLL_EDGE_RATIO
+  const deltaSecond = direction * viewSpan * AUTO_SCROLL_MAX_VIEW_SPANS_PER_SECOND * zoomScale * edgeIntensity * elapsedSeconds
+
+  return edgeSecond + deltaSecond
 }
 
 /**
@@ -50,6 +55,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
 
   const dragRef = useRef(null)
   const autoScrollFrameRef = useRef(null)
+  const autoScrollTimestampRef = useRef(null)
   const autoScrollTickRef = useRef(null)
   const offsetFrameRef = useRef(null)
   const pendingOffsetRef = useRef(null)
@@ -59,6 +65,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
     viewEnd: 0,
     widthPx: 0,
     timelineMinimum: 0,
+    hasVideo: false,
     videoSyncOffsetSeconds: 0,
     activityDurationSeconds: 0,
     importedVideoDuration: 0,
@@ -69,6 +76,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
   }, [])
 
   const cancelAutoScroll = useCallback(() => {
+    autoScrollTimestampRef.current = null
     if (autoScrollFrameRef.current === null) return
     window.cancelAnimationFrame?.(autoScrollFrameRef.current)
     autoScrollFrameRef.current = null
@@ -125,37 +133,52 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
         viewStart: metrics.viewStart,
         widthPx,
       })
-      const nextOffset = snap.offset
-      if (!videoOverlapsActivity({ videoStart: nextOffset, videoDuration: metrics.importedVideoDuration })) return
-      if (nextOffset === drag.currentOffset && snap.guidelineSecond === drag.guidelineSecond) return
+      const desiredOffset = snap.offset
+      if (!videoOverlapsActivity({ videoStart: desiredOffset, videoDuration: metrics.importedVideoDuration })) return
+
+      drag.desiredOffset = desiredOffset
+      metrics.timelineMinimum = getTimelineMinimum({ hasVideo: metrics.hasVideo, videoSyncOffsetSeconds: desiredOffset })
+      const nextOffset = drag.laneId === 'video' ? Math.max(desiredOffset, metrics.viewStart) : desiredOffset
+      const guidelineSecond = nextOffset === desiredOffset ? snap.guidelineSecond : null
+      if (nextOffset === drag.currentOffset && guidelineSecond === drag.guidelineSecond) return
 
       drag.currentOffset = nextOffset
-      drag.guidelineSecond = snap.guidelineSecond
-      setSnapGuidelineSecond(snap.guidelineSecond)
+      drag.guidelineSecond = guidelineSecond
+      setSnapGuidelineSecond(guidelineSecond)
       publishPreviewOffset(nextOffset)
     },
     [publishPreviewOffset],
   )
 
-  const autoScrollTick = useCallback(() => {
-    autoScrollFrameRef.current = null
-    const drag = dragRef.current
-    if (drag?.type !== 'clip-drag') return
+  const autoScrollTick = useCallback(
+    (timestamp) => {
+      autoScrollFrameRef.current = null
+      const drag = dragRef.current
+      if (drag?.type !== 'clip-drag') return
 
-    const metrics = metricsRef.current
-    const targetSecond = getAutoScrollPointerSecond(metrics, drag.pointerClientX)
-    if (targetSecond === null) return
+      const metrics = metricsRef.current
+      metrics.timelineMinimum = getTimelineMinimum({ hasVideo: metrics.hasVideo, videoSyncOffsetSeconds: drag.desiredOffset })
+      const previousTimestamp = autoScrollTimestampRef.current
+      const elapsedSeconds = previousTimestamp === null ? 1 / 60 : Math.min((timestamp - previousTimestamp) / 1000, AUTO_SCROLL_MAX_FRAME_SECONDS)
+      autoScrollTimestampRef.current = timestamp
+      const targetSecond = getAutoScrollPointerSecond(metrics, drag.pointerClientX, elapsedSeconds)
+      if (targetSecond === null) {
+        autoScrollTimestampRef.current = null
+        return
+      }
 
-    const followResult = metrics.followSecond?.(targetSecond)
-    if (!followResult) return
+      const followResult = metrics.followSecond?.(targetSecond, metrics.timelineMinimum)
+      if (!followResult) return
 
-    const direction = drag.laneId === 'activity' ? -1 : 1
-    drag.initialOffset += direction * followResult.deltaStart
-    metrics.viewStart = followResult.viewport.viewStart
-    metrics.viewEnd = followResult.viewport.viewEnd
-    updateDragOffset(drag.pointerClientX)
-    autoScrollFrameRef.current = window.requestAnimationFrame(() => autoScrollTickRef.current?.())
-  }, [updateDragOffset])
+      const direction = drag.laneId === 'activity' ? -1 : 1
+      drag.initialOffset += direction * followResult.deltaStart
+      metrics.viewStart = followResult.viewport.viewStart
+      metrics.viewEnd = followResult.viewport.viewEnd
+      updateDragOffset(drag.pointerClientX)
+      autoScrollFrameRef.current = window.requestAnimationFrame((nextTimestamp) => autoScrollTickRef.current?.(nextTimestamp))
+    },
+    [updateDragOffset],
+  )
 
   // A queued RAF must call the newest tick callback after dependencies change.
   useEffect(() => {
@@ -223,6 +246,7 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
           laneId,
           initialOffset: metricsRef.current.videoSyncOffsetSeconds,
           currentOffset: metricsRef.current.videoSyncOffsetSeconds,
+          desiredOffset: metricsRef.current.videoSyncOffsetSeconds,
           pointerId: event.pointerId,
           pointerClientX: event.clientX,
           startClientX: event.clientX,

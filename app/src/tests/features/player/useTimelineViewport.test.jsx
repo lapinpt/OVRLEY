@@ -82,7 +82,7 @@ describe('useTimelineViewport', () => {
     expect(result.current.displayedFitTargetId).toBe('activity')
   })
 
-  test('preserves the viewport when only the sync offset changes', () => {
+  test('preserves the viewport when the sync offset changes across the timeline minimum', () => {
     const { result, rerender } = renderHook(
       ([videoSyncOffsetSeconds]) =>
         useTimelineViewport({
@@ -101,7 +101,7 @@ describe('useTimelineViewport', () => {
     expect(result.current.displayedFitTargetId).toBe('video')
 
     act(() => {
-      rerender([20])
+      rerender([-10])
     })
 
     expect(result.current.viewport).toEqual({ viewStart: 9.2, viewEnd: 30.8 })

@@ -57,7 +57,7 @@ export default function usePlaybackEngine({
 }) {
   // Imperative playback refs - RAF reads these without forcing React renders every frame.
   const playbackAnchorRef = useRef({ startedAtMs: 0, startedSecond: 0 })
-  const previousTimelineMinimumRef = useRef(0)
+  const previousVideoPathRef = useRef(null)
   const scrubFrameRef = useRef(null)
   const latestScrubSecondRef = useRef(null)
   const totalDurationRef = useRef(0)
@@ -144,16 +144,15 @@ export default function usePlaybackEngine({
     totalDurationRef.current = totalDuration
   }, [totalDuration])
 
-  // Timeline-start sync - a playhead at the previous start follows a newly imported negative video start.
+  // Video-import sync - a playhead at zero follows a newly imported negative video start, but later sync edits preserve it.
   useEffect(() => {
-    const previousTimelineMinimum = previousTimelineMinimumRef.current
-    if (timelineMinimum === previousTimelineMinimum) return
-
-    previousTimelineMinimumRef.current = timelineMinimum
-    if (selectedSecond === previousTimelineMinimum) {
+    const previousVideoPath = previousVideoPathRef.current
+    previousVideoPathRef.current = importedVideoPath
+    if (!importedVideoPath || importedVideoPath === previousVideoPath) return
+    if (selectedSecond === 0 && timelineMinimum < 0) {
       setSelectedSecond(timelineMinimum)
     }
-  }, [selectedSecond, setSelectedSecond, timelineMinimum])
+  }, [importedVideoPath, selectedSecond, setSelectedSecond, timelineMinimum])
 
   // Playhead bounds sync - clamps stale store values when media duration changes under the player.
   useEffect(() => {

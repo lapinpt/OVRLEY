@@ -130,12 +130,14 @@ export default function useOverlayPlayer({ backgroundMode }) {
     updateTimelineMetrics(metrics)
     updateClipDragMetrics({
       ...metrics,
+      hasVideo,
       videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
       activityDurationSeconds,
       importedVideoDuration: playback.importedVideoDuration,
     })
   }, [
     activityDurationSeconds,
+    hasVideo,
     playback.importedVideoDuration,
     playback.totalDuration,
     playback.videoSyncOffsetSeconds,
