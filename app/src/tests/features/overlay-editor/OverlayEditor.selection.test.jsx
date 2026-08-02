@@ -5,6 +5,7 @@
  * store remains the single owner of the selected-id list and primary widget.
  */
 
+import { useEffect } from 'react'
 import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditor from '@/features/overlay-editor/components/OverlayEditor'
@@ -14,6 +15,20 @@ import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 const moveableUpdateRectMock = vi.fn()
+const previewMocks = vi.hoisted(() => ({
+  buildMetricWidgetPreviewModel: vi.fn(() => null),
+  buildTextWidgetPreviewModel: vi.fn(({ widget }) => ({
+    visualBounds: {
+      minX: 0,
+      minY: 0,
+      maxX: (widget?.data?.font_size ?? 30) * 4,
+      maxY: Math.round((widget?.data?.font_size ?? 30) * 1.5),
+      width: (widget?.data?.font_size ?? 30) * 4,
+      height: Math.round((widget?.data?.font_size ?? 30) * 1.5),
+    },
+  })),
+  widgetPreview: vi.fn(),
+}))
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path) => path,
@@ -29,21 +44,16 @@ vi.mock('@/features/video-preview', () => ({
 }))
 
 vi.mock('@/features/widget-preview', () => ({
-  WidgetPreview: ({ widget }) => <div>{widget.name}</div>,
-  buildMetricWidgetPreviewModel: () => null,
-  buildTextWidgetPreviewModel: ({ widget }) => ({
-    visualBounds: {
-      minX: 0,
-      minY: 0,
-      maxX: (widget?.data?.font_size ?? 30) * 4,
-      maxY: Math.round((widget?.data?.font_size ?? 30) * 1.5),
-      width: (widget?.data?.font_size ?? 30) * 4,
-      height: Math.round((widget?.data?.font_size ?? 30) * 1.5),
-    },
-  }),
+  WidgetPreview: ({ widget, ...props }) => {
+    previewMocks.widgetPreview({ widget, ...props })
+    return <div>{widget.name}</div>
+  },
+  buildMetricWidgetPreviewModel: previewMocks.buildMetricWidgetPreviewModel,
+  buildTextWidgetPreviewModel: previewMocks.buildTextWidgetPreviewModel,
 }))
 
 vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
+  useFontMetricsEpoch: () => 0,
   useFontMetricsVersion: () => 0,
 }))
 
@@ -52,8 +62,25 @@ vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
 }))
 
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: ({ canResizeSelected, maintainAspectRatio, moveableRef, showEdgeResizeHandles }) => {
+  default: function MockOverlayMoveable({
+    canResizeSelected,
+    geometryVersion,
+    maintainAspectRatio,
+    moveableRef,
+    selectedTarget,
+    selectedTargets,
+    showEdgeResizeHandles,
+  }) {
     moveableRef.current = { updateRect: moveableUpdateRectMock }
+
+    useEffect(() => {
+      if ((!selectedTarget && !selectedTargets.length) || geometryVersion === 'none') return undefined
+
+      const frameId = requestAnimationFrame(() => moveableRef.current?.updateRect())
+
+      return () => cancelAnimationFrame(frameId)
+    }, [geometryVersion, moveableRef, selectedTarget, selectedTargets])
+
     return (
       <div
         data-testid="moveable-props"
@@ -114,6 +141,9 @@ describe('OverlayEditor selection flow', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
     moveableUpdateRectMock.mockReset()
+    previewMocks.buildMetricWidgetPreviewModel.mockClear()
+    previewMocks.buildTextWidgetPreviewModel.mockClear()
+    previewMocks.widgetPreview.mockClear()
     vi.stubGlobal('requestAnimationFrame', (callback) => {
       callback(0)
       return 1
@@ -704,5 +734,39 @@ describe('OverlayEditor selection flow', () => {
     })
 
     expect(moveableUpdateRectMock).toHaveBeenCalled()
+  })
+
+  test('reuses static label models and renderer output while the preview second changes', () => {
+    const config = makeConfig([makeLabel('A', { id: 'widget-1' })])
+
+    useStore.getState().setConfig(config)
+
+    render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const buildCount = previewMocks.buildTextWidgetPreviewModel.mock.calls.length
+    const renderCount = previewMocks.widgetPreview.mock.calls.length
+
+    act(() => {
+      useStore.getState().setSelectedSecond(10)
+    })
+
+    expect(previewMocks.buildTextWidgetPreviewModel).toHaveBeenCalledTimes(buildCount)
+    expect(previewMocks.widgetPreview).toHaveBeenCalledTimes(renderCount)
   })
 })

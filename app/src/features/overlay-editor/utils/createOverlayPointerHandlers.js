@@ -2,6 +2,7 @@
  * Provides overlay editor helpers for create overlay pointer handlers.
  */
 
+import { useCallback } from 'react'
 import { clamp } from '@/lib/utils'
 import { buildSelectionRect, getPrimarySelectionId, hasSelectionModifier, normalizeSelectionIds, rectanglesIntersect } from './overlayEditorHelpers'
 
@@ -139,147 +140,167 @@ export default function useOverlayPointerHandlers({
   setSelectionState,
   widgetNodes,
 }) {
-  const handleWidgetMouseDown = (event, widgetId) => {
-    event.stopPropagation()
+  const handleWidgetMouseDown = useCallback(
+    (event, widgetId) => {
+      event.stopPropagation()
 
-    if (event.button !== 0) {
-      return
-    }
-
-    const isSelected = selectedWidgetIds.includes(widgetId)
-    const isCtrlAxisLockDrag = event.ctrlKey && isSelected && !event.metaKey && !event.shiftKey
-
-    if (isCtrlAxisLockDrag && selectedWidgetIds.length > 1) {
-      event.preventDefault()
-      const draggedWidgetIds = [...selectedWidgetIds]
-      setIsGroupDragActive(true)
-      setGroupDragSelectionIds(draggedWidgetIds)
-      moveableRef.current?.dragStart(event.nativeEvent, event.currentTarget)
-      return
-    }
-
-    if (isCtrlAxisLockDrag) {
-      return
-    }
-
-    if (hasSelectionModifier(event)) {
-      const nextIds = isSelected ? selectedWidgetIds.filter((selectedId) => selectedId !== widgetId) : [...selectedWidgetIds, widgetId]
-      const nextPrimaryId = isSelected ? getPrimarySelectionId(nextIds, selectedWidgetId === widgetId ? null : selectedWidgetId) : widgetId
-
-      commitSelection(nextIds, nextPrimaryId)
-      return
-    }
-
-    if (isSelected && selectedWidgetIds.length > 1) {
-      event.preventDefault()
-      const draggedWidgetIds = [...selectedWidgetIds]
-      setIsGroupDragActive(true)
-      setGroupDragSelectionIds(draggedWidgetIds)
-      moveableRef.current?.dragStart(event.nativeEvent, event.currentTarget)
-      return
-    }
-
-    if (selectedWidgetIds.length === 1 && selectedWidgetId === widgetId) {
-      return
-    }
-
-    commitSelection([widgetId], widgetId)
-  }
-
-  const handleSceneMouseDown = (event) => {
-    if (event.button !== 0) {
-      return
-    }
-
-    const startScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, event.clientX, event.clientY)
-    const startStagePoint = getElementPoint(stageElement, event.clientX, event.clientY)
-    if (!startScenePoint || !startStagePoint) {
-      return
-    }
-
-    event.preventDefault()
-    marqueeCleanupRef.current?.()
-
-    const additive = hasSelectionModifier(event)
-    const baseIds = additive ? selectedWidgetIds : []
-    marqueeSelectionRef.current = {
-      additive,
-      baseIds,
-      hasMoved: false,
-      previewIds: baseIds,
-      startScenePoint,
-      startStagePoint,
-    }
-
-    setSelectionRect({
-      x: startStagePoint.x,
-      y: startStagePoint.y,
-      width: 0,
-      height: 0,
-    })
-
-    const handleWindowMouseMove = (moveEvent) => {
-      const nextScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, moveEvent.clientX, moveEvent.clientY)
-      const nextStagePoint = getElementPoint(stageElement, moveEvent.clientX, moveEvent.clientY)
-      const gesture = marqueeSelectionRef.current
-      if (!nextScenePoint || !nextStagePoint || !gesture) {
+      if (event.button !== 0) {
         return
       }
 
-      const nextSceneRect = buildSelectionRect(gesture.startScenePoint, nextScenePoint)
-      const nextStageRect = buildSelectionRect(gesture.startStagePoint, nextStagePoint)
-      const hasMoved = nextStageRect.width > 2 || nextStageRect.height > 2
-      const hitIds = hasMoved
-        ? getIntersectedWidgetIds({
-            displayScale,
-            nextSelectionRect: nextSceneRect,
-            orderedWidgetIds,
-            sceneElement,
-            widgetNodes,
-          })
-        : []
-      const nextIds = additive ? normalizeSelectionIds([...baseIds, ...hitIds], orderedWidgetIds) : hitIds
+      const isSelected = selectedWidgetIds.includes(widgetId)
+      const isCtrlAxisLockDrag = event.ctrlKey && isSelected && !event.metaKey && !event.shiftKey
 
-      marqueeSelectionRef.current = {
-        ...gesture,
-        hasMoved,
-        previewIds: nextIds,
+      if (isCtrlAxisLockDrag && selectedWidgetIds.length > 1) {
+        event.preventDefault()
+        const draggedWidgetIds = [...selectedWidgetIds]
+        setIsGroupDragActive(true)
+        setGroupDragSelectionIds(draggedWidgetIds)
+        moveableRef.current?.dragStart(event.nativeEvent, event.currentTarget)
+        return
       }
 
-      setSelectionRect(nextStageRect)
-      if (hasMoved) {
-        setSelectionState(nextIds)
+      if (isCtrlAxisLockDrag) {
+        return
       }
-    }
 
-    const handleWindowMouseUp = () => {
-      const gesture = marqueeSelectionRef.current
+      if (hasSelectionModifier(event)) {
+        const nextIds = isSelected ? selectedWidgetIds.filter((selectedId) => selectedId !== widgetId) : [...selectedWidgetIds, widgetId]
+        const nextPrimaryId = isSelected ? getPrimarySelectionId(nextIds, selectedWidgetId === widgetId ? null : selectedWidgetId) : widgetId
 
+        commitSelection(nextIds, nextPrimaryId)
+        return
+      }
+
+      if (isSelected && selectedWidgetIds.length > 1) {
+        event.preventDefault()
+        const draggedWidgetIds = [...selectedWidgetIds]
+        setIsGroupDragActive(true)
+        setGroupDragSelectionIds(draggedWidgetIds)
+        moveableRef.current?.dragStart(event.nativeEvent, event.currentTarget)
+        return
+      }
+
+      if (selectedWidgetIds.length === 1 && selectedWidgetId === widgetId) {
+        return
+      }
+
+      commitSelection([widgetId], widgetId)
+    },
+    [commitSelection, moveableRef, selectedWidgetId, selectedWidgetIds, setGroupDragSelectionIds, setIsGroupDragActive],
+  )
+
+  const handleSceneMouseDown = useCallback(
+    (event) => {
+      if (event.button !== 0) {
+        return
+      }
+
+      const startScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, event.clientX, event.clientY)
+      const startStagePoint = getElementPoint(stageElement, event.clientX, event.clientY)
+      if (!startScenePoint || !startStagePoint) {
+        return
+      }
+
+      event.preventDefault()
       marqueeCleanupRef.current?.()
-      marqueeSelectionRef.current = null
-      setSelectionRect(null)
 
-      if (!gesture) {
-        return
+      const additive = hasSelectionModifier(event)
+      const baseIds = additive ? selectedWidgetIds : []
+      marqueeSelectionRef.current = {
+        additive,
+        baseIds,
+        hasMoved: false,
+        previewIds: baseIds,
+        startScenePoint,
+        startStagePoint,
       }
 
-      if (!gesture.hasMoved) {
-        commitSelection(gesture.baseIds, selectedWidgetId)
-        return
+      setSelectionRect({
+        x: startStagePoint.x,
+        y: startStagePoint.y,
+        width: 0,
+        height: 0,
+      })
+
+      const handleWindowMouseMove = (moveEvent) => {
+        const nextScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, moveEvent.clientX, moveEvent.clientY)
+        const nextStagePoint = getElementPoint(stageElement, moveEvent.clientX, moveEvent.clientY)
+        const gesture = marqueeSelectionRef.current
+        if (!nextScenePoint || !nextStagePoint || !gesture) {
+          return
+        }
+
+        const nextSceneRect = buildSelectionRect(gesture.startScenePoint, nextScenePoint)
+        const nextStageRect = buildSelectionRect(gesture.startStagePoint, nextStagePoint)
+        const hasMoved = nextStageRect.width > 2 || nextStageRect.height > 2
+        const hitIds = hasMoved
+          ? getIntersectedWidgetIds({
+              displayScale,
+              nextSelectionRect: nextSceneRect,
+              orderedWidgetIds,
+              sceneElement,
+              widgetNodes,
+            })
+          : []
+        const nextIds = additive ? normalizeSelectionIds([...baseIds, ...hitIds], orderedWidgetIds) : hitIds
+
+        marqueeSelectionRef.current = {
+          ...gesture,
+          hasMoved,
+          previewIds: nextIds,
+        }
+
+        setSelectionRect(nextStageRect)
+        if (hasMoved) {
+          setSelectionState(nextIds)
+        }
       }
 
-      commitSelection(gesture.previewIds, getPrimarySelectionId(gesture.previewIds, selectedWidgetId))
-    }
+      const handleWindowMouseUp = () => {
+        const gesture = marqueeSelectionRef.current
 
-    marqueeCleanupRef.current = () => {
-      window.removeEventListener('mousemove', handleWindowMouseMove)
-      window.removeEventListener('mouseup', handleWindowMouseUp)
-      marqueeCleanupRef.current = null
-    }
+        marqueeCleanupRef.current?.()
+        marqueeSelectionRef.current = null
+        setSelectionRect(null)
 
-    window.addEventListener('mousemove', handleWindowMouseMove)
-    window.addEventListener('mouseup', handleWindowMouseUp)
-  }
+        if (!gesture) {
+          return
+        }
+
+        if (!gesture.hasMoved) {
+          commitSelection(gesture.baseIds, selectedWidgetId)
+          return
+        }
+
+        commitSelection(gesture.previewIds, getPrimarySelectionId(gesture.previewIds, selectedWidgetId))
+      }
+
+      marqueeCleanupRef.current = () => {
+        window.removeEventListener('mousemove', handleWindowMouseMove)
+        window.removeEventListener('mouseup', handleWindowMouseUp)
+        marqueeCleanupRef.current = null
+      }
+
+      window.addEventListener('mousemove', handleWindowMouseMove)
+      window.addEventListener('mouseup', handleWindowMouseUp)
+    },
+    [
+      commitSelection,
+      displayScale,
+      marqueeCleanupRef,
+      marqueeSelectionRef,
+      orderedWidgetIds,
+      sceneElement,
+      sceneSize,
+      selectedWidgetId,
+      selectedWidgetIds,
+      setSelectionRect,
+      setSelectionState,
+      stageElement,
+      widgetNodes,
+    ],
+  )
 
   return {
     handleSceneMouseDown,
