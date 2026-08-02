@@ -90,7 +90,7 @@ export function useVideoPreview(videoRef, isActive = true) {
       video.pause()
     }
 
-    syncVideoCurrentTime(video, selectedSecond - videoSyncOffsetPreviewSeconds)
+    scrubSchedulerRef.current?.schedule(selectedSecond - videoSyncOffsetPreviewSeconds)
   }, [selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds])
 
   // Scrub scheduler ownership - preserve throttle state across playhead updates.
