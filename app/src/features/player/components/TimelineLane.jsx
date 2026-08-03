@@ -10,14 +10,17 @@ export default function TimelineLane({ lane }) {
     <div aria-label={lane.ariaLabel} className={`relative w-full ${lane.isVideo ? 'h-6 border-b-0' : 'h-6'}`}>
       <div data-testid="timeline-lane-clip-mask" className="absolute inset-x-0 -top-3 -bottom-1 overflow-hidden">
         {lane.isVisible && (
-          <div
+          <button
+            type="button"
             aria-describedby={lane.tooltip.isVisible ? lane.tooltip.id : undefined}
             aria-label={lane.label || 'clip'}
-            className="absolute top-3 bottom-1 z-10 cursor-grab touch-none active:cursor-grabbing"
+            className="group absolute top-3 bottom-1 z-10 cursor-grab touch-none appearance-none border-0 bg-transparent p-0 text-left outline-none active:cursor-grabbing"
             style={lane.clipStyle}
             {...lane.clipProps}
           >
-            <div className={`absolute inset-0 overflow-visible ${lane.clipClassName}`}>
+            <div
+              className={`absolute inset-0 overflow-visible group-focus-visible:ring-2 group-focus-visible:ring-foreground ${lane.isSelected ? 'ring-2 ring-foreground' : ''} ${lane.clipClassName}`}
+            >
               {lane.highlightStyle && (
                 <div aria-hidden="true" className="pointer-events-none absolute -top-3 -bottom-1 bg-success/20" style={lane.highlightStyle} />
               )}
@@ -38,7 +41,7 @@ export default function TimelineLane({ lane }) {
                 </div>
               )}
             </div>
-          </div>
+          </button>
         )}
       </div>
       {lane.tooltip.isVisible && lane.label && (

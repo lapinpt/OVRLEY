@@ -20,13 +20,13 @@ export default function ControlPanel({ config, onConfigChange, widgetLiveEdits }
   return (
     <div className="flex flex-col h-full bg-card">
       <Tabs defaultValue="settings" className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 pt-4 pb-6 shrink-0">
-          <TabsList className="grid w-full grid-cols-2 bg-surface h-12">
-            <TabsTrigger value="settings" className="text-sm gap-2 cursor-pointer p-2">
+        <div className="pb-8 shrink-0 ">
+          <TabsList variant="main" className="grid w-full grid-cols-2 ">
+            <TabsTrigger variant="main" value="settings" className="text-sm gap-2 cursor-pointer p-4 pt-6">
               <Settings2 className="h-4 w-4" />
               Settings
             </TabsTrigger>
-            <TabsTrigger value="widgets" className="text-sm gap-2 cursor-pointer p-2">
+            <TabsTrigger variant="main" value="widgets" className="text-sm gap-2 cursor-pointer p-4 pt-6">
               <Activity className="h-4 w-4" />
               Widgets
             </TabsTrigger>

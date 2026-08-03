@@ -109,6 +109,21 @@ describe('useClipDrag', () => {
     expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
   })
 
+  test('commits a negative offset while the video still overlaps the activity', () => {
+    const setVideoSyncOffset = vi.fn()
+    const { result } = renderDrag(setVideoSyncOffset)
+    const target = createTarget()
+
+    act(() => {
+      result.current.updateMetrics({ timelineMinimum: -10, viewEnd: 90, viewStart: -10 })
+      result.current.getLaneDragProps('video').onPointerDown(createEvent(100, target))
+      result.current.getLaneDragProps('video').onPointerMove(createEvent(80, target))
+      result.current.getLaneDragProps('video').onPointerUp(createEvent(80, target))
+    })
+
+    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(-3)
+  })
+
   test('reduces autoscroll edge penetration when the timeline is zoomed in', () => {
     const animationFrames = []
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {

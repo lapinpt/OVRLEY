@@ -3,6 +3,7 @@ import {
   clampExportRangeMarkerSecond,
   getClipGeometry,
   getExportRangeHighlightGeometry,
+  moveClipOffset,
   pointerToSecond,
   roundToDevicePixel,
   secondsToViewPx,
@@ -104,5 +105,10 @@ describe('timelineGeometry utilities', () => {
         widthPx: 500,
       }),
     ).toEqual({ guidelineSecond: null, offset: 2 })
+  })
+
+  test('moves either lane relative to the canonical video offset without discarding negative offsets', () => {
+    expect(moveClipOffset({ currentOffset: 0, deltaSeconds: -0.1, laneId: 'video' })).toBe(-0.1)
+    expect(moveClipOffset({ currentOffset: 0, deltaSeconds: 0.1, laneId: 'activity' })).toBe(-0.1)
   })
 })

@@ -136,6 +136,17 @@ export function snapClipOffset({ proposedOffset, activityDuration, videoDuration
   return { guidelineSecond, offset: bestValue }
 }
 
+/**
+ * Converts horizontal clip movement into the canonical video sync offset.
+ *
+ * @param {{ currentOffset: number, deltaSeconds: number, laneId: string }} options Movement inputs.
+ * @returns {number} Video sync offset after applying lane-relative movement.
+ */
+export function moveClipOffset({ currentOffset, deltaSeconds, laneId }) {
+  const direction = laneId === 'activity' ? -1 : 1
+  return currentOffset + direction * deltaSeconds
+}
+
 export function getExportRangeHighlightGeometry({ startSecond, durationSeconds, exportFromSecond, exportToSecond }) {
   if (durationSeconds <= 0) return { isVisible: false, leftPercent: 0, widthPercent: 0 }
 

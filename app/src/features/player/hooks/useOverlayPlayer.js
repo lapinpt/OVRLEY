@@ -2,12 +2,14 @@
  * Top-level player orchestration hook for the presentational overlay player components.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { isInteractiveElement } from '@/lib/utils'
+import { videoOverlapsActivity } from '@/lib/video-timing'
 import useStore from '@/store/useStore'
 import { formatTimelineTime, snapTimelineSecondToFrame } from '../utils/playerTiming'
-import { roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
+import { moveClipOffset, roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
+
 import useClipDrag from './useClipDrag'
 import useExportRangeTimeline from './useExportRangeTimeline'
 import usePlaybackEngine from './usePlaybackEngine'
@@ -44,6 +46,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
       fallbackDurationSeconds: state.fallbackDurationSeconds,
       importedVideoDuration: state.importedVideoDuration,
       importedVideoFps: state.importedVideoFps,
+      importedVideoImportId: state.importedVideoImportId,
       importedVideoPath: state.importedVideoPath,
       pausePreviewPlayback: state.pausePreviewPlayback,
       toggleVideoMute: state.toggleVideoMute,
@@ -62,6 +65,9 @@ export default function useOverlayPlayer({ backgroundMode }) {
       videoSyncOffsetPreviewSeconds: state.videoSyncOffsetPreviewSeconds,
     })),
   )
+
+  const [selectedClipId, setSelectedClipId] = useState(null)
+  const [keyboardSyncOffsetSeconds, setKeyboardSyncOffsetSeconds] = useState(null)
 
   // Durable domains - each hook owns behavior for one player concern, while this hook wires them together.
   const playback = usePlaybackEngine({ ...playerStore, backgroundMode })
@@ -88,6 +94,39 @@ export default function useOverlayPlayer({ backgroundMode }) {
   const hasVideo = Boolean(playback.importedVideoPath)
   const hasActivityData = Boolean(playerStore.activitySummary)
   const activityDurationSeconds = playerStore.activitySummary?.durationSeconds ?? 0
+  const canSelectClip = hasVideo && playback.hasActivity
+
+  const nudgeClip = (laneId, deltaSeconds) => {
+    setKeyboardSyncOffsetSeconds((currentOffset) => {
+      const nextOffset = moveClipOffset({
+        currentOffset: currentOffset ?? playerStore.videoSyncOffsetSeconds,
+        deltaSeconds,
+        laneId,
+      })
+      const roundedOffset = Math.round(nextOffset * 10) / 10
+      return videoOverlapsActivity({ videoStart: roundedOffset, videoDuration: playback.importedVideoDuration })
+        ? roundedOffset
+        : (currentOffset ?? playerStore.videoSyncOffsetSeconds)
+    })
+  }
+
+  const commitClipNudge = () => {
+    if (keyboardSyncOffsetSeconds === null) return
+    playerStore.setVideoSyncOffset(keyboardSyncOffsetSeconds)
+    setKeyboardSyncOffsetSeconds(null)
+  }
+
+  // Selection is scoped to the current media pair and ends when the user clicks elsewhere.
+  useEffect(() => {
+    setSelectedClipId(null)
+    setKeyboardSyncOffsetSeconds(null)
+  }, [playerStore.activitySummary, playerStore.importedVideoImportId, playback.importedVideoPath])
+
+  useEffect(() => {
+    const clearClipSelection = () => setSelectedClipId(null)
+    window.addEventListener('pointerdown', clearClipSelection, true)
+    return () => window.removeEventListener('pointerdown', clearClipSelection, true)
+  }, [])
 
   // Clip drag - owns horizontal drag gesture state for sync offset adjustment.
   const clipDrag = useClipDrag({
@@ -97,7 +136,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
     importedVideoDuration: playback.importedVideoDuration,
   })
   const { getLaneDragProps, isDragging: isClipDragging, snapGuidelineSecond, updateMetrics: updateClipDragMetrics } = clipDrag
-  const timelineVideoSyncOffsetSeconds = playerStore.videoSyncOffsetPreviewSeconds ?? playback.videoSyncOffsetSeconds
+  const timelineVideoSyncOffsetSeconds = keyboardSyncOffsetSeconds ?? playerStore.videoSyncOffsetPreviewSeconds ?? playback.videoSyncOffsetSeconds
 
   // Viewport domain - owns measurement, fit targets, ticks, zoom, pan, and playback follow behavior.
   const viewport = useTimelineViewport({
@@ -188,12 +227,17 @@ export default function useOverlayPlayer({ backgroundMode }) {
   const lanes = useTimelineClips({
     activityFilename: playerStore.activityFilename,
     activitySummary: playerStore.activitySummary,
+    canSelect: canSelectClip,
+    commitClipNudge,
     exportHighlightRange: exportTimeline.highlightRange,
     getLaneDragProps,
     hasActivity: playback.hasActivity,
     hasVideo,
     importedVideoDuration: playback.importedVideoDuration,
     importedVideoPath: playback.importedVideoPath,
+    nudgeClip,
+    selectedClipId,
+    setSelectedClipId,
     videoSyncOffsetSeconds: timelineVideoSyncOffsetSeconds,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
