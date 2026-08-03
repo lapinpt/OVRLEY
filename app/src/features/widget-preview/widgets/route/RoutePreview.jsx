@@ -32,6 +32,8 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
   const shadow = getTextShadowParts(sceneStyle)
   const shadowFilterId = sanitizeSvgId(`${widget.id}-route-shadow-blur`)
   const contentTransform = geometry.contentScale ? `scale(${geometry.contentScale.x}, ${geometry.contentScale.y})` : undefined
+  const remainingLineWidth = widget.data.remaining_line_width * globalScale
+  const completedLineWidth = widget.data.completed_line_width * globalScale
 
   return (
     <svg
@@ -47,7 +49,7 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
           points={geometry.remainingSvgPoints}
           shadow={shadow}
           blurFilterId={shadowFilterId}
-          strokeWidth={widget.data.remaining_line_width}
+          strokeWidth={remainingLineWidth}
           strokeOpacity={style.remainingLineOpacity}
           rotation={widget.data.rotation}
         />
@@ -55,7 +57,7 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
           fill="none"
           stroke={widget.data.remaining_line_color}
           strokeOpacity={style.remainingLineOpacity}
-          strokeWidth={widget.data.remaining_line_width}
+          strokeWidth={remainingLineWidth}
           vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -65,7 +67,7 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
           fill="none"
           stroke={widget.data.completed_line_color}
           strokeOpacity={style.completedLineOpacity}
-          strokeWidth={widget.data.completed_line_width}
+          strokeWidth={completedLineWidth}
           vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"

@@ -28,16 +28,21 @@ export function OverlayElevationWidget({ widget, activity, previewSecond, global
   const contentTransform = previewModel.geometry.contentScale
     ? `scale(${previewModel.geometry.contentScale.x}, ${previewModel.geometry.contentScale.y})`
     : undefined
+  const remainingLineWidth = widget.data.remaining_line_width * globalScale
+  const completedLineWidth = widget.data.completed_line_width * globalScale
   const markerPoint = previewModel.geometry.markerPoint
-  const scaledMarkerPoint = markerPoint && previewModel.geometry.contentScale
-    ? [markerPoint[0] * previewModel.geometry.contentScale.x, markerPoint[1] * previewModel.geometry.contentScale.y]
-    : markerPoint
-  const metricLabelBaseline = scaledMarkerPoint && previewModel.geometry.contentScale
-    ? scaledMarkerPoint[1] + (previewModel.metricLabelBaseline - markerPoint[1])
-    : previewModel.metricLabelBaseline
-  const imperialLabelBaseline = scaledMarkerPoint && previewModel.geometry.contentScale
-    ? scaledMarkerPoint[1] + (previewModel.imperialLabelBaseline - markerPoint[1])
-    : previewModel.imperialLabelBaseline
+  const scaledMarkerPoint =
+    markerPoint && previewModel.geometry.contentScale
+      ? [markerPoint[0] * previewModel.geometry.contentScale.x, markerPoint[1] * previewModel.geometry.contentScale.y]
+      : markerPoint
+  const metricLabelBaseline =
+    scaledMarkerPoint && previewModel.geometry.contentScale
+      ? scaledMarkerPoint[1] + (previewModel.metricLabelBaseline - markerPoint[1])
+      : previewModel.metricLabelBaseline
+  const imperialLabelBaseline =
+    scaledMarkerPoint && previewModel.geometry.contentScale
+      ? scaledMarkerPoint[1] + (previewModel.imperialLabelBaseline - markerPoint[1])
+      : previewModel.imperialLabelBaseline
 
   return (
     <svg
@@ -59,7 +64,7 @@ export function OverlayElevationWidget({ widget, activity, previewSecond, global
           points={previewModel.geometry.remainingSvgPoints}
           shadow={previewModel.shadow}
           blurFilterId={previewModel.lineShadowFilterId}
-          strokeWidth={widget.data.remaining_line_width}
+          strokeWidth={remainingLineWidth}
           strokeOpacity={previewModel.style.remainingLineOpacity}
           rotation={widget.data.rotation}
         />
@@ -67,7 +72,7 @@ export function OverlayElevationWidget({ widget, activity, previewSecond, global
           fill="none"
           stroke={widget.data.remaining_line_color}
           strokeOpacity={previewModel.style.remainingLineOpacity}
-          strokeWidth={widget.data.remaining_line_width}
+          strokeWidth={remainingLineWidth}
           vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -82,18 +87,14 @@ export function OverlayElevationWidget({ widget, activity, previewSecond, global
           fill="none"
           stroke={widget.data.completed_line_color}
           strokeOpacity={previewModel.style.completedLineOpacity}
-          strokeWidth={widget.data.completed_line_width}
+          strokeWidth={completedLineWidth}
           vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"
           points={previewModel.geometry.completedSvgPoints}
         />
       </g>
-      <PreviewMarkerLayers
-        layers={previewModel.style.markerLayers}
-        point={markerPoint}
-        pointScale={previewModel.geometry.contentScale}
-      />
+      <PreviewMarkerLayers layers={previewModel.style.markerLayers} point={markerPoint} pointScale={previewModel.geometry.contentScale} />
       {markerPoint && widget.data.show_elevation_metric ? (
         <PreviewSvgText
           text={previewModel.metricLabel}
