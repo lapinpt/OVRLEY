@@ -11,6 +11,7 @@ import { TYPE_LABELS } from '@/lib/widget/widget-icons'
 const TEXT_HIDE_THRESHOLD_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
 const CLIP_CONTENT_OFFSET_CLASS = 'translate-y-[0.04rem]'
+const CLIP_SYNC_STEP_SECONDS = 0.1
 
 function getRootRemPx() {
   if (typeof window === 'undefined') return 16
@@ -31,12 +32,17 @@ function getBasename(path) {
  * @param {object} options Clip timeline inputs.
  * @param {string|null} options.activityFilename Imported activity filename.
  * @param {object|null} options.activitySummary Imported activity summary metadata.
+ * @param {boolean} options.canSelect Whether both video and activity are loaded so selection is available.
+ * @param {function} options.commitClipNudge Callback to commit a keyboard sync adjustment.
  * @param {{ fromSecond: number, toSecond: number }|null} options.exportHighlightRange Active export highlight range.
  * @param {function} options.getLaneDragProps Per-lane drag handler factory from useClipDrag.
  * @param {boolean} options.hasActivity Whether the activity lane should be present.
  * @param {boolean} options.hasVideo Whether the video lane should be present.
  * @param {number|null} options.importedVideoDuration Imported video duration.
  * @param {string|null} options.importedVideoPath Imported video path.
+ * @param {function} options.nudgeClip Callback to move a clip by a relative number of seconds.
+ * @param {string|null} options.selectedClipId Currently selected clip lane id.
+ * @param {function} options.setSelectedClipId Callback to set selected clip lane id.
  * @param {number} options.videoSyncOffsetSeconds Timeline second where video starts.
  * @param {number} options.viewEnd Visible viewport end second.
  * @param {number} options.viewStart Visible viewport start second.
@@ -46,12 +52,17 @@ function getBasename(path) {
 export default function useTimelineClips({
   activityFilename,
   activitySummary,
+  canSelect,
+  commitClipNudge,
   exportHighlightRange,
   getLaneDragProps,
   hasActivity,
   hasVideo,
   importedVideoDuration,
   importedVideoPath,
+  nudgeClip,
+  selectedClipId,
+  setSelectedClipId,
   videoSyncOffsetSeconds,
   viewEnd,
   viewStart,
@@ -104,6 +115,7 @@ export default function useTimelineClips({
     }
 
     return laneInputs.map((lane) => {
+      const dragProps = getLaneDragProps(lane.id)
       // Clip geometry - percent styles are derived from pixel geometry so rendering stays responsive.
       const geometry = getClipGeometry({
         startSecond: lane.startSecond,
@@ -133,11 +145,40 @@ export default function useTimelineClips({
         clipClassName: lane.isVideo ? 'bg-accent/70' : 'bg-primary/80',
         clipContentClassName: CLIP_CONTENT_OFFSET_CLASS,
         clipProps: {
-          onClick: stopClipEvent,
+          ...dragProps,
+          'aria-keyshortcuts': 'ArrowLeft ArrowRight',
+          'aria-pressed': selectedClipId === lane.id,
+          tabIndex: canSelect ? 0 : -1,
+          onClick: (e) => {
+            stopClipEvent(e)
+            if (!canSelect) return
+            e.currentTarget.focus()
+            setSelectedClipId(lane.id)
+          },
           onDoubleClick: stopClipEvent,
+          onBlur: commitClipNudge,
+          onKeyDown: (event) => {
+            if (selectedClipId !== lane.id || (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight')) return
+            if (event.metaKey || event.ctrlKey || event.altKey) return
+            event.preventDefault()
+            event.stopPropagation()
+            nudgeClip(lane.id, event.code === 'ArrowRight' ? CLIP_SYNC_STEP_SECONDS : -CLIP_SYNC_STEP_SECONDS)
+          },
+          onKeyUp: (event) => {
+            if (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') return
+            event.preventDefault()
+            event.stopPropagation()
+            commitClipNudge()
+          },
           onMouseEnter: () => setHoveredLaneId(lane.id),
           onMouseLeave: () => setHoveredLaneId(null),
-          ...getLaneDragProps(lane.id),
+          onPointerDown: (event) => {
+            if (canSelect && (event.button === undefined || event.button === 0)) {
+              event.currentTarget.focus()
+              setSelectedClipId(lane.id)
+            }
+            dragProps.onPointerDown?.(event)
+          },
         },
         clipStyle: {
           left: widthPx > 0 ? `${(geometry.x / widthPx) * 100}%` : '0%',
@@ -152,6 +193,7 @@ export default function useTimelineClips({
               }
             : null,
         isVisible: geometry.isVisible,
+        isSelected: selectedClipId === lane.id,
         showText: geometry.isVisible && geometry.width >= TEXT_HIDE_THRESHOLD_REM * getRootRemPx(),
         sourceColumnWidth: CLIP_SOURCE_COLUMN_WIDTH,
         textClassName: lane.isVideo ? 'text-accent-foreground' : 'text-background',
@@ -167,6 +209,8 @@ export default function useTimelineClips({
   }, [
     activityFilename,
     activitySummary,
+    canSelect,
+    commitClipNudge,
     exportHighlightRange,
     getLaneDragProps,
     hasActivity,
@@ -174,6 +218,9 @@ export default function useTimelineClips({
     hoveredLaneId,
     importedVideoDuration,
     importedVideoPath,
+    nudgeClip,
+    selectedClipId,
+    setSelectedClipId,
     stopClipEvent,
     tooltipBaseId,
     videoSyncOffsetSeconds,

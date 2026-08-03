@@ -383,7 +383,7 @@ function OverlayEditor({
         <div
           ref={setStageElement}
           data-testid="overlay-editor-stage"
-          className="relative grid min-h-full min-w-full w-max place-items-center overflow-visible p-8"
+          className="relative grid min-h-full min-w-full w-max place-items-center overflow-visible p-4"
           onMouseDown={handleSceneMouseDown}
         >
           <div

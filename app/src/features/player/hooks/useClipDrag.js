@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { pointerToSecond, snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
+import { moveClipOffset, pointerToSecond, snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
 
 const AUTO_SCROLL_EDGE_RATIO = 0.15
 
@@ -111,8 +111,11 @@ export default function useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPrev
         viewEnd: metrics.viewEnd,
         widthPx,
       })
-      const direction = drag.laneId === 'activity' ? -1 : 1
-      const raw = drag.initialOffset + direction * deltaSeconds
+      const raw = moveClipOffset({
+        currentOffset: drag.initialOffset,
+        deltaSeconds,
+        laneId: drag.laneId,
+      })
       const snap = snapClipOffset({
         activityDuration: metrics.activityDurationSeconds,
         proposedOffset: raw,
