@@ -89,16 +89,14 @@ export default function SidebarWidgetsTab() {
                     value={widget.id}
                     className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border"
                   >
-                    <div className="relative group">
-                      <AccordionTrigger className="group w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
-                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <div className="relative group/widget-row">
+                      <AccordionTrigger className="group/trigger w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0 text-muted-foreground transition-colors group-hover/widget-row:text-primary group-data-[state=open]/trigger:text-primary">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded">
-                            <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />
+                            <Icon className="h-3.5 w-3.5" />
                           </div>
                           <div className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
-                            <span className="w-full truncate text-left text-sm font-semibold group-data-[state=open]:text-primary">
-                              {widget.name}
-                            </span>
+                            <span className="w-full truncate text-left text-sm font-semibold">{widget.name}</span>
                           </div>
                         </div>
                       </AccordionTrigger>
