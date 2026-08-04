@@ -9,7 +9,7 @@ import { snapClipOffset, viewPxToSeconds } from '../utils/timelineGeometry'
 
 const AUTO_SCROLL_EDGE_RATIO = 0.15
 const AUTO_SCROLL_MIN_ZOOM_SCALE = 0.1
-const AUTO_SCROLL_MAX_VIEW_SPANS_PER_SECOND = 3
+const AUTO_SCROLL_MAX_VIEW_SPANS_PER_SECOND = 0.75
 const AUTO_SCROLL_MAX_FRAME_SECONDS = 0.05
 
 function isPrimaryButton(event) {

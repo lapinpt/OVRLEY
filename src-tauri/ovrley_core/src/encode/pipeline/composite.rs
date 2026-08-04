@@ -275,12 +275,13 @@ pub fn render_composite_video(
 
     // ── PHASE 1: DERIVE PIPELINE PLAN (timing, FPS, FFmpeg args, output path) ──
     let scene = &config.scene;
-    let source_rotation_degrees = verify_composite_source_resolution(
+    let (source_rotation_degrees, source_has_audio) = verify_composite_source_resolution(
         paths,
         &render_plan.video_path,
         scene.width,
         scene.height,
     )?;
+    let include_audio = include_audio && source_has_audio;
     let plan = derive_composite_pipeline_plan(
         paths,
         scene,

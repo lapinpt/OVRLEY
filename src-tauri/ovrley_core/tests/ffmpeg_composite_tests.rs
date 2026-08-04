@@ -260,6 +260,32 @@ fn test_2_7_filtered_audio_map_and_encoding_are_present() {
 }
 
 #[test]
+fn test_2_7b_source_without_audio_omits_audio_input_and_filter_graph() {
+    let render = render_plan(
+        "libx264",
+        "60M",
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        0.0,
+    );
+    let built = build_composite_ffmpeg_settings(
+        &render,
+        FrameSize {
+            width: 3840,
+            height: 2160,
+        },
+        false,
+        None,
+    )
+    .unwrap();
+
+    assert!(built.input_2_args.is_empty());
+    assert!(!built.filter_complex.contains("[2:a]"));
+    assert!(!built.output_args.iter().any(|arg| arg == "[aout]"));
+    assert!(!built.output_args.iter().any(|arg| arg == "-c:a"));
+}
+
+#[test]
 fn test_2_7a_video_trim_is_filter_side_even_without_input_seek() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
