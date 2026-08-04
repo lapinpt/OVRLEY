@@ -261,7 +261,7 @@ pub(crate) fn verify_composite_source_resolution(
     composite_video_path: &Path,
     scene_width: u32,
     scene_height: u32,
-) -> CoreResult<Option<i32>> {
+) -> CoreResult<(Option<i32>, bool)> {
     if !composite_video_path.is_file() {
         return Err(CoreError::Config(format!(
             "Composite video does not exist: {}",
@@ -304,5 +304,5 @@ pub(crate) fn verify_composite_source_resolution(
         )));
     }
 
-    Ok(metadata.rotation_degrees)
+    Ok((metadata.rotation_degrees, metadata.has_audio))
 }
