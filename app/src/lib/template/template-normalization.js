@@ -159,6 +159,21 @@ function normalizeDisplayVariants(variants) {
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
+function normalizeLeanAngleGeometry(value) {
+  if (value.display_type !== 'lean_angle') return
+
+  const variant = value.display_variants?.lean_angle
+  if (Object.hasOwn(value, 'width') || Object.hasOwn(value, 'height')) {
+    throw new Error('lean_angle does not accept width or height; use diameter')
+  }
+  if (!variant || !Number.isFinite(variant.diameter) || variant.diameter <= 0) {
+    throw new Error('lean_angle diameter must be a positive finite number')
+  }
+  if (Object.hasOwn(variant, 'width') || Object.hasOwn(variant, 'height')) {
+    throw new Error('lean_angle does not accept width or height; use diameter')
+  }
+}
+
 function normalizeLinearGaugeLabelPosition(variant) {
   if (!variant || typeof variant !== 'object') return variant
 
@@ -176,6 +191,7 @@ function normalizeLinearGaugeLabelPosition(variant) {
 
 function normalizeValue(value = {}) {
   const type = value.value
+  normalizeLeanAngleGeometry(value)
   const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
   const extraKeys = Object.keys(valueDefaults).filter((key) => !VALUE_SHARED_KEYS.includes(key))
   const keys = [...VALUE_SHARED_KEYS, ...extraKeys]

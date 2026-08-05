@@ -6,7 +6,7 @@
  * creating a new section component and registering it below.
  */
 
-import { getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
+import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
 import { SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 import { initDisplayVariant } from '@/lib/widget/widget-resolver'
@@ -15,6 +15,8 @@ import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
 import ArcDisplaySection from './ArcDisplaySection'
 import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
+import LeanAngleDisplaySection from './LeanAngleDisplaySection'
+import GForceWidgetEditor from '../GForceWidgetEditor'
 
 /**
  * Registry mapping display_type values to their editor section components.
@@ -26,6 +28,8 @@ const DISPLAY_SECTION = {
   linear: LinearDisplaySection,
   arc: ArcDisplaySection,
   corner: ArcDisplaySection,
+  lean_angle: LeanAngleDisplaySection,
+  g_force: GForceWidgetEditor,
 }
 
 /**
@@ -36,14 +40,24 @@ const DISPLAY_SECTION = {
  * @param {boolean} props.showDisplayControls - Whether to show the display type header + dropdown.
  * @returns {JSX.Element}
  */
-export default function MetricWidgetEditor({ widget, updateWidgetData, setNumericField, showDisplayControls = true }) {
+export default function MetricWidgetEditor({
+  widget,
+  updateWidgetData,
+  updateWidgetSize,
+  commitWidgetSize,
+  setNumericField,
+  showDisplayControls = true,
+}) {
   const displayType = widget.data.display_type || 'text'
   const displayOptions = getDisplayTypeOptions(widget.type)
 
   const handleDisplayTypeChange = useCallback(
     (value) => {
       const nextData = initDisplayVariant(widget.data, value)
-      updateWidgetData(widget.id, { display_type: value, display_variants: nextData.display_variants })
+      const patch = { display_type: value, display_variants: nextData.display_variants }
+      const defaultFontSize = getDisplayTypeDefaultFontSize(value)
+      if (defaultFontSize !== null) patch.font_size = defaultFontSize
+      updateWidgetData(widget.id, patch)
     },
     [widget.id, widget.data, updateWidgetData],
   )
@@ -61,9 +75,15 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
       ) : null}
 
       {isTextDisplayType(displayType) ? (
-        <TextDisplaySection widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
+        <TextDisplaySection
+          widget={widget}
+          updateWidgetData={updateWidgetData}
+          updateWidgetSize={updateWidgetSize}
+          commitWidgetSize={commitWidgetSize}
+          setNumericField={setNumericField}
+        />
       ) : DisplaySection ? (
-        <DisplaySection widget={widget} updateWidgetData={updateWidgetData} />
+        <DisplaySection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
       ) : null}
     </>
   )

@@ -5,7 +5,8 @@
 //! one place avoids subtle drift between GPS row expansion, sync-time
 //! derivation, and vendor fallback parsers.
 
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{NaiveDateTime, TimeZone, Utc};
+use chrono_tz::Tz;
 use telemetry_parser::util::SampleInfo;
 
 pub(crate) const DJI_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -73,11 +74,22 @@ pub(crate) fn gpsu_millis_to_video_start_rfc3339(
     unix_millis_plus_offset_ms_to_rfc3339(gpsu_unix_ms, -first_row_media_time_ms)
 }
 
-/// Parses a DJI AC004 local timestamp as UTC-formatted RFC 3339 text.
-pub(crate) fn dji_timestamp_to_rfc3339(timestamp_text: &str) -> Option<String> {
+/// Converts a DJI AC004 camera-local timestamp to UTC RFC 3339 text.
+///
+/// DJI stores timestamps in the camera's local time without a timezone offset.
+/// This function uses the IANA timezone derived from GPS coordinates to convert
+/// the naive timestamp into an absolute UTC instant. Returns `None` when the
+/// timezone name is unrecognized, the timestamp text is malformed, or the
+/// local time is ambiguous (e.g. DST spring-forward gap).
+pub(crate) fn dji_timestamp_to_rfc3339(
+    timestamp_text: &str,
+    tz_name: &str,
+) -> Option<String> {
     let naive = NaiveDateTime::parse_from_str(timestamp_text, DJI_TIMESTAMP_FORMAT).ok()?;
-    let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive, Utc);
-    Some(datetime.to_rfc3339())
+    let tz: Tz = tz_name.parse().ok()?;
+    let local_dt = tz.from_local_datetime(&naive).single()?;
+    let utc_dt = local_dt.with_timezone(&Utc);
+    Some(utc_dt.to_rfc3339())
 }
 
 #[cfg(test)]
@@ -101,11 +113,21 @@ mod tests {
     }
 
     #[test]
-    fn dji_timestamp_parser_promotes_camera_text_to_utc_rfc3339() {
+    fn dji_timestamp_parser_converts_camera_local_to_utc_via_timezone() {
         assert_eq!(
-            dji_timestamp_to_rfc3339("2026-03-15 23:58:14").as_deref(),
-            Some("2026-03-15T23:58:14+00:00")
+            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Europe/Prague").as_deref(),
+            Some("2026-03-15T22:58:14+00:00")
         );
+    }
+
+    #[test]
+    fn dji_timestamp_parser_rejects_invalid_timezone() {
+        assert_eq!(dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Not/A_Tz"), None);
+    }
+
+    #[test]
+    fn dji_timestamp_parser_rejects_malformed_timestamp() {
+        assert_eq!(dji_timestamp_to_rfc3339("2026-13-01 99:99:99", "Europe/Prague"), None);
     }
 
     #[test]

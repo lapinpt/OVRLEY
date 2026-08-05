@@ -58,6 +58,20 @@ describe('video import — telemetry lifecycle', () => {
     useStore.getState().clearVideoTelemetry()
     expect(useStore.getState().parsedActivity).toBeNull()
   })
+
+  test('resets a stale negative offset when importing a shorter unsynced video', () => {
+    useStore.setState({ videoSyncOffsetSeconds: -20 })
+
+    useStore.getState().setImportedVideo({
+      duration: 10,
+      fps: 30,
+      path: '/videos/short.mp4',
+      resolution: { width: 1920, height: 1080 },
+    })
+
+    expect(useStore.getState().importedVideoPath).toBe('/videos/short.mp4')
+    expect(useStore.getState().videoSyncOffsetSeconds).toBe(0)
+  })
 })
 
 describe('activity import — overwrites MP4 telemetry', () => {

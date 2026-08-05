@@ -78,7 +78,7 @@
       "gradient": {
         "label": "Gradient",
         "defaults": {
-          "decimals": 0,
+          "decimals": 1,
           "unit_color": "#ffffff",
           "value_offset": 0,
           "show_sign": true,

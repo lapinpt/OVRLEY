@@ -12,10 +12,18 @@ import { FontSection } from './widgetEditorSections'
  * @param {*} props.updateWidgetData - Value for update widget data.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function TextWidgetEditor({ widget, updateWidgetData }) {
+export default function TextWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   return (
     <>
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Typography" showTextInput colorLabel="Color" />
+      <FontSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        title="Typography"
+        showTextInput
+        colorLabel="Color"
+      />
     </>
   )
 }

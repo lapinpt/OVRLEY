@@ -10,7 +10,8 @@
 import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
-import { getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
+import { interpolateNumericSeries, MISSING_SAMPLE_POLICY } from '@/lib/interpolation'
+import { getStandardMetricDefinition, getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.
@@ -23,115 +24,6 @@ export function getSceneSize(config) {
     width: config?.scene?.width || 1920,
     height: config?.scene?.height || 1080,
   }
-}
-
-function isValidInterpolatedSample(xValues, yValues, index) {
-  return Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])
-}
-
-function findNearestValidSampleIndex(xValues, yValues, startIndex, direction) {
-  for (let index = startIndex; index >= 0 && index < xValues.length; index += direction) {
-    if (isValidInterpolatedSample(xValues, yValues, index)) {
-      return index
-    }
-  }
-
-  return -1
-}
-
-function findFirstIndexAtOrAfter(xValues, targetX, low, high) {
-  let left = low
-  let right = high
-  let result = high
-
-  while (left <= right) {
-    const middle = Math.floor((left + right) / 2)
-    const middleX = Number(xValues[middle])
-
-    if (Number.isFinite(middleX) && middleX >= targetX) {
-      result = middle
-      right = middle - 1
-    } else {
-      left = middle + 1
-    }
-  }
-
-  return result
-}
-
-/**
- * Performs linear interpolation on a series of (x, y) values at the target X.
- * Falls back to the nearest endpoint if targetX is out of range.
- *
- * @param {number[]} xValues - X-axis sample values (monotonic).
- * @param {number[]} yValues - Y-axis sample values aligned with xValues.
- * @param {number} targetX - Requested X value to interpolate at.
- * @returns {number|null} Interpolated Y value or null if no valid samples.
- */
-export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
-  if (!Array.isArray(xValues) || !Array.isArray(yValues) || !xValues.length) {
-    return null
-  }
-
-  const safeTargetX = Number(targetX)
-  if (!Number.isFinite(safeTargetX)) {
-    return null
-  }
-
-  let firstValidIndex = -1
-  let lastValidIndex = -1
-
-  for (let index = 0; index < xValues.length; index += 1) {
-    if (Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])) {
-      firstValidIndex = index
-      break
-    }
-  }
-
-  if (firstValidIndex === -1) {
-    return null
-  }
-
-  for (let index = yValues.length - 1; index >= 0; index -= 1) {
-    if (Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])) {
-      lastValidIndex = index
-      break
-    }
-  }
-
-  if (safeTargetX <= xValues[firstValidIndex]) {
-    return Number(yValues[firstValidIndex])
-  }
-
-  if (safeTargetX >= xValues[lastValidIndex]) {
-    return Number(yValues[lastValidIndex])
-  }
-
-  const insertionIndex = findFirstIndexAtOrAfter(xValues, safeTargetX, firstValidIndex, lastValidIndex)
-  const rightIndex = findNearestValidSampleIndex(xValues, yValues, insertionIndex, 1)
-  const rightXAtInsertion = Number(xValues[rightIndex])
-  const leftIndex = findNearestValidSampleIndex(
-    xValues,
-    yValues,
-    rightXAtInsertion === safeTargetX ? rightIndex : Math.min(rightIndex - 1, lastValidIndex),
-    -1,
-  )
-
-  const leftX = Number(xValues[leftIndex])
-  const rightX = Number(xValues[rightIndex])
-  const leftY = Number(yValues[leftIndex])
-  const rightY = Number(yValues[rightIndex])
-
-  if (!Number.isFinite(leftX) || !Number.isFinite(rightX) || !Number.isFinite(leftY) || !Number.isFinite(rightY)) {
-    return null
-  }
-
-  if (rightIndex === leftIndex || rightX === leftX) {
-    return leftY
-  }
-
-  const ratio = (safeTargetX - leftX) / (rightX - leftX)
-  return leftY + (rightY - leftY) * ratio
 }
 
 /**
@@ -191,6 +83,34 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
 }
 
 /**
+ * Returns the canonical activity series for a metric type.
+ * Standard metrics use their manifest dataSource; altitude uses the preferred
+ * barometric series when present and otherwise falls back to elevation.
+ *
+ * @param {object|null} activity - Parsed activity data.
+ * @param {string} metricType - Metric or raw activity series key.
+ * @returns {Array<unknown>|undefined} The selected series, or undefined when absent.
+ */
+export function getMetricSeries(activity, metricType) {
+  const activityKey = getStandardMetricDefinition(metricType)?.dataSource ?? metricType
+  return metricType === 'altitude' ? getPreferredElevationSeries(activity) : activity?.[activityKey]
+}
+
+/**
+ * Supplies activity data only while the current preview second belongs to it.
+ *
+ * @param {object|null} activity - Parsed activity data.
+ * @param {number} previewSecond - Current preview second.
+ * @returns {object|null} Activity data available at the preview second.
+ */
+export function getPreviewActivity(activity, previewSecond) {
+  if (activity === null) return null
+
+  const activityEnd = activity.trim_end_seconds
+  return previewSecond >= 0 && previewSecond <= activityEnd ? activity : null
+}
+
+/**
  * Interpolates an activity metric series (speed, heartrate, etc.) at the
  * given elapsed second. Falls back to DEFAULT_ACTIVITY_PREVIEW values.
  *
@@ -200,10 +120,11 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
  * @returns {number|string|null} Interpolated value or preview default.
  */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-  const series = activity?.[key]
+  const previewActivity = getPreviewActivity(activity, elapsedSecond)
+  const elapsedSeries = Array.isArray(previewActivity?.sample_elapsed_seconds) ? previewActivity.sample_elapsed_seconds : []
+  const series = getMetricSeries(previewActivity, key)
 
-  if (!Array.isArray(series) || !elapsedSeries.length) {
+  if (!Array.isArray(series) || !series.length || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
   }
 
@@ -214,35 +135,55 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
     return heldValue ?? null
   }
 
-  const interpolatedValue = getInterpolatedSeriesValue(elapsedSeries, series, elapsedSecond)
+  const policy = interpolationMode === 'preserve' ? MISSING_SAMPLE_POLICY.PRESERVE : MISSING_SAMPLE_POLICY.BRIDGE
+  const interpolatedValue = interpolateNumericSeries(elapsedSeries, series, elapsedSecond, policy)
 
-  return interpolatedValue ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+  if (interpolatedValue !== null) return interpolatedValue
+  return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+}
+
+function getPreferredElevationSeries(activity) {
+  const barometricSeries = activity?.barometric_altitude
+  if (Array.isArray(barometricSeries) && barometricSeries.some((value) => value !== null && value !== undefined)) {
+    return barometricSeries
+  }
+
+  return activity?.elevation
 }
 
 /**
  * Interpolates the time-of-day value at the given elapsed second.
- * Uses the sync_time offset when available, otherwise
- * interpolates the ISO time series.
+ * Interpolates the ISO time series when available, falling back to sync_time
+ * only when the activity has no time series values.
  *
  * @param {object|null} activity - Parsed activity data.
  * @param {number} elapsedSecond - Target elapsed second.
  * @returns {string} ISO timestamp string.
  */
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
-  const syncTimeMs = Date.parse(activity?.sync_time || '')
-  if (Number.isFinite(syncTimeMs)) {
-    return new Date(syncTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
-  }
+  const previewActivity = getPreviewActivity(activity, elapsedSecond)
+  if (previewActivity === null) return DEFAULT_ACTIVITY_PREVIEW.time
 
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-  const timeSeries = Array.isArray(activity?.time) ? activity.time : []
+  const elapsedSeries = Array.isArray(previewActivity.sample_elapsed_seconds) ? previewActivity.sample_elapsed_seconds : []
+  const timeSeries = Array.isArray(previewActivity.time) ? previewActivity.time : []
   const numericTimeSeries = timeSeries.map((value) => {
     const parsed = Date.parse(value || '')
     return Number.isFinite(parsed) ? parsed : null
   })
-  const interpolatedTimeMs = getInterpolatedSeriesValue(elapsedSeries, numericTimeSeries, elapsedSecond)
+  const interpolatedTimeMs = interpolateNumericSeries(elapsedSeries, numericTimeSeries, elapsedSecond)
 
-  return Number.isFinite(interpolatedTimeMs) ? new Date(interpolatedTimeMs).toISOString() : DEFAULT_ACTIVITY_PREVIEW.time
+  if (Number.isFinite(interpolatedTimeMs)) {
+    return new Date(interpolatedTimeMs).toISOString()
+  }
+
+  if (numericTimeSeries.every((value) => value === null)) {
+    const syncTimeMs = Date.parse(previewActivity.sync_time || '')
+    if (Number.isFinite(syncTimeMs)) {
+      return new Date(syncTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
+    }
+  }
+
+  return DEFAULT_ACTIVITY_PREVIEW.time
 }
 
 /**
@@ -258,7 +199,7 @@ export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const distanceProgressSeries = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
 
-  const interpolatedProgress = getInterpolatedSeriesValue(elapsedSeries, distanceProgressSeries, elapsedSecond)
+  const interpolatedProgress = interpolateNumericSeries(elapsedSeries, distanceProgressSeries, elapsedSecond)
 
   if (Number.isFinite(interpolatedProgress)) {
     return clamp(interpolatedProgress, 0, 1)

@@ -12,13 +12,16 @@ function createMeasuredElement(width = 500) {
 }
 
 describe('useTimelineViewport', () => {
-  test('initializes to full range and re-fits when totalDuration changes', () => {
-    const { result, rerender } = renderHook(([totalDuration]) => useTimelineViewport({ totalDuration }), { initialProps: [100] })
+  test('initializes to full range and re-fits when the media shape changes', () => {
+    const { result, rerender } = renderHook(
+      ([activityDurationSeconds, totalDuration]) => useTimelineViewport({ activityDurationSeconds, hasActivityData: true, totalDuration }),
+      { initialProps: [100, 100] },
+    )
 
     expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
 
     act(() => {
-      rerender([200])
+      rerender([200, 200])
     })
 
     expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 200 })
@@ -79,7 +82,7 @@ describe('useTimelineViewport', () => {
     expect(result.current.displayedFitTargetId).toBe('activity')
   })
 
-  test('resets to full range when media shape changes instead of keeping stale fit state', () => {
+  test('preserves the viewport when the sync offset changes across the timeline minimum', () => {
     const { result, rerender } = renderHook(
       ([videoSyncOffsetSeconds]) =>
         useTimelineViewport({
@@ -98,11 +101,29 @@ describe('useTimelineViewport', () => {
     expect(result.current.displayedFitTargetId).toBe('video')
 
     act(() => {
-      rerender([20])
+      rerender([-10])
     })
 
-    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 100 })
-    expect(result.current.displayedFitTargetId).toBe('all')
+    expect(result.current.viewport).toEqual({ viewStart: 9.2, viewEnd: 30.8 })
+    expect(result.current.displayedFitTargetId).toBeNull()
+  })
+
+  test('does not change viewport scale while a sync offset drag changes total duration', () => {
+    const { result, rerender } = renderHook(([totalDuration, isDragging]) => useTimelineViewport({ isDragging, totalDuration }), {
+      initialProps: [120, true],
+    })
+
+    act(() => {
+      rerender([110, true])
+    })
+
+    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 120 })
+
+    act(() => {
+      rerender([110, false])
+    })
+
+    expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 110 })
   })
 
   test('pans by seconds and clamps when panning past the end', () => {

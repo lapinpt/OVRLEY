@@ -10,6 +10,7 @@
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
+import { videoOverlapsActivity } from '@/lib/video-timing'
 import { formatCompositeBitrate, isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
 
 /**
@@ -67,8 +68,8 @@ function applyCompositeSceneFields(scene, options) {
   if (!Number.isFinite(displayWidth) || displayWidth <= 0 || !Number.isFinite(displayHeight) || displayHeight <= 0) {
     throw new Error('Imported video resolution is required for MP4 compositing.')
   }
-  if (!Number.isFinite(videoSyncOffsetSeconds) || videoSyncOffsetSeconds < 0) {
-    throw new Error('Imported video sync offset must be a non-negative number.')
+  if (!Number.isFinite(videoSyncOffsetSeconds)) {
+    throw new Error('Imported video sync offset must be a finite number.')
   }
 
   scene.width = displayWidth
@@ -82,6 +83,21 @@ function applyCompositeSceneFields(scene, options) {
   scene.composite_render_duration = renderDuration
   scene.composite_video_trim_start = 0
   scene.composite_widget_update_rate = scene.update_rate
+}
+
+/**
+ * Validates the effective video/activity overlap after export-range translation.
+ *
+ * @param {object} scene - Render-effective scene config.
+ * @param {number|null|undefined} timelineEnd - Activity timeline end.
+ */
+function validateCompositeTiming(scene, timelineEnd) {
+  const syncOffset = scene.composite_sync_offset
+  const renderDuration = scene.composite_render_duration
+  const activityEnd = timelineEnd ?? Number.POSITIVE_INFINITY
+  if (!videoOverlapsActivity({ videoStart: syncOffset, videoDuration: renderDuration, activityEnd })) {
+    throw new Error('Imported video range must have positive overlap with the activity timeline.')
+  }
 }
 
 /**
@@ -215,10 +231,17 @@ export function createRenderEffectiveConfig(options) {
   applyTimelineSceneFields(scene, timelineStart, timelineEnd)
   applyCodecDefaults(scene, resolvedExportCodec)
   applyCustomExportRange(scene, exportRange, shouldComposite ? importedVideoPath : null)
+  if (shouldComposite) {
+    validateCompositeTiming(scene, timelineEnd)
+  }
 
   return {
     ...nextConfig,
     scene,
-    values: nextConfig.values?.map(({ display_variants: _displayVariants, ...value }) => value),
+    values: nextConfig.values?.map(({ display_variants: _displayVariants, ...value }) => {
+      if (value.display_type !== 'lean_angle') return value
+      const { width: _width, height: _height, ...renderValue } = value
+      return renderValue
+    }),
   }
 }

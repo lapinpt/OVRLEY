@@ -3,7 +3,7 @@
  */
 
 import { clamp } from '@/lib/utils'
-import { interpolateCoursePoint, coursePointsEqual } from '@/lib/interpolation'
+import { interpolateCoursePoint, coursePointsEqual, interpolateNumericSeries } from '@/lib/interpolation'
 import { resolveActivityDuration } from '@/lib/preview-timing'
 
 /**
@@ -46,12 +46,13 @@ export function timeToSeconds(timeStr) {
  * @returns {string} Zero-padded HH:MM:SS string.
  */
 export function formatExportRangeTime(seconds) {
-  const safeSeconds = Math.max(0, Math.trunc(Number(seconds) || 0))
+  const sign = seconds < 0 ? '-' : ''
+  const safeSeconds = Math.trunc(Math.abs(seconds))
   const hours = Math.floor(safeSeconds / 3600)
   const minutes = Math.floor((safeSeconds % 3600) / 60)
   const remainingSeconds = safeSeconds % 60
 
-  return [hours, minutes, remainingSeconds].map((part) => String(part).padStart(2, '0')).join(':')
+  return `${sign}${[hours, minutes, remainingSeconds].map((part) => String(part).padStart(2, '0')).join(':')}`
 }
 
 /**
@@ -165,19 +166,8 @@ export function getExportWindowDistanceSpan(activity, window) {
     return null
   }
 
-  const interpolate = (xValues, yValues, targetX) => {
-    if (!xValues.length || !yValues.length) return null
-    for (let i = 0; i < xValues.length - 1; i++) {
-      if (targetX >= xValues[i] && targetX <= xValues[i + 1]) {
-        const t = (targetX - xValues[i]) / (xValues[i + 1] - xValues[i] || 1)
-        return yValues[i] + t * (yValues[i + 1] - yValues[i])
-      }
-    }
-    return targetX <= xValues[0] ? yValues[0] : yValues[yValues.length - 1]
-  }
-
-  const startProgress = interpolate(elapsedSeries, distanceProgress, window.start)
-  const endProgress = interpolate(elapsedSeries, distanceProgress, window.end)
+  const startProgress = interpolateNumericSeries(elapsedSeries, distanceProgress, window.start)
+  const endProgress = interpolateNumericSeries(elapsedSeries, distanceProgress, window.end)
 
   if (!Number.isFinite(startProgress) || !Number.isFinite(endProgress)) {
     return null
@@ -228,18 +218,7 @@ export function getWindowProgressAtTime(activity, window, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const distanceProgress = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
 
-  const interpolate = (xValues, yValues, targetX) => {
-    if (!xValues.length || !yValues.length) return null
-    for (let i = 0; i < xValues.length - 1; i++) {
-      if (targetX >= xValues[i] && targetX <= xValues[i + 1]) {
-        const t = (targetX - xValues[i]) / (xValues[i + 1] - xValues[i] || 1)
-        return yValues[i] + t * (yValues[i + 1] - yValues[i])
-      }
-    }
-    return targetX <= xValues[0] ? yValues[0] : yValues[yValues.length - 1]
-  }
-
-  const currentProgress = interpolate(elapsedSeries, distanceProgress, elapsedSecond)
+  const currentProgress = interpolateNumericSeries(elapsedSeries, distanceProgress, elapsedSecond)
 
   if (!Number.isFinite(currentProgress)) {
     return null

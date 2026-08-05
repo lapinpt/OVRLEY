@@ -32,4 +32,4 @@ The workflow uploads a zipped `.app`. The `.app` is the portable form on macOS; 
 
 ## FFmpeg Updates
 
-`pnpm install` runs `scripts/install-ffmpeg.mjs`. The script skips an existing bundled FFmpeg when it is version `8.1` or newer. Set `OVRLEY_FFMPEG_ARCHIVE_URL` to test or pin a different ZIP source, or set `OVRLEY_SKIP_FFMPEG_INSTALL=1` when preparing a build environment manually.
+`pnpm install` runs `scripts/install-ffmpeg.mjs`. Windows and Linux use BtbN's current `latest` GPL shared archives and validate the required encoders, filters, and `ffprobe` executable without pinning an internal BtbN build identifier. macOS remains pinned to FFmpeg `8.1.2`. Set `OVRLEY_FFMPEG_ARCHIVE_URL` to test or pin a different archive source, or set `OVRLEY_SKIP_FFMPEG_INSTALL=1` when preparing a build environment manually.

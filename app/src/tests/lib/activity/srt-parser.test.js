@@ -33,10 +33,10 @@ describe('parseSrtActivityFile (Format A bracketed telemetry)', () => {
     expect(elapsed[1]).toBeCloseTo(3.002, 3)
   })
 
-  test('populates abs_alt into both altitude and elevation', () => {
+  test('populates abs_alt into elevation without the removed altitude alias', () => {
     const result = parseSrtActivityFile(FORMAT_A_SRT, 'test-format-a.SRT')
-    expect(result.raw_samples[0].altitude).toBe(864.309)
     expect(result.raw_samples[0].elevation).toBe(864.309)
+    expect(result.raw_samples[0]).not.toHaveProperty('altitude')
   })
 
   test('populates camera telemetry fields from bracketed keys', () => {
@@ -137,7 +137,8 @@ describe('parseSrtActivityFile (shutter parsing)', () => {
     expect(result.raw_samples[1].aperture).toBe(2.8)
     expect(result.raw_samples[0].ev).toBe(0)
     expect(result.raw_samples[1].ev).toBeNull()
-    expect(result.raw_samples[0].altitude).toBe(14)
-    expect(result.raw_samples[1].altitude).toBe(16)
+    expect(result.raw_samples[0].elevation).toBe(14)
+    expect(result.raw_samples[1].elevation).toBe(16)
+    expect(result.raw_samples[0]).not.toHaveProperty('altitude')
   })
 })

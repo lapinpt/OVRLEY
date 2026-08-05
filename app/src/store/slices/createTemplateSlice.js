@@ -112,6 +112,14 @@ export function createTemplateSlice(set, get) {
         }
       }),
 
+    setSceneFpsAndUpdateRate: (fps, rate) =>
+      set((state) => {
+        state.config.scene.fps = fps
+        state.config.scene.updateRate = rate
+        state.updateRate = rate
+        updateConfigPersistence(state)
+      }),
+
     setExportRange: (range) =>
       set((state) => {
         state.exportRange = { ...state.exportRange, ...range }
@@ -148,9 +156,17 @@ export function createTemplateSlice(set, get) {
       })
     },
 
-    setAspectRatio: (ratio) =>
+    setCustomAspectRatio: () =>
+      set((state) => {
+        state.aspectRatio = 'custom'
+      }),
+
+    setAspectRatioPreset: (ratio, resolution) =>
       set((state) => {
         state.aspectRatio = ratio
+        state.config.scene.width = resolution.width
+        state.config.scene.height = resolution.height
+        updateConfigPersistence(state)
       }),
 
     createNewTemplate: () => {

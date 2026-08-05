@@ -8,10 +8,11 @@
 
 use super::interpolate::{
     densify_hold_series, interpolate_course_value, interpolate_numeric_series_value,
-    interpolate_time_series_value,
+    interpolation_strategy, interpolate_time_series_value, InterpolationStrategy,
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
+use crate::interpolation::MissingSamplePolicy;
 use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
@@ -60,14 +61,19 @@ fn trim_numeric_series(
     end: f64,
     start_inner_index: usize,
     end_inner_index: usize,
+    strategy: InterpolationStrategy,
 ) -> Vec<Option<f64>> {
     if data.is_empty() {
         return Vec::new();
     }
     // Boundary interpolation preserves continuity when the trim cuts through
     // the middle of a source sampling interval.
-    let start_value = interpolate_numeric_series_value(elapsed, data, start);
-    let end_value = interpolate_numeric_series_value(elapsed, data, end);
+    let missing_sample_policy = match strategy {
+        InterpolationStrategy::Hold => MissingSamplePolicy::Bridge,
+        InterpolationStrategy::Numeric(policy) => policy,
+    };
+    let start_value = interpolate_numeric_series_value(elapsed, data, start, missing_sample_policy);
+    let end_value = interpolate_numeric_series_value(elapsed, data, end, missing_sample_policy);
     trim_series(
         data,
         start_inner_index,
@@ -176,9 +182,11 @@ pub fn trim_activity(
             .map(Some)
             .collect::<Vec<_>>();
         let start_progress =
-            interpolate_numeric_series_value(elapsed, &source, start).unwrap_or(0.0);
+            interpolate_numeric_series_value(elapsed, &source, start, MissingSamplePolicy::Bridge)
+                .unwrap_or(0.0);
         let end_progress =
-            interpolate_numeric_series_value(elapsed, &source, end).unwrap_or(start_progress);
+            interpolate_numeric_series_value(elapsed, &source, end, MissingSamplePolicy::Bridge)
+                .unwrap_or(start_progress);
         let mut trimmed = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
         trimmed.push(Some(start_progress));
         trimmed.extend(
@@ -233,6 +241,60 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Elevation),
+            )
+        } else {
+            Vec::new()
+        },
+        calories: if requirements.calories {
+            trim_numeric_series(
+                elapsed,
+                &activity.calories,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                interpolation_strategy(crate::MetricKind::Calories),
+            )
+        } else {
+            Vec::new()
+        },
+        distance_to_home: if requirements.distance_to_home {
+            trim_numeric_series(
+                elapsed,
+                &activity.distance_to_home,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                interpolation_strategy(crate::MetricKind::DistanceToHome),
+            )
+        } else {
+            Vec::new()
+        },
+        total_ascent: if requirements.total_ascent {
+            trim_numeric_series(
+                elapsed,
+                &activity.total_ascent,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                interpolation_strategy(crate::MetricKind::TotalAscent),
+            )
+        } else {
+            Vec::new()
+        },
+        full_activity_total_ascent: last_finite(&activity.total_ascent),
+        barometric_altitude: if requirements.barometric_altitude {
+            trim_numeric_series(
+                elapsed,
+                &activity.barometric_altitude,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                interpolation_strategy(crate::MetricKind::Elevation),
             )
         } else {
             Vec::new()
@@ -245,6 +307,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Speed),
             )
         } else {
             Vec::new()
@@ -257,6 +320,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Distance),
             )
         } else {
             Vec::new()
@@ -269,6 +333,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Heartrate),
             )
         } else {
             Vec::new()
@@ -281,6 +346,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Cadence),
             )
         } else {
             Vec::new()
@@ -293,6 +359,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Power),
             )
         } else {
             Vec::new()
@@ -305,6 +372,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Temperature),
             )
         } else {
             Vec::new()
@@ -317,6 +385,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Pace),
             )
         } else {
             Vec::new()
@@ -329,6 +398,46 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::GForce),
+            )
+        } else {
+            Vec::new()
+        },
+        g_force_x: if requirements.g_force_x {
+            trim_numeric_series(
+                elapsed,
+                &activity.g_force_x,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
+            )
+        } else {
+            Vec::new()
+        },
+        g_force_y: if requirements.g_force_y {
+            trim_numeric_series(
+                elapsed,
+                &activity.g_force_y,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
+            )
+        } else {
+            Vec::new()
+        },
+        g_force_z: if requirements.g_force_z {
+            trim_numeric_series(
+                elapsed,
+                &activity.g_force_z,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
             )
         } else {
             Vec::new()
@@ -341,6 +450,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Rpm),
             )
         } else {
             Vec::new()
@@ -353,6 +463,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::ThrottlePosition),
             )
         } else {
             Vec::new()
@@ -365,6 +476,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::BrakePosition),
             )
         } else {
             Vec::new()
@@ -377,6 +489,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::LeanAngle),
             )
         } else {
             Vec::new()
@@ -389,6 +502,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::AirPressure),
             )
         } else {
             Vec::new()
@@ -401,6 +515,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::GroundContactTime),
             )
         } else {
             Vec::new()
@@ -413,6 +528,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::LeftRightBalance),
             )
         } else {
             Vec::new()
@@ -425,6 +541,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::StrideLength),
             )
         } else {
             Vec::new()
@@ -437,6 +554,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::StrokeRate),
             )
         } else {
             Vec::new()
@@ -449,6 +567,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Torque),
             )
         } else {
             Vec::new()
@@ -461,18 +580,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
-            )
-        } else {
-            Vec::new()
-        },
-        altitude: if requirements.altitude {
-            trim_numeric_series(
-                elapsed,
-                &activity.altitude,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
+                interpolation_strategy(crate::MetricKind::VerticalSpeed),
             )
         } else {
             Vec::new()
@@ -485,6 +593,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Iso),
             )
         } else {
             Vec::new()
@@ -497,6 +606,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Aperture),
             )
         } else {
             Vec::new()
@@ -509,6 +619,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::ShutterSpeed),
             )
         } else {
             Vec::new()
@@ -521,6 +632,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::FocalLength),
             )
         } else {
             Vec::new()
@@ -533,6 +645,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Ev),
             )
         } else {
             Vec::new()
@@ -545,6 +658,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::ColorTemperature),
             )
         } else {
             Vec::new()
@@ -570,6 +684,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::VerticalRatio),
             )
         } else {
             Vec::new()
@@ -582,6 +697,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::VerticalOscillation),
             )
         } else {
             Vec::new()
@@ -594,6 +710,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::CoreTemperature),
             )
         } else {
             Vec::new()
@@ -606,6 +723,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Gradient),
             )
         } else {
             Vec::new()
@@ -618,6 +736,7 @@ pub fn trim_activity(
                 end,
                 start_inner_index,
                 end_inner_index,
+                interpolation_strategy(crate::MetricKind::Heading),
             )
         } else {
             Vec::new()

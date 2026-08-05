@@ -73,8 +73,14 @@ export const COURSE_PLOT_KEYS = [...Object.keys(COURSE_PLOT_DEFAULTS), 'id']
 /** Keys preserved when normalizing an elevation plot widget. */
 export const ELEVATION_PLOT_KEYS = [...Object.keys(ELEVATION_PLOT_DEFAULTS), 'id']
 
+/** Keys that are structural/identity and never belong in per-display variants. */
+const DISPLAY_VARIANT_EXCLUDED_KEYS = new Set(['id', 'value', 'display_variants', 'x', 'y', 'display_type'])
+
 /** Allowed keys for display variant configs during normalization. */
 const DISPLAY_VARIANT_FRAME_KEYS = ['width', 'height', 'rotation']
+const DISPLAY_VARIANT_FRAME_KEYS_BY_TYPE = {
+  lean_angle: ['rotation'],
+}
 
 export const DISPLAY_VARIANT_KEYS = Object.freeze(
   Object.fromEntries(
@@ -82,7 +88,11 @@ export const DISPLAY_VARIANT_KEYS = Object.freeze(
       .filter(([, definition]) => definition.layoutMode === 'boxed')
       .map(([displayType, definition]) => [
         displayType,
-        [...DISPLAY_VARIANT_FRAME_KEYS, ...Object.keys(definition.defaults || {}), ...(definition.conditionalKeys || [])],
+        [
+          ...(DISPLAY_VARIANT_FRAME_KEYS_BY_TYPE[displayType] || DISPLAY_VARIANT_FRAME_KEYS),
+          ...Object.keys(definition.defaults || {}).filter((key) => !DISPLAY_VARIANT_EXCLUDED_KEYS.has(key)),
+          ...(definition.conditionalKeys || []),
+        ],
       ]),
   ),
 )

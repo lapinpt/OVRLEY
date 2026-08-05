@@ -26,6 +26,10 @@ describe('standard metric widget catalog', () => {
     expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual([
       'speed',
       'distance',
+      'gps_coordinates',
+      'distance_to_home',
+      'total_ascent',
+      'calories',
       'heartrate',
       'cadence',
       'power',
@@ -78,7 +82,36 @@ describe('standard metric widget catalog', () => {
         assetFile: 'widget-distance.svg',
       },
     })
-    expect(distance.supportedDisplayUnits.map((option) => option.value)).toEqual(['m', 'km', 'mi'])
+    expect(distance.supportedDisplayUnits.map((option) => option.value)).toEqual(['m', 'km', 'mi', 'ft'])
+  })
+
+  test('exposes the new text metric definitions from the shared manifest', () => {
+    expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(['gps_coordinates', 'distance_to_home', 'total_ascent', 'calories']))
+    expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(['gps_coordinates', 'distance_to_home', 'total_ascent', 'calories']))
+    expect(getStandardMetricDefinition('gps_coordinates')).toMatchObject({
+      formatter: 'coordinates',
+      defaultDisplayUnit: 'both',
+      supportedDisplayUnits: [{ value: 'latitude' }, { value: 'longitude' }, { value: 'both' }],
+      showUnitsByDefault: false,
+      category: 'general',
+    })
+    expect(getStandardMetricDefinition('distance_to_home')).toMatchObject({
+      formatter: 'distance',
+      defaultDisplayUnit: 'm',
+      category: 'other',
+    })
+    expect(getStandardMetricDefinition('total_ascent')).toMatchObject({
+      formatter: 'elevation',
+      defaultDisplayUnit: 'm',
+      category: 'general',
+    })
+    expect(getStandardMetricDefinition('calories')).toMatchObject({
+      formatter: 'integer',
+      defaultDisplayUnit: 'kcal',
+      showUnitsByDefault: true,
+      category: 'other',
+    })
+    expect(getSupportedDisplayTypes('gps_coordinates')).toEqual(['text'])
   })
 
   test('records the planned icon catalog for future standard metric widgets', () => {
@@ -131,6 +164,7 @@ describe('standard metric widget catalog', () => {
       expect(def.interpolation).toBeDefined()
       expect(def.unitsMode).toBeDefined()
     }
+    expect(getStandardMetricDefinition('altitude').dataSource).toBe('elevation')
   })
 
   test('Phase 1 new metric definitions carry correct interpolation policy', () => {
@@ -158,7 +192,7 @@ describe('standard metric widget catalog', () => {
     for (const type of vehicleTypes) {
       expect(isStandardMetricWidgetType(type)).toBe(true)
       expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')
-      expect(getStandardMetricInterpolation(type)).toBe('linear')
+      expect(getStandardMetricInterpolation(type)).toBe(type === 'rpm' ? 'preserve' : 'linear')
       expect(getStandardMetricUnitsMode(type)).toBe('selectable')
     }
 
@@ -173,10 +207,21 @@ describe('standard metric widget catalog', () => {
     })
   })
 
+  test('registers shared icons for the new metric widgets', () => {
+    for (const type of ['gps_coordinates', 'distance_to_home', 'total_ascent', 'calories']) {
+      expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')
+    }
+  })
+
   test('existing metrics carry interpolation and unitsMode defaults', () => {
-    const existingTypes = ['speed', 'distance', 'heartrate', 'cadence', 'power', 'temperature', 'pace', 'heading']
-    for (const type of existingTypes) {
+    const linearTypes = ['speed', 'distance', 'heartrate', 'temperature', 'heading']
+    const preserveTypes = ['cadence', 'power', 'pace']
+    for (const type of linearTypes) {
       expect(getStandardMetricInterpolation(type)).toBe('linear')
+      expect(getStandardMetricUnitsMode(type)).toBe('selectable')
+    }
+    for (const type of preserveTypes) {
+      expect(getStandardMetricInterpolation(type)).toBe('preserve')
       expect(getStandardMetricUnitsMode(type)).toBe('selectable')
     }
   })
@@ -197,15 +242,43 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.arc).toMatchObject({ label: 'Arc Gauge', layoutMode: 'boxed' })
     expect(DISPLAY_TYPE_DEFINITIONS.corner).toMatchObject({ label: 'Corner Gauge', layoutMode: 'boxed' })
     expect(DISPLAY_TYPE_DEFINITIONS.heading_tape).toMatchObject({ label: 'Heading Tape', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).toMatchObject({ label: 'Lean Angle', layoutMode: 'boxed' })
   })
 
-  test('boxed display types include default frame dimensions', () => {
+  test('boxed display types use explicit or derived geometry contracts', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameWidth).toBe(200)
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(24)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(220)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(220)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameWidth).toBe(162)
     expect(DISPLAY_TYPE_DEFINITIONS.corner.defaultFrameHeight).toBe(162)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFrameWidth')
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFrameHeight')
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.diameter).toBe(450)
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).not.toHaveProperty('defaultFontSize')
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults.font_size).toBe(90)
+  })
+
+  test('lean-angle display type exposes the complete static-sector contract', () => {
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle.defaults).toEqual({
+      display_type: 'lean_angle',
+      diameter: 450,
+      show_icon: false,
+      track_empty_color: '#222222',
+      track_empty_opacity: 0.5,
+      track_filled_color: '#dce2e8',
+      track_filled_opacity: 1,
+      track_border_thickness: 0,
+      track_border_color: '#ffffff',
+      track_thickness: 150,
+      font: 'Arial.ttf',
+      font_size: 90,
+      color: '#ffffff',
+      unit_color: '#ffffff',
+      show_units: true,
+      value_offset_x: 0,
+      value_offset_y: 0,
+    })
   })
 
   test('gauge defaults select continuous fill without fixed segmented geometry', () => {
@@ -243,6 +316,7 @@ describe('display type definitions', () => {
     expect(isBoxedDisplayType('arc')).toBe(true)
     expect(isBoxedDisplayType('corner')).toBe(true)
     expect(isBoxedDisplayType('heading_tape')).toBe(true)
+    expect(isBoxedDisplayType('lean_angle')).toBe(true)
     expect(isBoxedDisplayType('nonexistent')).toBe(false)
   })
 
@@ -251,12 +325,14 @@ describe('display type definitions', () => {
     expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 24 })
     expect(getDefaultFrameDimensions('arc')).toEqual({ width: 220, height: 220 })
     expect(getDefaultFrameDimensions('corner')).toEqual({ width: 162, height: 162 })
+    expect(getDefaultFrameDimensions('lean_angle')).toBeNull()
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
 
   test('getSupportedDisplayTypes respects per-metric overrides', () => {
     expect(getSupportedDisplayTypes('heading')).toEqual(['text', 'heading_tape'])
     expect(getSupportedDisplayTypes('core_temperature')).toEqual(['text'])
+    expect(getSupportedDisplayTypes('lean_angle')).toEqual(['text', 'lean_angle'])
     expect(getSupportedDisplayTypes('speed')).toContain('text')
   })
 

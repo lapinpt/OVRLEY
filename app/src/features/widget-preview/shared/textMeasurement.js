@@ -4,16 +4,17 @@
  */
 
 import {
-  FONT_FAMILY_MAP,
   METRIC_WIDGET_LINE_HEIGHT,
   METRIC_WIDGET_OUTER_GAP_PX,
   METRIC_WIDGET_UNITS_GAP_PX,
   NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
-} from '@/features/overlay-editor'
+} from '@/features/overlay-editor/data/overlayEditorConstants'
+import { FONT_FAMILY_MAP } from '@/features/overlay-editor/data/overlayEditorConfig'
 import { getFontFamilyName } from '@/lib/fonts'
 import { clamp } from '@/lib/utils'
 
 let metricMeasureContext = null
+const COORDINATE_PREVIEW_VERTICAL_METRICS_TEXT = 'NSEW88\u00B088.888\u203288\u2033'
 
 function createEmptyTextMeasure() {
   return {
@@ -113,10 +114,14 @@ function resolvePreviewVerticalMetricsText(text) {
     return ''
   }
 
+  if (text.includes('\u00B0') && (text.includes('\u2032') || text.includes('\u2033'))) {
+    return COORDINATE_PREVIEW_VERTICAL_METRICS_TEXT
+  }
+
   return text === 'N' || /^[0-9/:.%+-]+$/.test(text) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : text
 }
 
-function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
+export function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
   const metricsText = resolvePreviewVerticalMetricsText(text)
   if (!metricsText) {
     return createEmptyVerticalMetrics()

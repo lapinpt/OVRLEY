@@ -15,10 +15,13 @@ import {
 } from '@/features/overlay-editor/utils/exportRange'
 
 function sanitizeTimeInput(value) {
-  return String(value)
+  const input = String(value).trim()
+  const sign = input.startsWith('-') ? '-' : ''
+  const sanitized = input
     .split(':')
     .map((part) => part.split(/[.,]/)[0].replace(/\D/g, ''))
     .join(':')
+  return `${sign}${sanitized}`
 }
 
 function preventDecimalInput(event) {

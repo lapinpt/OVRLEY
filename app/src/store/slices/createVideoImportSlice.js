@@ -1,5 +1,26 @@
 import { detectCodecs } from '@/api/backend'
+import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
+import { videoOverlapsActivity } from '@/lib/video-timing'
+
+/**
+ * Converts a timestamp to the comparison clock used for activity sync.
+ *
+ * Activity/GPS timestamps are absolute UTC instants, so the formatter converts
+ * them to the activity timezone before the clock text is parsed. The `ffprobe`
+ * path deliberately keeps the tag's clock text unchanged: camera metadata is
+ * inconsistent, and a value ending in `Z` may be either real UTC or local
+ * camera time incorrectly labeled as UTC. Both interpretations are evaluated
+ * in `computeVideoSync` when that source is used.
+ */
+function parseSyncTimestamp(timestamp, source, timezone) {
+  const formattedTimestamp = formatVideoCreationTime(timestamp, source, timezone)
+  if (typeof formattedTimestamp !== 'string' || formattedTimestamp.trim() === '') return null
+
+  const normalized = formattedTimestamp.trim().replace(' ', 'T')
+  const parsed = Date.parse(normalized.endsWith('Z') ? normalized : `${normalized}Z`)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 let fetchCodecsOnce = null
 
@@ -44,6 +65,24 @@ function validateImportedVideoTiming(metadata) {
   }
 }
 
+function validateVideoSyncOffset(seconds, videoDuration, label = 'Video sync offset') {
+  if (!Number.isFinite(seconds)) {
+    throw new Error(`${label} must be a finite number`)
+  }
+  if (videoDuration === null) return
+  if (!videoOverlapsActivity({ videoStart: seconds, videoDuration })) {
+    throw new Error(`${label} must leave a positive overlap with the imported video`)
+  }
+}
+
+function videoTimestampOverlapsActivity(timestamp, videoDuration, activityStart, activityEnd) {
+  return videoOverlapsActivity({
+    videoStart: (timestamp - activityStart) / 1000,
+    videoDuration,
+    activityEnd: (activityEnd - activityStart) / 1000,
+  })
+}
+
 export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
   importedVideoDuration: null, // seconds (float), read via ffprobe
@@ -52,12 +91,15 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoFpsDen: null, // exact ffprobe FPS denominator
   importedVideoResolution: null, // display-oriented { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
+  importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | null
   importedVideoImportId: null, // opaque local preview server import ID
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
   importedVideoPreviewWarnings: [],
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
+  videoSyncOffsetPreviewSeconds: null, // transient drag preview; committed on release
   videoSyncWarning: null, // string warning or null
+  videoSyncTimezoneMode: null, // "local" or "utc" when both ffprobe interpretations fit the activity
   availableCodecs: null,
   importedVideoCodecName: null,
   importedVideoCodecLongName: null,
@@ -77,10 +119,13 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFpsDen: metadata.fpsDen,
       importedVideoResolution,
       importedVideoCreationTime: metadata.creationTime,
+      importedVideoTimeSource: metadata.timeSource ?? null,
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
       importedBackgroundImagePath: null,
+      videoSyncOffsetPreviewSeconds: null,
+      videoSyncTimezoneMode: null,
       importedVideoCodecName: metadata.codecName ?? null,
       importedVideoCodecLongName: metadata.codecLongName ?? null,
       importedVideoBitRate: metadata.bitRate ?? null,
@@ -102,12 +147,15 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFpsDen: null,
       importedVideoResolution: null,
       importedVideoCreationTime: null,
+      importedVideoTimeSource: null,
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
       importedBackgroundImagePath: path || null,
       videoSyncOffsetSeconds: 0,
+      videoSyncOffsetPreviewSeconds: null,
       videoSyncWarning: null,
+      videoSyncTimezoneMode: null,
       importedVideoCodecName: null,
       importedVideoCodecLongName: null,
       importedVideoBitRate: null,
@@ -125,12 +173,15 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFpsDen: null,
       importedVideoResolution: null,
       importedVideoCreationTime: null,
+      importedVideoTimeSource: null,
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
       importedBackgroundImagePath: null,
       videoSyncOffsetSeconds: 0,
+      videoSyncOffsetPreviewSeconds: null,
       videoSyncWarning: null,
+      videoSyncTimezoneMode: null,
       importedVideoCodecName: null,
       importedVideoCodecLongName: null,
       importedVideoBitRate: null,
@@ -140,11 +191,16 @@ export const createVideoImportSlice = (set, get) => ({
   },
 
   setVideoSyncOffset: (seconds) => {
-    if (!Number.isFinite(seconds) || seconds < 0) {
-      throw new Error('Video sync offset must be a non-negative number')
-    }
+    validateVideoSyncOffset(seconds, get().importedVideoDuration)
     set({
       videoSyncOffsetSeconds: seconds,
+    })
+  },
+
+  setVideoSyncOffsetPreview: (seconds) => {
+    if (seconds !== null) validateVideoSyncOffset(seconds, get().importedVideoDuration, 'Video sync offset preview')
+    set({
+      videoSyncOffsetPreviewSeconds: seconds,
     })
   },
 
@@ -152,6 +208,15 @@ export const createVideoImportSlice = (set, get) => ({
     set({
       videoSyncWarning: msg,
     }),
+
+  setVideoSyncTimezoneMode: (mode) => {
+    if (mode !== 'local' && mode !== 'utc') {
+      throw new Error('Video sync timezone mode must be local or utc')
+    }
+
+    set({ videoSyncTimezoneMode: mode })
+    get().computeVideoSync(get().activitySummary)
+  },
 
   setImportedVideoPreviewWarnings: (warnings) =>
     set({
@@ -185,33 +250,94 @@ export const createVideoImportSlice = (set, get) => ({
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Could not determine video creation time',
+          videoSyncTimezoneMode: null,
         }
       }
 
-      const videoStart = new Date(state.importedVideoCreationTime).getTime()
-      const activityStart = new Date(activitySummary?.syncTime).getTime()
-      const activityEnd = new Date(activitySummary?.endTime).getTime()
+      const timezone = activitySummary?.timezone
+      if (!timezone) {
+        return {
+          videoSyncOffsetSeconds: 0,
+          videoSyncWarning: 'Activity timezone is required for video sync',
+          videoSyncTimezoneMode: null,
+        }
+      }
 
-      if (isNaN(videoStart) || (activitySummary && (isNaN(activityStart) || isNaN(activityEnd)))) {
+      const activityStart = parseSyncTimestamp(activitySummary.syncTime, 'gps', timezone)
+      const activityEnd = parseSyncTimestamp(activitySummary.endTime, 'gps', timezone)
+      if (activityStart === null || activityEnd === null) {
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncTimezoneMode: null,
+        }
+      }
+
+      let videoStart = null
+      let timezoneMode = null
+      const videoDuration = state.importedVideoDuration
+
+      if (state.importedVideoTimeSource === 'ffprobe') {
+        // An ffprobe `creation_time` tag cannot reliably identify its timezone.
+        // Some cameras write a real UTC instant; others write local camera time
+        // and append `Z`. Build both candidates, then keep only candidates whose
+        // start time lies inside the activity interval. If both survive, the
+        // stored mode selects one and the UI exposes the alternate choice.
+        const withoutTimezone = parseSyncTimestamp(state.importedVideoCreationTime, 'ffprobe', timezone)
+        const withTimezone = parseSyncTimestamp(state.importedVideoCreationTime, 'gps', timezone)
+        const candidates = [
+          { timestamp: withoutTimezone, timezoneApplied: false },
+          { timestamp: withTimezone, timezoneApplied: true },
+        ].filter(({ timestamp }) => timestamp !== null && videoTimestampOverlapsActivity(timestamp, videoDuration, activityStart, activityEnd))
+
+        if (withoutTimezone === null || withTimezone === null) {
+          return {
+            videoSyncOffsetSeconds: 0,
+            videoSyncWarning: 'Invalid timestamp formats',
+            videoSyncTimezoneMode: null,
+          }
+        }
+
+        if (candidates.length === 0) {
+          return {
+            videoSyncOffsetSeconds: 0,
+            videoSyncWarning: 'Video could not be synced with activity',
+            videoSyncTimezoneMode: null,
+          }
+        }
+
+        const timezoneAmbiguous = candidates.length === 2 && withoutTimezone !== withTimezone
+        timezoneMode = timezoneAmbiguous ? (state.videoSyncTimezoneMode ?? 'local') : null
+        const selectedCandidate = timezoneAmbiguous
+          ? (candidates.find(({ timezoneApplied: candidateApplied }) => (candidateApplied ? 'utc' : 'local') === timezoneMode) ?? candidates[0])
+          : candidates[0]
+        videoStart = selectedCandidate.timestamp
+      } else {
+        videoStart = parseSyncTimestamp(state.importedVideoCreationTime, 'gps', timezone)
+      }
+
+      if (videoStart === null) {
+        return {
+          videoSyncOffsetSeconds: 0,
+          videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncTimezoneMode: null,
         }
       }
 
       const offsetSeconds = (videoStart - activityStart) / 1000
 
-      // within [activityStart, activityEnd]
-      if (videoStart < activityStart || videoStart > activityEnd) {
+      if (!videoTimestampOverlapsActivity(videoStart, videoDuration, activityStart, activityEnd)) {
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Video could not be synced with activity',
+          videoSyncTimezoneMode: null,
         }
       }
 
       return {
         videoSyncOffsetSeconds: offsetSeconds,
         videoSyncWarning: null,
+        videoSyncTimezoneMode: timezoneMode,
       }
     }),
 })

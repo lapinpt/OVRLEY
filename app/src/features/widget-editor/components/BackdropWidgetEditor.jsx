@@ -48,26 +48,38 @@ function CornerGrid({ rectangleData, onToggle }) {
   )
 }
 
-export default function BackdropWidgetEditor({ widget, updateWidgetData }) {
+export default function BackdropWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const displayType = widget.data.display_type || 'rectangle'
   const displayOptions = useMemo(() => getBackdropTypeOptions(), [])
   const activeData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
   const resolvedData = { ...widget.data, ...activeData, display_type: displayType }
   const borderMax = maxBorderThickness(resolvedData)
 
+  const buildActiveVariantUpdate = useCallback(
+    (updates) => ({
+      display_variants: {
+        ...(widget.data.display_variants || {}),
+        [displayType]: {
+          ...activeData,
+          ...updates,
+        },
+      },
+    }),
+    [activeData, displayType, widget.data.display_variants],
+  )
+
   const updateActiveVariant = useCallback(
     (updates) => {
-      updateWidgetData(widget.id, {
-        display_variants: {
-          ...(widget.data.display_variants || {}),
-          [displayType]: {
-            ...activeData,
-            ...updates,
-          },
-        },
-      })
+      updateWidgetData(widget.id, buildActiveVariantUpdate(updates))
     },
-    [activeData, displayType, updateWidgetData, widget.data.display_variants, widget.id],
+    [buildActiveVariantUpdate, updateWidgetData, widget.id],
+  )
+
+  const updateActiveVariantSize = useCallback(
+    (updates) => {
+      updateWidgetSize(widget.id, buildActiveVariantUpdate(updates))
+    },
+    [buildActiveVariantUpdate, updateWidgetSize, widget.id],
   )
 
   const handleDisplayTypeChange = useCallback(
@@ -143,8 +155,10 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData }) {
               min={0}
               max={borderMax}
               step={1}
+              integerDisplay
               valueDisplay={`${widget.data.border_thickness ?? 0}px`}
-              onSliderChange={(value) => updateWidgetData(widget.id, { border_thickness: value })}
+              onSliderChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
+              onSliderCommit={() => commitWidgetSize(widget.id)}
             />
           </div>
           <div className="min-h-0">
@@ -154,8 +168,10 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData }) {
               min={0}
               max={radiusMax}
               step={1}
+              integerDisplay
               valueDisplay={`${cornerRadius}px`}
-              onSliderChange={(value) => updateActiveVariant({ corner_radius: Math.min(Math.max(0, value), radiusMax) })}
+              onSliderChange={(value) => updateActiveVariantSize({ corner_radius: Math.min(Math.max(0, value), radiusMax) })}
+              onSliderCommit={() => commitWidgetSize(widget.id)}
             />
           </div>
         </div>
@@ -207,8 +223,10 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData }) {
             min={0}
             max={borderMax}
             step={1}
+            integerDisplay
             valueDisplay={`${widget.data.border_thickness ?? 0}px`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { border_thickness: value })}
+            onChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
           />
         ) : null}
       </div>

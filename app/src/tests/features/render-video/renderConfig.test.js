@@ -48,6 +48,52 @@ describe('render config preparation', () => {
     expect(renderConfig.values[0].color).toBe('#ffffff')
   })
 
+  test('removes lean-angle ephemeral frame dimensions from the backend payload', () => {
+    const config = {
+      scene: {
+        width: 1920,
+        height: 1080,
+        fps: 60,
+        start: 0,
+        end: 50,
+      },
+      labels: [],
+      values: [
+        {
+          id: 'lean-angle-1',
+          value: 'lean_angle',
+          x: 10,
+          y: 20,
+          font: 'Arial.ttf',
+          font_size: 60,
+          display_type: 'lean_angle',
+          display_variants: {
+            lean_angle: {
+              diameter: 180,
+              track_thickness: 24,
+            },
+          },
+        },
+      ],
+      plots: [],
+    }
+
+    const renderConfig = createRenderEffectiveConfig({
+      config,
+      globalDefaults: {},
+      updateRate: 1,
+      exportRange: { ...DEFAULT_EXPORT_RANGE },
+      exportCodec: 'prores_ks',
+      importedVideoPath: null,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.values[0]).toMatchObject({ diameter: 180, track_thickness: 24 })
+    expect(renderConfig.values[0]).not.toHaveProperty('width')
+    expect(renderConfig.values[0]).not.toHaveProperty('height')
+    expect(renderConfig.values[0]).not.toHaveProperty('display_variants')
+  })
+
   test('rehydrates scene start/end from editor timeline when durable template config omits them', () => {
     const config = {
       scene: {
@@ -124,5 +170,57 @@ describe('render config preparation', () => {
     expect(renderConfig.scene.custom_export_range_active).toBe(true)
     expect(renderConfig.scene).not.toHaveProperty('composite_video_path')
     expect(renderConfig.scene).not.toHaveProperty('composite_render_duration')
+  })
+
+  test('preserves a negative composite offset for the full video export', () => {
+    const renderConfig = createRenderEffectiveConfig({
+      config: {
+        scene: { width: 1920, height: 1080, fps: 60 },
+        labels: [],
+        values: [],
+        plots: [],
+      },
+      globalDefaults: {},
+      updateRate: 1,
+      exportRange: { ...DEFAULT_EXPORT_RANGE },
+      exportCodec: 'libx264',
+      importedVideoPath: 'C:\\clip.mp4',
+      importedVideoDuration: 30,
+      importedVideoFps: 30,
+      importedVideoFpsNum: 30,
+      importedVideoFpsDen: 1,
+      importedVideoResolution: { width: 1920, height: 1080 },
+      timelineStart: 0,
+      timelineEnd: 25,
+      videoSyncOffsetSeconds: -5,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.scene.composite_sync_offset).toBe(-5)
+    expect(renderConfig.scene.composite_render_duration).toBe(30)
+    expect(renderConfig.scene.start).toBe(0)
+    expect(renderConfig.scene.end).toBe(25)
+  })
+
+  test('rejects composite ranges with no activity overlap', () => {
+    expect(() =>
+      createRenderEffectiveConfig({
+        config: { scene: { width: 1920, height: 1080, fps: 60 }, labels: [], values: [], plots: [] },
+        globalDefaults: {},
+        updateRate: 1,
+        exportRange: { ...DEFAULT_EXPORT_RANGE },
+        exportCodec: 'libx264',
+        importedVideoPath: 'C:\\clip.mp4',
+        importedVideoDuration: 10,
+        importedVideoFps: 30,
+        importedVideoFpsNum: 30,
+        importedVideoFpsDen: 1,
+        importedVideoResolution: { width: 1920, height: 1080 },
+        timelineStart: 0,
+        timelineEnd: 25,
+        videoSyncOffsetSeconds: -10,
+        availableCodecs: null,
+      }),
+    ).toThrow(/positive overlap/)
   })
 })

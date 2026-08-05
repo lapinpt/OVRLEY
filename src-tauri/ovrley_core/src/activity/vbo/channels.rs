@@ -201,7 +201,7 @@ impl Metric {
                 "long_accel",
                 "y_acc",
             ],
-            Self::GForceZ => &["vertical_acc", "vert_acc", "z_acc"],
+            Self::GForceZ => &["vertical_acc", "vert_acc", "vertacc", "z_acc"],
             Self::Rpm => &["rpm", "engine_rpm"],
             Self::ThrottlePosition => &[
                 "accelerator_pos",

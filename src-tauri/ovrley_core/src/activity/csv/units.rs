@@ -79,7 +79,7 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
     let unit = match normalized.as_str() {
         "s" | "sec" | "second" | "seconds" => Unit::Seconds,
         "ms" | "millisecond" | "milliseconds" => Unit::Milliseconds,
-        "deg" | "degree" | "degrees" => Unit::Degrees,
+        "deg" | "degree" | "degrees" | "°" => Unit::Degrees,
         "m/s" | "mps" => Unit::MetresPerSecond,
         "km/h" | "kmh" | "kph" => Unit::KilometresPerHour,
         "mph" | "mi/h" => Unit::MilesPerHour,
@@ -127,7 +127,10 @@ pub(super) fn declaration_compatible(metric: Metric, declaration: DeclaredUnit) 
         DeclaredUnit::Unsupported(UnitDimension::Length) => {
             matches!(
                 metric,
-                Metric::Elevation | Metric::Altitude | Metric::Distance
+                Metric::Elevation
+                    | Metric::BarometricAltitude
+                    | Metric::Distance
+                    | Metric::DistanceToHome
             )
         }
         DeclaredUnit::Unsupported(UnitDimension::Unknown) => false,
@@ -169,7 +172,10 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
             unit,
             Unit::MetresPerSecond | Unit::KilometresPerHour | Unit::MilesPerHour
         ),
-        Metric::Elevation | Metric::Altitude | Metric::Distance => {
+        Metric::Elevation
+        | Metric::BarometricAltitude
+        | Metric::Distance
+        | Metric::DistanceToHome => {
             matches!(unit, Unit::Metres | Unit::Kilometres | Unit::Feet)
         }
         Metric::Heading => matches!(unit, Unit::Degrees),
@@ -180,6 +186,7 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
+        Metric::CompanionDate | Metric::GpsCoordinate => matches!(unit, Unit::Raw),
     }
 }
 
@@ -208,12 +215,16 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::ElapsedSeconds | Metric::Timestamp => Unit::Seconds,
         Metric::Latitude | Metric::Longitude => Unit::DecimalDegrees,
         Metric::Speed => Unit::KilometresPerHour,
-        Metric::Elevation | Metric::Altitude | Metric::Distance => Unit::Metres,
+        Metric::Elevation
+        | Metric::BarometricAltitude
+        | Metric::Distance
+        | Metric::DistanceToHome => Unit::Metres,
         Metric::Heading => Unit::Degrees,
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
         Metric::Rpm => Unit::RevolutionsPerMinute,
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,
         Metric::GearPosition => Unit::Raw,
+        Metric::CompanionDate | Metric::GpsCoordinate => Unit::Raw,
     }
 }

@@ -9,7 +9,7 @@
  * @returns {object} Preview model with measurement, baseline, visualBounds, and text properties.
  */
 
-import { METRIC_WIDGET_LINE_HEIGHT } from '@/features/overlay-editor'
+import { METRIC_WIDGET_LINE_HEIGHT } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { getPreviewFontFamily, getPreviewTextBaseline, measurePreviewText } from '../../shared/textMeasurement'
 
 export function buildTextWidgetPreviewModel({ widget }) {

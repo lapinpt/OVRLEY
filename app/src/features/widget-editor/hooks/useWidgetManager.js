@@ -12,6 +12,9 @@ import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget/widget-
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
 import { clamp } from '@/lib/utils'
 import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
+import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
+import { updateLiveWidgetDraft } from '@/features/overlay-editor/utils/widgetDomHelpers'
+import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
@@ -22,6 +25,8 @@ import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults,
  *   widgets: Array<object>,
  *   selectedWidgetId: string|null,
  *   updateWidgetData: Function,
+ *   updateWidgetSize: Function,
+ *   commitWidgetSize: Function,
  *   setNumericField: Function,
  *   addWidget: Function,
  *   deleteWidget: Function,
@@ -29,7 +34,7 @@ import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults,
  *   setSelectedWidgetId: Function,
  * }}
  */
-export function useWidgetManager() {
+export function useWidgetManager({ widgetLiveEdits }) {
   // Store selectors — shallow-pick zustand state needed for widget management
   const { config, globalDefaults, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
     useShallow((state) => ({
@@ -40,16 +45,43 @@ export function useWidgetManager() {
       setSelectedWidgetId: state.setSelectedWidgetId,
     })),
   )
+  const liveEdits = useWidgetDraftView(widgetLiveEdits)
   const parsedActivity = useStore.getState().parsedActivity
 
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {
-    return groupWidgetsForSidebar(buildConfigWidgets(config), TYPE_LABELS)
-  }, [config])
+    return groupWidgetsForSidebar(applyWidgetDrafts(buildConfigWidgets(config), liveEdits.liveWidgetDrafts), TYPE_LABELS)
+  }, [config, liveEdits.liveWidgetDrafts])
 
   // Update handler — applies partial updates to a widget via config utility
   const updateWidgetData = (id, updates) => {
     setConfig(updateWidgetInConfig(config, id, updates))
+  }
+
+  const updateWidgetSize = (id, updates) => {
+    const widget = widgets.find((item) => item.id === id)
+    if (!liveEdits.draftWidgetsRef.current[id]) {
+      liveEdits.beginWidgetInteraction(id, 'slider')
+    }
+    updateLiveWidgetDraft({
+      draftWidgetsRef: liveEdits.draftWidgetsRef,
+      setLiveWidgetDraft: liveEdits.setLiveWidgetDraft,
+      widgetId: id,
+      widget,
+      updates,
+      target: liveEdits.getWidgetNode(id),
+      globalScale: globalDefaults?.scale ?? 1,
+    })
+  }
+
+  const commitWidgetSize = (id) => {
+    const draft = liveEdits.draftWidgetsRef.current[id]?.data
+    if (draft) {
+      setConfig(updateWidgetInConfig(config, id, draft))
+    }
+
+    liveEdits.clearWidgetDraft(id)
+    liveEdits.endWidgetInteraction(id)
   }
 
   // Numeric field handler — parses raw input, clamps to range, updates widget
@@ -137,6 +169,8 @@ export function useWidgetManager() {
     widgets,
     selectedWidgetId,
     updateWidgetData,
+    updateWidgetSize,
+    commitWidgetSize,
     setNumericField,
     addWidget,
     deleteWidget,

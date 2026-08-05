@@ -40,10 +40,19 @@ const mockConfig = {
     },
   ],
 }
+const mockGlobalDefaults = {}
 
 vi.mock('@/store/useStore', () => ({
-  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: {}, fallbackDurationSeconds: 73 })),
+  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: mockGlobalDefaults, fallbackDurationSeconds: 73 })),
 }))
+
+const mockPointsToSvg = vi.fn((points) => points.map((p) => p.join(',')).join(' '))
+const mockAreaToSvg = vi.fn((points, width, height) => {
+  if (!points.length) return ''
+  const baseline = height
+  const topPoints = points.map(([x, y]) => `${x},${y}`).join(' ')
+  return `0,${baseline} ${topPoints} ${width},${baseline}`
+})
 
 vi.mock('@/lib/geometryUtils', () => ({
   findPointAtProgress: vi.fn((points, progress, target) => {
@@ -60,13 +69,8 @@ vi.mock('@/lib/geometryUtils', () => ({
     return { point: points[points.length - 1], index: points.length - 1 }
   }),
   getPointAtProgress: vi.fn(() => null),
-  pointsToSvg: vi.fn((points) => points.map((p) => p.join(',')).join(' ')),
-  areaToSvg: vi.fn((points, width, height) => {
-    if (!points.length) return ''
-    const baseline = height
-    const topPoints = points.map(([x, y]) => `${x},${y}`).join(' ')
-    return `0,${baseline} ${topPoints} ${width},${baseline}`
-  }),
+  pointsToSvg: (...args) => mockPointsToSvg(...args),
+  areaToSvg: (...args) => mockAreaToSvg(...args),
 }))
 
 vi.mock('@/features/widget-preview/shared/svgPreviewUtils', () => ({
@@ -82,6 +86,7 @@ import { buildElevationCompletedPoints } from '@/features/widget-preview/shared/
 
 function makeActivity() {
   return {
+    trim_end_seconds: 30,
     sample_elapsed_seconds: [0, 10, 20, 30],
     sample_distance_progress: [0, 0.33, 0.66, 1],
     sample_elevations: [100, 130, 115, 160],
@@ -185,6 +190,36 @@ describe('useElevationPreviewGeometry', () => {
     expect(geometry.remainingSvgPoints.length).toBeGreaterThan(0)
   })
 
+  test('reuses static elevation geometry when only previewSecond changes', async () => {
+    const activity = { ...makeActivity(), trim_end_seconds: 30 }
+    const data = makeData()
+    const style = makeStyle()
+    const { result, rerender } = renderHook(
+      ({ previewSecond }) => useElevationPreviewGeometry({ activity, data, exportRange: null, previewSecond, style }),
+      {
+        initialProps: { previewSecond: 15 },
+      },
+    )
+
+    await waitFor(() => {
+      expect(result.current).not.toBeNull()
+    })
+
+    const initialGeometry = result.current
+    const initialPointsSerializerCalls = mockPointsToSvg.mock.calls.length
+    const initialAreaSerializerCalls = mockAreaToSvg.mock.calls.length
+
+    rerender({ previewSecond: 20 })
+
+    expect(mockBuildElevationGeometry).toHaveBeenCalledTimes(1)
+    expect(mockPointsToSvg).toHaveBeenCalledTimes(initialPointsSerializerCalls + 1)
+    expect(mockAreaToSvg).toHaveBeenCalledTimes(initialAreaSerializerCalls + 1)
+    expect(result.current.remainingSvgPoints).toBe(initialGeometry.remainingSvgPoints)
+    expect(result.current.areaSvgPoints).toBe(initialGeometry.areaSvgPoints)
+    expect(result.current.completedSvgPoints).not.toBe(initialGeometry.completedSvgPoints)
+    expect(result.current.completedAreaSvgPoints).not.toBe(initialGeometry.completedAreaSvgPoints)
+  })
+
   test('keeps marker x distance-based while marker y and label follow elapsed-time elevation', async () => {
     mockBuildElevationGeometry.mockResolvedValue({
       ...GEOMETRY_RESPONSE,
@@ -200,6 +235,7 @@ describe('useElevationPreviewGeometry', () => {
     })
 
     const activity = {
+      trim_end_seconds: 30,
       sample_elapsed_seconds: [0, 10, 20, 30],
       sample_distance_progress: [0, 0, 0.66, 1],
       sample_elevations: [100, 130, 145, 160],

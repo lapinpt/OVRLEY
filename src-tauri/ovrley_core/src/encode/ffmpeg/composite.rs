@@ -30,7 +30,8 @@ use crate::render::FrameSize;
 
 use super::composite_filters::{
     composite_filter_complex, composite_overlay_thread_queue_size, cuda_display_metadata_filter,
-    format_seconds_arg, source_rotation_filter,
+    format_seconds_arg, normalize_source_rotation, qsv_overlay_cpu_rotation_filter,
+    source_rotation_filter,
 };
 use super::composite_profiles::composite_profile;
 
@@ -55,7 +56,7 @@ pub struct CompositeProfile {
 /// Composite mode currently uses three inputs:
 /// - input 0: unseeked source video for frame-accurate filter-side video trim
 /// - input 1: raw RGBA overlay frames from stdin (`pipe:0`)
-/// - input 2: separately trimmed source media for audio stream copy
+/// - input 2: untrimmed source media for filtered audio encoding
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
     pub codec_id: CompositeCodecId,
@@ -98,6 +99,9 @@ pub fn build_composite_ffmpeg_settings(
     source_rotation_degrees: Option<i32>,
 ) -> CoreResult<CompositeFfmpegSettings> {
     let FrameSize { width, height } = frame_size;
+    // Establish one canonical rotation value before profile selection and reuse
+    // it for filters, dimensions, autorotation, and output metadata.
+    let source_rotation_degrees = normalize_source_rotation(source_rotation_degrees)?;
     // ── PHASE 1: VALIDATE INPUTS & REDUCE FPS ──
     let video_path = render.video_path.to_string_lossy().into_owned();
 
@@ -137,6 +141,11 @@ pub fn build_composite_ffmpeg_settings(
         }
     }
 
+    let filter_stack_kind = selected_profile.codec_id.metadata().filter_stack_kind;
+    let qsv_full_overlay = matches!(filter_stack_kind, CompositeFilterStackKind::QsvFullOverlay);
+    let qsv_overlay_cpu_rotation_filter =
+        qsv_overlay_cpu_rotation_filter(source_rotation_degrees, filter_stack_kind);
+
     // ── PHASE 3: BUILD INPUT 0 ARGS (unseeked source video for filter-side trim) ──
     let mut input_0_args = if matches!(
         selected_profile.codec_id.metadata().filter_stack_kind,
@@ -150,7 +159,10 @@ pub fn build_composite_ffmpeg_settings(
             .map(|arg| (*arg).to_string())
             .collect()
     };
-    let source_autorotate_arg = if source_rotation_filter.is_some() {
+    // QSV-full must retain coded main-video surfaces for zero-copy compositing.
+    // Other profiles keep their existing behavior: disable FFmpeg autorotation
+    // only when the selected graph physically applies a rotation filter.
+    let source_autorotate_arg = if qsv_full_overlay || source_rotation_filter.is_some() {
         "-noautorotate"
     } else {
         "-autorotate"
@@ -178,36 +190,35 @@ pub fn build_composite_ffmpeg_settings(
         "pipe:0".to_string(),
     ];
 
-    // ── PHASE 5: BUILD INPUT 2 ARGS (trimmed audio source for stream copy) ──
+    // ── PHASE 5: BUILD INPUT 2 ARGS (untrimmed source for filtered audio) ──
     let mut input_2_args = Vec::new();
     if include_audio {
-        if render.trim_start > 0.0 {
-            input_2_args.push("-ss".to_string());
-            input_2_args.push(format_seconds_arg(render.trim_start));
-        }
-        input_2_args.extend([
-            source_autorotate_arg.to_string(),
-            "-t".to_string(),
-            format_seconds_arg(render.render_duration),
-            "-i".to_string(),
-            video_path,
-        ]);
+        input_2_args.extend(["-i".to_string(), video_path]);
     }
 
     // ── PHASE 6: BUILD FILTER COMPLEX (video trim + scale + overlay + format) ──
-    let filter_complex = composite_filter_complex(
+    let mut filter_complex = composite_filter_complex(
         width,
         height,
         render.trim_start,
         render.render_duration,
         selected_profile,
+        source_rotation_degrees,
         source_rotation_filter,
+        qsv_overlay_cpu_rotation_filter,
     )?;
+    if include_audio {
+        filter_complex.push_str(&format!(
+            ";[2:a]atrim=start={}:duration={},asetpts=N/SR/TB[aout]",
+            format_seconds_arg(render.trim_start),
+            format_seconds_arg(render.render_duration),
+        ));
+    }
 
-    // ── PHASE 7: BUILD OUTPUT ARGS (map, codec, bitrate, audio copy, mux flags) ──
+    // ── PHASE 7: BUILD OUTPUT ARGS (map, codecs, bitrate, audio encode, mux flags) ──
     let mut output_args = vec!["-map".to_string(), "[out]".to_string()];
     if include_audio {
-        output_args.extend(["-map".to_string(), "2:a?".to_string()]);
+        output_args.extend(["-map".to_string(), "[aout]".to_string()]);
     }
     output_args.extend(["-r".to_string(), render.source_fps.ffmpeg_arg()]);
     output_args.extend([
@@ -233,15 +244,20 @@ pub fn build_composite_ffmpeg_settings(
     }
     output_args.extend(["-b:v".to_string(), render.bitrate.clone()]);
     if include_audio {
-        output_args.extend(["-c:a".to_string(), "copy".to_string()]);
+        output_args.extend([
+            "-c:a".to_string(),
+            "aac".to_string(),
+            "-b:a".to_string(),
+            "192k".to_string(),
+        ]);
     }
-    output_args.extend([
-        "-movflags".to_string(),
-        "faststart".to_string(),
-        "-metadata:s:v:0".to_string(),
-        "rotate=0".to_string(),
-        "-y".to_string(),
-    ]);
+    output_args.extend(["-movflags".to_string(), "faststart".to_string()]);
+    // Physical-rotation profiles clear the now-stale display matrix. QSV-full
+    // leaves it untouched so players rotate the completed coded composite.
+    if !qsv_full_overlay {
+        output_args.extend(["-metadata:s:v:0".to_string(), "rotate=0".to_string()]);
+    }
+    output_args.push("-y".to_string());
 
     Ok(CompositeFfmpegSettings {
         codec_id: selected_profile.codec_id,
@@ -289,6 +305,8 @@ mod tests {
                 overlay_pipe_fps: Fps::new(30, 1).unwrap(),
                 overlay_frame_count: 30,
                 output_frame_count: 30,
+                activity_overlap_duration: 1.0,
+                blank_leading_frame_count: 0,
                 requested_codec_id: codec_id,
                 qsv_full_init_args: Vec::new(),
             };

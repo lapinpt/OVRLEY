@@ -82,6 +82,59 @@ fn test_4_3_derives_composite_shell_timing_without_rounding() {
 }
 
 #[test]
+fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
+    let mut config = mutable_recent_template_config(1920, 1080);
+    config.scene.composite_video_path = Some("input.mp4".to_string());
+    config.scene.composite_bitrate = Some("20M".to_string());
+    config.scene.composite_sync_offset = Some(-5.0);
+    config.scene.composite_video_fps_num = Some(30);
+    config.scene.composite_video_fps_den = Some(1);
+    config.scene.composite_video_duration = Some(30.0);
+    config.scene.composite_render_duration = Some(30.0);
+    config.scene.composite_video_trim_start = Some(0.0);
+    config.scene.composite_widget_update_rate = Some(1);
+
+    let mut shorter_activity_scene = validate_render_config(config.clone()).unwrap().scene;
+    let shorter_activity_plan =
+        derive_composite_render_plan(&mut shorter_activity_scene, Some(10.0)).unwrap();
+    assert_eq!(shorter_activity_scene.start, 0.0);
+    assert_eq!(shorter_activity_scene.end, 10.0);
+    assert_eq!(shorter_activity_plan.activity_overlap_duration, 10.0);
+    assert_eq!(shorter_activity_plan.overlay_frame_count, 900);
+    assert_eq!(shorter_activity_plan.output_frame_count, 900);
+
+    let mut scene = validate_render_config(config).unwrap().scene;
+    let plan = derive_composite_render_plan(&mut scene, Some(25.0)).unwrap();
+
+    assert_eq!(scene.start, 0.0);
+    assert_eq!(scene.end, 25.0);
+    assert_eq!(scene.end - scene.start, 25.0);
+    assert_eq!(plan.activity_overlap_duration, 25.0);
+    assert_eq!(plan.blank_leading_frame_count, 150);
+    assert_eq!(plan.overlay_frame_count, 900);
+    assert_eq!(plan.output_frame_count, 900);
+}
+
+#[test]
+fn composite_plan_rejects_offset_at_video_duration_boundary() {
+    let mut config = mutable_recent_template_config(1920, 1080);
+    config.scene.composite_video_path = Some("input.mp4".to_string());
+    config.scene.composite_bitrate = Some("20M".to_string());
+    config.scene.composite_sync_offset = Some(-30.0);
+    config.scene.composite_video_fps_num = Some(30);
+    config.scene.composite_video_fps_den = Some(1);
+    config.scene.composite_video_duration = Some(30.0);
+    config.scene.composite_render_duration = Some(30.0);
+    config.scene.composite_video_trim_start = Some(0.0);
+    config.scene.composite_widget_update_rate = Some(1);
+
+    let mut scene = validate_render_config(config).unwrap().scene;
+    let error = derive_composite_render_plan(&mut scene, Some(25.0)).unwrap_err();
+
+    assert!(error.to_string().contains("positive overlap"));
+}
+
+#[test]
 /// After deriving a plan, verifies the FFmpeg settings embedded in the plan
 /// have correct FPS args, codec/bitrate args, and filter graph labels.
 fn test_4_4_builds_ffmpeg_settings_inside_composite_shell() {
@@ -240,11 +293,19 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         "-ss",
         "300"
     ));
-    assert_argument_pair(&plan.ffmpeg_settings.input_2_args, "-t", "0.2");
+    assert_argument_pair(
+        &plan.ffmpeg_settings.input_2_args,
+        "-i",
+        "tmp/test-1080p.mp4",
+    );
     assert!(plan
         .ffmpeg_settings
         .filter_complex
         .contains("trim=start=0:end=0.2,setpts=PTS-STARTPTS,"));
+    assert!(plan
+        .ffmpeg_settings
+        .filter_complex
+        .contains("[2:a]atrim=start=0:duration=0.2,asetpts=N/SR/TB[aout]"));
 }
 
 /// Fractional render durations (0.101s) must use the overrun guard so that
@@ -281,7 +342,6 @@ fn test_5_8_video_with_audio_copies_audio_track() {
     assert!(audio.contains("codec_name=aac"));
 }
 
-#[test]
 /// Multi-threaded cancellation test: spawns a composite render on a
 /// background thread, cancels after 100ms, and verifies the render returns
 /// a Cancelled error and no partial output files are left behind.
@@ -293,6 +353,8 @@ fn test_5_8_video_with_audio_copies_audio_track() {
 /// Regressions guarded: cancelled renders leaving stale output files,
 /// cancel flag not respected by the render loop, error from cancel path
 /// not containing "cancelled".
+#[test]
+#[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
     let paths = test_paths_named("phase6_cancel");
     let before = composited_outputs(&paths);

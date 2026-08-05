@@ -1,7 +1,7 @@
 import { Compass, Ruler, Type, Target } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
-import { ColorField, SliderField, ToggleField, SelectField } from '../widgetFormControls'
+import { ColorField, SizeSlider, SliderField, ToggleField, SelectField } from '../widgetFormControls'
 import { SectionHeading } from '../widgetEditorSections'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
@@ -29,9 +29,10 @@ const INDICATOR_PLACEMENT_OPTIONS = [
  * @param {object} props.widget - Widget config.
  * @param {Function} props.updateWidgetData - Updates widget data.
  */
-export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) {
+export default function HeadingTapeDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const tapeData = useMemo(() => widget.data.display_variants?.heading_tape ?? {}, [widget.data.display_variants?.heading_tape])
   const updateTape = useDisplayVariantUpdater(widget, 'heading_tape', tapeData, updateWidgetData)
+  const updateTapeSize = useDisplayVariantUpdater(widget, 'heading_tape', tapeData, updateWidgetSize)
   const availableFonts = useAvailableFonts()
   const showMajorTicks = tapeData.show_major_ticks
   const showMinorTicks = tapeData.show_minor_ticks
@@ -43,14 +44,15 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
     <>
       <div className="space-y-4">
         <SectionHeading icon={Compass} title="Tape Scale" />
-        <SliderField
+        <SizeSlider
           label="Pixels per Degree"
           value={tapeData.pixels_per_degree}
           min={1}
           max={20}
           step={0.5}
           valueDisplay={`${tapeData.pixels_per_degree}px`}
-          onSliderChange={(value) => updateTape({ pixels_per_degree: value })}
+          onChange={(value) => updateTapeSize({ pixels_per_degree: value })}
+          onCommit={() => commitWidgetSize(widget.id)}
         />
       </div>
 
@@ -70,7 +72,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
               step={1}
               disabled={!showMajorTicks}
               valueDisplay={`${tapeData.major_tick_length_pct}%`}
-              onSliderChange={(value) => updateTape({ major_tick_length_pct: value })}
+              onSliderChange={(value) => updateTapeSize({ major_tick_length_pct: value })}
+              onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
               label="Major Thickness"
@@ -79,8 +82,10 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
               max={8}
               step={0.5}
               disabled={!showMajorTicks}
+              integerDisplay
               valueDisplay={`${tapeData.major_tick_thickness}px`}
-              onSliderChange={(value) => updateTape({ major_tick_thickness: value })}
+              onSliderChange={(value) => updateTapeSize({ major_tick_thickness: value })}
+              onSliderCommit={() => commitWidgetSize(widget.id)}
             />
           </div>
           <div className="space-y-4">
@@ -96,7 +101,8 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
               step={1}
               disabled={!showMinorTicks}
               valueDisplay={`${tapeData.minor_tick_length_pct}%`}
-              onSliderChange={(value) => updateTape({ minor_tick_length_pct: value })}
+              onSliderChange={(value) => updateTapeSize({ minor_tick_length_pct: value })}
+              onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
               label="Minor Thickness"
@@ -105,8 +111,10 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
               max={8}
               step={0.5}
               disabled={!showMinorTicks}
+              integerDisplay
               valueDisplay={`${tapeData.minor_tick_thickness}px`}
-              onSliderChange={(value) => updateTape({ minor_tick_thickness: value })}
+              onSliderChange={(value) => updateTapeSize({ minor_tick_thickness: value })}
+              onSliderCommit={() => commitWidgetSize(widget.id)}
             />
           </div>
         </div>
@@ -152,14 +160,15 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <SliderField
+          <SizeSlider
             label="Font Size"
             value={tapeData.label_font_size}
             min={6}
             max={36}
             step={1}
             valueDisplay={`${tapeData.label_font_size}px`}
-            onSliderChange={(value) => updateTape({ label_font_size: value })}
+            onChange={(value) => updateTapeSize({ label_font_size: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
             label="Offset"
@@ -167,8 +176,10 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
             min={0}
             max={20}
             step={1}
+            integerDisplay
             valueDisplay={`${tapeData.label_offset}px`}
-            onSliderChange={(value) => updateTape({ label_offset: value })}
+            onSliderChange={(value) => updateTapeSize({ label_offset: value })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
       </div>
@@ -196,14 +207,15 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
         </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField label="Indicator Color" value={tapeData.indicator_color} onChange={(value) => updateTape({ indicator_color: value })} />
-          <SliderField
+          <SizeSlider
             label="Indicator Size"
             value={tapeData.indicator_size}
             min={4}
             max={40}
             step={1}
             valueDisplay={`${tapeData.indicator_size}px`}
-            onSliderChange={(value) => updateTape({ indicator_size: value })}
+            onChange={(value) => updateTapeSize({ indicator_size: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
           />
         </div>
       </div>

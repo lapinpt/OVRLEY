@@ -45,6 +45,6 @@ fn zero_decimal_standard_metrics_round_like_canvas_preview() {
         ovrley_core::render::format::format_validated_metric_parts(&torque_validated, &dense, 0)
             .unwrap();
 
-    assert_eq!(speed_parts.value_text, "31");
-    assert_eq!(torque_parts.value_text, "19");
+    assert_eq!(speed_parts.standard_text().0, "31");
+    assert_eq!(torque_parts.standard_text().0, "19");
 }

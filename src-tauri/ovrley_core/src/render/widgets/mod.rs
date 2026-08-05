@@ -11,12 +11,16 @@ pub(crate) mod backdrop;
 pub(crate) mod common;
 /// Elevation profile widget implementation.
 pub(crate) mod elevation;
+/// G-force friction-circle widget implementation.
+pub mod g_force;
 /// Gauge renderers and gauge-specific shared infrastructure.
 pub mod gauges;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
 /// Heading compass tape widget implementation.
 pub mod heading;
+/// Lean-angle sector widget implementation.
+pub mod lean_angle;
 /// Marker and dot drawing helpers.
 mod marker;
 /// DisplayType-driven metric presentation dispatch.
@@ -42,8 +46,10 @@ use std::collections::BTreeMap;
 
 pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
+pub use g_force::{draw_g_force_widget, prepare_g_force_cache};
 pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
 pub use gauges::linear::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
+pub use lean_angle::{draw_lean_angle_widget, prepare_lean_angle_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
 pub use types::{
@@ -78,6 +84,7 @@ pub fn prepare_render_assets(
 
     let mut assets = PreparedRenderAssets {
         scene,
+        timezone: activity.timezone.clone(),
         backdrops,
         labels,
         values,
@@ -145,6 +152,28 @@ pub fn prepare_render_assets(
                 assets
                     .presentation_caches
                     .insert(idx, types::PresentationCache::ArcGauge(cache));
+            }
+            PreparedValue::LeanAngle(validated) => {
+                let cache = lean_angle::prepare_lean_angle_cache(
+                    validated,
+                    &assets.scene,
+                    prepare_profiler,
+                )?;
+                assets
+                    .presentation_caches
+                    .insert(idx, types::PresentationCache::LeanAngle(cache));
+            }
+            PreparedValue::GForce(validated) => {
+                let cache = g_force::prepare_g_force_cache(
+                    validated,
+                    &assets.scene,
+                    activity,
+                    dense_activity,
+                    prepare_profiler,
+                )?;
+                assets
+                    .presentation_caches
+                    .insert(idx, types::PresentationCache::GForce(cache));
             }
             _ => {}
         }

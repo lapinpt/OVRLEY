@@ -118,6 +118,12 @@ pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconK
             Some(MetricIconKind::BrakePosition)
         }
         crate::standard_metrics::MetricIconAssetKey::LeanAngle => Some(MetricIconKind::LeanAngle),
+        crate::standard_metrics::MetricIconAssetKey::House => Some(MetricIconKind::House),
+        crate::standard_metrics::MetricIconAssetKey::Satellite => Some(MetricIconKind::Satellite),
+        crate::standard_metrics::MetricIconAssetKey::ArrowUpNarrowWide => {
+            Some(MetricIconKind::ArrowUpNarrowWide)
+        }
+        crate::standard_metrics::MetricIconAssetKey::Calories => Some(MetricIconKind::Calories),
     }
 }
 
@@ -181,6 +187,12 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
             parsed_metric_icon_cached(icon_kind, &BRAKE_POSITION_ICON_CACHE)
         }
         MetricIconKind::LeanAngle => parsed_metric_icon_cached(icon_kind, &LEAN_ANGLE_ICON_CACHE),
+        MetricIconKind::House => parsed_metric_icon_cached(icon_kind, &HOUSE_ICON_CACHE),
+        MetricIconKind::Satellite => parsed_metric_icon_cached(icon_kind, &SATELLITE_ICON_CACHE),
+        MetricIconKind::ArrowUpNarrowWide => {
+            parsed_metric_icon_cached(icon_kind, &ARROW_UP_NARROW_WIDE_ICON_CACHE)
+        }
+        MetricIconKind::Calories => parsed_metric_icon_cached(icon_kind, &CALORIES_ICON_CACHE),
     }
 }
 
@@ -216,6 +228,10 @@ static RPM_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static THROTTLE_POSITION_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static BRAKE_POSITION_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static LEAN_ANGLE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static HOUSE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static SATELLITE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static ARROW_UP_NARROW_WIDE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static CALORIES_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 
 fn parsed_metric_icon_cached(
     icon_kind: MetricIconKind,
@@ -359,6 +375,22 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
         MetricIconKind::LeanAngle => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/widget-icons/widget-lean-angle.svg"
+        )),
+        MetricIconKind::House => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-house.svg"
+        )),
+        MetricIconKind::Satellite => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-satellite.svg"
+        )),
+        MetricIconKind::ArrowUpNarrowWide => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-arrow-up-narrow-wide.svg"
+        )),
+        MetricIconKind::Calories => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-calories.svg"
         )),
     }
 }
@@ -510,6 +542,25 @@ pub(crate) fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon,
                     canvas.draw_circle(Point::new(*cx, *cy), *r, &stroke_paint);
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{metric_icon_kind_for_value, parsed_metric_icon};
+    use crate::MetricKind;
+
+    #[test]
+    fn new_metric_icons_parse_from_shared_assets() {
+        for metric in [
+            MetricKind::GpsCoordinates,
+            MetricKind::DistanceToHome,
+            MetricKind::TotalAscent,
+            MetricKind::Calories,
+        ] {
+            let icon = metric_icon_kind_for_value(metric).and_then(parsed_metric_icon);
+            assert!(icon.is_some(), "shared icon should parse for {metric:?}");
         }
     }
 }

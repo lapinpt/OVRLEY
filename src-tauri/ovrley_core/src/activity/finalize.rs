@@ -14,6 +14,7 @@ pub mod gap;
 pub mod metrics;
 pub mod smoothing;
 
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::finalize::gap::{
     build_distance_series, build_progress_series, insert_idle_gap_samples, skipped_gap_debug,
 };
@@ -29,15 +30,19 @@ use crate::activity::schema::{
 };
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{finite_f64, round_f64};
-use chrono::{DateTime, Utc};
+use crate::media::timezone::timezone_for_coordinates;
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono_tz::Tz;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
 const CORE_ACTIVITY_ATTRIBUTES: &[&str] = &[
+    "altitude",
     "cadence",
     "course",
     "elevation",
+    "gps_coordinates",
     "gradient",
     "heartrate",
     "power",
@@ -48,11 +53,13 @@ const CORE_ACTIVITY_ATTRIBUTES: &[&str] = &[
 
 const EXTENDED_ACTIVITY_ATTRIBUTES: &[&str] = &[
     "air_pressure",
-    "altitude",
+    "barometric_altitude",
+    "calories",
     "aperture",
     "color_temperature",
     "core_temperature",
     "distance",
+    "distance_to_home",
     "ev",
     "focal_length",
     "brake_position",
@@ -71,6 +78,7 @@ const EXTENDED_ACTIVITY_ATTRIBUTES: &[&str] = &[
     "shutter_speed",
     "stroke_rate",
     "stride_length",
+    "total_ascent",
     "torque",
     "throttle_position",
     "vertical_oscillation",
@@ -201,8 +209,22 @@ fn finalize_columns_with_debug(
 ) -> CoreResult<FinalizedActivity> {
     validate_column_lengths(columns)?;
 
-    let time_series = build_time_series(columns);
     let course_series = build_course_series(columns);
+    validate_course_coordinate_ranges(&course_series)?;
+    let timezone = course_series.iter().find_map(|(latitude, longitude)| {
+        let (Some(latitude), Some(longitude)) = (*latitude, *longitude) else {
+            return None;
+        };
+        timezone_for_coordinates(longitude, latitude)
+    });
+    let timezone_tz = timezone
+        .as_deref()
+        .map(str::parse::<Tz>)
+        .transpose()
+        .map_err(|_| {
+            CoreError::Activity("Timezone finder returned an invalid IANA timezone".into())
+        })?;
+    let time_series = build_time_series(columns, timezone_tz);
     let elapsed_series = build_elapsed_series(columns, &time_series);
     let direct_distance_series: Vec<Option<f64>> = columns
         .distance
@@ -216,6 +238,14 @@ fn finalize_columns_with_debug(
         .iter()
         .map(|value| value.and_then(finite_f64))
         .collect();
+    let barometric_altitude_series: Vec<Option<f64>> = columns
+        .barometric_altitude
+        .iter()
+        .map(|value| value.and_then(finite_f64))
+        .collect();
+    let elevation_profile_series =
+        preferred_elevation_series(&barometric_altitude_series, &elevation_base_series).to_vec();
+
     let mut metric_series_map = derive_activity_metric_series(
         &course_series,
         &distance_series,
@@ -235,13 +265,24 @@ fn finalize_columns_with_debug(
     let duration_seconds = elapsed_series.last().copied().unwrap_or(0.0);
     let total_distance_meters = distance_series.last().copied().flatten().unwrap_or(0.0);
     let first_sample_time = time_series.iter().find_map(Clone::clone);
-    let sync_time = columns
-        .metadata
-        .get("sync_time")
-        .and_then(|value| value.as_str())
-        .filter(|value| DateTime::parse_from_rfc3339(value).is_ok())
-        .map(ToOwned::to_owned)
-        .or(first_sample_time);
+    let explicit_sync_time = columns
+        .sync_time
+        .as_deref()
+        .map(|value| {
+            DateTime::parse_from_rfc3339(value)
+                .map(|parsed| {
+                    parsed
+                        .with_timezone(&Utc)
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                })
+                .map_err(|error| {
+                    CoreError::Activity(format!(
+                        "Activity sync_time must be a valid RFC3339 timestamp: {error}"
+                    ))
+                })
+        })
+        .transpose()?;
+    let sync_time = explicit_sync_time.or(first_sample_time);
     let end_time = time_series.iter().rev().find_map(Clone::clone);
     let distance_progress_series = build_progress_series(&distance_series);
 
@@ -251,7 +292,11 @@ fn finalize_columns_with_debug(
     }
     if let Some(object) = metadata.as_object_mut() {
         object.remove("start_time");
-        object.insert("sync_time".to_string(), json!(sync_time));
+        object.remove("timezone");
+        object.remove("sync_time");
+        if let Some(timezone) = &timezone {
+            object.insert("timezone".to_string(), json!(timezone));
+        }
         object.insert(
             "duration_seconds".to_string(),
             json!(round_f64(duration_seconds, 3).unwrap_or(0.0)),
@@ -289,6 +334,7 @@ fn finalize_columns_with_debug(
         file_name: Some(columns.file_name.clone()),
         file_format: Some(columns.file_format.clone()),
         metadata,
+        timezone: timezone_tz,
         sync_time,
         sample_elapsed_seconds: elapsed_series,
         sample_distance_progress: distance_progress_series,
@@ -298,9 +344,13 @@ fn finalize_columns_with_debug(
         trim_start_seconds: 0.0,
         trim_end_seconds: round_f64(duration_seconds, 3).unwrap_or(0.0),
         sample_course_points: course_series.clone(),
-        sample_elevations: metric(&metric_series_map, "elevation"),
+        sample_elevations: elevation_profile_series.to_vec(),
         course: course_series,
         elevation: metric(&metric_series_map, "elevation"),
+        calories: metric(&metric_series_map, "calories"),
+        distance_to_home: metric(&metric_series_map, "distance_to_home"),
+        total_ascent: metric(&metric_series_map, "total_ascent"),
+        barometric_altitude: metric(&metric_series_map, "barometric_altitude"),
         speed: metric(&metric_series_map, "speed"),
         distance: metric(&metric_series_map, "distance"),
         heartrate: metric(&metric_series_map, "heartrate"),
@@ -323,7 +373,6 @@ fn finalize_columns_with_debug(
         stroke_rate: metric(&metric_series_map, "stroke_rate"),
         torque: metric(&metric_series_map, "torque"),
         vertical_speed: metric(&metric_series_map, "vertical_speed"),
-        altitude: metric(&metric_series_map, "altitude"),
         iso: metric(&metric_series_map, "iso"),
         aperture: metric(&metric_series_map, "aperture"),
         shutter_speed: metric(&metric_series_map, "shutter_speed"),
@@ -364,6 +413,7 @@ fn activity_columns_from_samples(
         file_name: raw_activity.file_name.clone(),
         file_format: raw_activity.file_format.clone(),
         metadata: raw_activity.metadata.clone(),
+        sync_time: None,
         options: raw_activity.options.clone(),
         preserve_direct_metric_gaps: Default::default(),
         timestamp: raw_samples
@@ -374,16 +424,18 @@ fn activity_columns_from_samples(
         latitude: collect!(latitude),
         longitude: collect!(longitude),
         elevation: collect!(elevation),
-        altitude: collect!(altitude),
+        barometric_altitude: collect!(barometric_altitude),
         speed: collect!(speed),
         heading: collect!(heading),
         heartrate: collect!(heartrate),
         cadence: collect!(cadence),
         power: collect!(power),
         temperature: collect!(temperature),
+        calories: collect!(calories),
         gradient: collect!(gradient),
         pace: collect!(pace),
         distance: collect!(distance),
+        distance_to_home: raw_samples.iter().map(|_| None).collect(),
         g_force: collect!(g_force),
         g_force_x: raw_samples.iter().map(|_| None).collect(),
         g_force_y: raw_samples.iter().map(|_| None).collect(),
@@ -429,16 +481,18 @@ fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
         ("latitude", columns.latitude.len()),
         ("longitude", columns.longitude.len()),
         ("elevation", columns.elevation.len()),
-        ("altitude", columns.altitude.len()),
+        ("barometric_altitude", columns.barometric_altitude.len()),
         ("speed", columns.speed.len()),
         ("heading", columns.heading.len()),
         ("heartrate", columns.heartrate.len()),
         ("cadence", columns.cadence.len()),
         ("power", columns.power.len()),
         ("temperature", columns.temperature.len()),
+        ("calories", columns.calories.len()),
         ("gradient", columns.gradient.len()),
         ("pace", columns.pace.len()),
         ("distance", columns.distance.len()),
+        ("distance_to_home", columns.distance_to_home.len()),
         ("g_force", columns.g_force.len()),
         ("g_force_x", columns.g_force_x.len()),
         ("g_force_y", columns.g_force_y.len()),
@@ -494,24 +548,62 @@ fn build_course_series(columns: &ActivityColumns) -> Vec<(Option<f64>, Option<f6
         .collect()
 }
 
+fn validate_course_coordinate_ranges(
+    course_series: &[(Option<f64>, Option<f64>)],
+) -> CoreResult<()> {
+    for (index, (latitude, longitude)) in course_series.iter().enumerate() {
+        if latitude.is_some_and(|value| !(-90.0..=90.0).contains(&value)) {
+            return Err(CoreError::Activity(format!(
+                "Invalid latitude at activity sample {index}: expected -90..=90 degrees"
+            )));
+        }
+        if longitude.is_some_and(|value| !(-180.0..=180.0).contains(&value)) {
+            return Err(CoreError::Activity(format!(
+                "Invalid longitude at activity sample {index}: expected -180..=180 degrees"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Normalizes source timestamps into UTC millisecond RFC 3339 strings.
 ///
 /// The frontend historically emitted `Date#toISOString()` values. Normalizing
 /// here keeps backend-created payloads byte-stable enough for diagnostics and
 /// avoids leaking local time-zone formatting into render data.
-fn build_time_series(columns: &ActivityColumns) -> Vec<Option<String>> {
+///
+/// When a timestamp has no timezone offset (naive local time such as SRT
+/// camera timestamps), it is interpreted in the GPS-derived activity timezone
+/// and converted to UTC. Without a timezone, naive timestamps are treated as
+/// UTC.
+fn build_time_series(
+    columns: &ActivityColumns,
+    timezone: Option<Tz>,
+) -> Vec<Option<String>> {
     columns
         .timestamp
         .iter()
         .map(|timestamp| {
-            timestamp
-                .as_deref()
-                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-                .map(|value| {
-                    value
+            let value = timestamp.as_deref()?;
+            if let Ok(parsed) = DateTime::parse_from_rfc3339(value) {
+                return Some(
+                    parsed
                         .with_timezone(&Utc)
-                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
-                })
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                );
+            }
+            let naive =
+                NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S%.f")
+                    .or_else(|_| NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S"))
+                    .ok()?;
+            let utc = match timezone {
+                Some(tz) => tz
+                    .from_local_datetime(&naive)
+                    .single()
+                    .map(|dt| dt.with_timezone(&Utc)),
+                None => Some(Utc.from_utc_datetime(&naive)),
+            }?;
+            Some(utc.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
         })
         .collect()
 }
@@ -607,13 +699,16 @@ fn build_valid_attributes(
         .iter()
         .filter(|attribute| {
             let key = **attribute;
-            if key == "course" {
+            if key == "course" || key == "gps_coordinates" {
                 return course_series
                     .iter()
                     .any(|(lat, lon)| lat.is_some() && lon.is_some());
             }
             if key == "time" {
                 return time_series.iter().any(Option::is_some);
+            }
+            if key == "altitude" {
+                return coverage["elevation"].is_available();
             }
             coverage[key].is_available()
         })
@@ -679,6 +774,9 @@ fn apply_metric_smoothing(
         "speed",
         "vertical_speed",
         "g_force",
+        "g_force_x",
+        "g_force_y",
+        "g_force_z",
         "gradient",
         "pace",
     ]);
@@ -720,12 +818,14 @@ fn apply_metric_smoothing(
 fn metric_units() -> Value {
     json!({
         "air_pressure": "bar",
-        "altitude": "m",
+        "barometric_altitude": "m",
         "aperture": "fnum",
+        "calories": "kcal",
         "cadence": "rpm",
         "color_temperature": "kelvin",
         "core_temperature": "celsius",
         "distance": "m",
+        "distance_to_home": "m",
         "elevation": "m",
         "ev": "ev",
         "focal_length": "mm",
@@ -751,6 +851,7 @@ fn metric_units() -> Value {
         "stroke_rate": "strokes_per_minute",
         "temperature": "celsius",
         "throttle_position": "percent",
+        "total_ascent": "m",
         "torque": "nm",
         "vertical_oscillation": "raw",
         "vertical_speed": "mps",

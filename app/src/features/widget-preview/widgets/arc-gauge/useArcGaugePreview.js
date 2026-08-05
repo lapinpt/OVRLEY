@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { getInterpolatedActivityValue } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from './geometry'
 import { getArcInnerWidgetLayout } from './arcGaugeInnerLayout'
 import { getArcFilledTrackRevealSpec, getArcPoint } from './trackPath'
@@ -7,7 +7,8 @@ import { getArcBarSegments, getBarFillCount } from '../../shared/gaugeBarGeometr
 import { buildArcGaugeInnerWidgetModel } from '../metric/model'
 import { getTextShadowParts } from '../../shared/shadow'
 import { getPreviewFontFamily, measureArcPreviewText } from '../../shared/textMeasurement'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
+import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Returns the SVG text origin that centers measured text around an x-coordinate. */
 function centeredTextX(measurement, centerX) {
@@ -41,12 +42,15 @@ function getLabelLayout(layout, minLabel, maxLabel, fontFamily, fontSize) {
 export function useArcGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
   const valueFontFamily = getPreviewFontFamily(widget.data.font)
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
-  useFontMetricsVersion(valueFontFamily, widget.data.font_size)
-  useFontMetricsVersion(labelFontFamily, widget.data.min_max_label_font_size)
+  useFontMetrics([
+    { fontFamily: valueFontFamily, fontSize: widget.data.font_size },
+    { fontFamily: labelFontFamily, fontSize: widget.data.min_max_label_font_size },
+  ])
 
   return useMemo(() => {
-    const value = getInterpolatedActivityValue(activity, widget.data.value, previewSecond)
-    const values = activity?.[widget.data.value] ?? []
+    const displayActivity = getPreviewActivity(activity, previewSecond)
+    const value = getInterpolatedActivityValue(displayActivity, widget.data.value, previewSecond)
+    const values = getMetricSeries(displayActivity, widget.data.value) ?? []
     const layout =
       widget.data.display_type === 'corner' ? getCornerGaugeLayout(widget.data, value, values) : getArcGaugeLayout(widget.data, value, values)
     const trackGeometry = {
@@ -57,7 +61,7 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
       sweepAngle: layout.sweepAngle,
       trackThickness: layout.trackThickness,
     }
-    const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond })
+    const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity: displayActivity, previewSecond })
     const opacity = widget.data.opacity * globalOpacity
     const segmented = widget.data.track_fill_style === 'bars'
     const fillEndCornerRadius = widget.data.track_fill_flat ? 0 : widget.data.track_corner_radius
@@ -78,8 +82,11 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
           bar_gap: widget.data.bar_gap,
         })
       : null
-    const minLabel = `${layout.min}`
-    const maxLabel = `${layout.max}`
+    const metricType = widget.data.value
+    const displayUnit = widget.data.display_unit
+    const minLabel = formatGaugeBoundaryLabel(metricType, layout.min, displayUnit)
+    const maxLabel = formatGaugeBoundaryLabel(metricType, layout.max, displayUnit)
+    const shadow = getTextShadowParts(sceneStyle)
 
     return {
       trackGeometry,
@@ -95,7 +102,8 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
         ? getLabelLayout(layout, minLabel, maxLabel, labelFontFamily, widget.data.min_max_label_font_size)
         : null,
       labelFontFamily,
-      shadow: widget.data.track_border_thickness > 0 ? getTextShadowParts(sceneStyle) : undefined,
+      shadow,
+      trackShadow: widget.data.track_border_thickness > 0 ? shadow : undefined,
       maskPadding: layout.outerStrokeWidth + 1,
     }
   }, [activity, globalOpacity, labelFontFamily, previewSecond, sceneStyle, widget])

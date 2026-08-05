@@ -37,6 +37,32 @@ function getSceneResolutionKey(scene) {
   return `${Number(scene.width)}x${Number(scene.height)}`
 }
 
+function formatOffsetInput(seconds) {
+  const rounded = Math.round(seconds * 10) / 10
+  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
+}
+
+function getResolutionPreset(aspectRatio, resolutionId) {
+  const presets = RESOLUTIONS[aspectRatio]
+  if (!presets) {
+    throw new Error(`Unknown aspect ratio "${aspectRatio}"`)
+  }
+
+  for (const preset of presets) {
+    if (preset.id === resolutionId) return preset
+  }
+
+  throw new Error(`Unknown resolution preset "${resolutionId}" for aspect ratio "${aspectRatio}"`)
+}
+
+function getDefaultResolutionPreset(aspectRatio) {
+  const presets = RESOLUTIONS[aspectRatio]
+  if (!presets) {
+    throw new Error(`Unknown aspect ratio "${aspectRatio}"`)
+  }
+  return presets[0]
+}
+
 export default function useSceneSettingsState({ config, onConfigChange }) {
   const {
     activitySummary,
@@ -44,24 +70,30 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     computeVideoSync,
     exportRange,
     globalDefaults,
+    parsedActivity,
     importedVideoBitRate,
     importedVideoCameraType,
     importedVideoCameraModel,
     importedVideoCodecName,
     importedVideoCodecLongName,
     importedVideoCreationTime,
+    importedVideoTimeSource,
     importedVideoDuration,
     importedVideoFps,
     importedVideoPath,
     importedVideoResolution,
     resetGlobalDefaults,
-    setAspectRatio,
+    setAspectRatioPreset,
+    setCustomAspectRatio,
     setExportRange,
     setGlobalDefault,
+    setSceneFpsAndUpdateRate,
     setUpdateRate,
     setVideoSyncOffset,
     setVideoSyncWarning,
+    setVideoSyncTimezoneMode,
     updateRate,
+    videoSyncTimezoneMode,
     videoSyncOffsetSeconds,
     videoSyncWarning,
   } = useStore(
@@ -71,28 +103,36 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       computeVideoSync: state.computeVideoSync,
       exportRange: state.exportRange,
       globalDefaults: state.globalDefaults,
+      parsedActivity: state.parsedActivity,
       importedVideoBitRate: state.importedVideoBitRate,
       importedVideoCameraType: state.importedVideoCameraType,
       importedVideoCameraModel: state.importedVideoCameraModel,
       importedVideoCodecName: state.importedVideoCodecName,
       importedVideoCodecLongName: state.importedVideoCodecLongName,
       importedVideoCreationTime: state.importedVideoCreationTime,
+      importedVideoTimeSource: state.importedVideoTimeSource,
       importedVideoDuration: state.importedVideoDuration,
       importedVideoFps: state.importedVideoFps,
       importedVideoPath: state.importedVideoPath,
       importedVideoResolution: state.importedVideoResolution,
       resetGlobalDefaults: state.resetGlobalDefaults,
-      setAspectRatio: state.setAspectRatio,
+      setAspectRatioPreset: state.setAspectRatioPreset,
+      setCustomAspectRatio: state.setCustomAspectRatio,
       setExportRange: state.setExportRange,
       setGlobalDefault: state.setGlobalDefault,
+      setSceneFpsAndUpdateRate: state.setSceneFpsAndUpdateRate,
       setUpdateRate: state.setUpdateRate,
       setVideoSyncOffset: state.setVideoSyncOffset,
       setVideoSyncWarning: state.setVideoSyncWarning,
+      setVideoSyncTimezoneMode: state.setVideoSyncTimezoneMode,
       updateRate: state.updateRate,
+      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncWarning: state.videoSyncWarning,
     })),
   )
+
+  const timezone = parsedActivity?.metadata?.timezone ?? null
 
   const availableFonts = useAvailableFonts()
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
@@ -106,8 +146,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({
     fps: scene?.fps,
     onFpsChange: (nextFps) => {
-      setUpdateRate(normalizeUpdateRateForFps(nextFps, updateRate))
-      updateScene('fps', nextFps)
+      setSceneFpsAndUpdateRate(nextFps, normalizeUpdateRateForFps(nextFps, updateRate))
     },
     updateRate,
   })
@@ -116,10 +155,10 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
 
   const updateRateOptions = useMemo(() => getUpdateRateOptions(scene?.fps), [scene?.fps])
 
-  const [offsetInput, setOffsetInput] = useState(videoSyncOffsetSeconds?.toString() || '0')
+  const [offsetInput, setOffsetInput] = useState(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
 
   useEffect(() => {
-    setOffsetInput(videoSyncOffsetSeconds?.toString() || '0')
+    setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
   }, [videoSyncOffsetSeconds])
 
   useEffect(() => {
@@ -140,11 +179,13 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   }
 
   const handleAspectRatioChange = (v) => {
-    setAspectRatio(v)
-    if (v !== 'custom' && RESOLUTIONS[v]) {
-      const preset = RESOLUTIONS[v][0]
-      onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
+    if (v === 'custom') {
+      setCustomAspectRatio()
+      return
     }
+
+    const preset = getDefaultResolutionPreset(v)
+    setAspectRatioPreset(v, { width: preset.w, height: preset.h })
   }
 
   const handleResolutionChange = (v) => {
@@ -153,8 +194,8 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       return
     }
     setCustomResolutionAnchor(null)
-    const preset = RESOLUTIONS[aspectRatio]?.find((r) => r.id === v)
-    if (preset) onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
+    const preset = getResolutionPreset(aspectRatio, v)
+    onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
   }
 
   const handleUpdateRateChange = (v) => setUpdateRate(parseInt(v))
@@ -162,7 +203,13 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const handleOffsetBlur = (val) => {
     const parsed = timeToSeconds(val)
     const rounded = Math.round(parsed * 10) / 10
-    setVideoSyncOffset(rounded)
+    try {
+      setVideoSyncOffset(rounded)
+    } catch (error) {
+      setVideoSyncWarning(error.message)
+      setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
+      return
+    }
     setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1))
   }
@@ -170,9 +217,19 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const handleIncrement = (amount) => {
     const current = timeToSeconds(offsetInput)
     const newOffset = Math.round((current + amount) * 10) / 10
-    setVideoSyncOffset(newOffset)
+    try {
+      setVideoSyncOffset(newOffset)
+    } catch (error) {
+      setVideoSyncWarning(error.message)
+      return
+    }
+    setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
   }
+
+  const handleComputeVideoSync = useCallback(() => {
+    computeVideoSync(activitySummary)
+  }, [activitySummary, computeVideoSync])
 
   const handlers = {
     handleAspectRatioChange,
@@ -199,20 +256,24 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     },
     videoSyncSettings: {
       activitySummary,
-      computeVideoSync,
+      computeVideoSync: handleComputeVideoSync,
       importedVideoBitRate,
       importedVideoCameraType,
       importedVideoCameraModel,
       importedVideoCodecName,
       importedVideoCodecLongName,
       importedVideoCreationTime,
+      importedVideoTimeSource,
+      timezone,
       importedVideoDuration,
       importedVideoFps,
       importedVideoPath,
       importedVideoResolution,
       offsetInput,
       setOffsetInput,
+      setVideoSyncTimezoneMode,
       videoResolutionMismatch,
+      videoSyncTimezoneMode,
       videoSyncOffsetSeconds,
       videoSyncWarning,
     },
@@ -225,7 +286,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     },
     handlers,
     // Store actions exposed directly for callers that need them
-    setAspectRatio,
     setExportRange,
     setUpdateRate,
   }

@@ -150,6 +150,7 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) 
         if (value.display_variants?.linear) value.display_variants.linear.min_max_label_font = globals.font_values
         if (value.display_variants?.arc) value.display_variants.arc.min_max_label_font = globals.font_values
         if (value.display_variants?.corner) value.display_variants.corner.min_max_label_font = globals.font_values
+        if (value.display_variants?.g_force) value.display_variants.g_force.label_font = globals.font_values
       }
       if (shouldApply('color_values')) value.color = globals.color_values
       if (shouldApply('color_icons') && Object.hasOwn(value, 'icon_color')) value.icon_color = globals.color_icons

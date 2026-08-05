@@ -14,7 +14,10 @@ import {
   DISPLAY_TYPE_LABELS,
   DISPLAY_TYPE_OVERRIDES,
   DEFAULT_DISPLAY_TYPES,
+  TEXT_DEFAULTS,
 } from './standard-widgets'
+
+const METRIC_SHARED_DEFAULT_KEYS = new Set(Object.keys(TEXT_DEFAULTS))
 
 // ---------------------------------------------------------------------------
 // Display type helpers
@@ -56,6 +59,7 @@ export function isBoxedDisplayType(displayType) {
 export function getDefaultFrameDimensions(displayType) {
   const definition = getDisplayTypeDefinition(displayType)
   if (!definition || definition.layoutMode !== 'boxed') return null
+  if (definition.defaultFrameWidth === undefined || definition.defaultFrameHeight === undefined) return null
   return { width: definition.defaultFrameWidth, height: definition.defaultFrameHeight }
 }
 
@@ -153,7 +157,7 @@ export function getStandardMetricUnitLabel(type, displayUnit) {
 export function getDisplayTypeConfigDefaults(displayType) {
   const definition = DISPLAY_TYPE_DEFINITIONS[displayType]
   if (!definition?.defaults || definition.layoutMode === 'intrinsic') return null
-  return definition.defaults
+  return Object.fromEntries(Object.entries(definition.defaults).filter(([key]) => !METRIC_SHARED_DEFAULT_KEYS.has(key)))
 }
 
 /**
@@ -165,7 +169,7 @@ export function getDisplayTypeConfigDefaults(displayType) {
  * @returns {number|null} configured default font size, or null
  */
 export function getDisplayTypeDefaultFontSize(displayType) {
-  const fontSize = DISPLAY_TYPE_DEFINITIONS[displayType]?.defaultFontSize
+  const fontSize = DISPLAY_TYPE_DEFINITIONS[displayType]?.defaults?.font_size
   return Number.isFinite(fontSize) ? fontSize : null
 }
 
@@ -176,7 +180,7 @@ export function getDisplayTypeDefaultFontSize(displayType) {
 /**
  * Look up the interpolation policy for a standard metric type.
  * @param {string} type - metric type string
- * @returns {'linear' | 'hold' | null} the interpolation mode, or `null` if not found
+ * @returns {'linear' | 'hold' | 'preserve' | null} the interpolation mode, or `null` if not found
  */
 export function getStandardMetricInterpolation(type) {
   const definition = getStandardMetricDefinition(type)

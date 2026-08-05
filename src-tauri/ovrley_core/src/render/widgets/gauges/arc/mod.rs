@@ -24,7 +24,9 @@ use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
-use crate::render::format::format_validated_metric_parts;
+use crate::render::format::{
+    format_validated_metric_parts, resolve_metric_display_value,
+};
 use crate::render::surface::create_surface;
 use crate::render::text::{
     draw_text, draw_text_with_vertical_metrics_text, origin_x_for_centered_text, parse_color,
@@ -86,19 +88,20 @@ pub fn prepare_arc_gauge_cache(
         let text_style = validated_value_style(&gauge.inner_value, scene, scale);
         let unit_parts = format_validated_metric_parts(&gauge.inner_value, dense_activity, 0)
             .expect("validated arc gauge metric must have a formatter");
-        let unit_text = unit_parts.unit_text;
+        let unit_text = unit_parts.standard_text().1.map(str::to_owned);
         let static_unit_font_size = unit_font_size(&text_style, scale);
         let frame_states = metric_values(&dense_activity.series, gauge.metric)
             .iter()
             .enumerate()
             .map(|(frame_index, raw_value)| {
-                let value = raw_value.unwrap_or(min_value);
+                let value = resolve_metric_display_value(gauge.metric, *raw_value, dense_activity)
+                    .unwrap_or(min_value);
                 let parts =
                     format_validated_metric_parts(&gauge.inner_value, dense_activity, frame_index)
                         .expect("validated arc gauge metric must have a formatter");
                 ArcGaugeFrameState {
                     fill01: fill_percentage(value, min_value, max_value),
-                    value_text: parts.value_text,
+                    value_text: parts.standard_text().0.to_string(),
                 }
             })
             .collect::<Vec<_>>();
@@ -287,8 +290,9 @@ pub(super) fn draw_arc_labels(
     label_style.font_size = font_size;
     label_style.line_height = font_size * LINE_HEIGHT;
     label_style.color = parse_color(&gauge.min_max_label_color, text_style.opacity);
-    let min_label = format_gauge_label(min_value);
-    let max_label = format_gauge_label(max_value);
+    let display_unit = Some(gauge.inner_value.display_unit.as_str());
+    let min_label = format_gauge_label(gauge.metric, display_unit, min_value);
+    let max_label = format_gauge_label(gauge.metric, display_unit, max_value);
     let (min_angle, max_angle) = arc_label_angles(geometry);
 
     for (label, angle) in [(&min_label, min_angle), (&max_label, max_angle)] {

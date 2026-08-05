@@ -188,32 +188,6 @@ describe('resolveActiveMetricWidgetData', () => {
     expect(resolved.tick_color).toBe('#ff0000')
   })
 
-  test('top-level shared position wins over stale heading_tape variant x/y', () => {
-    const data = {
-      value: 'heading',
-      display_type: 'heading_tape',
-      x: 320,
-      y: 180,
-      opacity: 0.65,
-      display_variants: {
-        heading_tape: {
-          x: 100,
-          y: 100,
-          opacity: 1,
-          width: 500,
-          height: 100,
-        },
-      },
-    }
-
-    const resolved = resolveActiveMetricWidgetData(data)
-    expect(resolved.x).toBe(320)
-    expect(resolved.y).toBe(180)
-    expect(resolved.opacity).toBe(0.65)
-    expect(resolved.width).toBe(500)
-    expect(resolved.height).toBe(100)
-  })
-
   test('falls back to frame defaults when variant is missing', () => {
     const data = {
       value: 'heading',
@@ -242,6 +216,23 @@ describe('resolveActiveMetricWidgetData', () => {
     const resolved = resolveActiveMetricWidgetData(data)
     expect(resolved.id).toBe('widget-42')
     expect(resolved.display_type).toBe('heading_tape')
+  })
+
+  test('can resolve an already-derived lean-angle widget without stripping its frame', () => {
+    const data = {
+      value: 'lean_angle',
+      display_type: 'lean_angle',
+      font_size: 60,
+      display_variants: {
+        lean_angle: {
+          diameter: 180,
+          track_thickness: 24,
+        },
+      },
+    }
+    const resolved = resolveActiveMetricWidgetData(data)
+
+    expect(resolveActiveMetricWidgetData(resolved)).toEqual(resolved)
   })
 })
 
@@ -333,6 +324,12 @@ describe('initDisplayVariant', () => {
 
   test('returns data as-is when data is null', () => {
     expect(initDisplayVariant(null, 'heading_tape')).toBeNull()
+  })
+
+  test('seeds a new G-force variant label font from the value font', () => {
+    const result = initDisplayVariant({ value: 'g_force', display_type: 'text', font: 'Roboto.ttf' }, 'g_force')
+
+    expect(result.display_variants.g_force.label_font).toBe('Roboto.ttf')
   })
 })
 

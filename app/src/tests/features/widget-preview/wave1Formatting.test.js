@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { buildMetricWidgetPreviewModel } from '@/features/widget-preview'
+import { formatCoordinates } from '@/features/widget-preview/widgets/metric/format'
 
 function makeMetricWidget(type, data = {}) {
   return {
@@ -24,6 +25,7 @@ function makeMetricWidget(type, data = {}) {
 
 function makeActivity(type, value) {
   return {
+    trim_end_seconds: 0,
     sample_elapsed_seconds: [0],
     [type]: [value],
   }
@@ -48,6 +50,17 @@ describe('Vehicle metric formatting', () => {
 })
 
 describe('Wave 2 metric formatting', () => {
+  test('distance_to_home uses the shared distance conversion', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('distance_to_home', { display_unit: 'km', decimals: 2 }),
+      activity: makeActivity('distance_to_home', 2500),
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('2.50')
+    expect(model?.unitText).toBe('KM')
+  })
+
   test('vertical_oscillation formats as mm', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('vertical_oscillation', { display_unit: 'mm', decimals: 1 }),
@@ -71,11 +84,152 @@ describe('Wave 2 metric formatting', () => {
   test('vertical_oscillation shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('vertical_oscillation', { display_unit: 'mm' }),
-      activity: { sample_elapsed_seconds: [0], vertical_oscillation: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], vertical_oscillation: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
     expect(model?.unitText).toBe('MM')
+  })
+})
+
+describe('total ascent and GPS coordinate formatting', () => {
+  test('formats total ascent as current over full ascent', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('total_ascent', {
+        display_unit: 'm',
+        show_full_ascent: true,
+        show_units: true,
+      }),
+      activity: {
+        trim_end_seconds: 20,
+        sample_elapsed_seconds: [0, 10, 20],
+        total_ascent: [0, 12, 25],
+      },
+      previewSecond: 10,
+    })
+
+    expect(model?.valueText).toBe('12/25')
+    expect(model?.unitText).toBe('M')
+  })
+
+  test('shows the ascent placeholder before an activity is loaded', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('total_ascent', {
+        display_unit: 'm',
+        show_full_ascent: true,
+        show_units: true,
+      }),
+      activity: null,
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('--')
+    expect(model?.unitText).toBe('M')
+  })
+
+  test('formats DMS and DDM coordinates for both hemispheres', () => {
+    expect(formatCoordinates([40.446111, -73.987222], 'both', 'dms', '#fff')).toEqual({
+      type: 'coordinates',
+      lines: [
+        { direction: 'N', valueText: '40°26′46″', directionColor: '#fff' },
+        { direction: 'W', valueText: '73°59′14″', directionColor: '#fff' },
+      ],
+    })
+    expect(formatCoordinates([-40.446111, 73.987222], 'both', 'ddm', '#fff')).toEqual({
+      type: 'coordinates',
+      lines: [
+        { direction: 'S', valueText: '40°26.767′', directionColor: '#fff' },
+        { direction: 'E', valueText: '73°59.233′', directionColor: '#fff' },
+      ],
+    })
+  })
+
+  test('formats equator and prime meridian without negative directions', () => {
+    expect(formatCoordinates([0, 0], 'both', 'dms', '#fff')).toEqual({
+      type: 'coordinates',
+      lines: [
+        { direction: 'N', valueText: '0°00′00″', directionColor: '#fff' },
+        { direction: 'E', valueText: '0°00′00″', directionColor: '#fff' },
+      ],
+    })
+  })
+
+  test('formats coordinate values with zero padding', () => {
+    expect(formatCoordinates([8.1, -8.1], 'both', 'dms', '#fff')).toEqual({
+      type: 'coordinates',
+      lines: [
+        { direction: 'N', valueText: '8°06′00″', directionColor: '#fff' },
+        { direction: 'W', valueText: '8°06′00″', directionColor: '#fff' },
+      ],
+    })
+    expect(formatCoordinates([8, -8], 'both', 'ddm', '#fff')).toEqual({
+      type: 'coordinates',
+      lines: [
+        { direction: 'N', valueText: '8°00.000′', directionColor: '#fff' },
+        { direction: 'W', valueText: '8°00.000′', directionColor: '#fff' },
+      ],
+    })
+  })
+
+  test('builds explicit stacked coordinate layout in both mode', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('gps_coordinates', {
+        display_unit: 'both',
+        coordinate_format: 'dms',
+        prefix: '',
+        suffix: '',
+        show_units: false,
+      }),
+      activity: {
+        trim_end_seconds: 0,
+        sample_elapsed_seconds: [0],
+        course: [[40.446111, -73.987222]],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.content.type).toBe('coordinates')
+    expect(model?.content.layout.fontSize).toBe(24)
+    expect(model?.content.layout.lines.map((line) => line.direction)).toEqual(['N', 'W'])
+  })
+
+  test('keeps directions left-aligned and coordinate values right-aligned', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('gps_coordinates', {
+        display_unit: 'both',
+        coordinate_format: 'dms',
+        prefix: '',
+        suffix: '',
+        show_units: false,
+      }),
+      activity: {
+        trim_end_seconds: 0,
+        sample_elapsed_seconds: [0],
+        course: [[8.1, -73.987222]],
+      },
+      previewSecond: 0,
+    })
+
+    const lines = model?.content.layout.lines
+    expect(lines?.[0].directionLeft).toBe(lines?.[1].directionLeft)
+    expect(lines?.[0].valueLeft + lines?.[0].valueWidth).toBeCloseTo(lines?.[1].valueLeft + lines?.[1].valueWidth)
+  })
+
+  test('shows coordinate placeholders when no activity is selected', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('gps_coordinates', {
+        display_unit: 'both',
+        coordinate_format: 'dms',
+        prefix: '',
+        suffix: '',
+        show_units: false,
+      }),
+      activity: null,
+      previewSecond: 0,
+    })
+
+    expect(model?.content.type).toBe('coordinates')
+    expect(model?.content.layout.lines.map((line) => line.valueText)).toEqual(['--°--′--″', '--°--′--″'])
   })
 })
 
@@ -191,7 +345,7 @@ describe('Wave 1 metric formatting', () => {
   test('gear_position shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('gear_position', { display_unit: 'gear' }),
-      activity: { sample_elapsed_seconds: [0], gear_position: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], gear_position: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -244,7 +398,7 @@ describe('Wave 1 placeholder behavior', () => {
   test('g_force shows placeholder when data missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('g_force', { display_unit: 'g' }),
-      activity: { sample_elapsed_seconds: [0], g_force: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], g_force: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -253,7 +407,7 @@ describe('Wave 1 placeholder behavior', () => {
   test('air_pressure shows placeholder when data missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('air_pressure', { display_unit: 'hpa' }),
-      activity: { sample_elapsed_seconds: [0], air_pressure: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], air_pressure: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -263,7 +417,7 @@ describe('Wave 1 placeholder behavior', () => {
   test('left_right_balance shows placeholder when data missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('left_right_balance', { display_unit: 'percent' }),
-      activity: { sample_elapsed_seconds: [0], left_right_balance: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--/--')
@@ -315,7 +469,7 @@ describe('left_right_balance format variants', () => {
   test('placeholder uses --/-- for all formats', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('left_right_balance', { display_unit: 'percent', balance_format: 'percent_label' }),
-      activity: { sample_elapsed_seconds: [0], left_right_balance: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--/--')
@@ -347,7 +501,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('aperture shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('aperture', {}),
-      activity: { sample_elapsed_seconds: [0], aperture: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], aperture: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -387,7 +541,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('shutter_speed shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('shutter_speed', {}),
-      activity: { sample_elapsed_seconds: [0], shutter_speed: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], shutter_speed: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -427,7 +581,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('ev shows placeholder when missing', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('ev', {}),
-      activity: { sample_elapsed_seconds: [0], ev: [null] },
+      activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], ev: [null] },
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('--')
@@ -447,7 +601,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('altitude formats with unit', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('altitude', { show_units: true, display_unit: 'm', decimals: 1 }),
-      activity: makeActivity('altitude', 42.5),
+      activity: makeActivity('elevation', 42.5),
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('42.5')
@@ -457,7 +611,7 @@ describe('Phase 4 camera metric formatting', () => {
   test('altitude converts meters to feet', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('altitude', { show_units: true, display_unit: 'ft', decimals: 0 }),
-      activity: makeActivity('altitude', 100),
+      activity: makeActivity('elevation', 100),
       previewSecond: 0,
     })
     expect(model?.valueText).toBe('328')

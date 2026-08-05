@@ -58,6 +58,8 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         icon_offset_y: None,
         show_units: None,
         show_full_distance: None,
+        show_full_ascent: None,
+        coordinate_format: None,
         unit_color: None,
         display_unit: None,
         balance_format: None,
@@ -83,6 +85,8 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         corner_orientation: None,
         inner_widget_offset_x: None,
         inner_widget_offset_y: None,
+        value_offset_x: None,
+        value_offset_y: None,
         track_thickness: None,
         track_corner_radius: None,
         track_border_thickness: None,
@@ -100,6 +104,26 @@ fn default_value_config(display_type: DisplayType) -> ValueConfig {
         min_max_label_font_size: None,
         min_max_label_position: None,
         min_max_label_color: None,
+        diameter: None,
+        fill_color: None,
+        fill_opacity: None,
+        border_opacity: None,
+        marker_size: None,
+        marker_color: None,
+        marker_opacity: None,
+        axis_horizontal: None,
+        axis_vertical: None,
+        invert_horizontal: None,
+        invert_vertical: None,
+        clip_percentile: None,
+        label_font: None,
+        label_font_size: None,
+        label_color: None,
+        label_decimals: None,
+        label_unit: None,
+        label_unit_color: None,
+        label_offset_x: None,
+        label_offset_y: None,
         extra: BTreeMap::new(),
     }
 }
@@ -157,6 +181,7 @@ fn default_dense_activity() -> DenseActivityReport {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series: empty_dense_series(),
     }
 }
@@ -337,7 +362,12 @@ fn future_boxed_display_types_return_none() {
     let mut profiler = RenderProfiler::default();
     let caches = empty_caches();
 
-    for display_type in [DisplayType::Linear, DisplayType::Arc, DisplayType::Corner] {
+    for display_type in [
+        DisplayType::Linear,
+        DisplayType::Arc,
+        DisplayType::Corner,
+        DisplayType::LeanAngle,
+    ] {
         let value = default_value_config(display_type);
         let result = draw_metric_presentation(
             surface.canvas(),
@@ -461,6 +491,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series: empty_dense_series(),
     };
     let paths = AppPaths {
@@ -543,6 +574,7 @@ fn render_preserves_multiple_boxed_reports() {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series,
     };
     let fonts_dir = workspace_root.join("fonts");
@@ -635,6 +667,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
         series: empty_dense_series(),
     };
     let fonts_dir = workspace_root.join("fonts");

@@ -14,6 +14,7 @@ use super::super::types::{
 use super::reduction::{
     downsample_elevation_points, project_elevation_points, simplify_elevation_samples,
 };
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::debug::RenderProfiler;
@@ -241,15 +242,17 @@ pub(crate) fn build_elevation_source_points(
         &RenderDataRequirements {
             distance_progress: true,
             elevation: true,
+            barometric_altitude: true,
             ..RenderDataRequirements::default()
         },
     )?;
+    let elevation = preferred_elevation_series(&trimmed.barometric_altitude, &trimmed.elevation);
     let normalized_progress = normalize_optional_progress_window(&trimmed.sample_distance_progress)
         .unwrap_or_else(|| {
-            (0..trimmed.elevation.len())
+            (0..elevation.len())
                 .map(|index| {
-                    if trimmed.elevation.len() > 1 {
-                        index as f64 / (trimmed.elevation.len() - 1) as f64
+                    if elevation.len() > 1 {
+                        index as f64 / (elevation.len() - 1) as f64
                     } else {
                         0.0
                     }
@@ -258,7 +261,7 @@ pub(crate) fn build_elevation_source_points(
         });
 
     Ok(raw_elevation_points(
-        &trimmed.elevation,
+        elevation,
         &normalized_progress,
         &trimmed.sample_elapsed_seconds,
         source_duration,

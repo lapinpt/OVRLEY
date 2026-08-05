@@ -223,9 +223,13 @@ pub struct ValueConfig {
     #[serde(default)]
     pub show_full_distance: Option<bool>,
     #[serde(default)]
+    pub show_full_ascent: Option<bool>,
+    #[serde(default)]
     pub unit_color: Option<String>,
     #[serde(default)]
     pub display_unit: Option<String>,
+    #[serde(default)]
+    pub coordinate_format: Option<String>,
     #[serde(default)]
     pub balance_format: Option<String>,
     #[serde(default)]
@@ -273,6 +277,10 @@ pub struct ValueConfig {
     #[serde(default)]
     pub inner_widget_offset_y: Option<f32>,
     #[serde(default)]
+    pub value_offset_x: Option<f32>,
+    #[serde(default)]
+    pub value_offset_y: Option<f32>,
+    #[serde(default)]
     pub track_thickness: Option<f32>,
     #[serde(default)]
     pub track_corner_radius: Option<f32>,
@@ -306,6 +314,46 @@ pub struct ValueConfig {
     pub min_max_label_position: Option<String>,
     #[serde(default)]
     pub min_max_label_color: Option<String>,
+    #[serde(default)]
+    pub diameter: Option<f32>,
+    #[serde(default)]
+    pub fill_color: Option<String>,
+    #[serde(default)]
+    pub fill_opacity: Option<f32>,
+    #[serde(default)]
+    pub border_opacity: Option<f32>,
+    #[serde(default)]
+    pub marker_size: Option<f32>,
+    #[serde(default)]
+    pub marker_color: Option<String>,
+    #[serde(default)]
+    pub marker_opacity: Option<f32>,
+    #[serde(default)]
+    pub axis_horizontal: Option<String>,
+    #[serde(default)]
+    pub axis_vertical: Option<String>,
+    #[serde(default)]
+    pub invert_horizontal: Option<bool>,
+    #[serde(default)]
+    pub invert_vertical: Option<bool>,
+    #[serde(default)]
+    pub clip_percentile: Option<f32>,
+    #[serde(default)]
+    pub label_font: Option<String>,
+    #[serde(default)]
+    pub label_font_size: Option<f32>,
+    #[serde(default)]
+    pub label_color: Option<String>,
+    #[serde(default)]
+    pub label_decimals: Option<usize>,
+    #[serde(default)]
+    pub label_unit: Option<String>,
+    #[serde(default)]
+    pub label_unit_color: Option<String>,
+    #[serde(default)]
+    pub label_offset_x: Option<f32>,
+    #[serde(default)]
+    pub label_offset_y: Option<f32>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

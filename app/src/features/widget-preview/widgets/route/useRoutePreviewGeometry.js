@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
-import { getDistanceProgressAtElapsed, getWindowProgressAtTime, resolveExportRangeWindow } from '@/features/overlay-editor'
-import { buildRouteGeometry, hasTauriRuntime } from '@/api/backend'
+import { useMemo } from 'react'
+import { getDistanceProgressAtElapsed, getPreviewActivity, getWindowProgressAtTime } from '@/features/overlay-editor'
+import { buildRouteGeometry } from '@/api/backend'
 import { pointsToSvg } from '@/lib/geometryUtils'
-import { buildPlaceholderRoutePreviewGeometry } from '../../shared/plotGeometry'
+import { buildPlaceholderRoutePreviewGeometry, buildPlaceholderRouteStaticGeometry } from '../../shared/plotPlaceholderGeometry'
 import { buildRouteFramePreview } from '../../shared/svgPreviewUtils'
-import useStore from '@/store/useStore'
+import { usePlotPreviewGeometry } from '../../shared/usePlotPreviewGeometry'
 
 /**
  * Builds the geometry model for the route preview renderer.
@@ -19,7 +19,7 @@ import useStore from '@/store/useStore'
  * injects pre-computed Rust geometry so Skia and SVG use identical data.
  *
  * @param {object} params
- * @param {object} params.activity - Activity data with route samples.
+ * @param {object|null} params.activity - Stable parsed activity used to prepare geometry and display activity data.
  * @param {object} params.data - Effective route widget data.
  * @param {object} params.exportRange - Active export-range selection.
  * @param {number} params.previewSecond - Current preview timestamp in seconds.
@@ -27,69 +27,35 @@ import useStore from '@/store/useStore'
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
 export function useRoutePreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
-  const [rustGeometry, setRustGeometry] = useState(null)
-  const config = useStore((state) => state.config)
-  const globalDefaults = useStore((state) => state.globalDefaults)
-  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
+  const { contentScale, exportWindow, fallbackDurationSeconds, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
+    activity,
+    data,
+    exportRange,
+    style,
+    plotType: 'course',
+    buildGeometry: buildRouteGeometry,
+    mockGeometryKey: '__OVRLEY_MOCK_ROUTE_GEOMETRY',
+  })
+  const isPlaceholder = getPreviewActivity(activity, previewSecond) === null
+  const placeholderStaticGeometry = useMemo(
+    () => (isPlaceholder ? buildPlaceholderRouteStaticGeometry({ width: data.width, height: data.height }) : null),
+    [data.height, data.width, isPlaceholder],
+  )
 
-  // Build the config Rust needs. The store scene lacks non-durable fields
-  // (scale, shadow, border) — globalDefaults fills them. start/end are
-  // overridden when an export window is active so Rust trims source points.
-  const geometryConfig = useMemo(() => {
-    if (!config || !activity || !hasTauriRuntime()) return null
-    const duration = activity?.trim_end_seconds ?? 0
-    const exportWindow = resolveExportRangeWindow(activity, exportRange, data.show_full_activity)
-    const { updateRate, start, end, ...sceneRest } = config.scene
-
-    return {
-      ...config,
-      scene: {
-        ...globalDefaults,
-        ...sceneRest,
-        scale: style.globalScale,
-        update_rate: updateRate,
-        start: exportWindow.active ? exportWindow.start : (start ?? 0),
-        end: exportWindow.active ? exportWindow.end : (end ?? duration),
-        custom_export_range_active: exportWindow.active,
-      },
-    }
-  }, [config, globalDefaults, activity, exportRange, style.globalScale, data.show_full_activity])
-
-  useEffect(() => {
-    if (!geometryConfig) return
-
-    if (typeof window !== 'undefined' && window.__OVRLEY_MOCK_ROUTE_GEOMETRY) {
-      setRustGeometry(window.__OVRLEY_MOCK_ROUTE_GEOMETRY)
-      return
-    }
-
-    let cancelled = false
-    buildRouteGeometry(geometryConfig, activity).then((geometry) => {
-      if (!cancelled) setRustGeometry(geometry)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [geometryConfig, activity, data])
-
-  if (!activity) {
+  if (isPlaceholder) {
     return buildPlaceholderRoutePreviewGeometry({
       width: data.width,
       height: data.height,
       previewSecond,
       fallbackDurationSeconds,
+      staticGeometry: placeholderStaticGeometry,
     })
   }
 
   if (!rustGeometry) return null
 
-  // Rust computes at scaled resolution (scene.width × scale), but SVG
-  // needs unscaled widget-local coordinates.
-  const points = rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale])
-
   // progress01 drives marker placement and completed polyline. Export
   // window normalizes it to 0..1 within the trimmed range.
-  const exportWindow = resolveExportRangeWindow(activity, exportRange, data.show_full_activity)
   const progress01 = exportWindow.active
     ? (getWindowProgressAtTime(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
@@ -97,8 +63,9 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   const { markerPoint, completedPoints } = buildRouteFramePreview(points, rustGeometry.progressValues, progress01)
 
   return {
+    contentScale,
     markerPoint,
-    remainingSvgPoints: pointsToSvg(points),
+    remainingSvgPoints,
     completedSvgPoints: pointsToSvg(completedPoints),
   }
 }

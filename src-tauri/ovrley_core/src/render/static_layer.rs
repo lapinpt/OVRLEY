@@ -205,7 +205,9 @@ fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValue
         PreparedValue::TimeText(validated) => Some(&validated.base),
         PreparedValue::Gradient(_)
         | PreparedValue::HeadingTape(_)
+        | PreparedValue::LeanAngle(_)
         | PreparedValue::LinearGauge(_)
-        | PreparedValue::ArcGauge(_) => None,
+        | PreparedValue::ArcGauge(_)
+        | PreparedValue::GForce(_) => None,
     }
 }

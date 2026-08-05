@@ -44,12 +44,14 @@ const mockConfig = {
     },
   ],
 }
+const mockGlobalDefaults = {}
 
 vi.mock('@/store/useStore', () => ({
-  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: {}, fallbackDurationSeconds: 73 })),
+  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: mockGlobalDefaults, fallbackDurationSeconds: 73 })),
 }))
 
 // Mock geometryUtils — the hook still uses local marker interpolation
+const mockPointsToSvg = vi.fn((points) => points.map((p) => p.join(',')).join(' '))
 vi.mock('@/lib/geometryUtils', () => ({
   getPointAtMetricProgress: vi.fn((points, progress, target) => {
     if (!points.length) return null
@@ -61,7 +63,7 @@ vi.mock('@/lib/geometryUtils', () => ({
     }
     return points[points.length - 1]
   }),
-  pointsToSvg: vi.fn((points) => points.map((p) => p.join(',')).join(' ')),
+  pointsToSvg: (...args) => mockPointsToSvg(...args),
 }))
 
 // Mock svgPreviewUtils — completed points filtering
@@ -79,6 +81,7 @@ import { useRoutePreviewGeometry } from '@/features/widget-preview/widgets/route
 
 function makeActivity() {
   return {
+    trim_end_seconds: 30,
     sample_elapsed_seconds: [0, 10, 20, 30],
     sample_distance_progress: [0, 0.33, 0.66, 1],
     sample_course_points: [
@@ -183,6 +186,32 @@ describe('useRoutePreviewGeometry', () => {
     expect(geometry.markerPoint).toHaveLength(2)
     expect(typeof geometry.remainingSvgPoints).toBe('string')
     expect(geometry.remainingSvgPoints.length).toBeGreaterThan(0)
+  })
+
+  test('reuses static route geometry when only previewSecond changes', async () => {
+    const activity = { ...makeActivity(), trim_end_seconds: 30 }
+    const data = makeData()
+    const style = makeStyle()
+    const { result, rerender } = renderHook(
+      ({ previewSecond }) => useRoutePreviewGeometry({ activity, data, exportRange: null, previewSecond, style }),
+      {
+        initialProps: { previewSecond: 15 },
+      },
+    )
+
+    await waitFor(() => {
+      expect(result.current).not.toBeNull()
+    })
+
+    const initialGeometry = result.current
+    const initialSerializerCalls = mockPointsToSvg.mock.calls.length
+
+    rerender({ previewSecond: 20 })
+
+    expect(mockBuildRouteGeometry).toHaveBeenCalledTimes(1)
+    expect(mockPointsToSvg).toHaveBeenCalledTimes(initialSerializerCalls + 1)
+    expect(result.current.remainingSvgPoints).toBe(initialGeometry.remainingSvgPoints)
+    expect(result.current.completedSvgPoints).not.toBe(initialGeometry.completedSvgPoints)
   })
 
   test('returns null while IPC call is in flight', () => {

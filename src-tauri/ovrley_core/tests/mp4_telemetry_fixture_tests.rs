@@ -17,17 +17,10 @@ fn extracts_supported_mp4_telemetry_fixtures_with_provenance() {
             .and_then(|s| s.to_str())
             .unwrap_or("video");
 
-        let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
-            .unwrap_or_else(|err| panic!("{stem}: probe failed: {err}"));
-        let activity = mp4_telemetry::extract_activity(
-            repo_root,
-            fixture.to_str().unwrap(),
-            metadata.fps.unwrap_or(30.0),
-            metadata.duration.unwrap_or(0.0),
-        )
-        .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
-        .unwrap_or_else(|| panic!("{stem}: expected telemetry activity"))
-        .parsed_activity;
+        let activity = mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
+            .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
+            .unwrap_or_else(|| panic!("{stem}: expected telemetry activity"))
+            .parsed_activity;
 
         assert_eq!(
             activity.file_format.as_deref(),
@@ -98,7 +91,7 @@ fn extracts_supported_mp4_telemetry_fixtures_with_provenance() {
         if filename == "DJI-telemetry.MP4" {
             assert_eq!(
                 activity.sync_time.as_deref(),
-                Some("2026-03-15T23:58:14+00:00"),
+                Some("2026-03-15T15:58:14+00:00"),
                 "{stem}: sync_time"
             );
             assert!(imu_count > 0, "{stem}: expected IMU telemetry");

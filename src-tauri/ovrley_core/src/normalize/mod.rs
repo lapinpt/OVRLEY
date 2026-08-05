@@ -8,10 +8,12 @@ mod arc_gauge;
 mod backdrop;
 mod bar_geometry;
 mod elevation;
+mod g_force;
 mod gradient;
 mod heading;
 mod helpers;
 mod label;
+mod lean_angle;
 mod linear_gauge;
 pub mod raw;
 mod route;
@@ -43,9 +45,14 @@ pub(crate) use bar_geometry::{
     scale_bar_geometry, track_corner_radius_max,
 };
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
+pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
+pub(crate) use lean_angle::LEAN_ANGLE_MAX_FILL_SWEEP;
+pub use lean_angle::{
+    lean_angle_layout, validate_lean_angle, LeanAngleLayout, ValidatedLeanAngleWidget,
+};
 pub use linear_gauge::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
     ValidatedLinearGaugeWidget,
@@ -64,6 +71,10 @@ pub struct RenderDataRequirements {
     pub speed: bool,
     pub distance: bool,
     pub elevation: bool,
+    pub barometric_altitude: bool,
+    pub calories: bool,
+    pub distance_to_home: bool,
+    pub total_ascent: bool,
     pub gradient: bool,
     pub heartrate: bool,
     pub cadence: bool,
@@ -71,6 +82,9 @@ pub struct RenderDataRequirements {
     pub temperature: bool,
     pub pace: bool,
     pub g_force: bool,
+    pub g_force_x: bool,
+    pub g_force_y: bool,
+    pub g_force_z: bool,
     pub rpm: bool,
     pub throttle_position: bool,
     pub brake_position: bool,
@@ -82,7 +96,6 @@ pub struct RenderDataRequirements {
     pub stroke_rate: bool,
     pub torque: bool,
     pub vertical_speed: bool,
-    pub altitude: bool,
     pub iso: bool,
     pub aperture: bool,
     pub shutter_speed: bool,
@@ -127,8 +140,17 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
         .into_iter()
         .enumerate()
         .map(|(idx, value)| {
+            if value.value == MetricKind::GForce && value.display_type == DisplayType::GForce {
+                let value = value.with_promoted_display_variant("g_force")?;
+                return validate_g_force(value, idx).map(PreparedValue::GForce);
+            }
             if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
                 return validate_heading(&value, idx, &scene).map(PreparedValue::HeadingTape);
+            }
+            if value.value == MetricKind::LeanAngle && value.display_type == DisplayType::LeanAngle
+            {
+                let value = value.with_promoted_display_variant("lean_angle")?;
+                return validate_lean_angle(value, idx).map(PreparedValue::LeanAngle);
             }
             if value.value == MetricKind::Gradient {
                 return validate_gradient_widget(value, idx).map(PreparedValue::Gradient);
@@ -213,9 +235,29 @@ impl ValidatedRenderConfig {
         let mut requirements = RenderDataRequirements::default();
 
         for value in &self.values {
+            if let PreparedValue::GForce(widget) = value {
+                for axis in [widget.axis_horizontal, widget.axis_vertical] {
+                    match axis {
+                        GForceAxis::X => requirements.g_force_x = true,
+                        GForceAxis::Y => requirements.g_force_y = true,
+                        GForceAxis::Z => requirements.g_force_z = true,
+                    }
+                }
+                continue;
+            }
             match value.metric_kind() {
                 MetricKind::Speed => requirements.speed = true,
                 MetricKind::Distance => requirements.distance = true,
+                MetricKind::DistanceToHome => {
+                    requirements.distance_to_home = true;
+                    requirements.course = true;
+                }
+                MetricKind::GpsCoordinates => requirements.course = true,
+                MetricKind::TotalAscent => {
+                    requirements.elevation = true;
+                    requirements.barometric_altitude = true;
+                    requirements.total_ascent = true;
+                }
                 MetricKind::Elevation => requirements.elevation = true,
                 MetricKind::Gradient => requirements.gradient = true,
                 MetricKind::Heartrate => requirements.heartrate = true,
@@ -235,7 +277,10 @@ impl ValidatedRenderConfig {
                 MetricKind::StrokeRate => requirements.stroke_rate = true,
                 MetricKind::Torque => requirements.torque = true,
                 MetricKind::VerticalSpeed => requirements.vertical_speed = true,
-                MetricKind::Altitude => requirements.altitude = true,
+                MetricKind::Altitude => {
+                    requirements.elevation = true;
+                    requirements.barometric_altitude = true;
+                }
                 MetricKind::Iso => requirements.iso = true,
                 MetricKind::Aperture => requirements.aperture = true,
                 MetricKind::ShutterSpeed => requirements.shutter_speed = true,
@@ -248,6 +293,7 @@ impl ValidatedRenderConfig {
                 MetricKind::CoreTemperature => requirements.core_temperature = true,
                 MetricKind::Heading => requirements.heading = true,
                 MetricKind::Time => requirements.time = true,
+                MetricKind::Calories => requirements.calories = true,
             }
         }
 
@@ -257,6 +303,7 @@ impl ValidatedRenderConfig {
 
         if self.elevation_plot.is_some() {
             requirements.elevation = true;
+            requirements.barometric_altitude = true;
             requirements.distance_progress = true;
         }
 

@@ -41,13 +41,15 @@ enum Metric {
     /// GPS or sensor elevation in metres.
     Elevation,
     /// Pressure or barometric altitude in metres.
-    Altitude,
+    BarometricAltitude,
     /// Ground speed in metres per second.
     Speed,
     /// Course or bearing in degrees clockwise from north.
     Heading,
     /// Cumulative travelled distance in metres.
     Distance,
+    /// Distance from the starting home point in metres.
+    DistanceToHome,
     /// Scalar acceleration magnitude in standard gravity units.
     GForce,
     /// Lateral or literal X acceleration in standard gravity units.
@@ -66,6 +68,16 @@ enum Metric {
     LeanAngle,
     /// Gear position as an unscaled numeric value.
     GearPosition,
+    /// Raw date string companion for time-of-day timestamp reconstruction.
+    ///
+    /// This is not emitted as an activity metric; it supplies the calendar date
+    /// paired with a [`Timestamp`](TimingKind::TimeOfDay) column.
+    CompanionDate,
+    /// Combined GPS coordinate as a space-separated "lat lon" string.
+    ///
+    /// This is not emitted as an activity metric; it is split into separate
+    /// latitude and longitude series during column assembly.
+    GpsCoordinate,
 }
 
 impl Metric {
@@ -84,6 +96,7 @@ impl Metric {
                 | Self::Speed
                 | Self::Heading
                 | Self::Distance
+                | Self::DistanceToHome
         )
     }
 }
@@ -143,7 +156,7 @@ pub fn parse_csv_activity_reader<R: Read>(
             let record = record.map_err(csv_error)?;
             record_count = record_index + 1;
             if header.is_none() {
-                if let Some(candidate) = headers::parse_header_candidate(&record) {
+                if let Some(candidate) = headers::parse_header_candidate(&record)? {
                     data = Some(columns::CsvColumnData::new(&candidate));
                     header = Some(candidate);
                     awaiting_units_row = true;

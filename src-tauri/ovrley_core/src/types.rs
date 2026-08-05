@@ -92,6 +92,14 @@ pub enum MetricKind {
     BrakePosition,
     #[serde(rename = "lean_angle")]
     LeanAngle,
+    #[serde(rename = "gps_coordinates")]
+    GpsCoordinates,
+    #[serde(rename = "distance_to_home")]
+    DistanceToHome,
+    #[serde(rename = "total_ascent")]
+    TotalAscent,
+    #[serde(rename = "calories")]
+    Calories,
 }
 
 /// Visual representation mode for a value widget.
@@ -119,6 +127,10 @@ pub enum DisplayType {
     Corner,
     #[serde(rename = "heading_tape")]
     Tape,
+    #[serde(rename = "lean_angle")]
+    LeanAngle,
+    #[serde(rename = "g_force")]
+    GForce,
 }
 
 impl DisplayType {
@@ -130,6 +142,8 @@ impl DisplayType {
             DisplayType::Arc => "arc",
             DisplayType::Corner => "corner",
             DisplayType::Tape => "heading_tape",
+            DisplayType::LeanAngle => "lean_angle",
+            DisplayType::GForce => "g_force",
         }
     }
 }
@@ -170,6 +184,8 @@ impl<'de> Deserialize<'de> for DisplayType {
                 "arc" => Ok(DisplayType::Arc),
                 "corner" => Ok(DisplayType::Corner),
                 "heading_tape" => Ok(DisplayType::Tape),
+                "lean_angle" => Ok(DisplayType::LeanAngle),
+                "g_force" => Ok(DisplayType::GForce),
                 _ => Ok(DisplayType::default()),
             },
             _ => Ok(DisplayType::default()),

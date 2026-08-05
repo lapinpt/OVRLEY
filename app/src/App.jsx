@@ -9,6 +9,7 @@
 
 import { useEffect } from 'react'
 import { OverlayEditor } from '@/features/overlay-editor'
+import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import { WidgetDrawer } from '@/features/widget-drawer'
@@ -26,6 +27,7 @@ import {
   useEditorShellState,
 } from '@/features/app-shell'
 import { useVideoImport } from '@/features/video-preview'
+import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from './api/backend'
 
 function useRightClickDevtools() {
@@ -78,12 +80,16 @@ function useRightClickDevtools() {
  */
 function useAppShellComposition() {
   const { config, isProcessing, globalDefaults, importingVideo, setConfig, setErrorMessage } = useAppShellStore()
+  const widgetLiveEdits = useWidgetDraftState()
   const { backendStatus } = useBackendStatus()
   const editorShell = useEditorShellState()
   const { activityFilename, handleActivityFileOpen } = useActivityImport()
   const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
+  const undoRedoControls = useUndoRedo({
+    disabled: renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.showNewTemplateConfirm,
+  })
 
   useAppBootstrap()
 
@@ -117,6 +123,7 @@ function useAppShellComposition() {
     onZoomIn: editorShell.increaseZoom,
     onZoomOut: editorShell.decreaseZoom,
     snapToGrid: editorShell.editorSnapToGrid,
+    undoRedoControls,
     zoomLevel: editorShell.editorZoomLevel,
   }
 
@@ -158,6 +165,7 @@ function useAppShellComposition() {
     templateControls,
     templateManagement,
     videoControls,
+    widgetLiveEdits,
   }
 }
 
@@ -184,6 +192,7 @@ function AppShell() {
     templateControls,
     templateManagement,
     videoControls,
+    widgetLiveEdits,
   } = useAppShellComposition()
 
   return (
@@ -222,7 +231,7 @@ function AppShell() {
               show={isProcessing || importingVideo}
               label={importingVideo ? 'Importing your video...' : 'Processing your activity...'}
             />
-            <WidgetDrawer />
+            <WidgetDrawer widgetLiveEdits={widgetLiveEdits} />
             <div className="min-h-0 flex-1">
               <OverlayEditor
                 config={config}
@@ -238,13 +247,14 @@ function AppShell() {
                 editorControls={editorControls}
                 showTemplateStatus={templateManagement.showTemplateStatus}
                 templateStatus={templateManagement.status}
+                widgetLiveEdits={widgetLiveEdits}
               />
             </div>
             <OverlayPlayer backgroundMode={editorShell.editorBackgroundMode} />
           </div>
 
           <div className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
-            <ControlPanel config={config} onConfigChange={setConfig} />
+            <ControlPanel config={config} onConfigChange={setConfig} widgetLiveEdits={widgetLiveEdits} />
           </div>
         </div>
       </div>

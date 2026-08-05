@@ -24,6 +24,9 @@ pub enum StandardMetricFormatterKind {
     Aperture,
     Ev,
     Gear,
+    Coordinates,
+    Distance,
+    Elevation,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -31,6 +34,7 @@ pub enum StandardMetricFormatterKind {
 pub enum StandardMetricInterpolationKind {
     Linear,
     Hold,
+    Preserve,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -74,6 +78,10 @@ pub enum MetricIconAssetKey {
     ThrottlePosition,
     BrakePosition,
     LeanAngle,
+    House,
+    Satellite,
+    ArrowUpNarrowWide,
+    Calories,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -207,6 +215,7 @@ fn load_manifest() -> StandardMetricManifest {
     let definitions = raw
         .definitions
         .into_iter()
+        .filter(|definition| definition.current)
         .map(|definition| {
             let kind = metric_kind_from_key(&definition.key).unwrap_or_else(|| {
                 panic!(
@@ -273,6 +282,10 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "throttle_position" => Some(MetricKind::ThrottlePosition),
         "brake_position" => Some(MetricKind::BrakePosition),
         "lean_angle" => Some(MetricKind::LeanAngle),
+        "gps_coordinates" => Some(MetricKind::GpsCoordinates),
+        "distance_to_home" => Some(MetricKind::DistanceToHome),
+        "total_ascent" => Some(MetricKind::TotalAscent),
+        "calories" => Some(MetricKind::Calories),
         _ => None,
     }
 }
@@ -313,6 +326,10 @@ fn metric_kind_to_key(kind: MetricKind) -> &'static str {
         MetricKind::ThrottlePosition => "throttle_position",
         MetricKind::BrakePosition => "brake_position",
         MetricKind::LeanAngle => "lean_angle",
+        MetricKind::GpsCoordinates => "gps_coordinates",
+        MetricKind::DistanceToHome => "distance_to_home",
+        MetricKind::TotalAscent => "total_ascent",
+        MetricKind::Calories => "calories",
     }
 }
 
@@ -385,6 +402,10 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
         "widget-throttle-position.svg" => Some(MetricIconAssetKey::ThrottlePosition),
         "widget-brake-position.svg" => Some(MetricIconAssetKey::BrakePosition),
         "widget-lean-angle.svg" => Some(MetricIconAssetKey::LeanAngle),
+        "widget-house.svg" => Some(MetricIconAssetKey::House),
+        "widget-satellite.svg" => Some(MetricIconAssetKey::Satellite),
+        "widget-arrow-up-narrow-wide.svg" => Some(MetricIconAssetKey::ArrowUpNarrowWide),
+        "widget-calories.svg" => Some(MetricIconAssetKey::Calories),
         _ => None,
     }
 }

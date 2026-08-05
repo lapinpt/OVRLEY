@@ -8,7 +8,7 @@ import {
   GRADIENT_WIDGET_TRIANGLE_GAP_PX,
   MAX_GRADIENT_ABS_PERCENT,
   GRADIENT_ZERO_EPSILON,
-} from '@/features/overlay-editor'
+} from '@/features/overlay-editor/data/overlayEditorConstants'
 import {
   getStandardMetricDefinition,
   getStandardMetricDisplayUnit,
@@ -26,10 +26,10 @@ import { measurePreviewText, getPreviewTextBaseline } from '../../shared/textMea
  */
 function formatSpeed(value, unit) {
   const conversions = {
-    kmh: { units: 'KM/H', factor: 3.6 },
-    mph: { units: 'MPH', factor: 2.236936 },
-    kn: { units: 'KN', factor: 1.943844 },
-    mps: { units: 'M/S', factor: 1 },
+    kmh: { units: 'KM/H' },
+    mph: { units: 'MPH' },
+    kn: { units: 'KN' },
+    mps: { units: 'M/S' },
   }
   const selection = conversions[unit]
 
@@ -38,7 +38,7 @@ function formatSpeed(value, unit) {
   }
 
   return {
-    value: Math.round(value * selection.factor).toString(),
+    value: Math.round(convertStandardMetricValue('speed', value, unit)).toString(),
     units: selection.units,
   }
 }
@@ -58,7 +58,7 @@ function formatTemperature(value, unit, decimals) {
     }
   }
 
-  const temp = unit === 'fahrenheit' ? (value * 9) / 5 + 32 : value
+  const temp = convertStandardMetricValue('temperature', value, unit)
   const roundedValue = decimals > 0 ? temp.toFixed(decimals) : Math.round(temp).toString()
 
   return {
@@ -75,15 +75,22 @@ function formatPace(value, unit) {
     }
   }
 
-  const totalSeconds = unit === 'min_per_mi' ? value * 1.609344 : value
+  const totalSeconds = convertStandardMetricValue('pace', value, unit)
   const roundedSeconds = Math.max(Math.round(totalSeconds), 0)
-  const minutes = Math.floor(roundedSeconds / 60)
-  const seconds = roundedSeconds % 60
 
   return {
-    value: `${minutes}:${String(seconds).padStart(2, '0')}`,
+    value: `${Math.floor(roundedSeconds / 60)}:${String(roundedSeconds % 60).padStart(2, '0')}`,
     units: unit === 'min_per_mi' ? 'MIN/MI' : 'MIN/KM',
   }
+}
+
+/** Formats a finite number with fixed decimals while normalizing negative zero. */
+export function formatFixedDecimal(value, decimals) {
+  const precision = decimals > 0 ? decimals : 0
+  const factor = 10 ** precision
+  const rounded = (Math.sign(value) * Math.round(Math.abs(value) * factor)) / factor
+  const roundedValue = precision > 0 ? rounded.toFixed(precision) : rounded.toString()
+  return Number(roundedValue) === 0 ? (0).toFixed(precision) : roundedValue
 }
 
 function formatRoundedMetric(value, units, decimals) {
@@ -94,11 +101,8 @@ function formatRoundedMetric(value, units, decimals) {
     }
   }
 
-  const roundedValue = decimals > 0 ? value.toFixed(decimals) : Math.round(value).toString()
-  const normalizedValue = Number(roundedValue) === 0 ? (0).toFixed(decimals) : roundedValue
-
   return {
-    value: normalizedValue,
+    value: formatFixedDecimal(value, decimals),
     units,
   }
 }
@@ -118,14 +122,44 @@ function formatDistanceValue(value, unit, decimals, showUnits) {
   }
 }
 
-function convertStandardMetricValue(type, value, displayUnit) {
+/**
+ * Converts a raw standard-metric telemetry value through the selected display
+ * unit. Handles all metric kinds including speed, temperature, and pace that
+ * have custom conversion logic.
+ *
+ * @param {string} type - Metric type key (e.g. "speed", "distance").
+ * @param {string|null} displayUnit - Target display unit.
+ * @param {number} value - Raw telemetry value in native units.
+ * @returns {number} Converted value.
+ */
+export function convertStandardMetricValue(type, value, displayUnit) {
   switch (type) {
+    case 'speed':
+      switch (displayUnit) {
+        case 'mph':
+        case 'imperial':
+          return value * 2.23694
+        case 'kn':
+          return value * 1.943844
+        case 'mps':
+          return value
+        default:
+          return value * 3.6
+      }
+    case 'temperature':
+    case 'core_temperature':
+      return displayUnit === 'fahrenheit' ? (value * 9) / 5 + 32 : value
+    case 'pace':
+      return displayUnit === 'min_per_mi' ? value * 1.609344 : value
     case 'distance':
+    case 'distance_to_home':
       switch (displayUnit) {
         case 'km':
           return value / 1000
         case 'mi':
           return value / 1609.344
+        case 'ft':
+          return value * 3.28084
         default:
           return value
       }
@@ -165,6 +199,8 @@ function convertStandardMetricValue(type, value, displayUnit) {
           return value
       }
     case 'altitude':
+      return displayUnit === 'ft' ? value * 3.28084 : value
+    case 'total_ascent':
       return displayUnit === 'ft' ? value * 3.28084 : value
     case 'vertical_oscillation':
       switch (displayUnit) {
@@ -257,6 +293,72 @@ function formatGearPosition(value, units) {
   return { value, units }
 }
 
+function formatCoordinatePlaceholder(coordinateFormat) {
+  if (coordinateFormat === 'dms') return '--°--′--″'
+  if (coordinateFormat === 'ddm') return '--°--.---′'
+  throw new Error(`Unknown GPS coordinate format: ${coordinateFormat}`)
+}
+
+function formatDmsCoordinate(absolute) {
+  let degrees = Math.floor(absolute)
+  const minutesTotal = (absolute - degrees) * 60
+  let minutes = Math.floor(minutesTotal)
+  let seconds = Math.round((minutesTotal - minutes) * 60)
+  if (seconds === 60) {
+    seconds = 0
+    minutes += 1
+  }
+  if (minutes === 60) {
+    minutes = 0
+    degrees += 1
+  }
+  return `${degrees}\u00B0${String(minutes).padStart(2, '0')}\u2032${String(seconds).padStart(2, '0')}\u2033`
+}
+
+function formatDdmCoordinate(absolute) {
+  let degrees = Math.floor(absolute)
+  let decimalMinutes = (absolute - degrees) * 60
+  if (decimalMinutes >= 59.9995) {
+    decimalMinutes = 0
+    degrees += 1
+  }
+  return `${degrees}\u00B0${decimalMinutes.toFixed(3).padStart(6, '0')}\u2032`
+}
+
+function formatCoordinateLine(coordinate, isLatitude, coordinateFormat, directionColor) {
+  if (coordinate === null || coordinate === undefined) {
+    return { direction: '', valueText: formatCoordinatePlaceholder(coordinateFormat), directionColor }
+  }
+
+  const direction = isLatitude ? (coordinate < 0 ? 'S' : 'N') : coordinate < 0 ? 'W' : 'E'
+  const valueFormatter = { dms: formatDmsCoordinate, ddm: formatDdmCoordinate }[coordinateFormat]
+  return {
+    direction,
+    valueText: valueFormatter(Math.abs(coordinate)),
+    directionColor,
+  }
+}
+
+/**
+ * Formats decimal latitude/longitude values as DMS or DDM text.
+ *
+ * @param {[number|null, number|null]} value - Latitude/longitude pair.
+ * @param {'latitude'|'longitude'|'both'} displayUnit - Coordinate selection.
+ * @param {'dms'|'ddm'} coordinateFormat - Coordinate notation.
+ * @param {string} unitColor - Direction-letter color consumed by the renderer.
+ * @returns {{type: 'coordinates', lines: Array<{direction: string, valueText: string, directionColor: string}>}} Coordinate display lines.
+ */
+export function formatCoordinates(value, displayUnit, coordinateFormat, unitColor) {
+  const [latitude, longitude] = value
+  const latitudeLine = formatCoordinateLine(latitude, true, coordinateFormat, unitColor)
+  const longitudeLine = formatCoordinateLine(longitude, false, coordinateFormat, unitColor)
+
+  if (displayUnit === 'latitude') return { type: 'coordinates', lines: [latitudeLine] }
+  if (displayUnit === 'longitude') return { type: 'coordinates', lines: [longitudeLine] }
+  if (displayUnit === 'both') return { type: 'coordinates', lines: [latitudeLine, longitudeLine] }
+  throw new Error(`Unknown GPS coordinate display unit: ${displayUnit}`)
+}
+
 export function formatStandardMetricDisplay(type, value, widgetData) {
   const definition = getStandardMetricDefinition(type)
   if (!definition) throw new Error(`Unknown standard metric type: ${type}`)
@@ -299,7 +401,11 @@ export function formatStandardMetricDisplay(type, value, widgetData) {
     return formatGearPosition(value, effectiveUnitLabel)
   }
 
-  if (type === 'distance') {
+  if (definition.formatter === 'coordinates') {
+    return formatCoordinates(value, displayUnit, widgetData.coordinate_format, widgetData.unit_color)
+  }
+
+  if (definition.formatter === 'distance') {
     return formatDistanceValue(
       value === null || value === undefined ? value : convertStandardMetricValue(type, value, displayUnit),
       effectiveUnitLabel,
@@ -327,27 +433,50 @@ function padNumber(value) {
  *
  * @param {string} format - Format key (e.g. 'time-24', 'date-dd-mm-yyyy').
  * @param {number|string|null|undefined} timestamp - Timestamp in milliseconds or ISO string.
+ * @param {string|null|undefined} timezone - Optional IANA timezone from activity metadata.
  * @returns {string} Formatted time/date string.
  */
-export function formatTimeValue(format, timestamp) {
+export function formatTimeValue(format, timestamp, timezone) {
   // Early return — missing or invalid timestamps show a placeholder
   if (!timestamp) return '--:--'
 
   const date = new Date(timestamp)
   if (!Number.isFinite(date.getTime())) return '--:--'
 
-  // Extract all date/time components for format string composition
-  const day = padNumber(date.getDate())
-  const month = padNumber(date.getMonth() + 1)
-  const year = date.getFullYear()
-  const shortMonth = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-  const longMonth = date.toLocaleString('en-US', { month: 'long' }).toUpperCase()
-  const hour24 = padNumber(date.getHours())
-  const hour12Raw = date.getHours() % 12 || 12
+  // Parsed activity timestamps are canonical UTC values. An absent activity
+  // timezone must remain deterministic and must never resolve through the
+  // user's computer timezone.
+  const timezoneOptions = { timeZone: timezone || 'UTC' }
+  const dateTimeParts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      ...timezoneOptions,
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .map(({ type, value }) => [type, value]),
+  )
+
+  // Extract all date/time components for format string composition. Intl applies
+  // the IANA zone's historical and daylight-saving rules when one is supplied.
+  const day = dateTimeParts.day
+  const month = dateTimeParts.month
+  const year = dateTimeParts.year
+  const shortMonth = new Intl.DateTimeFormat('en-US', { ...timezoneOptions, month: 'short' }).format(date).toUpperCase()
+  const longMonth = new Intl.DateTimeFormat('en-US', { ...timezoneOptions, month: 'long' }).format(date).toUpperCase()
+  const hour24 = dateTimeParts.hour
+  const hour12Raw = Number(hour24) % 12 || 12
   const hour12 = padNumber(hour12Raw)
-  const minutes = padNumber(date.getMinutes())
-  const seconds = padNumber(date.getSeconds())
-  const suffix = date.getHours() >= 12 ? 'PM' : 'AM'
+  const minutes = dateTimeParts.minute
+  const seconds = dateTimeParts.second
+  const suffix = Number(hour24) >= 12 ? 'PM' : 'AM'
 
   // Format map — selects the rendered string based on the format key; falls back to 24-hour time
   const formatMap = {

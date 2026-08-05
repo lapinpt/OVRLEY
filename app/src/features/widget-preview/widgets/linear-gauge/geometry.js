@@ -1,7 +1,7 @@
 /** Pure presentation geometry and label formatting for linear gauge previews. */
 
 import { getTranslatedTrackCapPath, getTranslatedTrackCapReveal } from '../../shared/trackPathGeometry'
-import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor'
+import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { measurePreviewText } from '../../shared/textMeasurement'
 
 const LINEAR_GAUGE_LABEL_GAP_PX = 8
@@ -193,16 +193,4 @@ export function getLinearTranslatedFillPath({ trackRect, fillRect, orientation, 
   if (!translatedCap) return ''
 
   return getTranslatedTrackCapPath({ ...getLinearTrackCapGeometry(trackRect, orientation, cornerRadius), ...translatedCap })
-}
-
-/**
- * Formats a gauge label value. Integers are formatted without decimals;
- * non-integers show one decimal place.
- *
- * @param {number} value - The value to format.
- * @returns {string} Formatted label string.
- */
-export function formatLinearGaugeLabel(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
-  return Number.isInteger(value) ? `${value}` : value.toFixed(1)
 }

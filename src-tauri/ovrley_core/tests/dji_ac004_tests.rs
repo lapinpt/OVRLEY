@@ -14,7 +14,7 @@ fn extract_from_video_reads_dji_fixture() {
     assert_eq!(telemetry.device_name.as_deref(), Some("DJI AC004"));
     assert_eq!(
         telemetry.sync_time.as_deref(),
-        Some("2026-03-15T23:58:14+00:00")
+        Some("2026-03-15T15:58:14+00:00")
     );
     assert!(!telemetry.samples.is_empty());
     assert!(telemetry.samples[0].latitude.is_finite());
@@ -28,22 +28,26 @@ fn extract_from_video_reads_dji_fixture() {
 fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
     let (repo_root, fixture) = dji_fixture();
 
-    let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
+    let metadata = mp4_telemetry::probe_video_metadata(repo_root, fixture.to_str().unwrap())
         .expect("expected video metadata probe to succeed");
-    let response = mp4_telemetry::extract_activity(
-        repo_root,
-        fixture.to_str().unwrap(),
-        metadata.fps.unwrap_or(30.0),
-        metadata.duration.unwrap_or(0.0),
-    )
-    .expect("expected extraction to succeed")
-    .expect("expected MP4 telemetry activity");
+    assert_eq!(
+        metadata.sync_time.as_deref(),
+        Some("2026-03-15T15:58:14+00:00")
+    );
+    assert_eq!(
+        metadata.creation_time.as_deref(),
+        Some("2026-03-15T15:58:14+00:00")
+    );
+    assert_eq!(metadata.time_source.as_deref(), Some("gps"));
+    let response = mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
+        .expect("expected extraction to succeed")
+        .expect("expected MP4 telemetry activity");
     let activity = &response.parsed_activity;
 
     assert_eq!(activity.file_format.as_deref(), Some("mp4_telemetry"));
     assert_eq!(
         activity.sync_time.as_deref(),
-        Some("2026-03-15T23:58:14+00:00")
+        Some("2026-03-15T15:58:14+00:00")
     );
     assert_eq!(
         activity
@@ -76,6 +80,13 @@ fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
             .and_then(|value| value.as_str()),
         Some("dji_ac004_fallback")
     );
+    assert_eq!(
+        activity
+            .metadata
+            .get("timezone")
+            .and_then(|value| value.as_str()),
+        Some("Europe/Prague")
+    );
 }
 
 #[test]
@@ -99,7 +110,7 @@ fn parse_raw_metadata_extracts_ac004_gps_points() {
     assert_eq!(telemetry.sample_rate_hz, Some(25.0));
     assert_eq!(
         telemetry.sync_time.as_deref(),
-        Some("2026-03-15T23:58:14+00:00")
+        Some("2026-03-15T15:58:14+00:00")
     );
     assert_eq!(telemetry.samples.len(), 1);
 
@@ -112,7 +123,7 @@ fn parse_raw_metadata_extracts_ac004_gps_points() {
     assert!((sample.speed - 5.0).abs() < 1e-9);
     assert!((sample.heading.unwrap() - 36.869_897_645_844_02).abs() < 1e-9);
     assert!((sample.g_force.unwrap() - 0.5).abs() < 1e-9);
-    assert_eq!(sample.timestamp, "2026-03-15T23:58:14+00:00");
+    assert_eq!(sample.timestamp, "2026-03-15T15:58:14+00:00");
 }
 
 #[test]

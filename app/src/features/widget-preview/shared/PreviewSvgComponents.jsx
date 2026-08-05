@@ -26,7 +26,7 @@ export function PreviewSvgShadowOnlyFilter({ id, shadow, opacity = 1 }) {
 
   return (
     <defs>
-      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
+      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" overflow="visible" colorInterpolationFilters="sRGB">
         <feGaussianBlur in="SourceAlpha" stdDeviation={Math.max(shadow.strength, 0)} result="shadow-blur" />
         <feOffset in="shadow-blur" dx={shadow.distance} dy={shadow.distance} result="shadow-offset" />
         <feFlood floodColor={shadowColor.color} floodOpacity={shadowColor.opacity} result="shadow-color" />
@@ -52,8 +52,8 @@ export function PreviewSvgShadowBlurFilter({ id, shadow }) {
 
   return (
     <defs>
-      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
-        <feGaussianBlur stdDeviation={shadow.strength} />
+      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" overflow="visible" colorInterpolationFilters="sRGB">
+        <feGaussianBlur stdDeviation={Math.max(shadow.strength, 0)} />
       </filter>
     </defs>
   )
@@ -237,6 +237,7 @@ export function PreviewPolylineShadow({ points, shadow, blurFilterId, strokeWidt
       stroke={shadowColor.color}
       strokeOpacity={shadowColor.opacity}
       strokeWidth={strokeWidth}
+      vectorEffect="non-scaling-stroke"
       strokeLinejoin="round"
       strokeLinecap="round"
       points={points}
@@ -257,19 +258,21 @@ export function PreviewPolylineShadow({ points, shadow, blurFilterId, strokeWidt
  * @param {Array<{radius: number, color: string, opacity: number, solidFill: boolean, strokeWidth?: number}>} props.layers - Sorted marker layer definitions.
  * @param {number} props.x - X position of the marker center.
  * @param {number} props.y - Y position of the marker center.
+ * @param {{x: number, y: number}|null} [props.pointScale] - Temporary plot scale applied to the marker position.
  * @returns {JSX.Element|null} Fragment of SVG circle elements, or null if no valid layers/position.
  */
-export function PreviewMarkerLayers({ layers, point }) {
+export function PreviewMarkerLayers({ layers, point, pointScale = null }) {
   if (!point) return null
 
+  const markerPoint = pointScale ? [point[0] * pointScale.x, point[1] * pointScale.y] : point
   const circles = []
   for (let index = 0; index < layers.length; index += 1) {
     const layer = layers[index]
     circles.push(
       <circle
         key={`${layer.radius}-${layer.color}-${index}`}
-        cx={point[0]}
-        cy={point[1]}
+        cx={markerPoint[0]}
+        cy={markerPoint[1]}
         r={layer.radius}
         fill={layer.solidFill ? layer.color : 'none'}
         stroke={layer.solidFill ? 'none' : layer.color}

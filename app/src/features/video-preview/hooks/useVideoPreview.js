@@ -3,13 +3,13 @@
  * scheduling, and playback synchronization around the active <video> element.
  */
 
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { openHevcSupport } from '@/api/backend'
 import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
-import { DRIFT_CORRECTION_SECONDS, SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/videoPreviewConstants'
-import { clampVideoTime, primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
+import { SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/videoPreviewConstants'
+import { primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
 import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/videoPreviewSource'
 
@@ -29,14 +29,18 @@ export function useVideoPreview(videoRef, isActive = true) {
   const importedVideoCodecName = useStore((state) => state.importedVideoCodecName)
   const platformOs = useStore((state) => state.platformOs)
   const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
+  const videoSyncOffsetPreviewSeconds = useStore((state) => state.videoSyncOffsetPreviewSeconds)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
+  const pausePreviewPlayback = useStore((state) => state.pausePreviewPlayback)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
+  const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
 
   // Derived state - determines whether the video should play and which source URL to load.
-  const isVideoPlaybackMode = isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video'
+  const isVideoPlaybackMode =
+    isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && videoSyncOffsetPreviewSeconds === null
   const videoSrc = useMemo(
     () =>
       resolveVideoPreviewSource({
@@ -68,7 +72,28 @@ export function useVideoPreview(videoRef, isActive = true) {
     onPreviewSecond: setSelectedSecond,
   })
 
-  // Video sync - keeps play/pause/scrub ownership focused on the active video element.
+  const scrubSchedulerRef = useRef(null)
+  const videoPlaybackOwnerRef = useRef(null)
+
+  // Drag preview - seek the video directly from the transient offset without committing global sync state.
+  useEffect(() => {
+    if (videoSyncOffsetPreviewSeconds === null) {
+      return
+    }
+
+    const video = videoRef.current
+    if (!video || !videoSrc) {
+      return
+    }
+
+    if (!video.paused) {
+      video.pause()
+    }
+
+    scrubSchedulerRef.current?.schedule(selectedSecond - videoSyncOffsetPreviewSeconds)
+  }, [selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds])
+
+  // Scrub scheduler ownership - preserve throttle state across playhead updates.
   useEffect(() => {
     const video = videoRef.current
     if (!video || !videoSrc) {
@@ -80,42 +105,81 @@ export function useVideoPreview(videoRef, isActive = true) {
       flushIntervalMs: SCRUB_SEEK_INTERVAL_MS,
       video,
     })
+    scrubSchedulerRef.current = scrubScheduler
+
+    return () => {
+      scrubScheduler.clear()
+      if (scrubSchedulerRef.current === scrubScheduler) {
+        scrubSchedulerRef.current = null
+      }
+    }
+  }, [isActive, videoRef, videoSrc])
+
+  // Video sync - the video clock owns playback; external playhead updates own paused and scrubbed seeks.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !videoSrc) {
+      return undefined
+    }
 
     const syncPlaybackState = () => {
+      if (videoSyncOffsetPreviewSeconds !== null) {
+        videoPlaybackOwnerRef.current = null
+        return
+      }
+
       const desiredVideoSecond = selectedSecond - videoSyncOffsetSeconds
 
-      if (isVideoPlaybackMode) {
-        scrubScheduler.clear()
+      const handlePlaybackFailure = (error) => {
+        const currentState = useStore.getState()
+        const isCurrentVideoPlayback =
+          videoRef.current === video && currentState.previewPlaybackState === 'playing' && currentState.previewPlaybackSource === 'video'
 
-        if (Math.abs(clampVideoTime(video, desiredVideoSecond) - video.currentTime) > DRIFT_CORRECTION_SECONDS) {
+        if (!isCurrentVideoPlayback) {
+          return
+        }
+
+        if (error?.name !== 'AbortError' && error?.name !== 'NotAllowedError') {
+          console.error('[useVideoPreview] Failed to start playback', error)
+        }
+
+        pausePreviewPlayback(currentState.selectedSecond)
+      }
+
+      const startVideoPlayback = () => {
+        const playPromise = video.play()
+
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(handlePlaybackFailure)
+        }
+      }
+
+      if (isVideoPlaybackMode) {
+        scrubSchedulerRef.current?.clear()
+        const owner = videoPlaybackOwnerRef.current
+        if (owner?.video !== video || owner.videoSyncOffsetSeconds !== videoSyncOffsetSeconds) {
           syncVideoCurrentTime(video, desiredVideoSecond)
+          videoPlaybackOwnerRef.current = { video, videoSyncOffsetSeconds }
         }
 
         if (video.paused) {
-          const playPromise = video.play()
-
-          if (playPromise && typeof playPromise.catch === 'function') {
-            playPromise.catch((error) => {
-              if (error?.name !== 'AbortError' && error?.name !== 'NotAllowedError') {
-                console.error('[useVideoPreview] Failed to start playback', error)
-              }
-            })
-          }
+          startVideoPlayback()
         }
 
         return
       }
 
+      videoPlaybackOwnerRef.current = null
       if (!video.paused) {
         video.pause()
       }
 
       if (previewPlaybackState === 'scrubbing') {
-        scrubScheduler.schedule(desiredVideoSecond)
+        scrubSchedulerRef.current?.schedule(desiredVideoSecond)
         return
       }
 
-      scrubScheduler.clear()
+      scrubSchedulerRef.current?.clear()
       syncVideoCurrentTime(video, desiredVideoSecond)
     }
 
@@ -129,17 +193,16 @@ export function useVideoPreview(videoRef, isActive = true) {
 
     return () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
-      scrubScheduler.clear()
     }
-  }, [isActive, isVideoPlaybackMode, previewPlaybackState, selectedSecond, videoRef, videoSrc, videoSyncOffsetSeconds])
+  }, [isActive, isVideoPlaybackMode, pausePreviewPlayback, previewPlaybackState, selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds, videoSyncOffsetSeconds])
 
   // Derived return values - aggregate imported-video warnings with local preview messages.
   const isOutOfRange = isVideoPreviewOutOfRange({
     selectedSecond,
     videoDuration,
-    videoSyncOffsetSeconds,
+    videoSyncOffsetSeconds: effectiveVideoSyncOffsetSeconds,
   })
-  const videoEndSecond = videoSyncOffsetSeconds + videoDuration
+  const videoEndSecond = effectiveVideoSyncOffsetSeconds + videoDuration
   const frozenFrameSecond = videoSrc && videoDuration > 0 && selectedSecond >= videoEndSecond ? videoDuration : null
   const videoPreviewHelpAvailable = Boolean(hevcPlaybackWarning) && platformOs === 'windows'
   const videoPreviewMessages = [hevcPlaybackWarning, ...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(

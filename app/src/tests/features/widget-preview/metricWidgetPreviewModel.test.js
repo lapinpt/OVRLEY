@@ -15,6 +15,7 @@ describe('core_temperature widget preview', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         core_temperature: [38.5],
       },
@@ -37,6 +38,7 @@ describe('core_temperature widget preview', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         core_temperature: [37],
       },
@@ -59,6 +61,7 @@ describe('core_temperature widget preview', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
       },
       previewSecond: 0,
@@ -81,6 +84,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         speed: [10],
       },
@@ -105,6 +109,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0, 10, 20],
         distance: [0, 22100, 35700],
       },
@@ -112,7 +117,7 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('22.1/35.7')
-    expect(model?.unitText).toBe('km')
+    expect(model?.unitText).toBe('KM')
   })
 
   test('formats distance widgets as current-only when show_full_distance is disabled', () => {
@@ -129,6 +134,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0, 10, 20],
         distance: [0, 1609.344, 3218.688],
       },
@@ -136,7 +142,55 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('1.00')
-    expect(model?.unitText).toBe('mi')
+    expect(model?.unitText).toBe('MI')
+  })
+
+  test('formats the altitude widget from the canonical elevation series', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'altitude',
+        data: {
+          display_unit: 'ft',
+          decimals: 0,
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        trim_end_seconds: 20,
+        sample_elapsed_seconds: [0],
+        elevation: [100],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('328')
+    expect(model?.unitText).toBe('FT')
+  })
+
+  test('formats calories from the parsed activity series', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'calories',
+        data: {
+          display_unit: 'kcal',
+          decimals: 0,
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        trim_end_seconds: 20,
+        sample_elapsed_seconds: [0],
+        calories: [742],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('742')
+    expect(model?.unitText).toBe('KCAL')
   })
 
   test('preserves requested trailing zeros for full distance formatting', () => {
@@ -153,6 +207,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0, 10, 20],
         distance: [0, 2300, 5000],
       },
@@ -160,7 +215,7 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model?.valueText).toBe('2.30/5.00')
-    expect(model?.unitText).toBe('km')
+    expect(model?.unitText).toBe('KM')
   })
 
   test('formats temperature widgets from display_unit', () => {
@@ -175,6 +230,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         temperature: [20],
       },
@@ -197,6 +253,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         pace: [275],
       },
@@ -220,6 +277,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         vertical_speed: [2],
       },
@@ -242,6 +300,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         gear_position: ['5'],
       },
@@ -264,6 +323,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         gear_position: [null],
       },
@@ -284,6 +344,7 @@ describe('metric widget preview model standard metric units', () => {
         },
       },
       activity: {
+        trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
         heading: [90],
       },
@@ -322,7 +383,7 @@ describe('metric widget preview model standard metric units', () => {
         type: 'speed',
         data: { display_type: 'linear' },
       },
-      activity: { sample_elapsed_seconds: [0], speed: [25] },
+      activity: { trim_end_seconds: 20, sample_elapsed_seconds: [0], speed: [25] },
       previewSecond: 0,
     })
     expect(linearModel).toBeNull()
@@ -333,7 +394,7 @@ describe('metric widget preview model standard metric units', () => {
         type: 'power',
         data: { display_type: 'arc' },
       },
-      activity: { sample_elapsed_seconds: [0], power: [200] },
+      activity: { trim_end_seconds: 20, sample_elapsed_seconds: [0], power: [200] },
       previewSecond: 0,
     })
     expect(arcModel).toBeNull()

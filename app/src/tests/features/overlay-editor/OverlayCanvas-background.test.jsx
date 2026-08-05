@@ -20,7 +20,7 @@ vi.mock('@/features/widget-preview', () => ({
 }))
 
 vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetricsVersion: () => 0,
+  useFontMetrics: () => 0,
 }))
 
 vi.mock('@/features/widget-preview/shared/textMeasurement', () => ({
@@ -31,7 +31,15 @@ import OverlayCanvas from '@/features/overlay-editor/components/OverlayCanvas'
 
 const defaultSceneProps = { sceneFont: 'Arial', sceneFontSize: 30, sceneStyle: {}, valueFont: 'Arial', sceneSize: { width: 1920, height: 1080 } }
 const defaultDisplayProps = (mode) => ({ displayScale: 1, globalScale: 1, globalOpacity: 1, backgroundMode: mode, gridVisible: false })
-const defaultDataProps = { widgets: [], activity: null, previewSecond: 0, selectionRect: null, exportRange: null }
+const defaultDataProps = {
+  widgets: [],
+  activity: null,
+  previewSecond: 0,
+  metricPreviewModels: {},
+  textPreviewModels: {},
+  selectionRect: null,
+  exportRange: null,
+}
 const defaultCallbacks = {
   setSceneElement: vi.fn(),
   handleSceneMouseDown: vi.fn(),

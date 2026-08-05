@@ -22,6 +22,7 @@ use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedLinearGaugeWidget, ValidatedSceneConfig};
+use crate::render::format::resolve_metric_display_value;
 use crate::render::surface::create_surface;
 use crate::render::widgets::common::{normalize_shadow_style_validated, static_layer_padding};
 use crate::render::widgets::types::{
@@ -77,7 +78,8 @@ pub fn prepare_linear_gauge_cache(
         let frame_states = metric_values(&dense_activity.series, gauge.metric)
             .iter()
             .map(|value| {
-                let value = value.unwrap_or(min_value);
+                let value = resolve_metric_display_value(gauge.metric, *value, dense_activity)
+                    .unwrap_or(min_value);
                 LinearGaugeFrameState {
                     fill01: fill_percentage(value, min_value, max_value),
                 }

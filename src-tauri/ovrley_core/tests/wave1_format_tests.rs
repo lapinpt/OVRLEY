@@ -47,6 +47,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
             frame_elapsed_seconds: vec![0.0],
             frame_distance_progress: vec![],
             full_activity_distance: None,
+            full_activity_total_ascent: None,
         };
     }
     let series = vec![raw];
@@ -61,7 +62,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         "torque" => s.torque = series,
         "vertical_speed" => s.vertical_speed = series,
         "vertical_oscillation" => s.vertical_oscillation = series,
-        "altitude" => s.altitude = series,
+        "altitude" => s.elevation = series,
         "iso" => s.iso = series,
         "aperture" => s.aperture = series,
         "shutter_speed" => s.shutter_speed = series,
@@ -76,6 +77,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![],
         full_activity_distance: None,
+        full_activity_total_ascent: None,
     }
 }
 
@@ -109,7 +111,10 @@ fn format_parts_for_activity(
         common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
     let parts = format_validated_metric_parts(&validated, &report, 0);
     match parts {
-        Some(p) => (p.value_text, p.unit_text),
+        Some(p) => {
+            let (value_text, unit_text) = p.standard_text();
+            (value_text.to_string(), unit_text.map(str::to_string))
+        }
         None => ("--".to_string(), None),
     }
 }
@@ -331,14 +336,14 @@ fn vertical_oscillation_converts_to_cm() {
 }
 
 #[test]
-fn vertical_oscillation_shows_placeholder_when_missing() {
+fn vertical_oscillation_preserves_gap_as_zero_when_series_is_available() {
     let (value, _) = format_parts(
         "vertical_oscillation",
         "vertical_oscillation",
         None,
         &[("display_unit", r#""mm""#)],
     );
-    assert_eq!(value, "--");
+    assert_eq!(value, "0");
 }
 
 #[test]
@@ -470,14 +475,14 @@ fn balance_formats_l_suffix() {
 }
 
 #[test]
-fn balance_placeholder_shows_dashes() {
+fn balance_preserves_gap_as_zero_when_series_is_available() {
     let (value, _) = format_parts(
         "left_right_balance",
         "left_right_balance",
         None,
         &[("display_unit", r#""percent""#)],
     );
-    assert_eq!(value, "--");
+    assert_eq!(value, "0/100");
 }
 
 // ── New camera metric formatting ──────────────────────────────────────────

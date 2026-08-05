@@ -9,10 +9,9 @@ import { useRoutePreviewGeometry } from './useRoutePreviewGeometry'
  *
  * @param {object} params
  * @param {object} params.widget - Widget configuration object.
- * @param {object} params.activity - Activity data with route samples.
+ * @param {object|null} params.activity - Stable parsed activity used to prepare geometry and display activity data.
  * @param {number} params.previewSecond - Current preview time in seconds.
  * @param {number} params.globalScale - Global scale multiplier.
- * @param {object} params.sceneStyle - Scene style object.
  * @param {object} params.exportRange - Export range configuration.
  * @returns {object|null} Preview model for the renderer, or null while loading.
  */

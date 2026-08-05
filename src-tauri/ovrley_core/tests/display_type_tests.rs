@@ -19,6 +19,8 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
         (r#""arc""#, DisplayType::Arc),
         (r#""corner""#, DisplayType::Corner),
         (r#""heading_tape""#, DisplayType::Tape),
+        (r#""lean_angle""#, DisplayType::LeanAngle),
+        (r#""g_force""#, DisplayType::GForce),
     ];
 
     for (json_value, expected) in cases {
@@ -53,6 +55,8 @@ fn display_type_round_trips_each_variant() {
         (DisplayType::Arc, r#""arc""#),
         (DisplayType::Corner, r#""corner""#),
         (DisplayType::Tape, r#""heading_tape""#),
+        (DisplayType::LeanAngle, r#""lean_angle""#),
+        (DisplayType::GForce, r#""g_force""#),
     ];
 
     for (variant, expected_json) in cases {
@@ -175,6 +179,53 @@ fn complete_linear_display_type_validates_as_gauge() {
 }
 
 #[test]
+fn complete_g_force_display_type_validates_with_canonical_marker_and_label_fields() {
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [{
+            "value": "g_force",
+            "x": 10,
+            "y": 20,
+            "display_type": "g_force",
+            "width": 220,
+            "height": 220,
+            "rotation": 0,
+            "opacity": 1,
+            "diameter": 200,
+            "fill_color": "#212121",
+            "fill_opacity": 0.5,
+            "border_thickness": 2,
+            "border_color": "#ffffff",
+            "border_opacity": 1,
+            "marker_size": 12,
+            "marker_color": "#ffffff",
+            "marker_opacity": 1,
+            "axis_horizontal": "x",
+            "axis_vertical": "y",
+            "invert_horizontal": false,
+            "invert_vertical": false,
+            "clip_percentile": 99,
+            "label_font": "Arial.ttf",
+            "label_font_size": 14,
+            "label_color": "#ffffff",
+            "label_decimals": 1,
+            "label_unit": "G",
+            "label_unit_color": "#ffffff",
+            "label_offset_x": 0,
+            "label_offset_y": 0
+        }],
+        "plots": []
+    }));
+
+    let PreparedValue::GForce(value) = config.values.into_iter().next().unwrap() else {
+        panic!("g_force display type should validate as a G-force prepared value");
+    };
+    assert_eq!(value.marker_size, 12.0);
+    assert_eq!(value.label_decimals, 1);
+}
+
+#[test]
 fn display_type_is_intrinsic_only_for_text() {
     assert_eq!(
         display_type_layout_mode(DisplayType::Text),
@@ -194,6 +245,14 @@ fn display_type_is_intrinsic_only_for_text() {
     );
     assert_eq!(
         display_type_layout_mode(DisplayType::Tape),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::LeanAngle),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::GForce),
         DisplayTypeLayoutMode::Boxed
     );
 }

@@ -99,6 +99,29 @@ pub(super) fn selected_absolute_timestamps(
     elapsed_column: Option<&HeaderColumn>,
     elapsed_unit: Option<Unit>,
 ) -> Vec<Option<AbsoluteTimestamp>> {
+    // Date + time-of-day pair: the date column supplies the calendar date and
+    // the time column supplies the clock time. Both are required per row.
+    if let Some(tod_column) = header
+        .columns
+        .iter()
+        .find(|column| column.timing == Some(TimingKind::TimeOfDay))
+    {
+        if let Some(date_column) = header
+            .columns
+            .iter()
+            .find(|column| column.metric == Metric::CompanionDate)
+        {
+            return (0..data.len())
+                .map(|row| {
+                    time_of_day_timestamp(
+                        data.value(row, date_column.index),
+                        data.value(row, tod_column.index),
+                    )
+                })
+                .collect();
+        }
+    }
+
     let mut explicit_columns = header
         .columns
         .iter()
@@ -147,7 +170,23 @@ pub(super) fn selected_absolute_timestamps(
     vec![None; data.len()]
 }
 
-/// Parses an RFC 3339 or numeric Unix timestamp.
+/// Reconstructs a UTC timestamp from a calendar date and a time-of-day string.
+///
+/// The date is expected in `YYYY-MM-DD` form. The time accepts both
+/// `HH:MM:SS` and `HH:MM:SS.fff` shapes. When no timezone is supplied by the
+/// source, the combination is interpreted as GMT0/UTC.
+fn time_of_day_timestamp(date: Option<&str>, time: Option<&str>) -> Option<AbsoluteTimestamp> {
+    let date = NaiveDate::parse_from_str(date?.trim(), "%Y-%m-%d").ok()?;
+    let time_str = time?.trim();
+    let time = NaiveTime::parse_from_str(time_str, "%H:%M:%S%.f")
+        .or_else(|_| NaiveTime::parse_from_str(time_str, "%H:%M:%S"))
+        .ok()?;
+    Some(AbsoluteTimestamp(
+        Utc.from_utc_datetime(&date.and_time(time)),
+    ))
+}
+
+/// Parses an RFC 3339, ISO 8601 (assumed UTC), or numeric Unix timestamp.
 ///
 /// Numeric values require an explicit `numeric_unit`; this prevents elapsed
 /// values from being reinterpreted as absolute time based on their magnitude.
@@ -158,6 +197,15 @@ fn parse_absolute_timestamp(
     let value = value?.trim();
     if let Ok(timestamp) = DateTime::parse_from_rfc3339(value) {
         return Some(AbsoluteTimestamp(timestamp.with_timezone(&Utc)));
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f") {
+        return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S") {
+        return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
     }
     let seconds = convert(parse_number(Some(value))?, numeric_unit?);
     unix_timestamp(seconds)

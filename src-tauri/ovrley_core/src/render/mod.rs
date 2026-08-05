@@ -149,6 +149,7 @@ pub struct VideoFrameRenderer<'a> {
     frame_size: FrameSize,
     scale: f32,
     base_rgba: &'a [u8],
+    blank_leading_frame_count: usize,
 }
 
 impl<'a> VideoFrameRenderer<'a> {
@@ -157,6 +158,7 @@ impl<'a> VideoFrameRenderer<'a> {
         dense_activity: &'a DenseActivityReport,
         prepared_preview_assets: &'a PreparedPreviewAssets,
         frame_size: FrameSize,
+        blank_leading_frame_count: u64,
     ) -> CoreResult<Self> {
         let expected_len = frame_size.rgba_len()?;
         let base_rgba = prepared_preview_assets
@@ -172,6 +174,8 @@ impl<'a> VideoFrameRenderer<'a> {
                 base_rgba.len(), frame_size.width, frame_size.height
             )));
         }
+        let blank_leading_frame_count = usize::try_from(blank_leading_frame_count)
+            .map_err(|_| CoreError::Render("Blank leading frame count exceeds usize".into()))?;
 
         Ok(Self {
             paths,
@@ -180,6 +184,7 @@ impl<'a> VideoFrameRenderer<'a> {
             frame_size,
             scale: prepared_preview_assets.scene().scale,
             base_rgba,
+            blank_leading_frame_count,
         })
     }
 
@@ -198,6 +203,20 @@ impl<'a> VideoFrameRenderer<'a> {
         }
 
         let started = Instant::now();
+        let activity_frame_index = prepare_output_frame(
+            frame_index,
+            self.blank_leading_frame_count,
+            self.dense_activity.frame_count,
+            pixels,
+        );
+        let Some(activity_frame_index) = activity_frame_index else {
+            frame_profiler.record_ms(
+                "blank.clear",
+                Instant::now().duration_since(started).as_secs_f64() * 1000.0,
+            );
+            return Ok(());
+        };
+
         pixels.copy_from_slice(self.base_rgba);
         let restore_ms = started.elapsed().as_secs_f64() * 1000.0;
         frame_profiler.record_ms("base.restore", restore_ms);
@@ -211,13 +230,47 @@ impl<'a> VideoFrameRenderer<'a> {
             self.paths,
             self.dense_activity,
             self.prepared_assets,
-            frame_index,
+            activity_frame_index,
             self.scale,
             None,
             true,
             frame_profiler,
         )?;
         Ok(())
+    }
+}
+
+fn prepare_output_frame(
+    output_frame_index: usize,
+    blank_leading_frame_count: usize,
+    activity_frame_count: usize,
+    pixels: &mut [u8],
+) -> Option<usize> {
+    let activity_frame_index = output_frame_index.checked_sub(blank_leading_frame_count);
+    if activity_frame_index.is_none_or(|index| index >= activity_frame_count) {
+        pixels.fill(0);
+        return None;
+    }
+    activity_frame_index
+}
+
+#[cfg(test)]
+mod video_frame_mapping_tests {
+    use super::prepare_output_frame;
+
+    #[test]
+    fn clears_frames_outside_activity_and_maps_frames_inside_it() {
+        let mut pixels = [255; 4];
+        assert_eq!(prepare_output_frame(0, 2, 3, &mut pixels), None);
+        assert_eq!(pixels, [0; 4]);
+
+        pixels.fill(255);
+        assert_eq!(prepare_output_frame(2, 2, 3, &mut pixels), Some(0));
+        assert_eq!(pixels, [255; 4]);
+
+        assert_eq!(prepare_output_frame(4, 2, 3, &mut pixels), Some(2));
+        assert_eq!(prepare_output_frame(5, 2, 3, &mut pixels), None);
+        assert_eq!(pixels, [0; 4]);
     }
 }
 
@@ -530,6 +583,7 @@ fn render_frame_to_surface(
                         validated: Some(validated),
                         validated_gradient: None,
                         validated_time: None,
+                        timezone: None,
                     })?;
                 }
                 PreparedValue::TimeText(validated) => {
@@ -549,6 +603,7 @@ fn render_frame_to_surface(
                         validated: None,
                         validated_gradient: None,
                         validated_time: Some(validated),
+                        timezone: prepared_assets.timezone,
                     })?;
                 }
                 PreparedValue::Gradient(validated) => {
@@ -566,11 +621,14 @@ fn render_frame_to_surface(
                         validated: None,
                         validated_gradient: Some(validated),
                         validated_time: None,
+                        timezone: None,
                     })?;
                 }
                 PreparedValue::HeadingTape(_)
+                | PreparedValue::LeanAngle(_)
                 | PreparedValue::LinearGauge(_)
-                | PreparedValue::ArcGauge(_) => {}
+                | PreparedValue::ArcGauge(_)
+                | PreparedValue::GForce(_) => {}
             }
         }
         Ok(())

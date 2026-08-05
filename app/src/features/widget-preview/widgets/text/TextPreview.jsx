@@ -17,12 +17,12 @@ import { getPreviewFontFamily, getWidgetOpacity } from '../../shared/textMeasure
 import { getTextShadowParts } from '../../shared/shadow'
 import { PreviewSvgText } from '../../shared/PreviewSvgComponents'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
 
 export function OverlayTextWidget({ widget, globalOpacity, sceneStyle, textPreviewModel }) {
   const fontSize = widget.data.font_size
   const fontFamily = getPreviewFontFamily(widget.data.font)
-  useFontMetricsVersion(fontFamily, fontSize)
+  useFontMetrics([{ fontFamily, fontSize }])
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)
   const previewModel = textPreviewModel ?? buildTextWidgetPreviewModel({ widget })

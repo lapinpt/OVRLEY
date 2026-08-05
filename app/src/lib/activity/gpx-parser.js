@@ -30,7 +30,7 @@ function readTrackPointValue(extensionValues, aliases, parseValue) {
     const normalizedAlias = normalizeExtensionKey(alias)
     if (!(normalizedAlias in extensionValues)) continue
 
-    const value = parseValue(extensionValues[normalizedAlias])
+    const value = parseValue(extensionValues[normalizedAlias], alias)
     if (value !== null) {
       return value
     }
@@ -41,6 +41,12 @@ function readTrackPointValue(extensionValues, aliases, parseValue) {
 
 function readTrackPointMetric(extensionValues, aliases) {
   return readTrackPointValue(extensionValues, aliases, safeNumber)
+}
+
+function parseStrictMetric(value, alias) {
+  const numeric = safeNumber(value)
+  if (numeric === null) throw new TypeError(`GPX extension ${alias} must be numeric when present`)
+  return numeric
 }
 
 export function parseGpxActivityFile(file, textContent) {
@@ -78,7 +84,12 @@ export function parseGpxActivityFile(file, textContent) {
 
     return {
       air_pressure: readTrackPointMetric(extensionValues, ['air_pressure', 'absolute_pressure', 'pressure']),
-      altitude: elevation,
+      barometric_altitude: readTrackPointValue(
+        extensionValues,
+        ['barometric_altitude', 'barometricaltitude', 'pressure_altitude'],
+        parseStrictMetric,
+      ),
+      calories: readTrackPointValue(extensionValues, ['calories', 'kcal', 'energy'], parseStrictMetric),
       cadence: readTrackPointMetric(extensionValues, ['cad', 'cadence']),
       core_temperature: readTrackPointMetric(extensionValues, ['core_temperature', 'coretemp', 'core_temp']),
       distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),

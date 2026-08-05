@@ -6,7 +6,7 @@
  *
  * @param {object} props
  * @param {object} props.widget - Widget configuration object.
- * @param {object} props.activity - Activity data with route samples.
+ * @param {object|null} props.activity - Stable parsed activity used to prepare geometry and display activity data.
  * @param {number} props.previewSecond - Current preview time in seconds.
  * @param {number} props.globalOpacity - Global opacity multiplier.
  * @param {number} props.globalScale - Global scale multiplier.
@@ -22,7 +22,7 @@ import { PreviewMarkerLayers, PreviewPolylineShadow, PreviewSvgShadowBlurFilter 
 import { useRoutePreview } from './useRoutePreview'
 
 export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
-  const previewModel = useRoutePreview({ widget, activity, previewSecond, globalScale, sceneStyle, exportRange })
+  const previewModel = useRoutePreview({ widget, activity, previewSecond, globalScale, exportRange })
 
   if (!previewModel) {
     return null
@@ -31,6 +31,9 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
   const { style, geometry } = previewModel
   const shadow = getTextShadowParts(sceneStyle)
   const shadowFilterId = sanitizeSvgId(`${widget.id}-route-shadow-blur`)
+  const contentTransform = geometry.contentScale ? `scale(${geometry.contentScale.x}, ${geometry.contentScale.y})` : undefined
+  const remainingLineWidth = widget.data.remaining_line_width * globalScale
+  const completedLineWidth = widget.data.completed_line_width * globalScale
 
   return (
     <svg
@@ -41,12 +44,12 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
       <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadow} />
-      <g>
+      <g style={{ transform: contentTransform, transformOrigin: '0 0' }}>
         <PreviewPolylineShadow
           points={geometry.remainingSvgPoints}
           shadow={shadow}
           blurFilterId={shadowFilterId}
-          strokeWidth={widget.data.remaining_line_width}
+          strokeWidth={remainingLineWidth}
           strokeOpacity={style.remainingLineOpacity}
           rotation={widget.data.rotation}
         />
@@ -54,7 +57,8 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
           fill="none"
           stroke={widget.data.remaining_line_color}
           strokeOpacity={style.remainingLineOpacity}
-          strokeWidth={widget.data.remaining_line_width}
+          strokeWidth={remainingLineWidth}
+          vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"
           points={geometry.remainingSvgPoints}
@@ -63,13 +67,14 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
           fill="none"
           stroke={widget.data.completed_line_color}
           strokeOpacity={style.completedLineOpacity}
-          strokeWidth={widget.data.completed_line_width}
+          strokeWidth={completedLineWidth}
+          vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"
           points={geometry.completedSvgPoints}
         />
-        <PreviewMarkerLayers layers={style.markerLayers} point={geometry.markerPoint} />
       </g>
+      <PreviewMarkerLayers layers={style.markerLayers} point={geometry.markerPoint} pointScale={geometry.contentScale} />
     </svg>
   )
 }

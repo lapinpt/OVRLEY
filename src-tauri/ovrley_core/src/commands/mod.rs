@@ -81,9 +81,7 @@ pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> C
 
 /// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
 pub fn backend_parse_csv_activity(path: &str) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::csv::parse_csv_activity_path(Path::new(path))?;
-    response.debug_payload = None;
-    Ok(response)
+    crate::activity::csv::parse_csv_activity_path(Path::new(path))
 }
 
 /// Parses and finalizes a native VBO activity without a frontend RawActivity hop.
@@ -249,7 +247,7 @@ fn start_composite_render(
         &parsed_activity,
         &validated,
         plan.overlay_pipe_fps
-            .timeline_for_duration(plan.render_duration)?,
+            .timeline_for_duration(plan.activity_overlap_duration)?,
     )?;
 
     let render_id = controller.try_start(plan.output_frame_count, "Compositing video...")?;
@@ -506,7 +504,7 @@ fn probe_video_metadata(
     paths: &AppPaths,
     file_path: &str,
 ) -> CoreResult<crate::media::SourceVideoMetadata> {
-    match crate::media::mp4_telemetry::probe_video_metadata(file_path) {
+    match crate::media::mp4_telemetry::probe_video_metadata(&paths.repo_root, file_path) {
         Ok(metadata) => {
             if needs_ffprobe_salvage(&metadata) {
                 match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
@@ -538,16 +536,7 @@ pub fn backend_extract_video_telemetry(
     paths: &AppPaths,
     file_path: &str,
 ) -> CoreResult<Option<FinalizeActivityResponse>> {
-    let metadata = probe_video_metadata(paths, file_path)?;
-    let fps = metadata.fps.unwrap_or(30.0);
-    let duration_s = metadata.duration.unwrap_or(0.0);
-
-    let mut response = crate::media::mp4_telemetry::extract_activity(
-        &paths.repo_root,
-        file_path,
-        fps,
-        duration_s,
-    )?;
+    let mut response = crate::media::mp4_telemetry::extract_activity(&paths.repo_root, file_path)?;
     if let Some(response) = &mut response {
         response.debug_payload = None;
     }
@@ -600,6 +589,7 @@ fn merge_ffprobe_metadata(
     }
     if metadata.creation_time.is_none() {
         metadata.creation_time = ffprobe_metadata.creation_time;
+        metadata.time_source = ffprobe_metadata.time_source.clone();
     }
     if metadata.codec_name.is_none() {
         metadata.codec_name = ffprobe_metadata.codec_name;

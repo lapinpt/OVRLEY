@@ -9,16 +9,17 @@
  * @returns {string} Timeline label in mm:ss or h:mm:ss format.
  */
 export function formatTimelineTime(value) {
-  const safeValue = Math.max(0, Math.floor(Number(value) || 0))
+  const sign = value < 0 ? '-' : ''
+  const safeValue = Math.floor(Math.abs(value))
   const hours = Math.floor(safeValue / 3600)
   const minutes = Math.floor((safeValue % 3600) / 60)
   const seconds = safeValue % 60
 
   if (hours > 0) {
-    return [hours, minutes, seconds].map((part, index) => String(part).padStart(index === 0 ? 1 : 2, '0')).join(':')
+    return `${sign}${[hours, minutes, seconds].map((part, index) => String(part).padStart(index === 0 ? 1 : 2, '0')).join(':')}`
   }
 
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  return `${sign}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 /**
@@ -44,17 +45,23 @@ export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, 
     return 'timeline'
   }
 
-  const safePlayheadSecond = Number(playheadSecond) || 0
-  const videoStartSecond = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
-  const safeVideoDuration = Number(importedVideoDuration)
-  const hasVideoEnd = Number.isFinite(safeVideoDuration) && safeVideoDuration > 0
-  const videoEndSecond = hasVideoEnd ? videoStartSecond + safeVideoDuration : Number.POSITIVE_INFINITY
+  const videoEndSecond = videoSyncOffsetSeconds + importedVideoDuration
 
-  if (safePlayheadSecond < videoStartSecond || safePlayheadSecond >= videoEndSecond) {
+  if (playheadSecond < videoSyncOffsetSeconds || playheadSecond >= videoEndSecond) {
     return 'timeline'
   }
 
   return 'video'
+}
+
+/**
+ * Resolves the first timeline second occupied by imported video.
+ *
+ * @param {{ hasVideo: boolean, videoSyncOffsetSeconds: number }} options
+ * @returns {number} Timeline minimum for the active media.
+ */
+export function getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds }) {
+  return hasVideo ? Math.min(0, videoSyncOffsetSeconds) : 0
 }
 
 /**
@@ -71,12 +78,10 @@ export function getTotalPlaybackDuration({
   importedVideoPath,
   videoSyncOffsetSeconds,
 }) {
-  const metadataDuration = Number(activityDurationSeconds)
-  const hasMetadataDuration = Number.isFinite(metadataDuration) && metadataDuration > 0
-  const fallbackDuration = Number(fallbackDurationSeconds) || 0
-  const videoEnd = importedVideoPath ? (Number(videoSyncOffsetSeconds) || 0) + (Number(importedVideoDuration) || 0) : 0
+  const activityDuration = activityDurationSeconds ?? 0
+  const videoEnd = importedVideoPath ? videoSyncOffsetSeconds + importedVideoDuration : 0
 
-  const contentDuration = hasMetadataDuration ? metadataDuration : importedVideoPath ? 0 : fallbackDuration
+  const contentDuration = activityDuration > 0 ? activityDuration : importedVideoPath ? 0 : fallbackDurationSeconds
   return Math.max(contentDuration, videoEnd, 0)
 }
 
@@ -87,18 +92,16 @@ export function getTotalPlaybackDuration({
  * @returns {{ startedAtMs: number, startedSecond: number }} Playback anchor.
  */
 export function createPlaybackAnchor({ source, second, nowMs }) {
-  const safeSecond = Number(second) || 0
-
   if (source === 'timeline') {
     return {
       startedAtMs: nowMs,
-      startedSecond: safeSecond,
+      startedSecond: second,
     }
   }
 
   return {
     startedAtMs: 0,
-    startedSecond: safeSecond,
+    startedSecond: second,
   }
 }
 

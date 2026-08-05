@@ -426,6 +426,15 @@ describe('syncGlobalDefaultsToConfig', () => {
     expect(result.values[0].color).toBe('#ff0000')
   })
 
+  test('pushes font_values into the G-force label variant', () => {
+    const config = {
+      values: [{ id: 'g-force-1', value: 'g_force', display_variants: { g_force: { label_font: 'Arial.ttf' } } }],
+    }
+    const result = syncGlobalDefaultsToConfig(config, { font_values: 'ValueFont.ttf' }, ['font_values'])
+
+    expect(result.values[0].display_variants.g_force.label_font).toBe('ValueFont.ttf')
+  })
+
   test('pushes color_values into plot widgets', () => {
     const config = {
       plots: [{ id: 'plot-1', value: 'speed', color: '#111111' }],

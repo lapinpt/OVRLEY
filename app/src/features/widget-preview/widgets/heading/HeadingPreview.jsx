@@ -18,6 +18,7 @@
 
 import { chevronVertices, headingLabelBaseline, headingTickPosition } from './geometry'
 import { useHeadingPreviewModel } from './useHeadingPreview'
+import { normalizeSvgShadowColor } from '../../shared/svgPreviewUtils'
 
 function renderTicks(ticks, topY, height, config) {
   const elements = []
@@ -127,9 +128,17 @@ function renderHighlightBar(centerX, topY, height, config) {
 }
 
 function HeadingShadowFilter({ id, shadow }) {
+  const shadowColor = normalizeSvgShadowColor(shadow.color, 1)
+
   return (
-    <filter id={id} x="-50%" y="-50%" width="200%" height="200%">
-      <feDropShadow dx={shadow.distance} dy={shadow.distance} stdDeviation={shadow.strength} floodColor={shadow.color} floodOpacity={1} />
+    <filter id={id} x="-50%" y="-50%" width="200%" height="200%" overflow="visible" colorInterpolationFilters="sRGB">
+      <feDropShadow
+        dx={shadow.distance}
+        dy={shadow.distance}
+        stdDeviation={shadow.strength}
+        floodColor={shadowColor.color}
+        floodOpacity={shadowColor.opacity}
+      />
     </filter>
   )
 }
@@ -150,7 +159,16 @@ function HeadingTapeCopies({ model, config, filterId }) {
 }
 
 export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle }) {
-  const model = useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle })
+  const model = useHeadingPreviewModel({
+    widget,
+    activity,
+    previewSecond,
+    globalOpacity,
+    globalScale,
+    sceneFont,
+    valueFont,
+    sceneStyle,
+  })
 
   return (
     <svg

@@ -547,6 +547,12 @@ function ColorPicker(props) {
 
         store.notify()
       },
+      setValueFromProps: (value) => {
+        const color = hexToRgb(value, stateRef.current.color?.a ?? 1)
+        stateRef.current.color = color
+        stateRef.current.hsv = rgbToHsv(color)
+        store.notify()
+      },
       notify: () => {
         for (const cb of listenersRef.current) {
           cb()
@@ -605,13 +611,9 @@ function ColorPickerImpl(props) {
 
   useIsomorphicLayoutEffect(() => {
     if (valueProp !== undefined) {
-      const currentState = store.getState()
-      const color = hexToRgb(valueProp, currentState.color.a)
-      const hsv = rgbToHsv(color)
-      store.setColor(color)
-      store.setHsv(hsv)
+      store.setValueFromProps(valueProp)
     }
-  }, [valueProp])
+  }, [valueProp, store])
 
   useIsomorphicLayoutEffect(() => {
     if (openProp !== undefined) {

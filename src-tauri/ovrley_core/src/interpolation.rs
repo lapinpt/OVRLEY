@@ -22,6 +22,12 @@ pub fn collect_valid_numeric_points(x_values: &[f64], y_values: &[Option<f64>]) 
         .collect()
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MissingSamplePolicy {
+    Bridge,
+    Preserve,
+}
+
 /// Linearly interpolates y at `target_x` between two nearest points.
 ///
 /// Uses `partition_point` for O(log n) lookup. Returns `None` if
@@ -56,12 +62,43 @@ pub fn interpolate_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
 
 /// Linearly interpolates an optional numeric series at `target_x`.
 ///
-/// Filters out `None` values, then delegates to [`interpolate_points`].
+/// `Bridge` filters out `None` values and delegates to [`interpolate_points`].
+/// `Preserve` treats missing samples as zero endpoints without bridging
+/// directly between the surrounding valid samples.
 pub fn interpolate_numeric_series_value(
     x_values: &[f64],
     y_values: &[Option<f64>],
     target_x: f64,
+    missing_sample_policy: MissingSamplePolicy,
 ) -> Option<f64> {
+    if missing_sample_policy == MissingSamplePolicy::Preserve {
+        if y_values.is_empty() {
+            return None;
+        }
+        assert_eq!(
+            x_values.len(),
+            y_values.len(),
+            "numeric series must align with its timestamp series"
+        );
+        let right = x_values.partition_point(|x| *x < target_x);
+        if right < x_values.len() && (x_values[right] - target_x).abs() <= 1e-9 {
+            return y_values[right];
+        }
+        if right == 0 {
+            return y_values[0];
+        }
+        if right >= x_values.len() {
+            return y_values[y_values.len() - 1];
+        }
+        let left = right - 1;
+        let left_value = y_values[left].unwrap_or(0.0);
+        let right_value = y_values[right].unwrap_or(0.0);
+        return interpolate_points(
+            &[(x_values[left], left_value), (x_values[right], right_value)],
+            target_x,
+        );
+    }
+
     let points = collect_valid_numeric_points(x_values, y_values);
     interpolate_points(&points, target_x)
 }

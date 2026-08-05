@@ -7,8 +7,14 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import useStore from '@/store/useStore'
 import { cloneSerializable, DEFAULT_CONFIG } from '@/store/store-utils'
-import { WidgetDrawer } from '@/features/widget-drawer/components/WidgetDrawer'
+import { WidgetDrawer as WidgetDrawerView } from '@/features/widget-drawer/components/WidgetDrawer'
+import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { BACKDROP_RECTANGLE_DEFAULTS } from '@/lib/widget/standard-widgets'
+
+function WidgetDrawer() {
+  const widgetLiveEdits = useWidgetDraftState()
+  return <WidgetDrawerView widgetLiveEdits={widgetLiveEdits} />
+}
 
 beforeEach(() => {
   useStore.setState({

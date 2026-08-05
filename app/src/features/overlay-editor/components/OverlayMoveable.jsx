@@ -3,7 +3,7 @@
  */
 
 import Moveable from 'react-moveable'
-import { useEffect, useMemo } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { CORNER_RESIZE_DIRECTIONS, EDGE_RESIZE_DIRECTIONS, MOVEABLE_ZOOM } from '../data/overlayEditorConstants'
 
@@ -38,6 +38,7 @@ function getGridGuidelines(max, gridSize, enabled) {
  * @param {*} props.sceneSize - Numeric scene size value.
  * @param {*} props.snapToGrid - Whether to snap Moveable to editor grid guides.
  * @param {*} props.handlers - Value for handlers.
+ * @param {string|null} props.interactionType - Live interaction currently owning geometry.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function OverlayMoveable({
@@ -57,6 +58,7 @@ export default function OverlayMoveable({
   sceneSize,
   snapToGrid,
   handlers,
+  interactionType,
 }) {
   const isGroupSelection = selectedTargets.length > 1
   const gridSize = getEditorGridSize(sceneSize)
@@ -64,17 +66,14 @@ export default function OverlayMoveable({
   const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
   const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
 
-  useEffect(() => {
-    if (!moveableRef.current || (!selectedTarget && !selectedTargets.length) || geometryVersion === 'none') {
-      return undefined
+  useLayoutEffect(() => {
+    const moveableOwnsGeometry = interactionType && interactionType !== 'slider'
+    if (moveableOwnsGeometry || !moveableRef.current || (!selectedTarget && !selectedTargets.length) || geometryVersion === 'none') {
+      return
     }
 
-    const frameId = requestAnimationFrame(() => {
-      moveableRef.current?.updateRect()
-    })
-
-    return () => cancelAnimationFrame(frameId)
-  }, [geometryVersion, moveableRef, selectedTarget, selectedTargets])
+    moveableRef.current.updateRect()
+  }, [geometryVersion, interactionType, moveableRef, selectedTarget, selectedTargets])
 
   if ((!selectedTarget && !selectedTargets.length) || !sceneElement) {
     return null

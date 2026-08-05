@@ -44,24 +44,54 @@ const WIDGET_EDITOR_MAP = {
  * @param {number} [sceneFontSize] - Scene fallback font size.
  * @returns {JSX.Element|null} Rendered editor component or null.
  */
-function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFontSize) {
+function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, sceneFontSize) {
   // Specialized editors take priority over the generic metric editor
   const Editor = WIDGET_EDITOR_MAP[widget.type]
   if (Editor) {
-    return <Editor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
+    return (
+      <Editor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        setNumericField={setNumericField}
+        sceneFontSize={sceneFontSize}
+      />
+    )
   }
   if (isStandardMetricWidgetType(widget.type)) {
-    return <MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
+    return (
+      <MetricWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        setNumericField={setNumericField}
+      />
+    )
   }
   return null
 }
 
 /**
  * Renders the sidebar widgets tab component.
+ * @param {object} props - Component props.
+ * @param {object} props.widgetLiveEdits - Shared live widget edit controller.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function SidebarWidgetsTab() {
-  const { config, widgets, selectedWidgetId, updateWidgetData, setNumericField, deleteWidget, resetWidget, setSelectedWidgetId } = useWidgetManager()
+export default function SidebarWidgetsTab({ widgetLiveEdits }) {
+  const {
+    config,
+    widgets,
+    selectedWidgetId,
+    updateWidgetData,
+    updateWidgetSize,
+    commitWidgetSize,
+    setNumericField,
+    deleteWidget,
+    resetWidget,
+    setSelectedWidgetId,
+  } = useWidgetManager({ widgetLiveEdits })
 
   if (!config) return null
 
@@ -89,16 +119,14 @@ export default function SidebarWidgetsTab() {
                     value={widget.id}
                     className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border"
                   >
-                    <div className="relative group">
-                      <AccordionTrigger className="group w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
-                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <div className="relative group/widget-row">
+                      <AccordionTrigger className="group/trigger w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0 text-muted-foreground transition-colors group-hover/widget-row:text-primary group-data-[state=open]/trigger:text-primary">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded">
-                            <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />
+                            <Icon className="h-3.5 w-3.5" />
                           </div>
                           <div className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
-                            <span className="w-full truncate text-left text-sm font-semibold group-data-[state=open]:text-primary">
-                              {widget.name}
-                            </span>
+                            <span className="w-full truncate text-left text-sm font-semibold">{widget.name}</span>
                           </div>
                         </div>
                       </AccordionTrigger>
@@ -134,7 +162,7 @@ export default function SidebarWidgetsTab() {
                             </Button>
                           }
                         />
-                        {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
+                        {renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, config?.scene?.font_size)}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

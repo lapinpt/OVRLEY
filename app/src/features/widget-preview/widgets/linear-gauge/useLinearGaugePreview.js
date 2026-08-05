@@ -1,8 +1,7 @@
 import { useId } from 'react'
-import { getInterpolatedActivityValue } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getBarFillCount, getLinearBarRects } from '../../shared/gaugeBarGeometry'
 import {
-  formatLinearGaugeLabel,
   getLinearGaugeLabelLayout,
   getLinearGaugeLayout,
   getLinearRectCornerRadii,
@@ -12,17 +11,19 @@ import {
 import { getTextShadowParts } from '../../shared/shadow'
 import { normalizeSvgShadowColor } from '../../shared/svgPreviewUtils'
 import { getPreviewFontFamily } from '../../shared/textMeasurement'
-import { useFontMetricsVersion } from '../../shared/useFontMetrics'
+import { useFontMetrics } from '../../shared/useFontMetrics'
+import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
 
 /** Builds all non-JSX state for a normalized linear-gauge preview. */
 export function useLinearGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
   const maskId = useId()
   const labelFontFamily = getPreviewFontFamily(widget.data.min_max_label_font)
-  useFontMetricsVersion(labelFontFamily, widget.data.min_max_label_font_size)
+  useFontMetrics([{ fontFamily: labelFontFamily, fontSize: widget.data.min_max_label_font_size }])
 
+  const displayActivity = getPreviewActivity(activity, previewSecond)
   const layout = getLinearGaugeLayout({
-    value: getInterpolatedActivityValue(activity, widget.data.value, previewSecond),
-    values: activity?.[widget.data.value] ?? [],
+    value: getInterpolatedActivityValue(displayActivity, widget.data.value, previewSecond),
+    values: getMetricSeries(displayActivity, widget.data.value) ?? [],
     width: widget.data.width,
     height: widget.data.height,
     orientation: widget.data.orientation,
@@ -46,8 +47,10 @@ export function useLinearGaugePreviewPresentation({ widget, activity, previewSec
           cornerRadius: fillCornerRadius,
         })
       : ''
-  const minLabel = formatLinearGaugeLabel(layout.min)
-  const maxLabel = formatLinearGaugeLabel(layout.max)
+  const metricType = widget.data.value
+  const displayUnit = widget.data.display_unit
+  const minLabel = formatGaugeBoundaryLabel(metricType, layout.min, displayUnit)
+  const maxLabel = formatGaugeBoundaryLabel(metricType, layout.max, displayUnit)
 
   return {
     maskId,

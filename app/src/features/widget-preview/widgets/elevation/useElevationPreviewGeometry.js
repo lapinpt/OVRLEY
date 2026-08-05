@@ -1,15 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
-import {
-  getDistanceProgressAtElapsed,
-  getInterpolatedSeriesValue,
-  getWindowProgressAtTime,
-  resolveExportRangeWindow,
-} from '@/features/overlay-editor'
-import { buildElevationGeometry, hasTauriRuntime } from '@/api/backend'
+import { useMemo } from 'react'
+import { getDistanceProgressAtElapsed, getPreviewActivity, getWindowProgressAtTime } from '@/features/overlay-editor'
+import { buildElevationGeometry } from '@/api/backend'
 import { areaToSvg, findPointAtProgress, pointsToSvg } from '@/lib/geometryUtils'
-import { buildPlaceholderElevationPreviewGeometry } from '../../shared/plotGeometry'
+import { buildPlaceholderElevationPreviewGeometry, buildPlaceholderElevationStaticGeometry } from '../../shared/plotPlaceholderGeometry'
 import { buildElevationCompletedPoints } from '../../shared/svgPreviewUtils'
-import useStore from '@/store/useStore'
+import { interpolateNumericSeries } from '@/lib/interpolation'
+import { usePlotPreviewGeometry } from '../../shared/usePlotPreviewGeometry'
 
 function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) {
   if (elevationValue === null) return null
@@ -34,7 +30,7 @@ function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) 
  * injects pre-computed Rust geometry so Skia and SVG use identical data.
  *
  * @param {object} params
- * @param {object} params.activity - Activity data with elevation samples.
+ * @param {object|null} params.activity - Stable parsed activity used to prepare geometry and display activity data.
  * @param {object} params.data - Effective elevation widget data.
  * @param {object} params.exportRange - Active export-range selection.
  * @param {number} params.previewSecond - Current preview timestamp in seconds.
@@ -42,68 +38,33 @@ function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) 
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
 export function useElevationPreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
-  const [rustGeometry, setRustGeometry] = useState(null)
-  const config = useStore((state) => state.config)
-  const globalDefaults = useStore((state) => state.globalDefaults)
-  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
-
-  const exportWindow = useMemo(
-    () => resolveExportRangeWindow(activity, exportRange, data.show_full_activity),
-    [activity, exportRange, data.show_full_activity],
+  const { areaSvgPoints, contentScale, exportWindow, fallbackDurationSeconds, geometryHeight, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
+    activity,
+    data,
+    exportRange,
+    style,
+    plotType: 'elevation',
+    buildGeometry: buildElevationGeometry,
+    mockGeometryKey: '__OVRLEY_MOCK_ELEVATION_GEOMETRY',
+    includeArea: true,
+  })
+  const isPlaceholder = getPreviewActivity(activity, previewSecond) === null
+  const placeholderStaticGeometry = useMemo(
+    () => (isPlaceholder ? buildPlaceholderElevationStaticGeometry({ width: data.width, height: data.height }) : null),
+    [data.height, data.width, isPlaceholder],
   )
 
-  // Build the config Rust needs. The store scene lacks non-durable fields
-  // (scale, shadow, border); globalDefaults fills them. start/end are
-  // overridden when an export window is active so Rust trims source points.
-  const geometryConfig = useMemo(() => {
-    if (!config || !activity || !hasTauriRuntime()) return null
-    const duration = activity?.trim_end_seconds ?? 0
-    const { updateRate, start, end, ...sceneRest } = config.scene
-
-    return {
-      ...config,
-      scene: {
-        ...globalDefaults,
-        ...sceneRest,
-        scale: style.globalScale,
-        update_rate: updateRate,
-        start: exportWindow.active ? exportWindow.start : (start ?? 0),
-        end: exportWindow.active ? exportWindow.end : (end ?? duration),
-        custom_export_range_active: exportWindow.active,
-      },
-    }
-  }, [config, globalDefaults, activity, exportWindow, style.globalScale])
-
-  useEffect(() => {
-    if (!geometryConfig) return
-
-    if (typeof window !== 'undefined' && window.__OVRLEY_MOCK_ELEVATION_GEOMETRY) {
-      setRustGeometry(window.__OVRLEY_MOCK_ELEVATION_GEOMETRY)
-      return
-    }
-
-    let cancelled = false
-    buildElevationGeometry(geometryConfig, activity).then((geometry) => {
-      if (!cancelled) setRustGeometry(geometry)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [geometryConfig, activity])
-
-  if (!activity) {
+  if (isPlaceholder) {
     return buildPlaceholderElevationPreviewGeometry({
       width: data.width,
       height: data.height,
       previewSecond,
       fallbackDurationSeconds,
+      staticGeometry: placeholderStaticGeometry,
     })
   }
 
   if (!rustGeometry) return null
-
-  // Rust computes at scaled resolution, but SVG needs widget-local coordinates.
-  const points = rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale])
 
   // Keep marker x distance-based so it stays put during hover/stop segments.
   const progress01 = exportWindow.active
@@ -112,14 +73,14 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
 
   // Completed profile fill is chronological, normalized to the same scoped duration
   // Rust used when building elapsedFractions.
-  const sourceDuration = exportWindow.active ? exportWindow.end - exportWindow.start : activity.sample_elapsed_seconds?.at(-1) || 1
+  const sourceDuration = exportWindow.active ? exportWindow.end - exportWindow.start : activity.sample_elapsed_seconds.at(-1) || 1
   const elapsedWindowStart = exportWindow.active ? exportWindow.start : 0
   const frameElapsedFraction = Math.min(Math.max((previewSecond - elapsedWindowStart) / Math.max(sourceDuration, 1e-9), 0), 1)
 
   const metricHit = findPointAtProgress(points, rustGeometry.progressValues, progress01)
   const elevationSeries = activity.sample_elevations.length ? activity.sample_elevations : activity.elevation
-  const elevationValue = getInterpolatedSeriesValue(activity.sample_elapsed_seconds, elevationSeries, previewSecond)
-  const markerY = projectElevationValueToSvgY(elevationValue, rustGeometry.dataRange, data.height, data.y_scale)
+  const elevationValue = interpolateNumericSeries(activity.sample_elapsed_seconds, elevationSeries, previewSecond)
+  const markerY = projectElevationValueToSvgY(elevationValue, rustGeometry.dataRange, geometryHeight, data.y_scale)
   const markerPoint = markerY === null ? null : [metricHit.point[0], markerY]
   const completedPoints = buildElevationCompletedPoints(
     points,
@@ -130,11 +91,12 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   )
 
   return {
+    contentScale,
     markerPoint,
     elevationValue,
-    remainingSvgPoints: pointsToSvg(points),
+    remainingSvgPoints,
     completedSvgPoints: pointsToSvg(completedPoints),
-    areaSvgPoints: areaToSvg(points, data.width, data.height, null),
-    completedAreaSvgPoints: areaToSvg(completedPoints, data.width, data.height, null),
+    areaSvgPoints,
+    completedAreaSvgPoints: areaToSvg(completedPoints, data.width, geometryHeight, null),
   }
 }

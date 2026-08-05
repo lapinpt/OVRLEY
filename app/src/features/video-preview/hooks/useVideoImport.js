@@ -3,6 +3,7 @@
  */
 
 import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo } from '@/api/backend'
+import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import { openSinglePath } from '@/lib/file-dialog'
 import useStore from '@/store/useStore'
 
@@ -16,7 +17,7 @@ async function extractAndStoreVideoTelemetry(filePath) {
   try {
     const response = await extractVideoTelemetry(filePath)
     if (response?.parsed_activity) {
-      useStore.getState().loadVideoTelemetry(response.parsed_activity)
+      await runWithoutEditorHistory(useStore, () => useStore.getState().loadVideoTelemetry(response.parsed_activity))
     }
   } catch (error) {
     console.warn('MP4 telemetry extraction failed (non-fatal):', error)
@@ -77,15 +78,17 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         throw new Error('Cannot import video without an active template scene')
       }
 
-      const importedVideoResolution = setImportedVideo(metadata)
-      setConfig({
-        ...currentConfig,
-        scene: {
-          ...currentConfig.scene,
-          ...(metadata.fps ? { fps: Math.round(metadata.fps) } : {}),
-          width: importedVideoResolution.width,
-          height: importedVideoResolution.height,
-        },
+      await runWithoutEditorHistory(useStore, () => {
+        const importedVideoResolution = setImportedVideo(metadata)
+        setConfig({
+          ...currentConfig,
+          scene: {
+            ...currentConfig.scene,
+            ...(metadata.fps ? { fps: Math.round(metadata.fps) } : {}),
+            width: importedVideoResolution.width,
+            height: importedVideoResolution.height,
+          },
+        })
       })
       onSetBackgroundMode?.('video')
 

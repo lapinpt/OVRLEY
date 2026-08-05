@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   createPlaybackAnchor,
   formatTimelineTime,
+  getTimelineMinimum,
   getTimelinePlaybackSecond,
   getTotalPlaybackDuration,
   resolvePlaybackSource,
@@ -11,6 +12,7 @@ import {
 describe('playerTiming utilities', () => {
   test('formats timeline seconds as mm:ss or h:mm:ss labels', () => {
     expect(formatTimelineTime(65)).toBe('01:05')
+    expect(formatTimelineTime(-65)).toBe('-01:05')
     expect(formatTimelineTime(3661)).toBe('1:01:01')
     expect(snapTimelineSecondToFrame(12.38, 30, 5.25)).toBeCloseTo(12.3833333333)
   })
@@ -50,6 +52,22 @@ describe('playerTiming utilities', () => {
     expect(resolvePlaybackSource({ ...baseOptions, playheadSecond: 5 })).toBe('video')
     expect(resolvePlaybackSource({ ...baseOptions, playheadSecond: 8.99 })).toBe('video')
     expect(resolvePlaybackSource({ ...baseOptions, playheadSecond: 9 })).toBe('timeline')
+
+    expect(resolvePlaybackSource({ ...baseOptions, videoSyncOffsetSeconds: -5, importedVideoDuration: 4, playheadSecond: -4.99 })).toBe('video')
+    expect(resolvePlaybackSource({ ...baseOptions, videoSyncOffsetSeconds: -5, importedVideoDuration: 4, playheadSecond: -1 })).toBe('timeline')
+  })
+
+  test('uses the negative video start as the timeline minimum', () => {
+    expect(getTimelineMinimum({ hasVideo: true, videoSyncOffsetSeconds: -5 })).toBe(-5)
+    expect(
+      getTotalPlaybackDuration({
+        activityDurationSeconds: 25,
+        fallbackDurationSeconds: 0,
+        importedVideoDuration: 30,
+        importedVideoPath: 'C:\\clips\\ride.mp4',
+        videoSyncOffsetSeconds: -5,
+      }),
+    ).toBe(25)
   })
 
   test('creates timeline anchors and resolves elapsed playback seconds', () => {

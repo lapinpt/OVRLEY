@@ -3,10 +3,14 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
-import { pointerToSecond } from '../utils/timelineGeometry'
+import { pointerToSecond, viewPxToSeconds } from '../utils/timelineGeometry'
 
 function isPrimaryButton(event) {
   return event.button === undefined || event.button === 0
+}
+
+function isDragType(dragRef, dragType) {
+  return dragRef.current?.type === dragType
 }
 
 /**
@@ -15,12 +19,13 @@ function isPrimaryButton(event) {
  * @param {object} options Gesture command inputs.
  * @param {function} options.scrubTo Preview-scrub command that accepts a timeline second.
  * @param {function} options.commitScrub Final scrub command that accepts a timeline second.
+ * @param {function} options.cancelScrub Scrub cancellation command for pending preview work.
  * @param {function} options.previewMarker Export-marker preview command.
  * @param {function} options.commitMarker Export-marker commit command.
  * @param {function} options.cancelMarkerPreview Export-marker cancellation command.
  * @returns {object} Drag state, event props, and metric sync command.
  */
-export default function useTimelineGestures({ scrubTo, commitScrub, previewMarker, commitMarker, cancelMarkerPreview }) {
+export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub, previewMarker, commitMarker, cancelMarkerPreview }) {
   // Drag state - one flag suspends viewport auto-follow during any timeline pointer interaction.
   const [isTimelineDragging, setIsTimelineDragging] = useState(false)
 
@@ -31,6 +36,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
   const metricsRef = useRef({
     containerElement: null,
     panBy: null,
+    timelineMinimum: 0,
     totalDuration: 0,
     viewEnd: 0,
     viewStart: 0,
@@ -56,6 +62,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
       viewStart: metrics.viewStart,
       viewEnd: metrics.viewEnd,
       widthPx: metrics.widthPx,
+      timelineMinimum: metrics.timelineMinimum,
       totalDuration: metrics.totalDuration,
     })
   }, [])
@@ -89,14 +96,14 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
     ),
     onPointerMove: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'scrub') return
+        if (!isDragType(dragRef, 'scrub')) return
         scrubTo(readSecond(event))
       },
       [readSecond, scrubTo],
     ),
     onPointerUp: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'scrub') return
+        if (!isDragType(dragRef, 'scrub')) return
         commitScrub(readSecond(event))
         releaseCapturedDrag(event)
       },
@@ -104,10 +111,11 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
     ),
     onPointerCancel: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'scrub') return
+        if (!isDragType(dragRef, 'scrub')) return
+        cancelScrub()
         releaseCapturedDrag(event)
       },
-      [releaseCapturedDrag],
+      [cancelScrub, releaseCapturedDrag],
     ),
   }
 
@@ -124,12 +132,15 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
       const metrics = metricsRef.current
       if (drag?.type !== 'pan') return
 
-      const pxPerSecond = metrics.widthPx > 0 && metrics.viewEnd > metrics.viewStart ? metrics.widthPx / (metrics.viewEnd - metrics.viewStart) : 0
-      if (pxPerSecond <= 0) return
-
-      const deltaSeconds = (drag.lastClientX - event.clientX) / pxPerSecond
+      const deltaSeconds = viewPxToSeconds({
+        deltaPx: drag.lastClientX - event.clientX,
+        viewStart: metrics.viewStart,
+        viewEnd: metrics.viewEnd,
+        widthPx: metrics.widthPx,
+      })
+      if (deltaSeconds === 0) return
       drag.lastClientX = event.clientX
-      if (deltaSeconds !== 0) metrics.panBy?.(deltaSeconds)
+      metrics.panBy?.(deltaSeconds)
     }, []),
     onPointerUp: useCallback(
       (event) => {
@@ -159,7 +170,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
     ),
     onPointerMove: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'playhead') return
+        if (!isDragType(dragRef, 'playhead')) return
         event.stopPropagation()
         scrubTo(readSecond(event))
       },
@@ -167,7 +178,7 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
     ),
     onPointerUp: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'playhead') return
+        if (!isDragType(dragRef, 'playhead')) return
         event.stopPropagation()
         commitScrub(readSecond(event))
         releaseCapturedDrag(event)
@@ -176,11 +187,12 @@ export default function useTimelineGestures({ scrubTo, commitScrub, previewMarke
     ),
     onPointerCancel: useCallback(
       (event) => {
-        if (dragRef.current?.type !== 'playhead') return
+        if (!isDragType(dragRef, 'playhead')) return
         event.stopPropagation()
+        cancelScrub()
         releaseCapturedDrag(event)
       },
-      [releaseCapturedDrag],
+      [cancelScrub, releaseCapturedDrag],
     ),
   }
 

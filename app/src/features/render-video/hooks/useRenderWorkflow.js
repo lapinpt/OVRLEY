@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { resolvePreviewSecond } from '@/lib/preview-timing'
+import { buildPreviewFrameWindow } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
@@ -28,13 +28,9 @@ export default function useRenderWorkflow({ backendStatus }) {
     renderStatus,
     renderingVideo,
     setActiveRenderId,
-    setConfig,
     setErrorMessage,
-    setExportCodec,
-    setExportRange,
     setRenderProgress,
     setRenderingVideo,
-    setUpdateRate,
     setVideoFilename,
     updateRate,
   } = useRenderStore()
@@ -63,7 +59,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     }
     return null
   }, [backendStatus, config, hasParsedActivity, renderingVideo])
-  const renderPreviewFrameDisabled = !canRender || renderingVideo || renderingPreviewFrame || backendStatus !== 'connected'
+  const renderPreviewFrameDisabled = renderDisabled || renderingPreviewFrame
 
   const buildRenderSettingsDraft = useCallback(() => {
     const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
@@ -171,47 +167,50 @@ export default function useRenderWorkflow({ backendStatus }) {
   useEffect(() => {
     if (!renderingVideo) return
 
-    const unsubscribe = useStore.subscribe(
-      (state) => state.renderProgress,
-      (nextProgress) => {
-        const { activeRenderId: nextActiveRenderId } = useStore.getState()
-        if (nextProgress.renderId !== nextActiveRenderId) {
-          return
-        }
+    let previousProgress = useStore.getState().renderProgress
+    const unsubscribe = useStore.subscribe((state) => {
+      const nextProgress = state.renderProgress
+      if (nextProgress === previousProgress) return
+      previousProgress = nextProgress
 
-        const { filename, message, status } = nextProgress
+      const { activeRenderId: nextActiveRenderId } = useStore.getState()
+      if (nextProgress.renderId !== nextActiveRenderId) {
+        return
+      }
 
-        if (status === 'complete' && filename) {
-          setVideoFilename(filename)
-          setActiveRenderId(null)
-          setRenderingVideo(false)
-          backend.openVideo(filename).catch((error) => {
-            console.error('Error calling open-video:', error)
-          })
-          return
-        }
+      const { filename, message, status } = nextProgress
 
-        if (status === 'cancelled') {
-          setActiveRenderId(null)
-          setRenderingVideo(false)
-          return
-        }
+      if (status === 'complete' && filename) {
+        setVideoFilename(filename)
+        setActiveRenderId(null)
+        setRenderingVideo(false)
+        backend.openVideo(filename).catch((error) => {
+          console.error('Error calling open-video:', error)
+        })
+        return
+      }
 
-        if (status === 'error') {
-          setActiveRenderId(null)
-          setRenderingVideo(false)
-          if (message) {
-            setErrorMessage(message)
-          }
+      if (status === 'cancelled') {
+        setActiveRenderId(null)
+        setRenderingVideo(false)
+        return
+      }
+
+      if (status === 'error') {
+        setActiveRenderId(null)
+        setRenderingVideo(false)
+        if (message) {
+          setErrorMessage(message)
         }
-      },
-    )
+      }
+    })
 
     return unsubscribe
   }, [renderingVideo, setErrorMessage, setActiveRenderId, setRenderingVideo, setVideoFilename])
 
-  // Confirm handler — persists dialog-local render choices, resolves the active export
-  // pipeline, kicks off the render IPC call, and manages error/recovery flow.
+  // Confirm handler — resolves dialog-local render choices, kicks off the
+  // render IPC call, and manages error/recovery flow. Modal choices are not
+  // promoted into editor state.
   const handleRenderVideoConfirm = useCallback(async () => {
     if (!config?.scene || !renderSettingsDraft) {
       return
@@ -235,12 +234,6 @@ export default function useRenderWorkflow({ backendStatus }) {
       },
     }
 
-    setConfig(nextConfig)
-    setUpdateRate(nextUpdateRate)
-    if (!shouldComposite) {
-      setExportCodec(renderSettingsDraft.exportCodec)
-    }
-    setExportRange(nextExportRange)
     setActiveRenderId(null)
     setRenderProgress({
       ...DEFAULT_RENDER_PROGRESS,
@@ -283,19 +276,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       console.error('Render failed:', error)
       useStore.getState().setErrorMessage(error.message || 'Unknown error')
     }
-  }, [
-    config,
-    globalDefaults,
-    renderSettingsDraft,
-    setConfig,
-    setActiveRenderId,
-    setExportCodec,
-    setExportRange,
-    setRenderProgress,
-    setRenderingVideo,
-    setUpdateRate,
-    setRenderDialogPhase,
-  ])
+  }, [config, globalDefaults, renderSettingsDraft, setActiveRenderId, setRenderProgress, setRenderingVideo, setRenderDialogPhase])
 
   const handleRenderPreviewFrame = useCallback(async () => {
     if (renderPreviewFrameDisabled || !config?.scene) {
@@ -303,8 +284,8 @@ export default function useRenderWorkflow({ backendStatus }) {
     }
 
     try {
-      const parsedActivity = useStore.getState().parsedActivity
-      if (!parsedActivity) {
+      const nextParsedActivity = useStore.getState().parsedActivity
+      if (!nextParsedActivity) {
         throw new Error('No parsed activity available')
       }
 
@@ -329,23 +310,25 @@ export default function useRenderWorkflow({ backendStatus }) {
       })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
 
-      const fallbackDurationSeconds = useStore.getState().fallbackDurationSeconds
       const selectedSecond = useStore.getState().selectedSecond
-      const resolvedPreviewSecond = resolvePreviewSecond({
-        fallbackDurationSeconds,
-        selectedSecond,
-        sourceActivity: parsedActivity,
+      const sceneStart = nextConfig.scene.start ?? 0
+      const sceneEnd = nextConfig.scene.end ?? sceneStart
+      const previewWindow = buildPreviewFrameWindow({
+        activityDuration: sceneEnd - sceneStart,
+        previewSecond: selectedSecond - sceneStart,
+        sceneFps: previewFps,
       })
-      const previewSecond = Math.min(Math.max(resolvedPreviewSecond, nextConfig.scene.start ?? 0), nextConfig.scene.end ?? resolvedPreviewSecond)
 
       nextConfig.scene = {
         ...nextConfig.scene,
+        start: sceneStart + previewWindow.start,
+        end: sceneStart + previewWindow.end,
         fps: previewFps,
         update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
       }
       delete nextConfig.scene.updateRate
 
-      const result = await backend.renderPreviewFrame(nextConfig, parsedActivity, previewSecond)
+      const result = await backend.renderPreviewFrame(nextConfig, nextParsedActivity, selectedSecond)
       if (result?.filename) {
         try {
           await backend.openVideo(result.filename)

@@ -182,6 +182,171 @@ fn validated_standard_metric_display_unit_survives_seam() {
 }
 
 #[test]
+fn validates_gps_coordinate_display_variants() {
+    let mut gps = common::builders::speed_value_json();
+    gps["value"] = json!("gps_coordinates");
+    gps["display_unit"] = json!("both");
+    gps["coordinate_format"] = json!("ddm");
+
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [gps],
+        "plots": []
+    }));
+    let value = common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
+
+    assert_eq!(value.coordinate_format.as_deref(), Some("ddm"));
+    assert_eq!(value.display_unit, "both");
+}
+
+#[test]
+fn validates_total_ascent_display_variant() {
+    let mut ascent = common::builders::speed_value_json();
+    ascent["value"] = json!("total_ascent");
+    ascent["display_unit"] = json!("ft");
+    ascent["show_full_ascent"] = json!(true);
+
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [ascent],
+        "plots": []
+    }));
+    let value = common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
+
+    assert_eq!(value.show_full_ascent, Some(true));
+    assert_eq!(value.display_unit, "ft");
+}
+
+#[test]
+fn validates_all_new_metric_widget_contracts() {
+    for (metric, display_unit, variant_field, variant_value) in [
+        (
+            "gps_coordinates",
+            "latitude",
+            "coordinate_format",
+            json!("dms"),
+        ),
+        ("distance_to_home", "mi", "coordinate_format", json!(null)),
+        ("total_ascent", "m", "show_full_ascent", json!(false)),
+        ("calories", "kcal", "coordinate_format", json!(null)),
+    ] {
+        let mut metric_value = common::builders::speed_value_json();
+        metric_value["value"] = json!(metric);
+        metric_value["display_unit"] = json!(display_unit);
+        if variant_field == "coordinate_format" {
+            metric_value["coordinate_format"] = variant_value;
+        } else {
+            metric_value["show_full_ascent"] = variant_value;
+        }
+
+        common::seam::validated_config_from_value(json!({
+            "scene": common::seam::explicit_scene_json(),
+            "labels": [],
+            "values": [metric_value],
+            "plots": []
+        }));
+    }
+}
+
+#[test]
+fn rejects_malformed_new_metric_display_variants() {
+    let cases = [
+        (
+            "gps_coordinates",
+            "coordinate_format",
+            json!("decimal"),
+            "expected 'dms' or 'ddm'",
+        ),
+        (
+            "gps_coordinates",
+            "display_unit",
+            json!("degrees"),
+            "expected 'latitude', 'longitude', or 'both'",
+        ),
+        (
+            "total_ascent",
+            "show_full_ascent",
+            json!(null),
+            "show_full_ascent: required",
+        ),
+        (
+            "total_ascent",
+            "display_unit",
+            json!("yards"),
+            "expected 'm' or 'ft'",
+        ),
+        (
+            "distance_to_home",
+            "display_unit",
+            json!("yards"),
+            "expected 'm', 'km', 'mi', or 'ft'",
+        ),
+        ("calories", "display_unit", json!("cal"), "expected 'kcal'"),
+    ];
+
+    for (metric, field, value, expected_error) in cases {
+        let mut metric_value = common::builders::speed_value_json();
+        metric_value["value"] = json!(metric);
+        if metric == "gps_coordinates" {
+            metric_value["display_unit"] = json!("both");
+            metric_value["coordinate_format"] = json!("dms");
+        } else if metric == "total_ascent" {
+            metric_value["display_unit"] = json!("m");
+            metric_value["show_full_ascent"] = json!(false);
+        } else if metric == "distance_to_home" {
+            metric_value["display_unit"] = json!("m");
+        } else {
+            metric_value["display_unit"] = json!("kcal");
+        }
+        metric_value[field] = value;
+
+        let result = ovrley_core::commands::validate_config_value(&json!({
+            "scene": common::seam::explicit_scene_json(),
+            "labels": [],
+            "values": [metric_value],
+            "plots": []
+        }));
+
+        let error = match result {
+            Ok(_) => panic!("malformed display variant should fail validation"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains(expected_error),
+            "expected '{expected_error}' in '{error}'"
+        );
+    }
+}
+
+#[test]
+fn rejects_new_display_variants_on_the_wrong_metric() {
+    for (field, value) in [
+        ("coordinate_format", json!("dms")),
+        ("show_full_ascent", json!(true)),
+    ] {
+        let mut speed = common::builders::speed_value_json();
+        speed[field] = value;
+
+        let result = ovrley_core::commands::validate_config_value(&json!({
+            "scene": common::seam::explicit_scene_json(),
+            "labels": [],
+            "values": [speed],
+            "plots": []
+        }));
+
+        let error = match result {
+            Ok(_) => panic!("unexpected display variant should fail validation"),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains(&format!("{field}: is only valid for")));
+    }
+}
+
+#[test]
 fn rejects_older_template_versions_explicitly() {
     let error = validate_template_contents(&format!(
         r#"{{

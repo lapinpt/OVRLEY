@@ -153,12 +153,42 @@ fn build_route_remaining_layer(
         plot.remaining_line_width,
         plot.remaining_line_shadow.as_ref(),
     );
-    let layer_width = plot.width.saturating_add(padding.saturating_mul(2)).max(1);
-    let layer_height = plot.height.saturating_add(padding.saturating_mul(2)).max(1);
+    let padding = padding as f32;
+    let radians = plot.rotation.to_radians();
+    let (sin, cos) = radians.sin_cos();
+    let corners = [
+        (-padding, -padding),
+        (plot.width as f32 + padding, -padding),
+        (-padding, plot.height as f32 + padding),
+        (plot.width as f32 + padding, plot.height as f32 + padding),
+    ];
+    let min_x = corners
+        .iter()
+        .map(|(x, y)| x * cos - y * sin)
+        .fold(f32::INFINITY, f32::min)
+        .floor();
+    let max_x = corners
+        .iter()
+        .map(|(x, y)| x * cos - y * sin)
+        .fold(f32::NEG_INFINITY, f32::max)
+        .ceil();
+    let min_y = corners
+        .iter()
+        .map(|(x, y)| x * sin + y * cos)
+        .fold(f32::INFINITY, f32::min)
+        .floor();
+    let max_y = corners
+        .iter()
+        .map(|(x, y)| x * sin + y * cos)
+        .fold(f32::NEG_INFINITY, f32::max)
+        .ceil();
+    let layer_width = (max_x - min_x).max(1.0) as u32;
+    let layer_height = (max_y - min_y).max(1.0) as u32;
     let mut surface = create_surface(layer_width, layer_height)?;
     surface.canvas().clear(skia_safe::Color::TRANSPARENT);
     surface.canvas().save();
-    surface.canvas().translate((padding as f32, padding as f32));
+    surface.canvas().translate((-min_x, -min_y));
+    surface.canvas().rotate(plot.rotation, None);
     draw_polyline_with_shadow(
         surface.canvas(),
         &geometry.points,
@@ -171,8 +201,8 @@ fn build_route_remaining_layer(
 
     Ok(Some(StaticLayer {
         image: surface.image_snapshot(),
-        x: -(padding as f32),
-        y: -(padding as f32),
+        x: min_x,
+        y: min_y,
     }))
 }
 

@@ -163,6 +163,7 @@ export function createEditorSlice(set, get) {
 
     setSelectedSecond: (second) => {
       const safeSecond = normalizePreviewSecond(second)
+      if (get().selectedSecond === safeSecond) return
 
       set((state) => {
         state.selectedSecond = safeSecond
@@ -196,6 +197,8 @@ export function createEditorSlice(set, get) {
 
     beginPreviewScrub: (second) => {
       const safeSecond = normalizePreviewSecond(second)
+      const state = get()
+      if (state.previewPlaybackState === 'scrubbing' && state.selectedSecond === safeSecond) return
 
       set((state) => {
         state.previewPlaybackState = 'scrubbing'
@@ -205,6 +208,8 @@ export function createEditorSlice(set, get) {
 
     updatePreviewScrub: (second) => {
       const safeSecond = normalizePreviewSecond(second)
+      const state = get()
+      if (state.previewPlaybackState === 'scrubbing' && state.selectedSecond === safeSecond) return
 
       set((state) => {
         state.previewPlaybackState = 'scrubbing'
@@ -214,6 +219,8 @@ export function createEditorSlice(set, get) {
 
     commitPreviewScrub: (second) => {
       const safeSecond = normalizePreviewSecond(second)
+      const state = get()
+      if (state.previewPlaybackState === 'paused' && state.selectedSecond === safeSecond) return
 
       set((state) => {
         state.previewPlaybackState = 'paused'

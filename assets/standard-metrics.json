@@ -39,8 +39,18 @@
             "decimals": 1,
             "show_full_distance": true
           },
+          "gps_coordinates": {
+            "coordinate_format": "dms"
+          },
+          "total_ascent": {
+            "decimals": 1,
+            "show_full_ascent": true
+          },
           "left_right_balance": {
             "balance_format": "percent_label"
+          },
+          "vertical_speed": {
+            "decimals": 1
           }
         }
       },
@@ -79,6 +89,68 @@
           "indicator_size": 10
         }
       },
+      "lean_angle": {
+        "label": "Lean Angle",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-lean-angle.svg"
+        },
+        "layoutMode": "boxed",
+        "defaults": {
+          "display_type": "lean_angle",
+          "diameter": 450,
+          "show_icon": false,
+          "track_empty_color": "#222222",
+          "track_empty_opacity": 0.5,
+          "track_filled_color": "#dce2e8",
+          "track_filled_opacity": 1,
+          "track_border_thickness": 0,
+          "track_border_color": "#ffffff",
+          "track_thickness": 150,
+          "font": "Arial.ttf",
+          "font_size": 90,
+          "color": "#ffffff",
+          "unit_color": "#ffffff",
+          "show_units": true,
+          "value_offset_x": 0,
+          "value_offset_y": 0
+        }
+      },
+      "g_force": {
+        "label": "G-Force",
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-g-force.svg"
+        },
+        "layoutMode": "boxed",
+        "defaultFrameWidth": 274,
+        "defaultFrameHeight": 274,
+        "defaults": {
+          "display_type": "g_force",
+          "diameter": 250,
+          "fill_color": "#212121",
+          "fill_opacity": 0.5,
+          "border_thickness": 0,
+          "border_color": "#ffffff",
+          "border_opacity": 1,
+          "marker_size": 24,
+          "marker_color": "#ffffff",
+          "marker_opacity": 1,
+          "axis_horizontal": "x",
+          "axis_vertical": "y",
+          "invert_horizontal": false,
+          "invert_vertical": false,
+          "clip_percentile": 99,
+          "label_font": "Arial.ttf",
+          "label_font_size": 50,
+          "label_color": "#ffffff",
+          "label_decimals": 1,
+          "label_unit": "G",
+          "label_unit_color": "#ffffff",
+          "label_offset_x": 0,
+          "label_offset_y": 0
+        }
+      },
       "linear": {
         "label": "Linear Bar",
         "icon": { "source": "shared", "assetFile": "display-type-linear.svg" },
@@ -115,9 +187,10 @@
         "layoutMode": "boxed",
         "defaultFrameWidth": 220,
         "defaultFrameHeight": 220,
-        "defaultFontSize": 60,
         "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
+          "font_size": 60,
+          "font": "Arial.ttf",
           "arc_angle": 240,
           "track_fill_style": "fill",
           "inner_widget_offset_x": 0,
@@ -147,9 +220,10 @@
         "layoutMode": "boxed",
         "defaultFrameWidth": 162,
         "defaultFrameHeight": 162,
-        "defaultFontSize": 51,
         "conditionalKeys": ["bar_count", "bar_gap"],
         "defaults": {
+          "font_size": 51,
+          "font": "Arial.ttf",
           "corner_orientation": "bottom-left",
           "track_fill_style": "fill",
           "inner_widget_offset_x": 0,
@@ -174,17 +248,22 @@
     "defaults": ["text", "linear", "arc", "corner"],
     "overrides": {
       "heading": ["text", "heading_tape"],
+      "g_force": ["text", "g_force"],
       "core_temperature": ["text"],
       "gear_position": ["text"],
       "left_right_balance": ["text"],
       "time": ["text"],
-      "lean_angle": ["text"],
+      "lean_angle": ["text", "lean_angle"],
       "iso": ["text"],
       "aperture": ["text"],
       "shutter_speed": ["text"],
       "focal_length": ["text"],
       "ev": ["text"],
-      "color_temperature": ["text"]
+      "color_temperature": ["text"],
+      "gps_coordinates": ["text"],
+      "distance_to_home": ["text", "linear"],
+      "total_ascent": ["text", "linear"],
+      "calories": ["text", "linear"]
     }
   },
   "definitions": [
@@ -234,17 +313,22 @@
         {
           "value": "m",
           "label": "m",
-          "renderLabel": "m"
+          "renderLabel": "M"
         },
         {
           "value": "km",
           "label": "km",
-          "renderLabel": "km"
+          "renderLabel": "KM"
         },
         {
           "value": "mi",
           "label": "mi",
-          "renderLabel": "mi"
+          "renderLabel": "MI"
+        },
+        {
+          "value": "ft",
+          "label": "ft",
+          "renderLabel": "FT"
         }
       ],
       "showUnitsByDefault": true,
@@ -256,6 +340,121 @@
         "assetFile": "widget-distance.svg"
       },
       "category": "general"
+    },
+    {
+      "type": "gps_coordinates",
+      "current": true,
+      "label": "Location",
+      "defaultDisplayUnit": "both",
+      "supportedDisplayUnits": [
+        {
+          "value": "latitude",
+          "label": "Latitude"
+        },
+        {
+          "value": "longitude",
+          "label": "Longitude"
+        },
+        {
+          "value": "both",
+          "label": "Both"
+        }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "coordinates",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-satellite.svg"
+      },
+      "category": "general"
+    },
+    {
+      "type": "distance_to_home",
+      "current": true,
+      "label": "Home",
+      "defaultDisplayUnit": "m",
+      "supportedDisplayUnits": [
+        {
+          "value": "m",
+          "label": "m",
+          "renderLabel": "M"
+        },
+        {
+          "value": "km",
+          "label": "km",
+          "renderLabel": "KM"
+        },
+        {
+          "value": "mi",
+          "label": "mi",
+          "renderLabel": "MI"
+        },
+        {
+          "value": "ft",
+          "label": "ft",
+          "renderLabel": "FT"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "distance",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-house.svg"
+      },
+      "category": "other"
+    },
+    {
+      "type": "total_ascent",
+      "current": true,
+      "label": "Ascent",
+      "defaultDisplayUnit": "m",
+      "supportedDisplayUnits": [
+        {
+          "value": "m",
+          "label": "m",
+          "renderLabel": "M"
+        },
+        {
+          "value": "ft",
+          "label": "ft",
+          "renderLabel": "FT"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "elevation",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-arrow-up-narrow-wide.svg"
+      },
+      "category": "general"
+    },
+    {
+      "type": "calories",
+      "current": true,
+      "label": "Calories",
+      "defaultDisplayUnit": "kcal",
+      "supportedDisplayUnits": [
+        {
+          "value": "kcal",
+          "label": "kcal",
+          "renderLabel": "KCAL"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-calories.svg"
+      },
+      "category": "other"
     },
     {
       "type": "heartrate",
@@ -291,7 +490,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "shared",
@@ -312,7 +511,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "shared",
@@ -364,7 +563,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "pace",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -452,7 +651,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "custom",
@@ -474,7 +673,7 @@
       ],
       "showUnitsByDefault": false,
       "formatter": "balance",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -512,7 +711,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -534,7 +733,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -557,7 +756,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "custom",
@@ -569,7 +768,7 @@
       "type": "vertical_speed",
       "current": true,
       "label": "Vertical Speed",
-      "defaultDisplayUnit": "mph_vertical",
+      "defaultDisplayUnit": "mps",
       "supportedDisplayUnits": [
         {
           "value": "mps",
@@ -638,7 +837,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -666,7 +865,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -727,6 +926,7 @@
       "type": "altitude",
       "current": true,
       "label": "Altitude",
+      "dataSource": "elevation",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
         {
@@ -891,7 +1091,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
-      "interpolation": "linear",
+      "interpolation": "preserve",
       "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
@@ -912,7 +1112,7 @@
         }
       ],
       "showUnitsByDefault": true,
-      "formatter": "decimal",
+      "formatter": "integer",
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
@@ -933,7 +1133,7 @@
         }
       ],
       "showUnitsByDefault": true,
-      "formatter": "decimal",
+      "formatter": "integer",
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
@@ -954,7 +1154,7 @@
         }
       ],
       "showUnitsByDefault": true,
-      "formatter": "decimal",
+      "formatter": "integer",
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {

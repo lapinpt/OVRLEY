@@ -16,12 +16,16 @@ pub(super) use super::timing::LocalPreamble;
 use super::timing::{selected_absolute_timestamps, AbsoluteTimestamp};
 use super::units::convert;
 use super::Metric;
-use crate::activity::schema::{ActivityColumns, DirectMetricGapPolicy, RawActivityOptions};
+use crate::activity::schema::{
+    ActivityColumns, DirectMetricGapPolicy, RawActivityOptions, SmoothingOption,
+};
 use crate::error::{CoreError, CoreResult};
-use crate::media::telemetry_math::lean_angle_from_lateral_g;
+use crate::media::telemetry_math::{
+    backfill_lateral_g_from_lean_angle, derive_lean_from_speed_heading, lean_angle_from_lateral_g,
+};
 use csv::StringRecord;
 use serde_json::json;
-use std::ops::Range;
+use std::{collections::BTreeMap, ops::Range};
 
 /// Builds canonical raw activity columns from a resolved CSV layout.
 ///
@@ -156,14 +160,39 @@ pub(super) fn build_activity_columns(
             uses_gps_update && gps_updates.is_some(),
         )
     };
-    let (latitude, _) = series(Metric::Latitude);
-    let (longitude, _) = series(Metric::Longitude);
+    let (mut latitude, _) = series(Metric::Latitude);
+    let (mut longitude, _) = series(Metric::Longitude);
+
+    // Some loggers emit a single GPS column containing a space-separated
+    // "lat lon" pair. When no dedicated latitude/longitude columns produced
+    // values, derive them from that combined column.
+    if latitude.iter().all(Option::is_none) && longitude.iter().all(Option::is_none) {
+        if let Some(gps_column) = header
+            .columns
+            .iter()
+            .find(|column| column.metric == Metric::GpsCoordinate)
+        {
+            let split = (0..data.len())
+                .map(|row| parse_gps_coordinate(data.value(row, gps_column.index)))
+                .collect::<Vec<_>>();
+            let coalesced = coalesce_series(split, &groups);
+            latitude = coalesced
+                .iter()
+                .map(|value| value.map(|(lat, _)| lat))
+                .collect();
+            longitude = coalesced
+                .iter()
+                .map(|value| value.map(|(_, lon)| lon))
+                .collect();
+        }
+    }
+
     let (elevation, _) = series(Metric::Elevation);
-    let (altitude, _) = series(Metric::Altitude);
+    let (barometric_altitude, _) = series(Metric::BarometricAltitude);
     let (speed, preserve_speed_gaps) = series(Metric::Speed);
     let (heading, preserve_heading_gaps) = series(Metric::Heading);
-    let (g_force_x, _) = series(Metric::GForceX);
-    let (g_force_y, _) = series(Metric::GForceY);
+    let (mut g_force_x, _) = series(Metric::GForceX);
+    let (mut g_force_y, _) = series(Metric::GForceY);
     let (g_force_z, _) = series(Metric::GForceZ);
     let mut g_force_source = selected_series(Metric::GForce, &header.columns, units_row, data);
     if g_force_source.iter().all(Option::is_none) {
@@ -232,6 +261,7 @@ pub(super) fn build_activity_columns(
                 .filter(|distance| *distance >= 0.0)
         });
     }
+    let (distance_to_home, _) = series(Metric::DistanceToHome);
     let preserve_direct_metric_gaps = DirectMetricGapPolicy {
         speed: preserve_speed_gaps,
         heading: preserve_heading_gaps,
@@ -240,6 +270,9 @@ pub(super) fn build_activity_columns(
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
     let (mut lean_angle, _) = series(Metric::LeanAngle);
+    if lean_angle.iter().all(Option::is_none) {
+        lean_angle = derive_lean_from_speed_heading(&speed, &heading, &elapsed_seconds);
+    }
     if lean_angle.iter().all(Option::is_none) {
         if let Some(lateral) = selected_acceleration_series(
             Metric::GForceX,
@@ -255,27 +288,59 @@ pub(super) fn build_activity_columns(
             lean_angle = coalesce_series(derived, &groups);
         }
     }
+    if lean_angle.iter().any(Option::is_some) {
+        let (new_x, new_y) =
+            backfill_lateral_g_from_lean_angle(&g_force_x, &g_force_y, &lean_angle);
+        g_force_x = new_x;
+        g_force_y = new_y;
+    }
     let gear_position = coalesce_series(
         selected_gear_series(&header.columns, units_row, data),
         &groups,
     );
     let empty = || vec![None; sample_count];
+    let smoothing = ["g_force_x", "g_force_y", "g_force_z"]
+        .into_iter()
+        .map(|metric| {
+            (
+                metric.to_string(),
+                SmoothingOption {
+                    enabled: true,
+                    method: "zero_phase_ma".to_string(),
+                    window_seconds: 0.2,
+                },
+            )
+        })
+        .chain([(
+            "heading".to_string(),
+            SmoothingOption {
+                enabled: true,
+                method: "circular_ema".to_string(),
+                window_seconds: 0.0,
+            },
+        )])
+        .collect::<BTreeMap<_, _>>();
 
     Ok(ActivityColumns {
         file_name: file_name.to_string(),
         file_format: "csv".to_string(),
         metadata: json!({}),
-        options: RawActivityOptions::default(),
+        sync_time: None,
+        options: RawActivityOptions {
+            smoothing,
+            ..RawActivityOptions::default()
+        },
         preserve_direct_metric_gaps,
         timestamp,
         elapsed_seconds: elapsed_seconds.into_iter().map(Some).collect(),
         latitude,
         longitude,
         elevation,
-        altitude,
+        barometric_altitude,
         speed,
         heading,
         distance,
+        distance_to_home,
         g_force,
         g_force_x,
         g_force_y,
@@ -291,6 +356,7 @@ pub(super) fn build_activity_columns(
         cadence: empty(),
         power: empty(),
         temperature: empty(),
+        calories: empty(),
         gradient: empty(),
         pace: empty(),
         vertical_speed: empty(),
@@ -309,6 +375,24 @@ pub(super) fn build_activity_columns(
         ev: empty(),
         color_temperature: empty(),
     })
+}
+
+/// Parses a single space-separated "lat lon" GPS coordinate string.
+///
+/// Both values must be finite and lie within the valid latitude/longitude
+/// ranges. Any extra tokens are ignored; missing or malformed values return
+/// `None`.
+fn parse_gps_coordinate(value: Option<&str>) -> Option<(f64, f64)> {
+    let mut parts = value?.trim().split_whitespace();
+    let lat: f64 = parts.next()?.parse().ok()?;
+    let lon: f64 = parts.next()?.parse().ok()?;
+    if !lat.is_finite() || !lon.is_finite() {
+        return None;
+    }
+    if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
+        return None;
+    }
+    Some((lat, lon))
 }
 
 /// Parses an optional GPS freshness signal as a strict row-aligned contract.

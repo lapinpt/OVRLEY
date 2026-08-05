@@ -23,6 +23,29 @@
 import { PreviewMetricIcon, PreviewSvgText } from '../../shared/PreviewSvgComponents'
 import { useMetricPreviewPresentation } from './useMetricPreview'
 
+function renderMetricTextRuns(textRuns, presentation, sceneStyle) {
+  const renderedRuns = []
+  for (const run of textRuns) {
+    renderedRuns.push(
+      <PreviewSvgText
+        key={run.key}
+        text={run.text}
+        x={run.x}
+        baseline={run.baseline}
+        color={run.color}
+        fontFamily={presentation.fontFamily}
+        fontSize={run.fontSize}
+        opacity={presentation.widgetOpacity}
+        shadow={presentation.shadow}
+        shadowFilterId={presentation.shadow ? run.shadowFilterId : undefined}
+        borderColor={sceneStyle?.border_color}
+        borderThickness={sceneStyle?.border_thickness}
+      />,
+    )
+  }
+  return renderedRuns
+}
+
 export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
   const presentation = useMetricPreviewPresentation({
     widget,
@@ -62,34 +85,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
                 shadowFilterId={presentation.shadow ? presentation.iconShadowFilterId : undefined}
               />
             ) : null}
-            <PreviewSvgText
-              text={presentation.valueText}
-              x={presentation.metricLayout.value.left + presentation.visualBounds.offsetX}
-              baseline={presentation.metricLayout.value.baseline + presentation.visualBounds.offsetY}
-              color={widget.data.color}
-              fontFamily={presentation.fontFamily}
-              fontSize={widget.data.font_size}
-              opacity={presentation.widgetOpacity}
-              shadow={presentation.shadow}
-              shadowFilterId={presentation.valueShadowFilterId}
-              borderColor={sceneStyle?.border_color}
-              borderThickness={sceneStyle?.border_thickness}
-            />
-            {presentation.metricLayout.units ? (
-              <PreviewSvgText
-                text={presentation.unitText}
-                x={presentation.metricLayout.units.left + presentation.visualBounds.offsetX}
-                baseline={presentation.metricLayout.units.baseline + presentation.visualBounds.offsetY}
-                color={widget.data.unit_color}
-                fontFamily={presentation.fontFamily}
-                fontSize={presentation.metricLayout.units.fontSize}
-                opacity={presentation.widgetOpacity}
-                shadow={presentation.shadow}
-                shadowFilterId={presentation.unitsShadowFilterId}
-                borderColor={sceneStyle?.border_color}
-                borderThickness={sceneStyle?.border_thickness}
-              />
-            ) : null}
+            {renderMetricTextRuns(presentation.textRuns, presentation, sceneStyle)}
           </svg>
         </div>
       </div>

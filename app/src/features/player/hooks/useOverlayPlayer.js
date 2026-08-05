@@ -2,12 +2,15 @@
  * Top-level player orchestration hook for the presentational overlay player components.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { isInteractiveElement } from '@/lib/utils'
+import { videoOverlapsActivity } from '@/lib/video-timing'
 import useStore from '@/store/useStore'
 import { formatTimelineTime, snapTimelineSecondToFrame } from '../utils/playerTiming'
-import { roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
+import { moveClipOffset, roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
+
+import useClipDrag from './useClipDrag'
 import useExportRangeTimeline from './useExportRangeTimeline'
 import usePlaybackEngine from './usePlaybackEngine'
 import useTimelineClips from './useTimelineClips'
@@ -43,6 +46,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
       fallbackDurationSeconds: state.fallbackDurationSeconds,
       importedVideoDuration: state.importedVideoDuration,
       importedVideoFps: state.importedVideoFps,
+      importedVideoImportId: state.importedVideoImportId,
       importedVideoPath: state.importedVideoPath,
       pausePreviewPlayback: state.pausePreviewPlayback,
       toggleVideoMute: state.toggleVideoMute,
@@ -52,34 +56,87 @@ export default function useOverlayPlayer({ backgroundMode }) {
       sceneFps: state.config?.scene?.fps ?? 30,
       selectedSecond: state.selectedSecond,
       setSelectedSecond: state.setSelectedSecond,
+      setVideoSyncOffset: state.setVideoSyncOffset,
+      setVideoSyncOffsetPreview: state.setVideoSyncOffsetPreview,
       startPreviewPlayback: state.startPreviewPlayback,
       updatePreviewScrub: state.updatePreviewScrub,
       updateRate: state.updateRate,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      videoSyncOffsetPreviewSeconds: state.videoSyncOffsetPreviewSeconds,
     })),
   )
 
+  const [selectedClipId, setSelectedClipId] = useState(null)
+  const [keyboardSyncOffsetSeconds, setKeyboardSyncOffsetSeconds] = useState(null)
+
   // Durable domains - each hook owns behavior for one player concern, while this hook wires them together.
   const playback = usePlaybackEngine({ ...playerStore, backgroundMode })
+  const { hasActivity, isPlaying, pause, play, stepBySeconds } = playback
   const exportBoundarySecond = playback.importedVideoPath
-    ? snapTimelineSecondToFrame(playback.displayedPlayhead, playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
-    : playback.displayedPlayhead
+    ? snapTimelineSecondToFrame(playback.clampedPlayhead, playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
+    : playback.clampedPlayhead
   const exportTimeline = useExportRangeTimeline({
     defaultEndSecond: playback.importedVideoPath ? playback.videoSyncOffsetSeconds + playback.importedVideoDuration : playback.totalDuration,
+    timelineMinimum: playback.timelineMinimum,
     totalDuration: playback.totalDuration,
   })
   const gestures = useTimelineGestures({
     cancelMarkerPreview: exportTimeline.cancelMarkerPreview,
+    cancelScrub: playback.cancelScrub,
     commitMarker: exportTimeline.commitMarker,
     commitScrub: playback.commitScrub,
     previewMarker: exportTimeline.previewMarker,
     scrubTo: playback.scrubTo,
   })
+  const { getExportMarkerProps, updateTimelineMetrics } = gestures
 
   // Media flags - downstream hooks need explicit availability booleans, not inferred path/summary checks.
   const hasVideo = Boolean(playback.importedVideoPath)
   const hasActivityData = Boolean(playerStore.activitySummary)
   const activityDurationSeconds = playerStore.activitySummary?.durationSeconds ?? 0
+  const canSelectClip = hasVideo && playback.hasActivity
+
+  const nudgeClip = (laneId, deltaSeconds) => {
+    setKeyboardSyncOffsetSeconds((currentOffset) => {
+      const nextOffset = moveClipOffset({
+        currentOffset: currentOffset ?? playerStore.videoSyncOffsetSeconds,
+        deltaSeconds,
+        laneId,
+      })
+      const roundedOffset = Math.round(nextOffset * 10) / 10
+      return videoOverlapsActivity({ videoStart: roundedOffset, videoDuration: playback.importedVideoDuration })
+        ? roundedOffset
+        : (currentOffset ?? playerStore.videoSyncOffsetSeconds)
+    })
+  }
+
+  const commitClipNudge = () => {
+    if (keyboardSyncOffsetSeconds === null) return
+    playerStore.setVideoSyncOffset(keyboardSyncOffsetSeconds)
+    setKeyboardSyncOffsetSeconds(null)
+  }
+
+  // Selection is scoped to the current media pair and ends when the user clicks elsewhere.
+  useEffect(() => {
+    setSelectedClipId(null)
+    setKeyboardSyncOffsetSeconds(null)
+  }, [playerStore.activitySummary, playerStore.importedVideoImportId, playback.importedVideoPath])
+
+  useEffect(() => {
+    const clearClipSelection = () => setSelectedClipId(null)
+    window.addEventListener('pointerdown', clearClipSelection, true)
+    return () => window.removeEventListener('pointerdown', clearClipSelection, true)
+  }, [])
+
+  // Clip drag - owns horizontal drag gesture state for sync offset adjustment.
+  const clipDrag = useClipDrag({
+    setVideoSyncOffset: playerStore.setVideoSyncOffset,
+    setVideoSyncOffsetPreview: playerStore.setVideoSyncOffsetPreview,
+    activityDurationSeconds,
+    importedVideoDuration: playback.importedVideoDuration,
+  })
+  const { getLaneDragProps, isDragging: isClipDragging, snapGuidelineSecond, updateMetrics: updateClipDragMetrics } = clipDrag
+  const timelineVideoSyncOffsetSeconds = keyboardSyncOffsetSeconds ?? playerStore.videoSyncOffsetPreviewSeconds ?? playback.videoSyncOffsetSeconds
 
   // Viewport domain - owns measurement, fit targets, ticks, zoom, pan, and playback follow behavior.
   const viewport = useTimelineViewport({
@@ -88,45 +145,64 @@ export default function useOverlayPlayer({ backgroundMode }) {
     hasActivityData,
     hasVideo,
     importedVideoDuration: playback.importedVideoDuration,
-    isDragging: gestures.isTimelineDragging,
+    isDragging: gestures.isTimelineDragging || isClipDragging,
     isPlaying: playback.isPlaying,
     playheadSecond: playback.clampedPlayhead,
     totalDuration: playback.totalDuration,
+    videoSyncOffsetPreviewSeconds: timelineVideoSyncOffsetSeconds,
     videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
   })
+  const { displayedFitTargetId, fitTarget, fitTargets: viewportFitTargets, viewport: timelineViewport, widthPx } = viewport
 
   // Gesture metrics sync - pointer math uses the latest measured element and viewport without re-rendering on every move.
   useEffect(() => {
-    gestures.updateTimelineMetrics({
+    const metrics = {
       containerElement: viewport.containerElement,
+      followSecond: viewport.followSecond,
       panBy: viewport.panBy,
+      timelineMinimum: viewport.timelineMinimum,
       totalDuration: playback.totalDuration,
       viewEnd: viewport.viewport.viewEnd,
       viewStart: viewport.viewport.viewStart,
       widthPx: viewport.widthPx,
+    }
+    updateTimelineMetrics(metrics)
+    updateClipDragMetrics({
+      ...metrics,
+      hasVideo,
+      videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
+      activityDurationSeconds,
+      importedVideoDuration: playback.importedVideoDuration,
     })
   }, [
-    gestures,
+    activityDurationSeconds,
+    hasVideo,
+    playback.importedVideoDuration,
     playback.totalDuration,
+    playback.videoSyncOffsetSeconds,
     viewport.containerElement,
     viewport.containerRef,
+    viewport.followSecond,
+    viewport.timelineMinimum,
     viewport.panBy,
     viewport.viewport.viewEnd,
     viewport.viewport.viewStart,
     viewport.widthPx,
+    updateClipDragMetrics,
+    updateTimelineMetrics,
   ])
 
   // Keyboard shortcuts - global commands route through the same playback API as toolbar buttons.
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !playback.hasActivity) {
+      if (event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !hasActivity) {
         return
       }
 
       if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
         if (isInteractiveElement(event.target)) return
         event.preventDefault()
-        playback.stepBySeconds(event.code === 'ArrowRight' ? 1 : -1)
+        stepBySeconds(event.code === 'ArrowRight' ? 1 : -1)
         return
       }
 
@@ -135,28 +211,34 @@ export default function useOverlayPlayer({ backgroundMode }) {
       }
 
       event.preventDefault()
-      if (playback.isPlaying) {
-        playback.pause()
+      if (isPlaying) {
+        pause()
         return
       }
 
-      playback.play()
+      play()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [playback])
+  }, [hasActivity, isPlaying, pause, play, stepBySeconds])
 
   // Lane models - clip geometry and tooltip state are prepared before presentational rendering.
   const lanes = useTimelineClips({
     activityFilename: playerStore.activityFilename,
     activitySummary: playerStore.activitySummary,
+    canSelect: canSelectClip,
+    commitClipNudge,
     exportHighlightRange: exportTimeline.highlightRange,
+    getLaneDragProps,
     hasActivity: playback.hasActivity,
     hasVideo,
     importedVideoDuration: playback.importedVideoDuration,
     importedVideoPath: playback.importedVideoPath,
-    videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
+    nudgeClip,
+    selectedClipId,
+    setSelectedClipId,
+    videoSyncOffsetSeconds: timelineVideoSyncOffsetSeconds,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
     widthPx: viewport.widthPx,
@@ -166,13 +248,25 @@ export default function useOverlayPlayer({ backgroundMode }) {
   const pixelRatio = getDevicePixelRatio()
   const playheadLeft = roundToDevicePixel(
     secondsToViewPx({
-      second: playback.displayedPlayhead,
+      second: playback.clampedPlayhead,
       viewStart: viewport.viewport.viewStart,
       viewEnd: viewport.viewport.viewEnd,
       widthPx: viewport.widthPx,
     }),
     pixelRatio,
   )
+  const snapGuidelineLeft =
+    snapGuidelineSecond === null
+      ? null
+      : roundToDevicePixel(
+          secondsToViewPx({
+            second: snapGuidelineSecond,
+            viewStart: viewport.viewport.viewStart,
+            viewEnd: viewport.viewport.viewEnd,
+            widthPx: viewport.widthPx,
+          }),
+          pixelRatio,
+        )
 
   // Export marker models - hide markers outside the viewport and attach gesture props to visible handles.
   const exportMarkers = useMemo(
@@ -180,19 +274,19 @@ export default function useOverlayPlayer({ backgroundMode }) {
       exportTimeline.markers
         .map((marker) => {
           const isVisible =
-            marker.second >= viewport.viewport.viewStart &&
-            marker.second <= viewport.viewport.viewEnd &&
-            viewport.widthPx > 0 &&
-            viewport.viewport.viewEnd > viewport.viewport.viewStart
+            marker.second >= timelineViewport.viewStart &&
+            marker.second <= timelineViewport.viewEnd &&
+            widthPx > 0 &&
+            timelineViewport.viewEnd > timelineViewport.viewStart
 
           if (!isVisible) return null
 
           const left = roundToDevicePixel(
             secondsToViewPx({
               second: marker.second,
-              viewStart: viewport.viewport.viewStart,
-              viewEnd: viewport.viewport.viewEnd,
-              widthPx: viewport.widthPx,
+              viewStart: timelineViewport.viewStart,
+              viewEnd: timelineViewport.viewEnd,
+              widthPx,
             }),
             pixelRatio,
           )
@@ -201,24 +295,24 @@ export default function useOverlayPlayer({ backgroundMode }) {
             ...marker,
             handleClassName: getMarkerClassName(marker.marker),
             lineStyle: { left },
-            markerProps: gestures.getExportMarkerProps(marker.marker),
+            markerProps: getExportMarkerProps(marker.marker),
             style: { left },
           }
         })
         .filter(Boolean),
-    [exportTimeline.markers, gestures, pixelRatio, viewport.viewport.viewEnd, viewport.viewport.viewStart, viewport.widthPx],
+    [exportTimeline.markers, getExportMarkerProps, pixelRatio, timelineViewport.viewEnd, timelineViewport.viewStart, widthPx],
   )
 
   // Fit target commands - presentational tabs only need active state, labels, and a command callback.
   const fitTargets = useMemo(
     () =>
-      viewport.fitTargets.map((target) => ({
+      viewportFitTargets.map((target) => ({
         id: target.id,
-        isActive: viewport.displayedFitTargetId === target.id,
+        isActive: displayedFitTargetId === target.id,
         label: target.label,
-        onSelect: () => viewport.fitTarget(target.id),
+        onSelect: () => fitTarget(target.id),
       })),
-    [viewport],
+    [displayedFitTargetId, fitTarget, viewportFitTargets],
   )
 
   // View model - components receive only render-ready state and callbacks, not store or calculation details.
@@ -238,6 +332,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
         lineStyle: { left: playheadLeft },
         style: { left: playheadLeft },
       },
+      snapGuidelineStyle: snapGuidelineLeft === null ? null : { left: snapGuidelineLeft },
       ticks: viewport.ticks,
       viewport: viewport.viewport,
       widthPx: viewport.widthPx,
@@ -257,7 +352,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
         onClick: viewport.resetView,
       },
       timeLabel: {
-        current: formatTimelineTime(playback.displayedPlayhead),
+        current: formatTimelineTime(playback.clampedPlayhead),
         total: formatTimelineTime(playback.totalDuration),
       },
       isMuted: playerStore.isVideoMuted,

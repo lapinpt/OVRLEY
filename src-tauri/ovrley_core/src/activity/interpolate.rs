@@ -3,8 +3,8 @@
 //! Source activities usually contain unevenly spaced samples, while the renderer
 //! needs values at exact frame times. This module converts trimmed samples into
 //! frame-aligned series using linear interpolation and conservative edge
-//! clamping. Missing values are filtered out before interpolation so sparse
-//! telemetry can still render wherever enough valid samples exist.
+//! clamping. Missing-value behavior is selected per metric: bridge policies
+//! filter gaps, while preserve policies retain missing frame samples.
 
 use super::schema::{
     CourseSeries, DenseActivityReport, DenseSeriesReport, NumericSeries, TimeSeries,
@@ -16,7 +16,32 @@ use chrono::{DateTime, SecondsFormat, Utc};
 
 pub use crate::interpolation::{
     collect_valid_numeric_points, interpolate_numeric_series_value, interpolate_points,
+    MissingSamplePolicy,
 };
+
+#[derive(Clone, Copy)]
+pub(crate) enum InterpolationStrategy {
+    Hold,
+    Numeric(MissingSamplePolicy),
+}
+
+pub(crate) fn interpolation_strategy(kind: crate::MetricKind) -> InterpolationStrategy {
+    match standard_metric_interpolation(kind) {
+        Some(StandardMetricInterpolationKind::Hold) => InterpolationStrategy::Hold,
+        Some(StandardMetricInterpolationKind::Preserve) => {
+            InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve)
+        }
+        Some(StandardMetricInterpolationKind::Linear) => {
+            InterpolationStrategy::Numeric(MissingSamplePolicy::Bridge)
+        }
+        None => match kind {
+            crate::MetricKind::Elevation | crate::MetricKind::Gradient => {
+                InterpolationStrategy::Numeric(MissingSamplePolicy::Bridge)
+            }
+            _ => panic!("standard metric has no interpolation policy: {kind:?}"),
+        },
+    }
+}
 
 /// Interpolates a latitude/longitude pair at `target_x`.
 ///
@@ -38,8 +63,18 @@ pub fn interpolate_course_value(
         .map(|point| point.1)
         .collect::<Vec<_>>();
     (
-        interpolate_numeric_series_value(x_values, &latitudes, target_x),
-        interpolate_numeric_series_value(x_values, &longitudes, target_x),
+        interpolate_numeric_series_value(
+            x_values,
+            &latitudes,
+            target_x,
+            MissingSamplePolicy::Bridge,
+        ),
+        interpolate_numeric_series_value(
+            x_values,
+            &longitudes,
+            target_x,
+            MissingSamplePolicy::Bridge,
+        ),
     )
 }
 
@@ -99,12 +134,29 @@ fn interpolate_numeric_series(
     x_values: &[f64],
     y_values: &NumericSeries,
     target_x_values: &[f64],
+    missing_sample_policy: MissingSamplePolicy,
 ) -> Vec<Option<f64>> {
-    let points = collect_valid_numeric_points(x_values, y_values);
-    target_x_values
-        .iter()
-        .map(|target| interpolate_points(&points, *target))
-        .collect()
+    if y_values.is_empty() {
+        return Vec::new();
+    }
+
+    match missing_sample_policy {
+        MissingSamplePolicy::Bridge => {
+            // Build the filtered source points once. Rebuilding them for every
+            // frame makes densification quadratic for large activities.
+            let points = collect_valid_numeric_points(x_values, y_values);
+            target_x_values
+                .iter()
+                .map(|target| interpolate_points(&points, *target))
+                .collect()
+        }
+        MissingSamplePolicy::Preserve => target_x_values
+            .iter()
+            .map(|target| {
+                interpolate_numeric_series_value(x_values, y_values, *target, missing_sample_policy)
+            })
+            .collect(),
+    }
 }
 
 // Densifies a series with hold (step) interpolation.
@@ -148,7 +200,12 @@ fn densify_forward_fill_series(
         return Vec::new();
     }
     // First, do standard interpolation to get frame-aligned values
-    let interpolated = interpolate_numeric_series(x_values, y_values, target_x_values);
+    let interpolated = interpolate_numeric_series(
+        x_values,
+        y_values,
+        target_x_values,
+        MissingSamplePolicy::Bridge,
+    );
     // Then forward-fill: carry last known value across null gaps
     let mut last_known: Option<f64> = None;
     interpolated
@@ -172,20 +229,41 @@ fn interpolate_course_series(
     let latitudes = y_values.iter().map(|point| point.0).collect::<Vec<_>>();
     let longitudes = y_values.iter().map(|point| point.1).collect::<Vec<_>>();
     (
-        interpolate_numeric_series(x_values, &latitudes, target_x_values),
-        interpolate_numeric_series(x_values, &longitudes, target_x_values),
+        interpolate_numeric_series(
+            x_values,
+            &latitudes,
+            target_x_values,
+            MissingSamplePolicy::Bridge,
+        ),
+        interpolate_numeric_series(
+            x_values,
+            &longitudes,
+            target_x_values,
+            MissingSamplePolicy::Bridge,
+        ),
     )
 }
 
-// Generates or interpolates timestamps over all target frame times.
+// Interpolates source timestamps, falling back to sync_time only when the
+// activity has no timestamp series at all.
 fn interpolate_time_series(
     sync_time: Option<&str>,
     x_values: &[f64],
     y_values: &TimeSeries,
     target_x_values: &[f64],
 ) -> Vec<Option<String>> {
-    // If the sync time is known, generating timestamps from elapsed seconds
-    // avoids drift caused by sparse or missing source timestamp samples.
+    // The source time series is authoritative. In particular, using sync_time
+    // here would hide a mismatch between the activity start and its actual
+    // timestamp samples and would make the time widget display the wrong time.
+    if y_values.iter().any(Option::is_some) {
+        return target_x_values
+            .iter()
+            .map(|target| interpolate_time_series_value(x_values, y_values, *target))
+            .collect();
+    }
+
+    // sync_time is only a fallback for formats that do not provide absolute
+    // timestamp samples at all.
     if let Some(start_time) = sync_time
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| value.with_timezone(&Utc))
@@ -202,10 +280,7 @@ fn interpolate_time_series(
             .collect();
     }
 
-    target_x_values
-        .iter()
-        .map(|target| interpolate_time_series_value(x_values, y_values, *target))
-        .collect()
+    vec![None; target_x_values.len()]
 }
 
 /// Converts a trimmed activity into frame-aligned render data.
@@ -237,6 +312,7 @@ pub fn densify_activity(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.sample_distance_progress,
                 &frame_elapsed_seconds,
+                MissingSamplePolicy::Bridge,
             )
         };
 
@@ -252,8 +328,8 @@ pub fn densify_activity(
         (Vec::new(), Vec::new())
     };
 
-    // Timestamps use sync_time to generate synthetic values when
-    // available, falling back to interpolation from sparse source samples.
+    // Timestamps use the source time series when available. sync_time is only
+    // used for formats that have no absolute timestamp samples.
     let time = if requirements.time && !trimmed.time.is_empty() {
         interpolate_time_series(
             trimmed.sync_time.as_deref(),
@@ -268,15 +344,18 @@ pub fn densify_activity(
     // ── Phase 3: densify each requested numeric series ───────────────────
     // Empty vectors signal to render code that the series is not needed,
     // avoiding wasted per-frame lookups and allocations.
-    // Interpolation mode (linear vs hold) is read from the manifest per metric.
+    // Resolve each metric's manifest strategy once per series; internal
+    // derived series use their explicit bridge default.
     let densify =
         |x: &[f64], y: &NumericSeries, target: &[f64], enabled: bool, kind: crate::MetricKind| {
             if !enabled || y.is_empty() {
                 return Vec::new();
             }
-            match standard_metric_interpolation(kind) {
-                Some(StandardMetricInterpolationKind::Hold) => densify_hold_series(x, y, target),
-                _ => interpolate_numeric_series(x, y, target),
+            match interpolation_strategy(kind) {
+                InterpolationStrategy::Hold => densify_hold_series(x, y, target),
+                InterpolationStrategy::Numeric(policy) => {
+                    interpolate_numeric_series(x, y, target, policy)
+                }
             }
         };
 
@@ -285,6 +364,7 @@ pub fn densify_activity(
         frame_elapsed_seconds: frame_elapsed_seconds.clone(),
         frame_distance_progress,
         full_activity_distance: trimmed.full_activity_distance,
+        full_activity_total_ascent: trimmed.full_activity_total_ascent,
         series: DenseSeriesReport {
             speed: densify(
                 &trimmed.sample_elapsed_seconds,
@@ -305,6 +385,34 @@ pub fn densify_activity(
                 &trimmed.elevation,
                 &frame_elapsed_seconds,
                 requirements.elevation,
+                crate::MetricKind::Elevation,
+            ),
+            calories: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.calories,
+                &frame_elapsed_seconds,
+                requirements.calories,
+                crate::MetricKind::Calories,
+            ),
+            distance_to_home: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.distance_to_home,
+                &frame_elapsed_seconds,
+                requirements.distance_to_home,
+                crate::MetricKind::DistanceToHome,
+            ),
+            total_ascent: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.total_ascent,
+                &frame_elapsed_seconds,
+                requirements.total_ascent,
+                crate::MetricKind::TotalAscent,
+            ),
+            barometric_altitude: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.barometric_altitude,
+                &frame_elapsed_seconds,
+                requirements.barometric_altitude,
                 crate::MetricKind::Elevation,
             ),
             gradient: densify(
@@ -356,6 +464,36 @@ pub fn densify_activity(
                 requirements.g_force,
                 crate::MetricKind::GForce,
             ),
+            g_force_x: if requirements.g_force_x {
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.g_force_x,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
+            g_force_y: if requirements.g_force_y {
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.g_force_y,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
+            g_force_z: if requirements.g_force_z {
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.g_force_z,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
             rpm: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.rpm,
@@ -432,13 +570,6 @@ pub fn densify_activity(
                 &frame_elapsed_seconds,
                 requirements.vertical_speed,
                 crate::MetricKind::VerticalSpeed,
-            ),
-            altitude: densify(
-                &trimmed.sample_elapsed_seconds,
-                &trimmed.altitude,
-                &frame_elapsed_seconds,
-                requirements.altitude,
-                crate::MetricKind::Altitude,
             ),
             iso: densify(
                 &trimmed.sample_elapsed_seconds,

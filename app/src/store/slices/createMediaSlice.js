@@ -126,6 +126,7 @@ export function createMediaSlice(set, get) {
           fileName: activity.file_name || null,
           sampleCount: activity.metadata?.sample_count ?? 0,
           syncTime: activity.sync_time ?? null,
+          timezone: activity.metadata?.timezone ?? null,
           totalDistanceMeters: activity.metadata?.total_distance_m ?? 0,
           validAttributes: activity.valid_attributes || [],
         }
@@ -177,7 +178,9 @@ export function createMediaSlice(set, get) {
           state.stashedVideoTelemetry = null
           state.activityFilename = null
           state.videoSyncOffsetSeconds = 0
+          state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
+          state.videoSyncTimezoneMode = null
           applyParsedDataToScene(state, activity)
         })
         get().setActivitySummary(activity, { computeVideoSync: false })
@@ -201,7 +204,9 @@ export function createMediaSlice(set, get) {
           state.parsedActivitySource = 'video-telemetry'
           state.stashedVideoTelemetry = null
           state.videoSyncOffsetSeconds = 0
+          state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
+          state.videoSyncTimezoneMode = null
           applyParsedDataToScene(state, stashedVideoTelemetry)
         })
         get().setActivitySummary(get().parsedActivity, { computeVideoSync: false })
@@ -240,7 +245,9 @@ export function createMediaSlice(set, get) {
       } else {
         set((state) => {
           state.videoSyncOffsetSeconds = 0
+          state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
+          state.videoSyncTimezoneMode = null
         })
       }
     },

@@ -22,6 +22,23 @@ function getOptionalRecordValue(record, keys) {
   return null
 }
 
+function getOptionalRecordNumber(record, key) {
+  const raw = record[key]
+  if (raw === undefined || raw === null) return null
+
+  const value = safeNumber(raw)
+  if (value === null) throw new TypeError(`FIT record.${key} must be numeric when present`)
+  return value
+}
+
+function getOptionalRecordNumberFromKeys(record, keys) {
+  for (const key of keys) {
+    if (record[key] !== undefined && record[key] !== null) return getOptionalRecordNumber(record, key)
+  }
+
+  return null
+}
+
 /**
  * Parses fit activity file.
  *
@@ -51,7 +68,8 @@ export default async function parseFitActivityFile(file) {
 
   const raw_samples = records.map((record) => ({
     air_pressure: safeNumber(record.absolute_pressure),
-    altitude: safeNumber(record.enhanced_altitude ?? record.altitude),
+    barometric_altitude: getOptionalRecordNumberFromKeys(record, ['enhanced_altitude', 'altitude']),
+    calories: getOptionalRecordNumber(record, 'calories'),
     cadence: safeNumber(record.cadence),
     core_temperature: safeNumber(record.core_temperature),
     distance: safeNumber(record.distance),

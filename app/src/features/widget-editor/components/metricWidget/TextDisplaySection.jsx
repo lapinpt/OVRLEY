@@ -8,6 +8,11 @@ import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
 import { ToggleField, SelectField, SliderField } from '../widgetFormControls'
 
+const COORDINATE_FORMAT_OPTIONS = [
+  { value: 'dms', label: 'Deg / Min / Sec' },
+  { value: 'ddm', label: 'Deg / Dec Min' },
+]
+
 /**
  * Renders text-specific display controls: font, decimals/balance, icon, units.
  *
@@ -16,22 +21,25 @@ import { ToggleField, SelectField, SliderField } from '../widgetFormControls'
  * @param {Function} props.updateWidgetData - Updates widget data.
  * @param {Function} props.setNumericField - Sets a numeric field.
  */
-export default function TextDisplaySection({ widget, updateWidgetData, setNumericField }) {
+export default function TextDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const definition = getStandardMetricDefinition(widget.type)
   const unitsMode = getStandardMetricUnitsMode(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)
   const showUnits = widget.data.show_units
   const supportsUnitSelection = unitOptions.length > 1
-  const hasDecimalControl = definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
-  const hasBalanceFormat = definition?.formatter === 'balance'
   const isDistanceWidget = widget.type === 'distance'
-  const maxDecimals = isDistanceWidget ? 2 : 1
-  const defaultDecimals = isDistanceWidget ? 1 : 0
+  const supportsDecimalPrecision = ['distance', 'distance_to_home', 'total_ascent'].includes(widget.type)
+  const isCoordinateWidget = widget.type === 'gps_coordinates'
+  const isTotalAscentWidget = widget.type === 'total_ascent'
+  const hasDecimalControl = supportsDecimalPrecision || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
+  const hasBalanceFormat = definition?.formatter === 'balance'
+  const maxDecimals = supportsDecimalPrecision ? 2 : 1
+  const defaultDecimals = supportsDecimalPrecision ? 1 : 0
   const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
 
   return (
     <>
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} />
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
 
       {hasDecimalControl ? (
         <SliderField
@@ -66,9 +74,40 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
         </div>
       ) : null}
 
+      {isCoordinateWidget ? (
+        <div className="grid grid-cols-2 gap-4">
+          <SelectField
+            label="Format"
+            value={getStandardMetricDisplayUnit(widget.type, widget.data)}
+            onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
+            options={unitOptions}
+          />
+          <SelectField
+            label="Coordinates"
+            value={widget.data.coordinate_format}
+            onValueChange={(value) => updateWidgetData(widget.id, { coordinate_format: value })}
+            options={COORDINATE_FORMAT_OPTIONS}
+          />
+        </div>
+      ) : null}
+
+      {isTotalAscentWidget ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between py-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Show Full Ascent</span>
+            <ToggleField
+              checked={widget.data.show_full_ascent}
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_ascent: checked })}
+            />
+          </div>
+        </div>
+      ) : null}
+
       <IconSection
         widget={widget}
         updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
         setNumericField={setNumericField}
         showUnitsToggle={unitsMode !== 'hidden'}
         unitsField={
@@ -84,7 +123,8 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
               selectLabel="Unit"
               value={getStandardMetricDisplayUnit(widget.type, widget.data)}
               onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
-              options={supportsUnitSelection ? unitOptions : undefined}
+              options={isCoordinateWidget ? undefined : supportsUnitSelection ? unitOptions : undefined}
+              showToggle={!isCoordinateWidget}
             />
           ) : null
         }

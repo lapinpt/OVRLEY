@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { OverlayTextWidget } from '@/features/widget-preview/widgets/text/TextPreview'
 
 vi.mock('@/features/widget-preview/shared/useFontMetrics', () => ({
-  useFontMetricsVersion: () => 0,
+  useFontMetrics: () => 0,
 }))
 
 vi.mock('@/features/widget-preview/shared/textMeasurement', async () => {

@@ -56,9 +56,14 @@ pub fn derive_composite_render_plan(
     let sync_offset = scene.composite_sync_offset.ok_or_else(|| {
         CoreError::Config("scene.composite_sync_offset required for composite render".into())
     })?;
-    if !sync_offset.is_finite() || sync_offset < 0.0 {
+    if !sync_offset.is_finite() {
         return Err(CoreError::Config(format!(
-            "scene.composite_sync_offset must be zero or greater: {sync_offset}"
+            "scene.composite_sync_offset must be finite: {sync_offset}"
+        )));
+    }
+    if sync_offset <= -video_duration {
+        return Err(CoreError::Config(format!(
+            "scene.composite_sync_offset ({sync_offset}) must leave a positive overlap with scene.composite_video_duration ({video_duration})"
         )));
     }
     let trim_start = scene.composite_video_trim_start.ok_or_else(|| {
@@ -87,20 +92,37 @@ pub fn derive_composite_render_plan(
             "scene.composite_render_duration must be greater than zero: {render_duration}"
         )));
     }
+    let mut activity_overlap_duration = render_duration;
     if let Some(activity_end) = activity_end {
         if !activity_end.is_finite() || activity_end < 0.0 {
             return Err(CoreError::Config(format!(
                 "Composite activity end must be finite and zero or greater: {activity_end}"
             )));
         }
+        let video_end = sync_offset + render_duration;
+        if sync_offset >= activity_end || video_end <= 0.0 {
+            return Err(CoreError::Config(format!(
+                "Composite video range [{sync_offset}, {video_end}] does not overlap activity range [0, {activity_end}]"
+            )));
+        }
         let max_render_duration = activity_end - sync_offset;
         let overrun = render_duration - max_render_duration;
-        if max_render_duration > 0.0
-            && overrun > 0.0
-            && overrun <= COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS
-        {
-            render_duration = max_render_duration;
+        if sync_offset >= 0.0 {
+            let ends_just_after_activity =
+                overrun > 0.0 && overrun <= COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS;
+            if ends_just_after_activity {
+                render_duration = max_render_duration;
+            }
         }
+        let overlap_start = sync_offset.max(0.0);
+        let overlap_end = activity_end.min(sync_offset + render_duration);
+        activity_overlap_duration = overlap_end - overlap_start;
+
+        scene.start = overlap_start;
+        scene.end = overlap_end;
+    } else {
+        scene.start = sync_offset.max(0.0);
+        scene.end = scene.start + render_duration;
     }
     let requested_codec_id = match scene.ffmpeg.codec {
         CodecSelection::Composite(codec_id) => codec_id,
@@ -112,11 +134,11 @@ pub fn derive_composite_render_plan(
         }
     };
 
-    scene.start = sync_offset;
-    scene.end = sync_offset + render_duration;
     scene.fps = overlay_pipe_fps.as_f64();
     scene.update_rate = std::num::NonZeroU32::MIN;
     let overlay_frame_count = overlay_pipe_fps.frame_count_for_duration(render_duration)?;
+    let blank_leading_frame_count =
+        blank_leading_frame_count(overlay_pipe_fps, sync_offset, overlay_frame_count)?;
     let output_frame_count = u32::try_from(source_fps.frame_count_for_duration(render_duration)?)
         .map_err(|_| {
         CoreError::Encode("Composite output frame count exceeds u32".to_string())
@@ -133,9 +155,34 @@ pub fn derive_composite_render_plan(
         overlay_pipe_fps,
         overlay_frame_count,
         output_frame_count,
+        activity_overlap_duration,
+        blank_leading_frame_count,
         requested_codec_id,
         qsv_full_init_args: scene.ffmpeg.qsv_full_init_args.clone(),
     })
+}
+
+/// Counts output overlay frames whose canonical timeline timestamp precedes
+/// activity time zero, using the canonical rational-FPS duration conversion.
+fn blank_leading_frame_count(fps: Fps, sync_offset: f64, frame_count: u64) -> CoreResult<u64> {
+    if sync_offset >= 0.0 {
+        return Ok(0);
+    }
+    Ok(fps.frame_count_for_duration(-sync_offset)?.min(frame_count))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn counts_negative_lead_in_frames_at_fractional_offsets() {
+        let fps = Fps::new(30, 1).expect("valid fps");
+
+        assert_eq!(blank_leading_frame_count(fps, -0.01, 30).unwrap(), 1);
+        assert_eq!(blank_leading_frame_count(fps, -5.0, 900).unwrap(), 150);
+        assert_eq!(blank_leading_frame_count(fps, -5.01, 900).unwrap(), 151);
+    }
 }
 
 /// Process resources derived from the canonical composite render plan.
@@ -214,7 +261,7 @@ pub(crate) fn verify_composite_source_resolution(
     composite_video_path: &Path,
     scene_width: u32,
     scene_height: u32,
-) -> CoreResult<Option<i32>> {
+) -> CoreResult<(Option<i32>, bool)> {
     if !composite_video_path.is_file() {
         return Err(CoreError::Config(format!(
             "Composite video does not exist: {}",
@@ -257,5 +304,5 @@ pub(crate) fn verify_composite_source_resolution(
         )));
     }
 
-    Ok(metadata.rotation_degrees)
+    Ok((metadata.rotation_degrees, metadata.has_audio))
 }

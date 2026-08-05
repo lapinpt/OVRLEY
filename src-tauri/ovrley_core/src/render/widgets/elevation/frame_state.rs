@@ -9,6 +9,7 @@ use super::super::common::{
 };
 use super::super::types::{ElevationFrameState, NormalizedElevationPlot, WidgetGeometry};
 use super::reduction::project_single_elevation_y;
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::normalize::ValidatedSceneConfig;
 
@@ -36,7 +37,11 @@ pub(crate) fn build_elevation_frame_states(
     } else {
         frame_progress_values(activity, dense_activity, scene)
     };
-    let fallback_elevations = if dense_activity.series.elevation.len() == frame_progress.len() {
+    let dense_elevations = preferred_elevation_series(
+        &dense_activity.series.barometric_altitude,
+        &dense_activity.series.elevation,
+    );
+    let fallback_elevations = if dense_elevations.len() == frame_progress.len() {
         None
     } else {
         Some(interpolate_elevation_for_elapsed_frames(
@@ -64,9 +69,7 @@ pub(crate) fn build_elevation_frame_states(
             )
             .or_else(|| point_at_progress_x(&geometry.points, progress01))
             .unwrap_or((0, 0.0, 0.0));
-            let elevation_m = dense_activity
-                .series
-                .elevation
+            let elevation_m = dense_elevations
                 .get(frame_index)
                 .and_then(|value| *value)
                 .or_else(|| {
@@ -233,6 +236,7 @@ fn interpolate_elevation_for_elapsed_frames(
                 elapsed_seconds,
                 elevations,
                 scene_start + *frame_elapsed,
+                crate::interpolation::MissingSamplePolicy::Bridge,
             )
             .unwrap_or(0.0)
         })

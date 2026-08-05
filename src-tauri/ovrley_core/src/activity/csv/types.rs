@@ -89,6 +89,9 @@ pub(super) enum TimingKind {
     ExplicitUtc,
     /// Bare numeric time paired with an explicit elapsed-time column.
     PairedUnix,
+    /// Time-of-day value paired with a companion Date column for absolute
+    /// timestamps.
+    TimeOfDay,
 }
 
 /// Resolved telemetry layout.

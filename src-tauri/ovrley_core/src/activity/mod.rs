@@ -8,6 +8,7 @@
 
 /// Native CSV extraction into canonical activity columns.
 pub mod csv;
+pub(crate) mod elevation;
 /// Backend-owned post-processing from raw extraction samples to ParsedActivity.
 pub mod finalize;
 /// Interpolation helpers used for numeric, coordinate, and timestamp series.
@@ -24,6 +25,7 @@ use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity}
 use crate::activity::trim::trim_activity;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
+use chrono_tz::Tz;
 use serde_json::Value;
 
 /// Parses frontend activity JSON from either production or debug payload shapes.
@@ -34,7 +36,7 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| CoreError::Activity(format!("Invalid parsedActivity JSON: {error}")))?;
 
-    if value.get("parsed_activity").is_some() {
+    let mut activity = if value.get("parsed_activity").is_some() {
         serde_json::from_value::<DebugPayload>(value)
             .map(|payload| payload.parsed_activity)
             .map_err(|error| {
@@ -44,7 +46,28 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
         serde_json::from_value(value).map_err(|error| {
             CoreError::Activity(format!("Invalid parsedActivity payload: {error}"))
         })
-    }
+    }?;
+    activity.timezone = parse_activity_timezone(&activity.metadata)?;
+    Ok(activity)
+}
+
+fn parse_activity_timezone(metadata: &Value) -> CoreResult<Option<Tz>> {
+    let Some(value) = metadata.get("timezone") else {
+        return Ok(None);
+    };
+    let Some(timezone) = value.as_str() else {
+        if value == &Value::Null {
+            return Ok(None);
+        }
+        return Err(CoreError::Activity(
+            "parsedActivity metadata.timezone must be an IANA timezone string or null".into(),
+        ));
+    };
+    timezone.parse().map(Some).map_err(|_| {
+        CoreError::Activity(format!(
+            "parsedActivity metadata.timezone is not a valid IANA timezone: {timezone}"
+        ))
+    })
 }
 
 /// Trims and densifies parsed activity data for a validated render config.

@@ -8,7 +8,7 @@
 //!       trimming (see [`crate::activity::trim`]), interpolation (see
 //!       [`crate::activity::interpolate`] and [`crate::interpolation`]).
 //!
-//! Allowed dependencies: `serde`, `serde_json`.
+//! Allowed dependencies: `chrono-tz`, `serde`, `serde_json`, and activity metric contracts.
 //! Forbidden dependencies: `render`, `encode`, `commands`.
 //!
 //! Related modules: [`crate::activity::interpolate`] (consumes these types for
@@ -26,15 +26,18 @@
 //! parse-and-prepare phase. The `DenseActivityReport` is read heavily during
 //! per-frame rendering (O(1) lookup via `frame_index`).
 
+use super::elevation::preferred_elevation_series;
+use crate::MetricKind;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+use chrono_tz::Tz;
 use std::collections::BTreeMap;
 
 /// Numeric telemetry series aligned with `sample_elapsed_seconds`.
 ///
 /// `None` means the source file had no valid value for that sample. Consumers
-/// interpolate through available values and preserve empty vectors for series
-/// that a template did not request.
+/// apply the metric's interpolation policy and preserve empty vectors for
+/// series that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
 
 /// Canonical string gear observations aligned with `sample_elapsed_seconds`.
@@ -130,6 +133,8 @@ pub struct ActivityColumns {
     pub file_name: String,
     pub file_format: String,
     pub metadata: Value,
+    /// Optional source-provided activity start instant, normalized by the finalizer.
+    pub sync_time: Option<String>,
     pub options: RawActivityOptions,
     /// Direct metrics whose intentional source gaps must remain available for interpolation.
     pub preserve_direct_metric_gaps: DirectMetricGapPolicy,
@@ -138,7 +143,7 @@ pub struct ActivityColumns {
     pub latitude: NumericSeries,
     pub longitude: NumericSeries,
     pub elevation: NumericSeries,
-    pub altitude: NumericSeries,
+    pub barometric_altitude: NumericSeries,
     pub speed: NumericSeries,
     pub heading: NumericSeries,
     pub heartrate: NumericSeries,
@@ -148,6 +153,7 @@ pub struct ActivityColumns {
     pub gradient: NumericSeries,
     pub pace: NumericSeries,
     pub distance: NumericSeries,
+    pub distance_to_home: NumericSeries,
     pub g_force: NumericSeries,
     pub g_force_x: NumericSeries,
     pub g_force_y: NumericSeries,
@@ -165,6 +171,7 @@ pub struct ActivityColumns {
     pub left_right_balance: NumericSeries,
     pub core_temperature: NumericSeries,
     pub air_pressure: NumericSeries,
+    pub calories: NumericSeries,
     pub gear_position: GearSeries,
     pub iso: NumericSeries,
     pub aperture: NumericSeries,
@@ -213,9 +220,9 @@ pub struct RawSample {
     /// Elevation used by route/elevation/gradient widgets.
     #[serde(default)]
     pub elevation: Option<f64>,
-    /// Alternate altitude channel preserved as its own metric.
+    /// Barometric altitude in meters when the source identifies it explicitly.
     #[serde(default)]
-    pub altitude: Option<f64>,
+    pub barometric_altitude: Option<f64>,
     /// Direct source speed in meters per second.
     #[serde(default)]
     pub speed: Option<f64>,
@@ -234,6 +241,9 @@ pub struct RawSample {
     /// Ambient/device temperature in Celsius.
     #[serde(default)]
     pub temperature: Option<f64>,
+    /// Cumulative energy expenditure in kilocalories.
+    #[serde(default)]
+    pub calories: Option<f64>,
     /// Direct source gradient when available; standard derivation may override.
     #[serde(default)]
     pub gradient: Option<f64>,
@@ -315,6 +325,9 @@ pub struct ParsedActivity {
     /// Parser-provided metadata preserved for diagnostics and future widgets.
     #[serde(default)]
     pub metadata: Value,
+    /// Parsed IANA timezone from `metadata.timezone`, when GPS metadata provides one.
+    #[serde(skip)]
+    pub timezone: Option<Tz>,
     /// Canonical absolute timestamp for activity/video time zero.
     #[serde(default)]
     pub sync_time: Option<String>,
@@ -351,6 +364,18 @@ pub struct ParsedActivity {
     /// Elevation in meters.
     #[serde(default)]
     pub elevation: NumericSeries,
+    /// Cumulative energy expenditure in kilocalories.
+    #[serde(default)]
+    pub calories: NumericSeries,
+    /// Surface distance from the first valid GPS coordinate in meters.
+    #[serde(default)]
+    pub distance_to_home: NumericSeries,
+    /// Cumulative positive elevation gain in meters.
+    #[serde(default)]
+    pub total_ascent: NumericSeries,
+    /// Barometric altitude in meters when available.
+    #[serde(default)]
+    pub barometric_altitude: NumericSeries,
     /// Speed in meters per second.
     #[serde(default)]
     pub speed: NumericSeries,
@@ -420,9 +445,6 @@ pub struct ParsedActivity {
     /// Vertical speed in meters per second.
     #[serde(default)]
     pub vertical_speed: NumericSeries,
-    /// Altitude in meters (from SRT `abs_alt`).
-    #[serde(default)]
-    pub altitude: NumericSeries,
     /// ISO sensitivity.
     #[serde(default)]
     pub iso: NumericSeries,
@@ -493,6 +515,8 @@ pub struct DenseActivityReport {
     pub frame_distance_progress: Vec<Option<f64>>,
     /// Final source-activity distance from the parsed distance series.
     pub full_activity_distance: Option<f64>,
+    /// Final source-activity cumulative positive elevation gain.
+    pub full_activity_total_ascent: Option<f64>,
     /// Densified telemetry vectors used by text values and widgets.
     pub series: DenseSeriesReport,
 }
@@ -506,6 +530,14 @@ pub struct DenseSeriesReport {
     pub distance: Vec<Option<f64>>,
     /// Elevation in meters.
     pub elevation: Vec<Option<f64>>,
+    /// Cumulative energy expenditure in kilocalories.
+    pub calories: Vec<Option<f64>>,
+    /// Surface distance from the first valid GPS coordinate in meters.
+    pub distance_to_home: Vec<Option<f64>>,
+    /// Cumulative positive elevation gain in meters.
+    pub total_ascent: Vec<Option<f64>>,
+    /// Barometric altitude in meters.
+    pub barometric_altitude: Vec<Option<f64>>,
     /// Gradient in percent.
     pub gradient: Vec<Option<f64>>,
     /// Heart rate in beats per minute.
@@ -520,6 +552,12 @@ pub struct DenseSeriesReport {
     pub pace: Vec<Option<f64>>,
     /// G-force in multiples of Earth gravity.
     pub g_force: Vec<Option<f64>>,
+    /// Source X acceleration in multiples of Earth gravity.
+    pub g_force_x: Vec<Option<f64>>,
+    /// Source Y acceleration in multiples of Earth gravity.
+    pub g_force_y: Vec<Option<f64>>,
+    /// Source Z acceleration in multiples of Earth gravity.
+    pub g_force_z: Vec<Option<f64>>,
     /// Engine speed in revolutions per minute.
     pub rpm: Vec<Option<f64>>,
     /// Accelerator or throttle position as percent.
@@ -542,8 +580,6 @@ pub struct DenseSeriesReport {
     pub torque: Vec<Option<f64>>,
     /// Vertical speed in meters per second.
     pub vertical_speed: Vec<Option<f64>>,
-    /// Altitude in meters.
-    pub altitude: Vec<Option<f64>>,
     /// ISO sensitivity.
     pub iso: Vec<Option<f64>>,
     /// Aperture f-number.
@@ -574,6 +610,59 @@ pub struct DenseSeriesReport {
     pub time: Vec<Option<String>>,
 }
 
+impl DenseSeriesReport {
+    /// Returns the canonical numeric dense series for a metric.
+    ///
+    /// `None` means the metric has no numeric dense series. A returned empty
+    /// slice therefore continues to distinguish an unavailable metric from a
+    /// present series containing missing frame samples.
+    pub(crate) fn numeric_series_for(&self, metric: MetricKind) -> Option<&[Option<f64>]> {
+        match metric {
+            MetricKind::Speed => Some(&self.speed),
+            MetricKind::Distance => Some(&self.distance),
+            MetricKind::Elevation => Some(&self.elevation),
+            MetricKind::Gradient => Some(&self.gradient),
+            MetricKind::Heartrate => Some(&self.heartrate),
+            MetricKind::Cadence => Some(&self.cadence),
+            MetricKind::Power => Some(&self.power),
+            MetricKind::Temperature => Some(&self.temperature),
+            MetricKind::Calories => Some(&self.calories),
+            MetricKind::Pace => Some(&self.pace),
+            MetricKind::GForce => Some(&self.g_force),
+            MetricKind::AirPressure => Some(&self.air_pressure),
+            MetricKind::GroundContactTime => Some(&self.ground_contact_time),
+            MetricKind::LeftRightBalance => Some(&self.left_right_balance),
+            MetricKind::StrideLength => Some(&self.stride_length),
+            MetricKind::StrokeRate => Some(&self.stroke_rate),
+            MetricKind::Torque => Some(&self.torque),
+            MetricKind::VerticalSpeed => Some(&self.vertical_speed),
+            MetricKind::VerticalRatio => Some(&self.vertical_ratio),
+            MetricKind::VerticalOscillation => Some(&self.vertical_oscillation),
+            MetricKind::CoreTemperature => Some(&self.core_temperature),
+            MetricKind::Heading => Some(&self.heading),
+            MetricKind::Altitude => Some(preferred_elevation_series(
+                &self.barometric_altitude,
+                &self.elevation,
+            )),
+            MetricKind::Iso => Some(&self.iso),
+            MetricKind::Aperture => Some(&self.aperture),
+            MetricKind::ShutterSpeed => Some(&self.shutter_speed),
+            MetricKind::FocalLength => Some(&self.focal_length),
+            MetricKind::Ev => Some(&self.ev),
+            MetricKind::ColorTemperature => Some(&self.color_temperature),
+            MetricKind::Rpm => Some(&self.rpm),
+            MetricKind::ThrottlePosition => Some(&self.throttle_position),
+            MetricKind::BrakePosition => Some(&self.brake_position),
+            MetricKind::LeanAngle => Some(&self.lean_angle),
+            MetricKind::DistanceToHome => Some(&self.distance_to_home),
+            MetricKind::TotalAscent => Some(&self.total_ascent),
+            MetricKind::GearPosition
+            | MetricKind::GpsCoordinates
+            | MetricKind::Time => None,
+        }
+    }
+}
+
 /// Activity samples after applying a scene trim but before per-frame densifying.
 ///
 /// The first elapsed value is always `0.0`, and the last is `end - start`.
@@ -591,6 +680,16 @@ pub struct TrimmedActivity {
     pub course: CourseSeries,
     /// Trimmed elevation samples in meters.
     pub elevation: NumericSeries,
+    /// Trimmed cumulative energy expenditure in kilocalories.
+    pub calories: NumericSeries,
+    /// Trimmed surface distance from the first valid GPS coordinate in meters.
+    pub distance_to_home: NumericSeries,
+    /// Trimmed cumulative positive elevation gain in meters.
+    pub total_ascent: NumericSeries,
+    /// Full-activity cumulative positive elevation gain in meters.
+    pub full_activity_total_ascent: Option<f64>,
+    /// Trimmed barometric-altitude samples in meters.
+    pub barometric_altitude: NumericSeries,
     /// Trimmed speed samples in meters per second.
     pub speed: NumericSeries,
     /// Trimmed cumulative distance samples in meters.
@@ -607,6 +706,12 @@ pub struct TrimmedActivity {
     pub pace: NumericSeries,
     /// Trimmed g-force samples.
     pub g_force: NumericSeries,
+    /// Trimmed source X acceleration samples in multiples of Earth gravity.
+    pub g_force_x: NumericSeries,
+    /// Trimmed source Y acceleration samples in multiples of Earth gravity.
+    pub g_force_y: NumericSeries,
+    /// Trimmed source Z acceleration samples in multiples of Earth gravity.
+    pub g_force_z: NumericSeries,
     /// Trimmed engine speed samples in revolutions per minute.
     pub rpm: NumericSeries,
     /// Trimmed accelerator or throttle position samples as percent.
@@ -629,8 +734,6 @@ pub struct TrimmedActivity {
     pub torque: NumericSeries,
     /// Trimmed vertical speed samples in meters per second.
     pub vertical_speed: NumericSeries,
-    /// Trimmed altitude samples in meters.
-    pub altitude: NumericSeries,
     /// Trimmed ISO samples.
     pub iso: NumericSeries,
     /// Trimmed aperture samples.

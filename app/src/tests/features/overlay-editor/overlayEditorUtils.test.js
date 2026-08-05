@@ -3,13 +3,14 @@
  * playback clock. Covers the same behavior previously tested through
  * getEffectivePreviewFps before it was inlined.
  *
- * Also tests interpolated activity value retrieval with linear and hold
- * interpolation modes.
+ * Also tests interpolated activity value retrieval with linear, hold, and
+ * preserve interpolation modes.
  */
 
 import { describe, expect, test } from 'vitest'
 import { getContainerFps } from '@/lib/update-rate'
-import { getInterpolatedActivityValue } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue, getMetricSeries } from '@/features/overlay-editor'
+import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 
 describe('getContainerFps', () => {
   test('returns a number for common FPS and update rate combinations', () => {
@@ -35,11 +36,28 @@ describe('getContainerFps', () => {
   })
 })
 
+describe('getMetricSeries', () => {
+  test('uses manifest data sources and prefers barometric altitude when present', () => {
+    const barometricAltitude = [null, 101]
+    const elevation = [10, 20]
+    const activity = {
+      barometric_altitude: barometricAltitude,
+      elevation,
+      distance: [0, 5],
+    }
+
+    expect(getMetricSeries(activity, 'altitude')).toBe(barometricAltitude)
+    expect(getMetricSeries(activity, 'distance')).toBe(activity.distance)
+    expect(getMetricSeries({ elevation }, 'altitude')).toBe(elevation)
+  })
+})
+
 describe('getInterpolatedActivityValue — hold interpolation', () => {
   const baseActivity = {
+    trim_end_seconds: 4,
     sample_elapsed_seconds: [0, 1, 2, 3, 4],
     iso: [100, 200, 400, 800, 1600],
-    altitude: [10, 20, 30, 40, 50],
+    elevation: [10, 20, 30, 40, 50],
   }
 
   test('hold metric returns last known value at or before elapsedSecond, not interpolated', () => {
@@ -57,11 +75,12 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     expect(getInterpolatedActivityValue(baseActivity, 'altitude', 1.2)).toBe(22)
   })
 
-  test('hold metric clamps to the first sample before the first sample time', () => {
-    expect(getInterpolatedActivityValue(baseActivity, 'iso', -1)).toBe(100)
+  test('activity-backed values use the default before the activity starts', () => {
+    expect(getInterpolatedActivityValue(getPreviewActivity(baseActivity, -1), 'iso', -1)).toBeNull()
     expect(
       getInterpolatedActivityValue(
         {
+          trim_end_seconds: 0.5,
           sample_elapsed_seconds: [0.110097, 0.5],
           iso: [100, 200],
         },
@@ -71,8 +90,8 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     ).toBe(100)
   })
 
-  test('hold metric returns last sample for elapsedSecond beyond last sample', () => {
-    expect(getInterpolatedActivityValue(baseActivity, 'iso', 5)).toBe(1600)
+  test('activity-backed values use the default after the activity ends', () => {
+    expect(getInterpolatedActivityValue(getPreviewActivity(baseActivity, 5), 'iso', 5)).toBeNull()
   })
 
   test('hold metric returns null when series missing', () => {
@@ -85,16 +104,52 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
   })
 
   test('hold metric returns null when series key is missing from activity', () => {
-    const emptyActivity = { sample_elapsed_seconds: [0, 1] }
+    const emptyActivity = { trim_end_seconds: 1, sample_elapsed_seconds: [0, 1] }
     expect(getInterpolatedActivityValue(emptyActivity, 'iso', 1)).toBeNull()
+  })
+
+  test('preserve metric with an unavailable empty series remains missing', () => {
+    expect(
+      getInterpolatedActivityValue(
+        {
+          trim_end_seconds: 1,
+          sample_elapsed_seconds: [0, 1],
+          cadence: [],
+        },
+        'cadence',
+        0.5,
+      ),
+    ).toBeNull()
   })
 
   test('hold metric with sparse data returns last known value skipping nulls', () => {
     const sparseActivity = {
+      trim_end_seconds: 4,
       sample_elapsed_seconds: [0, 1, 2, 3, 4],
       iso: [100, null, null, 800, null],
     }
     expect(getInterpolatedActivityValue(sparseActivity, 'iso', 1.5)).toBe(100)
     expect(getInterpolatedActivityValue(sparseActivity, 'iso', 3.5)).toBe(800)
+  })
+})
+
+describe('getInterpolatedTimeValue', () => {
+  test('exposes activity only for elapsed seconds inside its preview range', () => {
+    const activity = { trim_end_seconds: 4 }
+
+    expect(getPreviewActivity(activity, -1)).toBeNull()
+    expect(getPreviewActivity(activity, 4)).toBe(activity)
+    expect(getPreviewActivity(activity, 5)).toBeNull()
+  })
+
+  test('uses the source time series before sync_time', () => {
+    const activity = {
+      trim_end_seconds: 60,
+      sample_elapsed_seconds: [0, 60],
+      sync_time: '2026-07-18T08:20:03.000Z',
+      time: ['2026-07-18T07:20:03.000Z', '2026-07-18T07:21:03.000Z'],
+    }
+
+    expect(getInterpolatedTimeValue(activity, 60)).toBe('2026-07-18T07:21:03.000Z')
   })
 })

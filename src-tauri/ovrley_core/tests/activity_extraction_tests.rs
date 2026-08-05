@@ -8,7 +8,7 @@ use ovrley_core::media::mp4_telemetry;
 #[ignore = "requires video fixtures under tests/fixtures/video/"]
 fn extract_activity_from_telemetry_fixtures() {
     let known_sync_times: HashMap<&str, &str> = [
-        ("DJI-telemetry.MP4", "2026-03-15T23:58:14+00:00"),
+        ("DJI-telemetry.MP4", "2026-03-15T15:58:14+00:00"),
         ("GoPro-telemetry.MP4", "2024-08-05T12:28:30.063903+00:00"),
     ]
     .iter()
@@ -31,16 +31,9 @@ fn extract_activity_from_telemetry_fixtures() {
             .and_then(|s| s.to_str())
             .unwrap_or("video");
 
-        let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
-            .unwrap_or_else(|err| panic!("{stem}: probe failed: {err}"));
-
-        let fps = metadata.fps.unwrap_or(30.0);
-        let duration_s = metadata.duration.unwrap_or(0.0);
-
-        let response =
-            mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap(), fps, duration_s)
-                .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
-                .unwrap_or_else(|| panic!("{stem}: expected activity, got None"));
+        let response = mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
+            .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
+            .unwrap_or_else(|| panic!("{stem}: expected activity, got None"));
 
         // Write artifact
         fs::write(
@@ -171,12 +164,6 @@ fn extract_activity_from_telemetry_fixtures() {
             activity.trim_start_seconds, 0.0,
             "{stem}: trim_start_seconds must be 0"
         );
-        assert!(
-            activity.trim_end_seconds >= duration_s - 0.1,
-            "{stem}: trim_end {end} must cover probe duration {duration_s}",
-            end = activity.trim_end_seconds
-        );
-
         // Distance progress must be non-decreasing and end near 1.0
         let last_progress = activity
             .sample_distance_progress

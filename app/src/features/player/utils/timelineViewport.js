@@ -3,7 +3,7 @@
  */
 
 import { clamp } from '@/lib/utils'
-import { formatTimelineTime } from './playerTiming'
+import { formatTimelineTime, getTimelineMinimum } from './playerTiming'
 import { secondsToViewPx } from './timelineGeometry'
 
 const VIEWPORT_MATCH_EPSILON_SECONDS = 0.001
@@ -15,6 +15,14 @@ const TICK_TARGET_PX = 90
 const MAX_ZOOM_MAJOR_STEP_SECONDS = 2
 const FOLLOW_EDGE_PADDING_RATIO = 0.15
 const NICE_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200, 1500, 1800, 3600]
+
+function getTimelineBounds(timelineMinimum, totalDuration) {
+  return {
+    start: timelineMinimum,
+    end: totalDuration,
+    span: totalDuration - timelineMinimum,
+  }
+}
 
 /**
  * Compares two viewports with a small tolerance.
@@ -29,29 +37,30 @@ export function rangesMatch(a, b) {
 }
 
 /**
- * Clamps a viewport so it stays within [0, totalDuration].
+ * Clamps a viewport so it stays within [timelineMinimum, totalDuration].
  *
  * @param {number} viewStart Visible window start in seconds.
  * @param {number} viewEnd Visible window end in seconds.
- * @param {number} totalDuration Total playable duration in seconds.
+ * @param {number} totalDuration Timeline end in seconds.
+ * @param {number} [timelineMinimum=0] Timeline start in seconds.
  * @returns {{ viewStart: number, viewEnd: number }} Clamped viewport.
  */
-export function clampToView(viewStart, viewEnd, totalDuration) {
-  const safe = Math.max(0, Number(totalDuration) || 0)
-  const span = clamp(viewEnd - viewStart, 0, safe)
-  const clampedStart = clamp(viewStart, 0, Math.max(0, safe - span))
+export function clampToView(viewStart, viewEnd, totalDuration, timelineMinimum = 0) {
+  const bounds = getTimelineBounds(timelineMinimum, totalDuration)
+  const span = clamp(viewEnd - viewStart, 0, bounds.span)
+  const clampedStart = clamp(viewStart, bounds.start, bounds.end - span)
   return { viewStart: clampedStart, viewEnd: clampedStart + span }
 }
 
 /**
  * Fits the viewport to the full playable range.
  *
- * @param {number} totalDuration Total playable duration in seconds.
+ * @param {number} totalDuration Timeline end in seconds.
+ * @param {number} [timelineMinimum=0] Timeline start in seconds.
  * @returns {{ viewStart: number, viewEnd: number }} Full-range viewport.
  */
-export function fitToFull(totalDuration) {
-  const safe = Math.max(0, Number(totalDuration) || 0)
-  return { viewStart: 0, viewEnd: safe }
+export function fitToFull(totalDuration, timelineMinimum = 0) {
+  return { viewStart: timelineMinimum, viewEnd: totalDuration }
 }
 
 function getMinimumZoomSpan(widthPx) {
@@ -63,29 +72,29 @@ function getMinimumZoomSpan(widthPx) {
 /**
  * Zooms the viewport by a factor around a pivot point.
  *
- * @param {{ viewStart: number, viewEnd: number, pivot: number, direction: 1|-1, totalDuration: number, widthPx?: number }} options
+ * @param {{ viewStart: number, viewEnd: number, pivot: number, direction: 1|-1, totalDuration: number, timelineMinimum?: number, widthPx?: number }} options
  * @returns {{ viewStart: number, viewEnd: number }} Zoomed viewport.
  */
-export function zoomRange({ viewStart, viewEnd, pivot, direction, totalDuration, widthPx = 0 }) {
-  const safeTotal = Math.max(0, Number(totalDuration) || 0)
+export function zoomRange({ viewStart, viewEnd, pivot, direction, totalDuration, timelineMinimum = 0, widthPx = 0 }) {
+  const bounds = getTimelineBounds(timelineMinimum, totalDuration)
   const span = viewEnd - viewStart
-  const clampedPivot = clamp(Number(pivot) || 0, viewStart, viewEnd)
+  const clampedPivot = clamp(pivot, viewStart, viewEnd)
   const ratio = span > 0 ? (clampedPivot - viewStart) / span : 0.5
-  const minSpan = Math.min(getMinimumZoomSpan(widthPx), safeTotal)
+  const minSpan = Math.min(getMinimumZoomSpan(widthPx), bounds.span)
 
   const factor = direction >= 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR
-  let newSpan = clamp(span * factor, minSpan, safeTotal)
+  const newSpan = clamp(span * factor, minSpan, bounds.span)
 
   let newStart = clampedPivot - ratio * newSpan
   let newEnd = newStart + newSpan
 
-  if (newStart < 0) {
-    newStart = 0
-    newEnd = newSpan
+  if (newStart < bounds.start) {
+    newStart = bounds.start
+    newEnd = bounds.start + newSpan
   }
-  if (newEnd > safeTotal) {
-    newEnd = safeTotal
-    newStart = Math.max(0, safeTotal - newSpan)
+  if (newEnd > bounds.end) {
+    newEnd = bounds.end
+    newStart = bounds.end - newSpan
   }
 
   return { viewStart: newStart, viewEnd: newEnd }
@@ -94,36 +103,37 @@ export function zoomRange({ viewStart, viewEnd, pivot, direction, totalDuration,
 /**
  * Fits the viewport to a target range with padding and clamping.
  *
- * @param {{ rangeStart: number, rangeEnd: number, totalDuration: number }} options
+ * @param {{ rangeStart: number, rangeEnd: number, totalDuration: number, timelineMinimum?: number, widthPx?: number }} options
  * @returns {{ viewStart: number, viewEnd: number }} Fitted viewport.
  */
-export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration }) {
-  const safeTotal = Math.max(0, Number(totalDuration) || 0)
-  const safeStart = Math.max(0, Number(rangeStart) || 0)
-  const safeEnd = Math.min(safeTotal, Math.max(safeStart, Number(rangeEnd) || 0))
-  const rangeSpan = safeEnd - safeStart
+export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration, timelineMinimum = 0, widthPx = 0 }) {
+  const bounds = getTimelineBounds(timelineMinimum, totalDuration)
+  const start = clamp(rangeStart, bounds.start, bounds.end)
+  const end = clamp(Math.max(start, rangeEnd), start, bounds.end)
+  const rangeSpan = end - start
   const padding = rangeSpan * FIT_PADDING_RATIO
 
-  let viewStart = safeStart - padding
-  let viewEnd = safeEnd + padding
+  let viewStart = start - padding
+  let viewEnd = end + padding
   let span = viewEnd - viewStart
 
-  if (span < FIT_MIN_SPAN && safeTotal >= FIT_MIN_SPAN) {
-    const halfExtra = (FIT_MIN_SPAN - span) / 2
+  const minimumSpan = Math.min(Math.max(FIT_MIN_SPAN, getMinimumZoomSpan(widthPx)), bounds.span)
+  if (span < minimumSpan) {
+    const halfExtra = (minimumSpan - span) / 2
     viewStart -= halfExtra
     viewEnd += halfExtra
-    span = FIT_MIN_SPAN
+    span = minimumSpan
   }
 
-  span = Math.min(span, safeTotal)
+  span = Math.min(span, bounds.span)
 
-  if (viewStart < 0) {
-    viewStart = 0
-    viewEnd = span
+  if (viewStart < bounds.start) {
+    viewStart = bounds.start
+    viewEnd = bounds.start + span
   }
-  if (viewEnd > safeTotal) {
-    viewEnd = safeTotal
-    viewStart = Math.max(0, safeTotal - span)
+  if (viewEnd > bounds.end) {
+    viewEnd = bounds.end
+    viewStart = bounds.end - span
   }
 
   return { viewStart, viewEnd }
@@ -132,27 +142,27 @@ export function fitRangeToViewport({ rangeStart, rangeEnd, totalDuration }) {
 /**
  * Shifts the viewport by a delta in seconds.
  *
- * @param {{ viewStart: number, viewEnd: number, deltaSeconds: number, totalDuration: number }} options
+ * @param {{ viewStart: number, viewEnd: number, deltaSeconds: number, totalDuration: number, timelineMinimum?: number }} options
  * @returns {{ viewStart: number, viewEnd: number }} Panned viewport.
  */
-export function panViewport({ viewStart, viewEnd, deltaSeconds, totalDuration }) {
-  const safeTotal = Math.max(0, Number(totalDuration) || 0)
-  if (safeTotal <= 0) return { viewStart: 0, viewEnd: 0 }
+export function panViewport({ viewStart, viewEnd, deltaSeconds, totalDuration, timelineMinimum = 0 }) {
+  const bounds = getTimelineBounds(timelineMinimum, totalDuration)
+  if (bounds.span === 0) return { viewStart: bounds.start, viewEnd: bounds.end }
   const span = viewEnd - viewStart
-  if (span >= safeTotal) return { viewStart, viewEnd }
-  return clampToView(viewStart + deltaSeconds, viewEnd + deltaSeconds, safeTotal)
+  if (span >= bounds.span) return { viewStart, viewEnd }
+  return clampToView(viewStart + deltaSeconds, viewEnd + deltaSeconds, bounds.end, bounds.start)
 }
 
 /**
  * Computes a viewport that keeps the playhead visible during playback.
  *
- * @param {{ playheadSecond: number, viewStart: number, viewEnd: number, totalDuration: number }} options
+ * @param {{ playheadSecond: number, viewStart: number, viewEnd: number, totalDuration: number, timelineMinimum?: number }} options
  * @returns {{ viewStart: number, viewEnd: number }} Updated viewport.
  */
-export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDuration }) {
-  const safeTotal = Math.max(0, Number(totalDuration) || 0)
+export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDuration, timelineMinimum = 0 }) {
+  const bounds = getTimelineBounds(timelineMinimum, totalDuration)
   const span = viewEnd - viewStart
-  if (span <= 0 || span >= safeTotal) return { viewStart, viewEnd }
+  if (span <= 0 || span >= bounds.span) return { viewStart, viewEnd }
 
   const followStart = viewStart + FOLLOW_EDGE_PADDING_RATIO * span
   const followEnd = viewEnd - FOLLOW_EDGE_PADDING_RATIO * span
@@ -160,17 +170,18 @@ export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDurati
 
   const playheadOffsetRatio = playheadSecond < followStart ? FOLLOW_EDGE_PADDING_RATIO : 1 - FOLLOW_EDGE_PADDING_RATIO
   const newStart = playheadSecond - playheadOffsetRatio * span
-  return clampToView(newStart, newStart + span, safeTotal)
+  return clampToView(newStart, newStart + span, bounds.end, bounds.start)
 }
 
 /**
  * Builds canonical fit targets for the current media shape.
  *
- * @param {{ totalDuration: number, hasVideo: boolean, videoSyncOffsetSeconds: number, importedVideoDuration: number, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
+ * @param {{ totalDuration: number, widthPx?: number, hasVideo: boolean, videoSyncOffsetSeconds: number, importedVideoDuration: number, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
  * @returns {Array<{ id: 'all'|'video'|'activity', label: string, viewport: { viewStart: number, viewEnd: number } }>}
  */
 export function buildFitTargets({
   totalDuration,
+  widthPx = 0,
   hasVideo,
   videoSyncOffsetSeconds,
   importedVideoDuration,
@@ -179,32 +190,34 @@ export function buildFitTargets({
   fallbackDurationSeconds,
 }) {
   const targets = []
-  let longestComponentDuration = 0
+  const timelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds })
+  const componentRanges = []
 
   if (hasVideo) {
-    const start = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
-    const duration = Number(importedVideoDuration) || 0
+    const start = videoSyncOffsetSeconds
+    const duration = importedVideoDuration
     const end = start + duration
-    longestComponentDuration = Math.max(longestComponentDuration, duration)
+    componentRanges.push({ start, end })
     targets.push({
       id: 'video',
       label: 'Video',
-      viewport: fitRangeToViewport({ rangeStart: start, rangeEnd: end, totalDuration }),
+      viewport: fitRangeToViewport({ rangeStart: start, rangeEnd: end, timelineMinimum, totalDuration, widthPx }),
     })
   }
 
   if (hasActivityData) {
     const duration = activityDurationSeconds > 0 ? activityDurationSeconds : fallbackDurationSeconds
-    longestComponentDuration = Math.max(longestComponentDuration, duration)
+    componentRanges.push({ start: 0, end: duration })
     targets.push({
       id: 'activity',
       label: 'Activity',
-      viewport: fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, totalDuration }),
+      viewport: fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, timelineMinimum, totalDuration, widthPx }),
     })
   }
 
-  if (totalDuration > longestComponentDuration) {
-    targets.unshift({ id: 'all', label: 'All', viewport: fitToFull(totalDuration) })
+  const coversFullTimeline = componentRanges.some(({ start, end }) => start <= timelineMinimum && end >= totalDuration)
+  if (!coversFullTimeline) {
+    targets.unshift({ id: 'all', label: 'All', viewport: fitToFull(totalDuration, timelineMinimum) })
   }
 
   return targets

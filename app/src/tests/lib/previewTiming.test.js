@@ -1,18 +1,12 @@
 import { describe, expect, test } from 'vitest'
 
-import { buildPreviewFrameWindow, resolveActivityDuration, resolvePreviewSecond } from '@/lib/preview-timing'
+import { buildPreviewFrameWindow, resolveActivityDuration } from '@/lib/preview-timing'
 
 describe('preview timing helpers', () => {
   test('resolveActivityDuration prefers trim_end_seconds and falls back to dummy duration', () => {
     expect(resolveActivityDuration({ sourceActivity: { trim_end_seconds: 42 } })).toBe(42)
     expect(resolveActivityDuration({ sourceActivity: { metadata: { duration_seconds: 18 } } })).toBe(18)
     expect(resolveActivityDuration({ fallbackDurationSeconds: 9, sourceActivity: null })).toBe(9)
-  })
-
-  test('resolvePreviewSecond clamps the selected second to the activity duration', () => {
-    expect(resolvePreviewSecond({ fallbackDurationSeconds: 10, selectedSecond: 12, sourceActivity: null })).toBe(10)
-    expect(resolvePreviewSecond({ fallbackDurationSeconds: 10, selectedSecond: -2, sourceActivity: null })).toBe(0)
-    expect(resolvePreviewSecond({ selectedSecond: 4.25, sourceActivity: { trim_end_seconds: 12 } })).toBe(4.25)
   })
 
   test('buildPreviewFrameWindow creates a valid one-frame render window around the preview second', () => {

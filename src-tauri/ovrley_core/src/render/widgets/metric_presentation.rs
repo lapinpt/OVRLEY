@@ -10,7 +10,7 @@
 //! - `type` (MetricKind) selects the telemetry data source.
 //! - `display_type` (DisplayType) selects the visual presentation.
 //! - Intrinsic text rendering stays in the value module.
-//! - Boxed metric presentations (heading_tape, linear, arc, and corner)
+//! - Boxed metric presentations (heading_tape, lean_angle, linear, arc, and corner)
 //!   are dispatched here.
 //!
 //! Route and elevation remain separate true graphical widgets outside this
@@ -19,9 +19,11 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::render::text::ResolvedTextStyle;
+use crate::render::widgets::g_force::draw_g_force_widget;
 use crate::render::widgets::gauges::arc::draw_arc_gauge_widget;
 use crate::render::widgets::gauges::linear::draw_linear_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
+use crate::render::widgets::lean_angle::draw_lean_angle_widget;
 use crate::render::widgets::types::{PresentationCache, WidgetRenderReport};
 use crate::types::{DisplayType, MetricKind};
 use skia_safe::Canvas;
@@ -75,7 +77,77 @@ pub fn draw_metric_presentation(
             frame_index,
             frame_profiler,
         ),
+        DisplayType::LeanAngle => draw_lean_angle_presentation(
+            canvas,
+            metric_kind,
+            presentation_caches.get(&value_idx),
+            dense_activity,
+            frame_index,
+            scale,
+            font_dirs,
+            frame_profiler,
+        ),
+        DisplayType::GForce => draw_g_force_presentation(
+            canvas,
+            metric_kind,
+            presentation_caches.get(&value_idx),
+            frame_index,
+            font_dirs,
+            frame_profiler,
+        ),
     }
+}
+
+fn draw_g_force_presentation(
+    canvas: &Canvas,
+    metric_kind: MetricKind,
+    cache: Option<&PresentationCache>,
+    frame_index: usize,
+    font_dirs: &[std::path::PathBuf],
+    frame_profiler: &mut RenderProfiler,
+) -> Option<WidgetRenderReport> {
+    assert_eq!(
+        metric_kind,
+        MetricKind::GForce,
+        "g_force display type requires the g_force metric"
+    );
+    let Some(PresentationCache::GForce(g_force_cache)) = cache else {
+        panic!("g_force presentation requires its prepared GForce cache");
+    };
+    draw_g_force_widget(
+        canvas,
+        g_force_cache,
+        frame_index,
+        font_dirs,
+        frame_profiler,
+    )
+}
+
+fn draw_lean_angle_presentation(
+    canvas: &Canvas,
+    metric_kind: MetricKind,
+    cache: Option<&PresentationCache>,
+    dense_activity: &DenseActivityReport,
+    frame_index: usize,
+    scale: f32,
+    font_dirs: &[std::path::PathBuf],
+    frame_profiler: &mut RenderProfiler,
+) -> Option<WidgetRenderReport> {
+    if metric_kind != MetricKind::LeanAngle {
+        return None;
+    }
+    let PresentationCache::LeanAngle(lean_angle_cache) = cache? else {
+        return None;
+    };
+    draw_lean_angle_widget(
+        canvas,
+        lean_angle_cache,
+        dense_activity,
+        frame_index,
+        scale,
+        font_dirs,
+        frame_profiler,
+    )
 }
 
 /// Draws the linear gauge presentation for a single frame. Delegates

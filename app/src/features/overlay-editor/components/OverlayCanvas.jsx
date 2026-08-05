@@ -6,14 +6,11 @@ import { memo, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
-import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
-import { useFontMetricsVersion } from '@/features/widget-preview/shared/useFontMetrics'
-import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
+import { WidgetPreview } from '@/features/widget-preview'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 import { syncVideoCurrentTime } from '@/features/video-preview/utils/videoPreviewPlayback'
 import useStore from '@/store/useStore'
-import { resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
 import HevcPlaybackPlaceholder from './HevcPlaybackPlaceholder'
 
 /**
@@ -127,11 +124,13 @@ function FrozenVideoFrame({ className, importId, second, src }) {
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
     widget,
-    preview,
     globalScale,
     globalOpacity,
     activity,
     previewSecond,
+    metricPreviewModel,
+    textPreviewModel,
+    renderGeometryModel,
     sceneFont,
     sceneFontSize,
     sceneStyle,
@@ -141,19 +140,8 @@ const OverlayCanvasWidget = memo(
     handleWidgetMouseDown,
     setHoveredWidgetId,
   }) {
-    const widgetFontSize = widget.data.font_size ?? 60
-    const widgetFontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
-    useFontMetricsVersion(widgetFontFamily, widgetFontSize)
-
-    const metricPreviewModel = buildMetricWidgetPreviewModel({
-      widget,
-      activity,
-      previewSecond,
-    })
-    const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
-    const textPreviewModel = widget.category === 'labels' ? buildTextWidgetPreviewModel({ widget }) : null
-    const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
-    const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview)
+    const visualBounds = renderGeometryModel.visualBounds
+    const renderGeometry = renderGeometryModel.renderGeometry
 
     return (
       <div
@@ -207,11 +195,13 @@ const OverlayCanvasWidget = memo(
   },
   (previousProps, nextProps) =>
     previousProps.widget === nextProps.widget &&
-    previousProps.preview === nextProps.preview &&
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.activity === nextProps.activity &&
-    previousProps.previewSecond === nextProps.previewSecond &&
+    (previousProps.widget.type === 'label' || previousProps.widget.type === 'backdrop' || previousProps.previewSecond === nextProps.previewSecond) &&
+    previousProps.metricPreviewModel === nextProps.metricPreviewModel &&
+    previousProps.textPreviewModel === nextProps.textPreviewModel &&
+    previousProps.renderGeometryModel === nextProps.renderGeometryModel &&
     previousProps.sceneFont === nextProps.sceneFont &&
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
     previousProps.sceneStyle === nextProps.sceneStyle &&
@@ -229,14 +219,14 @@ const OverlayCanvasWidget = memo(
  * @param {object} props
  * @param {object} props.sceneProps - { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize }
  * @param {object} props.displayProps - { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }
- * @param {object} props.dataProps - { widgets, activity, previewSecond, exportRange }
+ * @param {object} props.dataProps - { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange }
  * @param {object} props.callbacks - { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
  * @returns {JSX.Element} Rendered component output.
  */
 export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
-  const { widgets, activity, previewSecond, exportRange } = dataProps
+  const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
@@ -295,11 +285,13 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
             <OverlayCanvasWidget
               key={widget.id}
               widget={widget}
-              preview={dataProps.widgetPreviews?.[widget.id] ?? null}
               globalScale={globalScale}
               globalOpacity={globalOpacity}
               activity={activity}
               previewSecond={previewSecond}
+              metricPreviewModel={metricPreviewModels[widget.id] ?? null}
+              textPreviewModel={textPreviewModels[widget.id] ?? null}
+              renderGeometryModel={renderGeometryModels[widget.id]}
               sceneFont={sceneFont}
               sceneFontSize={sceneFontSize}
               sceneStyle={sceneStyle}

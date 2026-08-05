@@ -149,9 +149,9 @@ export function createBackdropDefaults(displayType) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createMetricValueDefaults(type, globalDefaults, displayType) {
+  const resolvedDisplayType = displayType || 'text'
   const font = globalDefaults?.font_values || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
-  const resolvedDisplayType = displayType || 'text'
   const sharedDefaults = {
     ...TEXT_DEFAULTS,
     value: type,
@@ -188,6 +188,11 @@ export function createMetricValueDefaults(type, globalDefaults, displayType) {
       }
       if (!seed.min_max_label_font && font) {
         seed.min_max_label_font = font
+      }
+      if (resolvedDisplayType === 'g_force') {
+        seed.label_font = font
+        seed.label_color = getGlobalColor(globalDefaults, 'color_values')
+        seed.label_unit_color = getGlobalColor(globalDefaults, 'color_units')
       }
       displayVariants[resolvedDisplayType] = seed
     }
