@@ -199,6 +199,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
+        "trip time" | "trip time(since journey start)" | "triptime" | "trip time (since journey start)" => (
+            Metric::ElapsedSeconds,
+            SourcePriority::Direct,
+            Some(TimingKind::ExplicitElapsed),
+            None,
+            None,
+        ),
         "utc time" => (
             Metric::Timestamp,
             SourcePriority::Direct,
@@ -265,6 +272,27 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(AccelerationKind::Literal),
         ),
         "gforcez" | "z" | "accel z" | "z acceleration" => (
+            Metric::GForceZ,
+            SourcePriority::AccelerationSensor,
+            None,
+            None,
+            Some(AccelerationKind::Literal),
+        ),
+        "gravity x" => (
+            Metric::GForceX,
+            SourcePriority::AccelerationSensor,
+            None,
+            None,
+            Some(AccelerationKind::Literal),
+        ),
+        "gravity y" => (
+            Metric::GForceY,
+            SourcePriority::AccelerationSensor,
+            None,
+            None,
+            Some(AccelerationKind::Literal),
+        ),
+        "gravity z" => (
             Metric::GForceZ,
             SourcePriority::AccelerationSensor,
             None,
