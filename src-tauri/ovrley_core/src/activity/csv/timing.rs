@@ -207,6 +207,18 @@ fn parse_absolute_timestamp(
     if let Ok(naive) = NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S") {
         return Some(AbsoluteTimestamp(Utc.from_utc_datetime(&naive)));
     }
+    // tentativa: textual RFC-like com dia abreviado e GMT+offset: "Wed Aug 05 18:57:56 GMT+01:00 2026"
+    if let Ok(dt) = DateTime::parse_from_str(value, "%a %b %d %H:%M:%S GMT%:z %Y") {
+        return Some(AbsoluteTimestamp(dt.with_timezone(&Utc)));
+    }
+    // tentativa sem o literal "GMT", com offset: "Wed Aug 05 18:57:56 +01:00 2026"
+    if let Ok(dt) = DateTime::parse_from_str(value, "%a %b %d %H:%M:%S %:z %Y") {
+        return Some(AbsoluteTimestamp(dt.with_timezone(&Utc)));
+    }
+    // tentativa com nome do timezone (p.ex. "GMT", mas pode não conter deslocamento)
+    if let Ok(dt) = DateTime::parse_from_str(value, "%a %b %d %H:%M:%S %Z %Y") {
+        return Some(AbsoluteTimestamp(dt.with_timezone(&Utc)));
+    }
     let seconds = convert(parse_number(Some(value))?, numeric_unit?);
     unix_timestamp(seconds)
 }
