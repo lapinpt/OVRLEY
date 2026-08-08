@@ -4,7 +4,8 @@
 //! Label formatting is intentionally omitted because it is a thin formatting
 //! expression with no meaningful branching contract.
 
-use super::super::gauges::metric::{bar_fill_count, fill_percentage};
+use super::super::gauges::metric::{bar_fill_count, fill_percentage, semantic_gauge_range};
+use crate::types::MetricKind;
 
 #[test]
 fn fill_percentage_clamps_and_handles_degenerate_ranges() {
@@ -12,6 +13,20 @@ fn fill_percentage_clamps_and_handles_degenerate_ranges() {
     assert_eq!(fill_percentage(-20.0, 0.0, 100.0), 0.0);
     assert_eq!(fill_percentage(120.0, 0.0, 100.0), 1.0);
     assert_eq!(fill_percentage(42.0, 10.0, 10.0), 0.0);
+}
+
+#[test]
+fn throttle_and_brake_use_their_absolute_percentage_domain() {
+    for metric in [MetricKind::ThrottlePosition, MetricKind::BrakePosition] {
+        assert_eq!(semantic_gauge_range(metric), Some((0.0, 100.0)));
+    }
+    assert_eq!(fill_percentage(0.0, 0.0, 100.0), 0.0);
+    assert_eq!(fill_percentage(40.0, 0.0, 100.0), 0.4);
+    assert_eq!(fill_percentage(100.0, 0.0, 100.0), 1.0);
+    assert_eq!(fill_percentage(-1.0, 0.0, 100.0), 0.0);
+    assert_eq!(fill_percentage(101.0, 0.0, 100.0), 1.0);
+
+    assert_eq!(semantic_gauge_range(MetricKind::Rpm), None);
 }
 
 #[test]

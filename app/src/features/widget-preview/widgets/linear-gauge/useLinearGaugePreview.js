@@ -24,6 +24,7 @@ export function useLinearGaugePreviewPresentation({ widget, activity, previewSec
   const layout = getLinearGaugeLayout({
     value: getInterpolatedActivityValue(displayActivity, widget.data.value, previewSecond),
     values: getMetricSeries(displayActivity, widget.data.value) ?? [],
+    metric: widget.data.value,
     width: widget.data.width,
     height: widget.data.height,
     orientation: widget.data.orientation,

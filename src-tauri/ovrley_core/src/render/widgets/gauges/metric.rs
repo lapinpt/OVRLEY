@@ -30,6 +30,9 @@ pub(crate) fn bar_fill_count(fill01: f32, count: u32) -> usize {
 /// An absent or constant series uses the documented neutral gauge range so
 /// cache preparation still has a usable scale.
 pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
+    if let Some(range) = semantic_gauge_range(metric) {
+        return range;
+    }
     let mut min_value = f64::INFINITY;
     let mut max_value = f64::NEG_INFINITY;
     for value in metric_values(series, metric).iter().flatten() {
@@ -40,6 +43,14 @@ pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f
         (min_value, max_value)
     } else {
         (0.0, 100.0)
+    }
+}
+
+/// Returns a fixed gauge domain where a metric's value has an absolute meaning.
+pub(crate) fn semantic_gauge_range(metric: MetricKind) -> Option<(f64, f64)> {
+    match metric {
+        MetricKind::ThrottlePosition | MetricKind::BrakePosition => Some((0.0, 100.0)),
+        _ => None,
     }
 }
 

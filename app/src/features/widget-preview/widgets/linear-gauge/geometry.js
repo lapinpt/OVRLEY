@@ -118,7 +118,9 @@ export function getLinearGaugeLabelLayout({ data, labelFontFamily, minLabel, max
  * @param {number[]} values - Array of numeric values.
  * @returns {{ min: number, max: number }} The value range.
  */
-export function getLinearGaugeRange(values) {
+export function getLinearGaugeRange(values, metric) {
+  const semanticRange = getSemanticGaugeRange(metric)
+  if (semanticRange) return semanticRange
   const finiteValues = []
   for (const value of values) {
     if (typeof value === 'number' && Number.isFinite(value)) finiteValues.push(value)
@@ -142,8 +144,8 @@ export function getLinearGaugeRange(values) {
  * @param {number} [params.borderThickness=0] - Border inset.
  * @returns {{ min: number, max: number, fill: number, innerTrackRect: object, fillRect: object }}
  */
-export function getLinearGaugeLayout({ value, values, width, height, orientation = 'horizontal', borderThickness = 0 }) {
-  const range = getLinearGaugeRange(values)
+export function getLinearGaugeLayout({ value, values, metric, width, height, orientation = 'horizontal', borderThickness = 0 }) {
+  const range = getLinearGaugeRange(values, metric)
   const hasValue = typeof value === 'number' && Number.isFinite(value)
   const fill = hasValue ? getFillPercentage(value, range.min, range.max) : 0.5
   const innerTrackRect = getLinearInsetRect({ width, height, borderThickness })
@@ -194,3 +196,4 @@ export function getLinearTranslatedFillPath({ trackRect, fillRect, orientation, 
 
   return getTranslatedTrackCapPath({ ...getLinearTrackCapGeometry(trackRect, orientation, cornerRadius), ...translatedCap })
 }
+import { getSemanticGaugeRange } from '../../shared/gaugeMetricRange'

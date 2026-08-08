@@ -1,6 +1,7 @@
 /** Product-level layout for normalized arc and corner gauges. */
 
 import { ARC_MAX_ANGLE_DEGREES } from './trackPath'
+import { getSemanticGaugeRange } from '../../shared/gaugeMetricRange'
 
 export const ARC_LABEL_GAP_PX = 8
 export const CORNER_GAUGE_DEFAULT_FRAME_SIZE = 110
@@ -26,7 +27,9 @@ export function getArcRadius({ width, height, trackThickness, borderThickness })
 }
 
 /** Returns the metric range, ignoring the null gaps used by sparse activity series. */
-export function getArcGaugeRange(values) {
+export function getArcGaugeRange(values, metric) {
+  const semanticRange = getSemanticGaugeRange(metric)
+  if (semanticRange) return semanticRange
   const presentValues = values.filter((value) => value != null)
   if (presentValues.length === 0) return { min: 0, max: 100 }
   const min = Math.min(...presentValues)
@@ -76,7 +79,7 @@ export function getCornerGaugeLayout(data, value, values) {
 
 /** Builds shared arc-shaped geometry for regular and corner gauges. */
 function getArcShapedGaugeLayout(data, value, values, angles, variant = {}) {
-  const range = getArcGaugeRange(values)
+  const range = getArcGaugeRange(values, data.value)
   const fill = value === null ? 0.5 : getArcFillPercentage(value, range.min, range.max)
   const centerX = variant.centerX ?? data.width * 0.5
   const centerY = variant.centerY ?? data.height * 0.5
