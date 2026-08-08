@@ -269,6 +269,10 @@ pub(super) fn build_activity_columns(
     let (rpm, _) = series(Metric::Rpm);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
+    let (estimated_torque, _) = series(Metric::EstimatedTorque);
+    let (estimated_power_kw, _) = series(Metric::EstimatedPowerKw);
+    let (estimated_power_cv, _) = series(Metric::EstimatedPowerCv);
+    let (estimated_gear, _) = series(Metric::EstimatedGear);
     let (mut lean_angle, _) = series(Metric::LeanAngle);
     if lean_angle.iter().all(Option::is_none) {
         lean_angle = derive_lean_from_speed_heading(&speed, &heading, &elapsed_seconds);
@@ -361,6 +365,10 @@ pub(super) fn build_activity_columns(
         pace: empty(),
         vertical_speed: empty(),
         torque: empty(),
+        estimated_torque,
+        estimated_power_kw,
+        estimated_power_cv,
+        estimated_gear,
         stroke_rate: empty(),
         stride_length: empty(),
         vertical_oscillation: empty(),

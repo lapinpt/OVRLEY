@@ -20,7 +20,7 @@ use crate::activity::finalize::gap::{
 };
 use crate::activity::finalize::metrics::{
     build_metric_coverage, derive_activity_metric_series, MetricCoverage, MetricDescriptor,
-    MetricSeries,
+    MetricSeries, MetricSource,
 };
 use crate::activity::finalize::smoothing::{
     circular_ema, smoothing_window_for_seconds, zero_phase_smooth,
@@ -253,6 +253,29 @@ fn finalize_columns_with_debug(
         &elapsed_series,
         columns,
     );
+    for (name, series) in [
+        ("estimated_torque", &columns.estimated_torque),
+        ("estimated_power_kw", &columns.estimated_power_kw),
+        ("estimated_power_cv", &columns.estimated_power_cv),
+        ("estimated_gear", &columns.estimated_gear),
+    ] {
+        let series: Vec<Option<f64>> = series
+            .iter()
+            .map(|value| value.and_then(finite_f64))
+            .collect();
+        let source = if series.iter().any(Option::is_some) {
+            MetricSource::Direct
+        } else {
+            MetricSource::Missing
+        };
+        metric_series_map.insert(
+            name.to_string(),
+            MetricDescriptor {
+                series: MetricSeries::Numeric(series),
+                source,
+            },
+        );
+    }
     apply_metric_smoothing(
         &mut metric_series_map,
         &elapsed_series,
@@ -372,6 +395,10 @@ fn finalize_columns_with_debug(
         stride_length: metric(&metric_series_map, "stride_length"),
         stroke_rate: metric(&metric_series_map, "stroke_rate"),
         torque: metric(&metric_series_map, "torque"),
+        estimated_torque: metric(&metric_series_map, "estimated_torque"),
+        estimated_power_kw: metric(&metric_series_map, "estimated_power_kw"),
+        estimated_power_cv: metric(&metric_series_map, "estimated_power_cv"),
+        estimated_gear: metric(&metric_series_map, "estimated_gear"),
         vertical_speed: metric(&metric_series_map, "vertical_speed"),
         iso: metric(&metric_series_map, "iso"),
         aperture: metric(&metric_series_map, "aperture"),
@@ -446,6 +473,10 @@ fn activity_columns_from_samples(
         lean_angle: raw_samples.iter().map(|_| None).collect(),
         vertical_speed: collect!(vertical_speed),
         torque: collect!(torque),
+        estimated_torque: raw_samples.iter().map(|_| None).collect(),
+        estimated_power_kw: raw_samples.iter().map(|_| None).collect(),
+        estimated_power_cv: raw_samples.iter().map(|_| None).collect(),
+        estimated_gear: raw_samples.iter().map(|_| None).collect(),
         stroke_rate: collect!(stroke_rate),
         stride_length: collect!(stride_length),
         vertical_oscillation: collect!(vertical_oscillation),

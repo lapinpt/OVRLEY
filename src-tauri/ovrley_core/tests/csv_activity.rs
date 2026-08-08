@@ -3,11 +3,74 @@ use chrono::{
     TimeZone, Utc,
 };
 use ovrley_core::activity::csv::{parse_csv_activity_path, parse_csv_activity_reader};
+use ovrley_core::activity::torque::{is_torque_activity_reader, parse_torque_activity_reader};
 use ovrley_core::activity::interpolate::densify_activity;
 use ovrley_core::activity::trim::trim_activity;
 use ovrley_core::commands::backend_parse_csv_activity;
 use ovrley_core::normalize::RenderDataRequirements;
 use std::io::Cursor;
+
+#[test]
+fn torque_exports_use_the_dedicated_importer_and_preserve_obd_metrics() {
+    let torque = "Trip Start Time,Device Time,Longitude,Latitude,GPS Speed (Meters/second),GPS Altitude(meters),RPM(rpm),Throttle Position(%),Engine Torque(Nm),Trip Distance(km)\n\
+2026-08-07 10:00:00,08-07-2026 10:00:00.000,-9.1400,38.7200,10.0,110.0,1200,25,180,0.000\n\
+2026-08-07 10:00:00,08-07-2026 10:00:01.000,-9.1401,38.7201,12.0,111.0,1300,30,200,0.012\n";
+
+    assert!(is_torque_activity_reader(Cursor::new(torque)).unwrap());
+    let activity = parse_torque_activity_reader(Cursor::new(torque), "torque.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.file_format.as_deref(), Some("torque"));
+    assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
+    assert_eq!(activity.speed, vec![Some(10.0), Some(12.0)]);
+    assert_eq!(activity.rpm, vec![Some(1200.0), Some(1300.0)]);
+    assert_eq!(activity.throttle_position, vec![Some(25.0), Some(30.0)]);
+    assert_eq!(activity.torque, vec![Some(180.0), Some(200.0)]);
+    assert_eq!(activity.distance, vec![Some(0.0), Some(12.0)]);
+}
+
+#[test]
+fn non_torque_csv_is_not_diverted_from_the_generic_importer() {
+    let csv = "Time,Latitude,Longitude,Speed (Km/h)\n0,38.72,-9.14,36\n1,38.73,-9.15,72\n";
+    assert!(!is_torque_activity_reader(Cursor::new(csv)).unwrap());
+}
+
+#[test]
+fn csv_command_routes_torque_fixture_around_the_generic_importer() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/activity/sample Torque.csv");
+
+    let activity = backend_parse_csv_activity(fixture.to_str().unwrap())
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.file_format.as_deref(), Some("torque"));
+    assert_eq!(activity.torque, vec![Some(180.0), Some(200.0)]);
+}
+
+#[test]
+fn torque_gps_device_time_dialect_accepts_localized_device_time_and_enriched_metrics() {
+    let torque = "GPS Time,Device Time,Elapsed Time,Longitude,Latitude,Engine RPM(rpm),Speed (GPS)(km/h),Speed (OBD)(km/h),Relative Throttle Position(%),Estimated Torque (Nm),Estimated Power (kW),Estimated Power (CV),Estimated Gear\n\
+Fri Aug 07 08:04:27 GMT+01:00 2026,07-ago.-2026 08:04:27.153,100,-7.8706,38.0105,1713.25,0,0,0,,,,\n\
+Fri Aug 07 08:04:28 GMT+01:00 2026,07-ago.-2026 08:04:28.145,102,-7.8707,38.0106,1800,36,72,8.2,7.311156,1.311703,1.783419,2\n";
+
+    assert!(is_torque_activity_reader(Cursor::new(torque)).unwrap());
+    let activity = parse_torque_activity_reader(Cursor::new(torque), "localized-torque.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.file_format.as_deref(), Some("torque"));
+    assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 2.0]);
+    assert_eq!(activity.rpm, vec![Some(1713.25), Some(1800.0)]);
+    assert_eq!(activity.speed, vec![Some(0.0), Some(20.0)]);
+    assert_eq!(activity.throttle_position, vec![Some(0.0), Some(8.2)]);
+    assert_eq!(activity.estimated_torque, vec![None, Some(7.311156)]);
+    assert_eq!(activity.estimated_power_kw, vec![None, Some(1.311703)]);
+    assert_eq!(activity.estimated_power_cv, vec![None, Some(1.783419)]);
+    assert_eq!(activity.estimated_gear, vec![None, Some(2.0)]);
+    assert_eq!(activity.time[0].as_deref(), Some("2026-08-07T07:04:27.000Z"));
+}
 
 #[test]
 fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {

@@ -216,6 +216,14 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
         ),
         "speed" | "kph" => (Metric::Speed, SourcePriority::Direct, None, None, None),
+        "estimated torque" => (Metric::EstimatedTorque, SourcePriority::Direct, None, None, None),
+        "estimated power" if matches!(declared_unit, DeclaredUnit::Supported(Unit::Kilowatt)) => (
+            Metric::EstimatedPowerKw, SourcePriority::Direct, None, None, None
+        ),
+        "estimated power" if matches!(declared_unit, DeclaredUnit::Supported(Unit::MetricHorsepower)) => (
+            Metric::EstimatedPowerCv, SourcePriority::Direct, None, None, None
+        ),
+        "estimated gear" => (Metric::EstimatedGear, SourcePriority::Direct, None, None, None),
         "gspd" => (Metric::Speed, SourcePriority::Direct, None, None, None),
         "vehspd1" => (Metric::Speed, SourcePriority::Vehicle, None, None, None),
         "distance" => (Metric::Distance, SourcePriority::Direct, None, None, None),

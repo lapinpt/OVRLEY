@@ -276,6 +276,10 @@ impl ValidatedRenderConfig {
                 MetricKind::StrideLength => requirements.stride_length = true,
                 MetricKind::StrokeRate => requirements.stroke_rate = true,
                 MetricKind::Torque => requirements.torque = true,
+                MetricKind::EstimatedTorque
+                | MetricKind::EstimatedPowerKw
+                | MetricKind::EstimatedPowerCv
+                | MetricKind::EstimatedGear => requirements.torque = true,
                 MetricKind::VerticalSpeed => requirements.vertical_speed = true,
                 MetricKind::Altitude => {
                     requirements.elevation = true;

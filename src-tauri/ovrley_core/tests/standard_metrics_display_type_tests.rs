@@ -17,7 +17,8 @@
 
 use ovrley_core::standard_metrics::{
     default_frame_dimensions, display_type_definition, display_type_label, is_boxed_display_type,
-    is_display_type_supported, supported_display_types, DisplayTypeLayoutMode,
+    is_display_type_supported, standard_metric_definition, standard_metric_interpolation,
+    supported_display_types, DisplayTypeLayoutMode, StandardMetricInterpolationKind,
 };
 use ovrley_core::MetricKind;
 
@@ -142,4 +143,36 @@ fn is_display_type_supported_checks_permitted_types() {
         MetricKind::CoreTemperature,
         "linear"
     ));
+}
+
+#[test]
+fn estimated_metrics_are_current_with_discrete_gear_interpolation() {
+    for kind in [
+        MetricKind::EstimatedTorque,
+        MetricKind::EstimatedPowerKw,
+        MetricKind::EstimatedPowerCv,
+        MetricKind::EstimatedGear,
+    ] {
+        assert!(standard_metric_definition(kind).is_some(), "{kind:?}");
+    }
+    assert_eq!(
+        standard_metric_interpolation(MetricKind::EstimatedGear),
+        Some(StandardMetricInterpolationKind::Hold)
+    );
+}
+
+#[test]
+fn estimated_numeric_metrics_use_generic_gauges_while_gear_is_text_only() {
+    for kind in [
+        MetricKind::EstimatedTorque,
+        MetricKind::EstimatedPowerKw,
+        MetricKind::EstimatedPowerCv,
+    ] {
+        assert!(is_display_type_supported(kind, "text"));
+        assert!(is_display_type_supported(kind, "linear"));
+        assert!(is_display_type_supported(kind, "arc"));
+    }
+    assert!(is_display_type_supported(MetricKind::EstimatedGear, "text"));
+    assert!(!is_display_type_supported(MetricKind::EstimatedGear, "linear"));
+    assert!(!is_display_type_supported(MetricKind::EstimatedGear, "arc"));
 }

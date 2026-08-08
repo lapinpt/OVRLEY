@@ -164,6 +164,10 @@ pub struct ActivityColumns {
     pub lean_angle: NumericSeries,
     pub vertical_speed: NumericSeries,
     pub torque: NumericSeries,
+    pub estimated_torque: NumericSeries,
+    pub estimated_power_kw: NumericSeries,
+    pub estimated_power_cv: NumericSeries,
+    pub estimated_gear: NumericSeries,
     pub stroke_rate: NumericSeries,
     pub stride_length: NumericSeries,
     pub vertical_oscillation: NumericSeries,
@@ -442,6 +446,18 @@ pub struct ParsedActivity {
     /// Torque in newton-meters.
     #[serde(default)]
     pub torque: NumericSeries,
+    /// External estimated torque in newton-meters.
+    #[serde(default)]
+    pub estimated_torque: NumericSeries,
+    /// External estimated power in kilowatts.
+    #[serde(default)]
+    pub estimated_power_kw: NumericSeries,
+    /// External estimated power in metric horsepower.
+    #[serde(default)]
+    pub estimated_power_cv: NumericSeries,
+    /// External estimated gear as a discrete numeric series.
+    #[serde(default)]
+    pub estimated_gear: NumericSeries,
     /// Vertical speed in meters per second.
     #[serde(default)]
     pub vertical_speed: NumericSeries,
@@ -578,6 +594,10 @@ pub struct DenseSeriesReport {
     pub stroke_rate: Vec<Option<f64>>,
     /// Torque in newton-meters.
     pub torque: Vec<Option<f64>>,
+    pub estimated_torque: Vec<Option<f64>>,
+    pub estimated_power_kw: Vec<Option<f64>>,
+    pub estimated_power_cv: Vec<Option<f64>>,
+    pub estimated_gear: Vec<Option<f64>>,
     /// Vertical speed in meters per second.
     pub vertical_speed: Vec<Option<f64>>,
     /// ISO sensitivity.
@@ -635,6 +655,10 @@ impl DenseSeriesReport {
             MetricKind::StrideLength => Some(&self.stride_length),
             MetricKind::StrokeRate => Some(&self.stroke_rate),
             MetricKind::Torque => Some(&self.torque),
+            MetricKind::EstimatedTorque => Some(&self.estimated_torque),
+            MetricKind::EstimatedPowerKw => Some(&self.estimated_power_kw),
+            MetricKind::EstimatedPowerCv => Some(&self.estimated_power_cv),
+            MetricKind::EstimatedGear => Some(&self.estimated_gear),
             MetricKind::VerticalSpeed => Some(&self.vertical_speed),
             MetricKind::VerticalRatio => Some(&self.vertical_ratio),
             MetricKind::VerticalOscillation => Some(&self.vertical_oscillation),
@@ -732,6 +756,10 @@ pub struct TrimmedActivity {
     pub stroke_rate: NumericSeries,
     /// Trimmed torque samples in newton-meters.
     pub torque: NumericSeries,
+    pub estimated_torque: NumericSeries,
+    pub estimated_power_kw: NumericSeries,
+    pub estimated_power_cv: NumericSeries,
+    pub estimated_gear: NumericSeries,
     /// Trimmed vertical speed samples in meters per second.
     pub vertical_speed: NumericSeries,
     /// Trimmed ISO samples.

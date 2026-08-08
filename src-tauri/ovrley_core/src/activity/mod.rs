@@ -15,6 +15,8 @@ pub mod finalize;
 pub mod interpolate;
 /// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
+/// Native Torque OBD CSV extraction into canonical activity columns.
+pub mod torque;
 /// Scene-window trimming for parsed activity samples.
 pub mod trim;
 /// Native Racelogic VBOX extraction into canonical activity columns.

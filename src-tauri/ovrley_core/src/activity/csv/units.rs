@@ -37,6 +37,9 @@ pub(super) enum Unit {
     Percent,
     /// Revolutions per minute.
     RevolutionsPerMinute,
+    NewtonMetre,
+    Kilowatt,
+    MetricHorsepower,
     /// Unscaled numeric value.
     Raw,
 }
@@ -89,6 +92,9 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "g" => Unit::G,
         "%" | "percent" | "percentage" => Unit::Percent,
         "rpm" => Unit::RevolutionsPerMinute,
+        "nm" | "n·m" | "n*m" | "n-m" | "newton metre" | "newton meter" => Unit::NewtonMetre,
+        "kw" => Unit::Kilowatt,
+        "cv" => Unit::MetricHorsepower,
         "#" | "raw" => Unit::Raw,
         _ => return DeclaredUnit::Unsupported(UnitDimension::Unknown),
     };
@@ -186,6 +192,10 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
+        Metric::EstimatedTorque => matches!(unit, Unit::NewtonMetre),
+        Metric::EstimatedPowerKw => matches!(unit, Unit::Kilowatt),
+        Metric::EstimatedPowerCv => matches!(unit, Unit::MetricHorsepower),
+        Metric::EstimatedGear => matches!(unit, Unit::Raw),
         Metric::CompanionDate | Metric::GpsCoordinate => matches!(unit, Unit::Raw),
     }
 }
@@ -205,6 +215,9 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         | Unit::G
         | Unit::Percent
         | Unit::RevolutionsPerMinute
+        | Unit::NewtonMetre
+        | Unit::Kilowatt
+        | Unit::MetricHorsepower
         | Unit::Raw => value,
     }
 }
@@ -225,6 +238,10 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,
         Metric::GearPosition => Unit::Raw,
+        Metric::EstimatedTorque => Unit::NewtonMetre,
+        Metric::EstimatedPowerKw => Unit::Kilowatt,
+        Metric::EstimatedPowerCv => Unit::MetricHorsepower,
+        Metric::EstimatedGear => Unit::Raw,
         Metric::CompanionDate | Metric::GpsCoordinate => Unit::Raw,
     }
 }

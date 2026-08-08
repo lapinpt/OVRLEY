@@ -72,6 +72,78 @@ fn formats_metric_parts_for_speed() {
 }
 
 #[test]
+fn formats_external_estimated_metrics_without_zeroing_missing_samples() {
+    let estimated_torque = validated_standard_value(json!({
+        "value": "estimated_torque", "x": 0.0, "y": 0.0, "font": "Arial.ttf",
+        "font_size": 32.0, "color": "#ffffff", "opacity": 1.0, "prefix": "", "suffix": "",
+        "decimals": 1, "show_icon": false, "icon_color": "#ffffff", "icon_size": 28.0,
+        "icon_offset_x": 0.0, "icon_offset_y": 0.0, "show_units": true,
+        "unit_color": "#ffffff", "display_unit": "nm", "triangle_width": 0.0,
+        "display_type": "text"
+    }));
+    let torque_dense = dense_report_with(|series| series.estimated_torque = vec![Some(38.9)]);
+    let torque_parts = format_validated_metric_parts(&estimated_torque, &torque_dense, 0).unwrap();
+    assert_eq!(torque_parts.standard_text(), ("38.9", Some("Nm")));
+
+    let missing_dense = dense_report_with(|series| series.estimated_torque = vec![None]);
+    assert_eq!(
+        format_validated_metric_parts(&estimated_torque, &missing_dense, 0)
+            .unwrap()
+            .standard_text()
+            .0,
+        "--"
+    );
+
+    let estimated_power_kw = validated_standard_value(json!({
+        "value": "estimated_power_kw", "x": 0.0, "y": 0.0, "font": "Arial.ttf",
+        "font_size": 32.0, "color": "#ffffff", "opacity": 1.0, "prefix": "", "suffix": "",
+        "decimals": 1, "show_icon": false, "icon_color": "#ffffff", "icon_size": 28.0,
+        "icon_offset_x": 0.0, "icon_offset_y": 0.0, "show_units": true,
+        "unit_color": "#ffffff", "display_unit": "kw", "triangle_width": 0.0,
+        "display_type": "text"
+    }));
+    let kw_dense = dense_report_with(|series| series.estimated_power_kw = vec![Some(17.4)]);
+    assert_eq!(
+        format_validated_metric_parts(&estimated_power_kw, &kw_dense, 0)
+            .unwrap()
+            .standard_text(),
+        ("17.4", Some("kW"))
+    );
+
+    let estimated_power_cv = validated_standard_value(json!({
+        "value": "estimated_power_cv", "x": 0.0, "y": 0.0, "font": "Arial.ttf",
+        "font_size": 32.0, "color": "#ffffff", "opacity": 1.0, "prefix": "", "suffix": "",
+        "decimals": 1, "show_icon": false, "icon_color": "#ffffff", "icon_size": 28.0,
+        "icon_offset_x": 0.0, "icon_offset_y": 0.0, "show_units": true,
+        "unit_color": "#ffffff", "display_unit": "cv", "triangle_width": 0.0,
+        "display_type": "text"
+    }));
+    let cv_dense = dense_report_with(|series| series.estimated_power_cv = vec![Some(23.7)]);
+    assert_eq!(
+        format_validated_metric_parts(&estimated_power_cv, &cv_dense, 0)
+            .unwrap()
+            .standard_text(),
+        ("23.7", Some("CV"))
+    );
+
+    let estimated_gear = validated_standard_value(json!({
+        "value": "estimated_gear", "x": 0.0, "y": 0.0, "font": "Arial.ttf",
+        "font_size": 32.0, "color": "#ffffff", "opacity": 1.0, "prefix": "", "suffix": "",
+        "decimals": 1, "show_icon": false, "icon_color": "#ffffff", "icon_size": 28.0,
+        "icon_offset_x": 0.0, "icon_offset_y": 0.0, "show_units": false,
+        "unit_color": "#ffffff", "display_unit": "", "triangle_width": 0.0,
+        "display_type": "text"
+    }));
+    let gear_dense = dense_report_with(|series| series.estimated_gear = vec![Some(3.0)]);
+    assert_eq!(
+        format_validated_metric_parts(&estimated_gear, &gear_dense, 0)
+            .unwrap()
+            .standard_text(),
+        ("3", None)
+    );
+}
+
+#[test]
 fn formats_metric_parts_for_temperature_with_degree_units() {
     let validated = validated_standard_value(json!({
         "value": "temperature",

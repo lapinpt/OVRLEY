@@ -80,8 +80,16 @@ pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> C
 }
 
 /// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
+///
+/// Torque exports are signature-detected here and routed to their dedicated
+/// importer. Other CSV files retain the generic capability-based route.
 pub fn backend_parse_csv_activity(path: &str) -> CoreResult<FinalizeActivityResponse> {
-    crate::activity::csv::parse_csv_activity_path(Path::new(path))
+    let path = Path::new(path);
+    if crate::activity::torque::is_torque_activity_path(path)? {
+        crate::activity::torque::parse_torque_activity_path(path)
+    } else {
+        crate::activity::csv::parse_csv_activity_path(path)
+    }
 }
 
 /// Parses and finalizes a native VBO activity without a frontend RawActivity hop.

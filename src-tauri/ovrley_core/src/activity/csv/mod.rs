@@ -73,6 +73,14 @@ enum Metric {
     /// This is not emitted as an activity metric; it supplies the calendar date
     /// paired with a [`Timestamp`](TimingKind::TimeOfDay) column.
     CompanionDate,
+    /// Externally estimated engine torque in newton-meters.
+    EstimatedTorque,
+    /// Externally estimated engine power in kilowatts.
+    EstimatedPowerKw,
+    /// Externally estimated engine power in metric horsepower.
+    EstimatedPowerCv,
+    /// Externally estimated selected gear.
+    EstimatedGear,
     /// Combined GPS coordinate as a space-separated "lat lon" string.
     ///
     /// This is not emitted as an activity metric; it is split into separate

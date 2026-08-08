@@ -464,6 +464,7 @@ fn parsed_activity_new_series_default_to_empty() {
     assert!(activity.color_temperature.is_empty());
 }
 
+
 #[test]
 fn parsed_activity_handles_nulls_in_new_series() {
     let json = serde_json::json!({

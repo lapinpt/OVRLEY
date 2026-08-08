@@ -251,6 +251,7 @@
       "g_force": ["text", "g_force"],
       "core_temperature": ["text"],
       "gear_position": ["text"],
+      "estimated_gear": ["text"],
       "left_right_balance": ["text"],
       "time": ["text"],
       "lean_angle": ["text", "lean_angle"],
@@ -763,6 +764,30 @@
         "assetFile": "widget-torque.svg"
       },
       "category": "cycling"
+    },
+    {
+      "type": "estimated_torque", "current": true, "label": "Estimated Torque", "defaultDisplayUnit": "nm",
+      "supportedDisplayUnits": [{"value": "nm", "label": "Nm"}], "showUnitsByDefault": true,
+      "formatter": "decimal", "interpolation": "preserve", "unitsMode": "selectable",
+      "icon": {"source": "custom", "assetFile": "widget-torque.svg"}, "category": "motosports"
+    },
+    {
+      "type": "estimated_power_kw", "current": true, "label": "Estimated Power", "defaultDisplayUnit": "kw",
+      "supportedDisplayUnits": [{"value": "kw", "label": "kW"}], "showUnitsByDefault": true,
+      "formatter": "decimal", "interpolation": "preserve", "unitsMode": "selectable",
+      "icon": {"source": "shared", "assetFile": "widget-power.svg"}, "category": "motosports"
+    },
+    {
+      "type": "estimated_power_cv", "current": true, "label": "Estimated Power", "defaultDisplayUnit": "cv",
+      "supportedDisplayUnits": [{"value": "cv", "label": "CV"}], "showUnitsByDefault": true,
+      "formatter": "decimal", "interpolation": "preserve", "unitsMode": "selectable",
+      "icon": {"source": "shared", "assetFile": "widget-power.svg"}, "category": "motosports"
+    },
+    {
+      "type": "estimated_gear", "current": true, "label": "Estimated Gear", "defaultDisplayUnit": "",
+      "supportedDisplayUnits": [], "showUnitsByDefault": false,
+      "formatter": "integer", "interpolation": "hold", "unitsMode": "hidden",
+      "icon": {"source": "custom", "assetFile": "widget-gear-position.svg"}, "category": "motosports"
     },
     {
       "type": "vertical_speed",

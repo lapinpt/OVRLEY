@@ -58,6 +58,14 @@ pub enum MetricKind {
     StrokeRate,
     #[serde(rename = "torque")]
     Torque,
+    #[serde(rename = "estimated_torque")]
+    EstimatedTorque,
+    #[serde(rename = "estimated_power_kw")]
+    EstimatedPowerKw,
+    #[serde(rename = "estimated_power_cv")]
+    EstimatedPowerCv,
+    #[serde(rename = "estimated_gear")]
+    EstimatedGear,
     #[serde(rename = "vertical_speed")]
     VerticalSpeed,
     #[serde(rename = "gear_position")]

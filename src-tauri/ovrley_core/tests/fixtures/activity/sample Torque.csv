@@ -1,0 +1,3 @@
+Trip Start Time,Device Time,Longitude,Latitude,GPS Speed (Meters/second),GPS Altitude(meters),RPM(rpm),Throttle Position(%),Engine Torque(Nm),Trip Distance(km)
+2026-08-07 10:00:00,08-07-2026 10:00:00.000,-9.1400,38.7200,10.0,110.0,1200,25,180,0.000
+2026-08-07 10:00:00,08-07-2026 10:00:01.000,-9.1401,38.7201,12.0,111.0,1300,30,200,0.012

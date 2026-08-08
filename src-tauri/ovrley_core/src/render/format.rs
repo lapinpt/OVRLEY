@@ -153,7 +153,13 @@ pub(crate) fn resolve_metric_display_value(
         return raw;
     }
 
-    if standard_metric_interpolation(kind) == Some(StandardMetricInterpolationKind::Preserve)
+    if !matches!(
+        kind,
+        MetricKind::EstimatedTorque
+            | MetricKind::EstimatedPowerKw
+            | MetricKind::EstimatedPowerCv
+            | MetricKind::EstimatedGear
+    ) && standard_metric_interpolation(kind) == Some(StandardMetricInterpolationKind::Preserve)
         && dense_metric_series_is_available(kind, dense_activity)
     {
         Some(0.0)
@@ -317,7 +323,11 @@ fn format_validated_standard_metric_parts<'a>(
     let kind = validated.metric;
     let raw = resolve_metric_display_value(kind, raw, dense_activity);
     let display_unit = Some(validated.display_unit.as_str());
-    let decimals = validated_decimals(&validated.formatting);
+    let decimals = if kind == MetricKind::EstimatedGear {
+        0
+    } else {
+        validated_decimals(&validated.formatting)
+    };
     let show_units = validated.show_units;
     let unit_text = show_units.then(|| standard_metric_unit_label(kind, display_unit).to_string());
 
@@ -661,7 +671,11 @@ pub(crate) fn convert_standard_metric_value(kind: MetricKind, display_unit: Opti
         | MetricKind::StrokeRate
         | MetricKind::GearPosition
         | MetricKind::VerticalRatio
-        | MetricKind::Torque => value,
+        | MetricKind::Torque
+        | MetricKind::EstimatedTorque
+        | MetricKind::EstimatedPowerKw
+        | MetricKind::EstimatedPowerCv
+        | MetricKind::EstimatedGear => value,
         MetricKind::Speed => match display_unit.unwrap_or("kmh") {
             "mph" | "imperial" => value * 2.23694,
             "kn" => value * 1.943844,

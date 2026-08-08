@@ -572,6 +572,22 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        estimated_torque: trim_numeric_series(
+            elapsed, &activity.estimated_torque, start, end, start_inner_index, end_inner_index,
+            interpolation_strategy(crate::MetricKind::EstimatedTorque),
+        ),
+        estimated_power_kw: trim_numeric_series(
+            elapsed, &activity.estimated_power_kw, start, end, start_inner_index, end_inner_index,
+            interpolation_strategy(crate::MetricKind::EstimatedPowerKw),
+        ),
+        estimated_power_cv: trim_numeric_series(
+            elapsed, &activity.estimated_power_cv, start, end, start_inner_index, end_inner_index,
+            interpolation_strategy(crate::MetricKind::EstimatedPowerCv),
+        ),
+        estimated_gear: trim_numeric_series(
+            elapsed, &activity.estimated_gear, start, end, start_inner_index, end_inner_index,
+            interpolation_strategy(crate::MetricKind::EstimatedGear),
+        ),
         vertical_speed: if requirements.vertical_speed {
             trim_numeric_series(
                 elapsed,
