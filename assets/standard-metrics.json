@@ -507,6 +507,10 @@
         {
           "value": "w",
           "label": "W"
+        },
+        {
+          "value": "cv",
+          "label": "CV"
         }
       ],
       "showUnitsByDefault": true,

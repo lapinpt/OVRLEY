@@ -656,12 +656,18 @@ pub(crate) fn convert_standard_metric_value(kind: MetricKind, display_unit: Opti
     match kind {
         MetricKind::Heartrate
         | MetricKind::Cadence
-        | MetricKind::Power
         | MetricKind::GroundContactTime
         | MetricKind::StrokeRate
         | MetricKind::GearPosition
         | MetricKind::VerticalRatio
         | MetricKind::Torque => value,
+        MetricKind::Power => {
+            if display_unit == Some("cv") {
+                value / 735.498_75
+            } else {
+                value
+            }
+        }
         MetricKind::Speed => match display_unit.unwrap_or("kmh") {
             "mph" | "imperial" => value * 2.23694,
             "kn" => value * 1.943844,

@@ -72,6 +72,26 @@ describe('core_temperature widget preview', () => {
 })
 
 describe('metric widget preview model standard metric units', () => {
+  test('formats power widgets in metric horsepower', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'power',
+        data: {
+          display_unit: 'cv',
+          show_units: true,
+          show_icon: false,
+          decimals: 0,
+        },
+      },
+      activity: { trim_end_seconds: 20, sample_elapsed_seconds: [0], power: [735.49875] },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('1')
+    expect(model?.unitText).toBe('CV')
+  })
+
   test('formats speed widgets from display_unit', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: {
