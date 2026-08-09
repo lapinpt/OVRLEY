@@ -293,6 +293,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(AccelerationKind::Semantic),
         ),
         "rpm" | "engine rpm" => (Metric::Rpm, SourcePriority::Direct, None, None, None),
+        "temperature" | "coolant temperature" | "engine coolant temperature" => (
+            Metric::Temperature,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "accelerator position" | "accelerator pedal position" => (
             Metric::ThrottlePosition,
             SourcePriority::Pedal,
@@ -350,7 +357,9 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
         ),
         "lean angle" | "leanangle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
-        "lap" | "lap #" | "lap number" => (Metric::LapNumber, SourcePriority::Direct, None, None, None),
+        "lap" | "lap #" | "lap number" => {
+            (Metric::LapNumber, SourcePriority::Direct, None, None, None)
+        }
         "gear" => (
             Metric::GearPosition,
             SourcePriority::Direct,
@@ -370,7 +379,9 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
     let mut declared_unit = declared_unit;
     if metric == Metric::Timestamp
         && annotation.as_deref().is_some_and(|ann| {
-            ann.eq_ignore_ascii_case("utc") || ann.eq_ignore_ascii_case("gmt") || ann.eq_ignore_ascii_case("z")
+            ann.eq_ignore_ascii_case("utc")
+                || ann.eq_ignore_ascii_case("gmt")
+                || ann.eq_ignore_ascii_case("z")
         })
     {
         declared_unit = DeclaredUnit::Absent;

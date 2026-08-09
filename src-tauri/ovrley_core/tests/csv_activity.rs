@@ -59,6 +59,19 @@ fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
 }
 
 #[test]
+fn imports_enriched_temperature_in_celsius() {
+    let csv = "Time (s),Speed (m/s),Temperature (C)\n\
+0.0,1.0,76.5\n\
+1.0,2.0,77.0\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "enriched.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.temperature, vec![Some(76.5), Some(77.0)]);
+}
+
+#[test]
 fn trackaddict_rejects_malformed_gps_update_values() {
     let csv = "Time,GPS_Update,Latitude,Longitude\n\
 0.0,1,10.0,20.0\n\
@@ -165,10 +178,7 @@ fn katana_fixture_reconstructs_time_gps_and_telemetry() {
 
     assert_eq!(activity.sample_elapsed_seconds.len(), 366);
     assert_eq!(activity.sample_elapsed_seconds[0], 0.0);
-    assert_eq!(
-        activity.sample_elapsed_seconds.last().copied(),
-        Some(365.0)
-    );
+    assert_eq!(activity.sample_elapsed_seconds.last().copied(), Some(365.0));
     assert!(activity
         .sample_elapsed_seconds
         .windows(2)
@@ -187,11 +197,11 @@ fn katana_fixture_reconstructs_time_gps_and_telemetry() {
         Some("2026-07-25T11:18:11.160Z")
     );
 
-    assert_eq!(
-        activity.course[0],
-        (Some(51.178278), Some(0.301071))
-    );
-    assert!(activity.course.iter().any(|(lat, lon)| lat.is_some() && lon.is_some()));
+    assert_eq!(activity.course[0], (Some(51.178278), Some(0.301071)));
+    assert!(activity
+        .course
+        .iter()
+        .any(|(lat, lon)| lat.is_some() && lon.is_some()));
 
     assert_eq!(activity.speed[0], Some(0.0));
     assert!(activity.speed.iter().any(Option::is_some));
@@ -1148,8 +1158,14 @@ fn airdata_datetime_utc_column_is_parsed_as_absolute_timestamps() {
 
     assert_eq!(activity.time.len(), 3);
     assert_eq!(activity.time[0], None);
-    assert_eq!(activity.time[1].as_deref(), Some("2026-07-14T11:45:06.000Z"));
-    assert_eq!(activity.time[2].as_deref(), Some("2026-07-14T11:45:06.000Z"));
+    assert_eq!(
+        activity.time[1].as_deref(),
+        Some("2026-07-14T11:45:06.000Z")
+    );
+    assert_eq!(
+        activity.time[2].as_deref(),
+        Some("2026-07-14T11:45:06.000Z")
+    );
 }
 
 mod lap_timing_fixture_tests {
@@ -1173,7 +1189,11 @@ mod lap_timing_fixture_tests {
             .join(expectations.fixture);
         match expectations.extraction {
             FixtureKind::Csv => parse_csv_activity_path(&path).unwrap().parsed_activity,
-            FixtureKind::Vbo => parse_vbo_activity_path(&path, None).unwrap().parsed_activity,
+            FixtureKind::Vbo => {
+                parse_vbo_activity_path(&path, None)
+                    .unwrap()
+                    .parsed_activity
+            }
         }
     }
 
@@ -1228,11 +1248,7 @@ mod lap_timing_fixture_tests {
             let activity = parse(&expectations);
             let n = activity.sample_elapsed_seconds.len();
 
-            assert!(
-                n > 0,
-                "{} must have samples",
-                expectations.fixture
-            );
+            assert!(n > 0, "{} must have samples", expectations.fixture);
             assert_eq!(
                 activity.lap_number.len(),
                 n,

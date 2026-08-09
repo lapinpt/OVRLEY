@@ -4,7 +4,10 @@
 //! Label formatting is intentionally omitted because it is a thin formatting
 //! expression with no meaningful branching contract.
 
-use super::super::gauges::metric::{bar_fill_count, fill_percentage, semantic_gauge_range};
+use super::super::gauges::metric::{
+    bar_fill_count, fill_percentage, metric_range, semantic_gauge_range,
+};
+use crate::activity::schema::ParsedActivity;
 use crate::types::MetricKind;
 
 #[test]
@@ -27,6 +30,17 @@ fn throttle_and_brake_use_their_absolute_percentage_domain() {
     assert_eq!(fill_percentage(101.0, 0.0, 100.0), 1.0);
 
     assert_eq!(semantic_gauge_range(MetricKind::Rpm), None);
+}
+
+#[test]
+fn gauge_range_uses_untrimmed_activity_observations() {
+    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "rpm": [1200.0, 3400.0, 9000.0]
+    }))
+    .expect("minimal activity JSON must deserialize");
+
+    assert_eq!(metric_range(&activity, MetricKind::Rpm), (1200.0, 9000.0));
 }
 
 #[test]

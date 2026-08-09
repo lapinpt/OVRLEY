@@ -37,6 +37,8 @@ pub(super) enum Unit {
     Percent,
     /// Revolutions per minute.
     RevolutionsPerMinute,
+    /// Degrees Celsius.
+    Celsius,
     /// Unscaled numeric value.
     Raw,
 }
@@ -89,6 +91,7 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "g" => Unit::G,
         "%" | "percent" | "percentage" => Unit::Percent,
         "rpm" => Unit::RevolutionsPerMinute,
+        "c" | ".c" | "°c" | "celsius" => Unit::Celsius,
         "#" | "raw" => Unit::Raw,
         _ => return DeclaredUnit::Unsupported(UnitDimension::Unknown),
     };
@@ -183,10 +186,13 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
             matches!(unit, Unit::G)
         }
         Metric::Rpm => matches!(unit, Unit::RevolutionsPerMinute),
+        Metric::Temperature => matches!(unit, Unit::Celsius),
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
-        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => matches!(unit, Unit::Raw),
+        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => {
+            matches!(unit, Unit::Raw)
+        }
     }
 }
 
@@ -205,6 +211,7 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         | Unit::G
         | Unit::Percent
         | Unit::RevolutionsPerMinute
+        | Unit::Celsius
         | Unit::Raw => value,
     }
 }
@@ -222,6 +229,7 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::Heading => Unit::Degrees,
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
         Metric::Rpm => Unit::RevolutionsPerMinute,
+        Metric::Temperature => Unit::Celsius,
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,
         Metric::GearPosition => Unit::Raw,

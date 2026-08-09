@@ -130,6 +130,7 @@ pub fn prepare_render_assets(
             PreparedValue::LinearGauge(validated) => {
                 let cache = gauges::linear::prepare_linear_gauge_cache(
                     validated,
+                    activity,
                     dense_activity,
                     &assets.scene,
                     assets.scene.scale,
@@ -143,6 +144,7 @@ pub fn prepare_render_assets(
             PreparedValue::ArcGauge(validated) => {
                 let cache = gauges::arc::prepare_arc_gauge_cache(
                     validated,
+                    activity,
                     dense_activity,
                     &assets.scene,
                     assets.scene.scale,
