@@ -300,6 +300,8 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
+        "power" | "estimated power" => (Metric::Power, SourcePriority::Direct, None, None, None),
+        "torque" | "estimated torque" => (Metric::Torque, SourcePriority::Direct, None, None, None),
         "accelerator position" | "accelerator pedal position" => (
             Metric::ThrottlePosition,
             SourcePriority::Pedal,
@@ -307,7 +309,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(ControlKind::Percentage),
             None,
         ),
-        "throttle position" | "throttlepos" => (
+        "throttle position" | "relative throttle position" | "throttlepos" => (
             Metric::ThrottlePosition,
             SourcePriority::Direct,
             None,
@@ -360,7 +362,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         "lap" | "lap #" | "lap number" => {
             (Metric::LapNumber, SourcePriority::Direct, None, None, None)
         }
-        "gear" => (
+        "gear" | "gear position" | "estimated gear" => (
             Metric::GearPosition,
             SourcePriority::Direct,
             None,

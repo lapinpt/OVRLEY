@@ -62,6 +62,10 @@ enum Metric {
     Rpm,
     /// Temperature in degrees Celsius.
     Temperature,
+    /// Mechanical power in watts.
+    Power,
+    /// Mechanical torque in newton metres.
+    Torque,
     /// Throttle position as a percentage from zero to one hundred.
     ThrottlePosition,
     /// Brake position as a percentage from zero to one hundred.
