@@ -149,6 +149,9 @@ export function convertStandardMetricValue(type, value, displayUnit) {
     case 'temperature':
     case 'core_temperature':
       return displayUnit === 'fahrenheit' ? (value * 9) / 5 + 32 : value
+    case 'power':
+    case 'engine_power':
+      return displayUnit === 'cv' ? value / 735.49875 : value
     case 'pace':
       return displayUnit === 'min_per_mi' ? value * 1.609344 : value
     case 'distance':

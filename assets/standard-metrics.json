@@ -538,6 +538,10 @@
         {
           "value": "w",
           "label": "W"
+        },
+        {
+          "value": "cv",
+          "label": "CV"
         }
       ],
       "showUnitsByDefault": true,
@@ -556,7 +560,8 @@
       "label": "Engine Power",
       "defaultDisplayUnit": "w",
       "supportedDisplayUnits": [
-        { "value": "w", "label": "W" }
+        { "value": "w", "label": "W" },
+        { "value": "cv", "label": "CV" }
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
