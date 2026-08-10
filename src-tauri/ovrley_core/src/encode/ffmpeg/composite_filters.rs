@@ -110,6 +110,16 @@ pub(super) fn composite_filter_complex(
             transform.crop_width, transform.crop_height, transform.crop_x, transform.crop_y
         ));
     }
+    // `scale` preserves the input display aspect ratio by changing SAR. That
+    // is correct for legacy source-sized renders, but Video Transform's
+    // STRETCH contract maps crop pixels directly onto the output canvas.
+    // Square-pixel output prevents media players from reintroducing a
+    // letterbox based on the source/crop DAR.
+    let output_sar_filter = if video_transform.is_some() {
+        ",setsar=1"
+    } else {
+        ""
+    };
     let (main_width, main_height) = if matches!(
         profile.codec_id.metadata().filter_stack_kind,
         CompositeFilterStackKind::QsvFullOverlay
@@ -125,6 +135,7 @@ pub(super) fn composite_filter_complex(
         .replace("{base_video_filters}", &base_video_filters)
         .replace("{width}", &width.to_string())
         .replace("{height}", &height.to_string())
+        .replace("{output_sar_filter}", output_sar_filter)
         .replace("{main_width}", &main_width.to_string())
         .replace("{main_height}", &main_height.to_string())
         .replace(
