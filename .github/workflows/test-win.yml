@@ -1,6 +1,9 @@
 name: OVRLEY Windows Test Build
 
 on:
+  push:
+    branches:
+      - feature/video-transform
   workflow_dispatch:
 
 permissions:
