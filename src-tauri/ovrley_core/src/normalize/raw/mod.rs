@@ -183,6 +183,8 @@ pub struct ValueConfig {
     pub x: f32,
     pub y: f32,
     #[serde(default)]
+    pub gauge_range: Option<GaugeRangeConfig>,
+    #[serde(default)]
     pub font: Option<String>,
     #[serde(default)]
     pub font_family: Option<String>,
@@ -366,6 +368,13 @@ pub struct ValueConfig {
     pub label_offset_y: Option<f32>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Optional canonical-unit range override for a gauge widget.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct GaugeRangeConfig {
+    pub min: f64,
+    pub max: f64,
 }
 
 impl ValueConfig {

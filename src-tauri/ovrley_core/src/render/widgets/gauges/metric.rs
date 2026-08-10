@@ -6,6 +6,7 @@
 //! linear renderers.
 
 use crate::activity::schema::{DenseSeriesReport, ParsedActivity};
+use crate::normalize::ValidatedGaugeRange;
 use crate::render::format::convert_standard_metric_value;
 use crate::types::MetricKind;
 
@@ -29,10 +30,11 @@ pub(crate) fn bar_fill_count(fill01: f32, count: u32) -> usize {
 ///
 /// An absent or constant series uses the documented neutral gauge range so
 /// cache preparation still has a usable scale.
-pub(crate) fn metric_range(activity: &ParsedActivity, metric: MetricKind) -> (f64, f64) {
-    if let Some(range) = semantic_gauge_range(metric) {
-        return range;
-    }
+pub(crate) fn metric_range(
+    activity: &ParsedActivity,
+    metric: MetricKind,
+    manual_range: Option<ValidatedGaugeRange>,
+) -> (f64, f64) {
     let mut min_value = f64::INFINITY;
     let mut max_value = f64::NEG_INFINITY;
     for value in activity
@@ -44,11 +46,25 @@ pub(crate) fn metric_range(activity: &ParsedActivity, metric: MetricKind) -> (f6
         min_value = min_value.min(*value);
         max_value = max_value.max(*value);
     }
-    if min_value.is_finite() && max_value.is_finite() && max_value > min_value {
-        (min_value, max_value)
+    let observed = if min_value.is_finite() && max_value.is_finite() && max_value > min_value {
+        Some((min_value, max_value))
     } else {
-        (0.0, 100.0)
+        None
+    };
+    resolve_gauge_range(manual_range, metric, observed)
+}
+
+pub(crate) fn resolve_gauge_range(
+    manual_range: Option<ValidatedGaugeRange>,
+    metric: MetricKind,
+    observed: Option<(f64, f64)>,
+) -> (f64, f64) {
+    if let Some(range) = manual_range {
+        return (range.min, range.max);
     }
+    semantic_gauge_range(metric)
+        .or(observed)
+        .unwrap_or((0.0, 100.0))
 }
 
 fn semantic_gauge_range(metric: MetricKind) -> Option<(f64, f64)> {

@@ -9,7 +9,7 @@
 //! value contract — they belong to the scene validation contract.
 
 use super::helpers::{require_bool, require_f32, require_str, require_string, rgba_from_hex};
-use super::raw::ValueConfig;
+use super::raw::{GaugeRangeConfig, ValueConfig};
 use crate::error::{CoreError, CoreResult};
 use crate::standard_metrics::is_standard_metric;
 use crate::types::DisplayType;
@@ -77,6 +77,79 @@ pub struct ValidatedValueWidget {
     pub formatting: ValidatedValueFormatting,
     pub hours_offset: Option<i64>,
     pub format: Option<String>,
+    pub gauge_range: Option<ValidatedGaugeRange>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ValidatedGaugeRange {
+    pub min: f64,
+    pub max: f64,
+}
+
+pub(crate) fn validate_gauge_range(
+    range: Option<GaugeRangeConfig>,
+    path: &str,
+) -> CoreResult<Option<ValidatedGaugeRange>> {
+    range
+        .map(|range| {
+            if !range.min.is_finite() || !range.max.is_finite() {
+                return Err(CoreError::Config(format!(
+                    "{path}: min and max must be finite"
+                )));
+            }
+            if range.min >= range.max {
+                return Err(CoreError::Config(format!(
+                    "{path}: min must be less than max"
+                )));
+            }
+            Ok(ValidatedGaugeRange {
+                min: range.min,
+                max: range.max,
+            })
+        })
+        .transpose()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_gauge_range, GaugeRangeConfig, ValidatedGaugeRange};
+
+    #[test]
+    fn gauge_range_is_optional_and_validates_bounds() {
+        assert_eq!(validate_gauge_range(None, "gauge_range").unwrap(), None);
+        assert_eq!(
+            validate_gauge_range(
+                Some(GaugeRangeConfig {
+                    min: 0.0,
+                    max: 9500.0,
+                }),
+                "gauge_range",
+            )
+            .unwrap(),
+            Some(ValidatedGaugeRange {
+                min: 0.0,
+                max: 9500.0,
+            })
+        );
+    }
+
+    #[test]
+    fn gauge_range_rejects_non_finite_and_non_increasing_bounds() {
+        for range in [
+            GaugeRangeConfig { min: 1.0, max: 1.0 },
+            GaugeRangeConfig { min: 2.0, max: 1.0 },
+            GaugeRangeConfig {
+                min: f64::NAN,
+                max: 1.0,
+            },
+            GaugeRangeConfig {
+                min: 0.0,
+                max: f64::INFINITY,
+            },
+        ] {
+            assert!(validate_gauge_range(Some(range), "gauge_range").is_err());
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +188,7 @@ fn validate_value_widget_fields(
     require_icon_fields: bool,
 ) -> CoreResult<ValidatedValueWidget> {
     let p = |f: &str| format!("values[{index}].{f}");
+    let gauge_range = validate_gauge_range(value.gauge_range.clone(), &p("gauge_range"))?;
 
     if !is_standard_metric(value.value) {
         return Err(CoreError::Config(format!(
@@ -357,5 +431,6 @@ fn validate_value_widget_fields(
         formatting,
         hours_offset: value.hours_offset.map(i64::from),
         format: value.format,
+        gauge_range,
     })
 }

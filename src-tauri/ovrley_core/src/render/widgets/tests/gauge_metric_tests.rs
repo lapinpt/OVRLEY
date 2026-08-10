@@ -4,7 +4,27 @@
 //! Label formatting is intentionally omitted because it is a thin formatting
 //! expression with no meaningful branching contract.
 
-use super::super::gauges::metric::{bar_fill_count, fill_percentage};
+use super::super::gauges::metric::{bar_fill_count, fill_percentage, resolve_gauge_range};
+use crate::normalize::ValidatedGaugeRange;
+use crate::MetricKind;
+
+#[test]
+fn manual_range_overrides_semantic_and_observed_ranges() {
+    let range = resolve_gauge_range(
+        Some(ValidatedGaugeRange {
+            min: 0.0,
+            max: 9500.0,
+        }),
+        MetricKind::Rpm,
+        Some((0.0, 5567.0)),
+    );
+    assert_eq!(range, (0.0, 9500.0));
+    assert_eq!(fill_percentage(4750.0, range.0, range.1), 0.5);
+    assert_eq!(
+        resolve_gauge_range(None, MetricKind::ThrottlePosition, Some((8.0, 92.0))),
+        (0.0, 100.0)
+    );
+}
 
 #[test]
 fn fill_percentage_clamps_and_handles_degenerate_ranges() {

@@ -15,6 +15,7 @@ import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '.
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/widgets/arc-gauge/geometry'
 import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
+import GaugeRangeSection from './GaugeRangeSection'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
@@ -186,6 +187,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
       </div>
+      <GaugeRangeSection widget={widget} updateWidgetData={updateWidgetData} />
 
       <FontSection
         widget={widget}
