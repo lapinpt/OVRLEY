@@ -27,6 +27,7 @@ use crate::encode::composite::CompositeRenderPlan;
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
 use crate::error::{CoreError, CoreResult};
 use crate::render::FrameSize;
+use crate::normalize::ValidatedVideoTransform;
 
 use super::composite_filters::{
     composite_filter_complex, composite_overlay_thread_queue_size, cuda_display_metadata_filter,
@@ -97,6 +98,7 @@ pub fn build_composite_ffmpeg_settings(
     frame_size: FrameSize,
     include_audio: bool,
     source_rotation_degrees: Option<i32>,
+    video_transform: Option<ValidatedVideoTransform>,
 ) -> CoreResult<CompositeFfmpegSettings> {
     let FrameSize { width, height } = frame_size;
     // Establish one canonical rotation value before profile selection and reuse
@@ -142,6 +144,19 @@ pub fn build_composite_ffmpeg_settings(
     }
 
     let filter_stack_kind = selected_profile.codec_id.metadata().filter_stack_kind;
+    if video_transform.is_some()
+        && matches!(
+            filter_stack_kind,
+            CompositeFilterStackKind::CudaOverlay
+                | CompositeFilterStackKind::QsvFullOverlay
+                | CompositeFilterStackKind::VaapiOverlay
+        )
+    {
+        return Err(CoreError::Encode(format!(
+            "Composite profile {} does not yet support Video Transform crop; choose its CPU-filter encoder profile",
+            selected_profile.codec_id.metadata().profile_name
+        )));
+    }
     let qsv_full_overlay = matches!(filter_stack_kind, CompositeFilterStackKind::QsvFullOverlay);
     let qsv_overlay_cpu_rotation_filter =
         qsv_overlay_cpu_rotation_filter(source_rotation_degrees, filter_stack_kind);
@@ -206,6 +221,7 @@ pub fn build_composite_ffmpeg_settings(
         source_rotation_degrees,
         source_rotation_filter,
         qsv_overlay_cpu_rotation_filter,
+        video_transform,
     )?;
     if include_audio {
         filter_complex.push_str(&format!(
@@ -318,6 +334,7 @@ mod tests {
                 },
                 true,
                 Some(90),
+                None,
             )
             .unwrap();
 

@@ -100,7 +100,7 @@ pub fn derive_fixture_composite_plan(
     config.scene.composite_widget_update_rate = Some(update_rate);
     let mut scene = ovrley_core::normalize::validate_scene_config(config.scene).unwrap();
     let render = derive_composite_render_plan(&mut scene, None).unwrap();
-    derive_composite_pipeline_plan(&paths, &scene, render, true, None).unwrap()
+    derive_composite_pipeline_plan(&paths, &scene, render, true, None, None).unwrap()
 }
 
 /// Renders the shared composite fixture and returns the output details.

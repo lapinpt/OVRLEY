@@ -33,7 +33,7 @@ use raw::RenderConfig;
 pub use raw::{
     find_plot_value, parse_config_json, parse_config_value, parse_template_json,
     parse_template_value, BackdropConfig, CoursePlotConfig, ElevationPlotConfig,
-    HeadingWidgetConfig, LabelConfig, SceneConfig, ValueConfig, TEMPLATE_FILE_FORMAT,
+    CropRectConfig, HeadingWidgetConfig, LabelConfig, SceneConfig, ValueConfig, VideoTransformConfig, TEMPLATE_FILE_FORMAT,
     TEMPLATE_FILE_VERSION,
 };
 
@@ -63,7 +63,7 @@ pub use linear_gauge::{
     ValidatedLinearGaugeWidget,
 };
 pub use route::{validate_route_plot, ValidatedRoutePlot};
-pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig};
+pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig, ValidatedVideoTransform};
 pub use time::{validate_time_value, ValidatedTimeFormatting, ValidatedTimeValue};
 pub use value::{validate_value_widget, ValidatedValueFormatting, ValidatedValueWidget};
 

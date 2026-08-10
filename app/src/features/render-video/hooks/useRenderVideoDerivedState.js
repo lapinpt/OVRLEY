@@ -11,13 +11,7 @@
 import { useCallback, useMemo } from 'react'
 import useStore from '@/store/useStore'
 import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
-import {
-  getAccelerationValueForSettings,
-  getOutputFormatForExportCodec,
-  getVisibleAccelerationOptions,
-  isMp4Codec,
-  resolutionsMismatch,
-} from '../utils/codecUtils'
+import { getAccelerationValueForSettings, getOutputFormatForExportCodec, getVisibleAccelerationOptions, isMp4Codec } from '../utils/codecUtils'
 import { getContainerFps, getUpdateRateOptions, sanitizeIntegerFps } from '@/lib/update-rate'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
 
@@ -51,10 +45,9 @@ export default function useRenderVideoDerivedState({ settings }) {
   const selectedCodecIsMp4 = isMp4Codec(settings?.exportCodec)
   const selectedAccelerationAvailable = Boolean(selectedAccelerationOptions.find((option) => option.value === selectedAccelerationValue)?.available)
   const selectedExportCodecAvailable = Boolean(EXPORT_CODEC_LOOKUP[settings?.exportCodec]) && selectedAccelerationAvailable
-  const resolutionMismatch = resolutionsMismatch(config?.scene, importedVideoResolution)
+  const resolutionMismatch = false
   const renderStartDisabled =
     renderingVideo ||
-    resolutionMismatch ||
     (exportMode === 'composite' && (!selectedCodecIsMp4 || !selectedExportCodecAvailable)) ||
     (exportMode !== 'composite' && selectedCodecIsMp4)
 

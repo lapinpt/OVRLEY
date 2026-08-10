@@ -105,6 +105,7 @@ fn scene() -> ValidatedSceneConfig {
         composite_render_duration: None,
         composite_video_trim_start: None,
         composite_widget_update_rate: None,
+        video_transform: None,
     }
 }
 

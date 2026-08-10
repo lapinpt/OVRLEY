@@ -10,6 +10,7 @@ use crate::encode::fps::Fps;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
 use crate::render::FrameSize;
+use crate::normalize::ValidatedVideoTransform;
 
 const COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS: f64 = 0.25;
 
@@ -195,6 +196,7 @@ pub struct CompositePipelinePlan {
     pub frame_size: FrameSize,
     pub ffmpeg_settings: CompositeFfmpegSettings,
     pub output_path: PathBuf,
+    pub video_transform: Option<ValidatedVideoTransform>,
 }
 
 impl CompositePipelinePlan {
@@ -230,6 +232,7 @@ pub fn derive_composite_pipeline_plan(
     render: CompositeRenderPlan,
     include_audio: bool,
     source_rotation_degrees: Option<i32>,
+    video_transform: Option<ValidatedVideoTransform>,
 ) -> CoreResult<CompositePipelinePlan> {
     // —— PHASE 1: VALIDATE & DERIVE TIMING VALUES ——
     let frame_size = FrameSize {
@@ -242,6 +245,7 @@ pub fn derive_composite_pipeline_plan(
         frame_size,
         include_audio,
         source_rotation_degrees,
+        video_transform,
     )?;
     // —— PHASE 3: GENERATE OUTPUT FILENAME ——
     let output_path = paths
@@ -253,6 +257,7 @@ pub fn derive_composite_pipeline_plan(
         frame_size,
         ffmpeg_settings,
         output_path,
+        video_transform,
     })
 }
 
@@ -261,6 +266,7 @@ pub(crate) fn verify_composite_source_resolution(
     composite_video_path: &Path,
     scene_width: u32,
     scene_height: u32,
+    video_transform: Option<ValidatedVideoTransform>,
 ) -> CoreResult<(Option<i32>, bool)> {
     if !composite_video_path.is_file() {
         return Err(CoreError::Config(format!(
@@ -292,7 +298,21 @@ pub(crate) fn verify_composite_source_resolution(
         (resolution.width, resolution.height)
     };
 
-    if u64::from(scene_width) != display_width || u64::from(scene_height) != display_height {
+    if let Some(transform) = video_transform {
+        let right = u64::from(transform.crop_x) + u64::from(transform.crop_width);
+        let bottom = u64::from(transform.crop_y) + u64::from(transform.crop_height);
+        if right > display_width || bottom > display_height {
+            return Err(CoreError::Config(format!(
+                "scene.video_transform.crop {}x{}+{},{} exceeds display-oriented composite video resolution {display_width}x{display_height}",
+                transform.crop_width, transform.crop_height, transform.crop_x, transform.crop_y
+            )));
+        }
+        if scene_width % 2 != 0 || scene_height % 2 != 0 {
+            return Err(CoreError::Config(format!(
+                "composite output resolution {scene_width}x{scene_height} must be even for YUV encoding"
+            )));
+        }
+    } else if u64::from(scene_width) != display_width || u64::from(scene_height) != display_height {
         return Err(CoreError::Config(format!(
             "scene resolution {scene_width}x{scene_height} must match display-oriented composite video resolution {display_width}x{display_height} (coded {}x{}, rotation {})",
             resolution.width,

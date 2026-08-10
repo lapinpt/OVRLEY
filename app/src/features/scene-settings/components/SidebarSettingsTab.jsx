@@ -59,7 +59,9 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             videoSyncTimezoneMode={videoSyncSettings.videoSyncTimezoneMode}
             onVideoSyncTimezoneModeChange={videoSyncSettings.setVideoSyncTimezoneMode}
             videoSyncWarning={videoSyncSettings.videoSyncWarning}
-            videoResolutionMismatch={videoSyncSettings.videoResolutionMismatch}
+            scene={videoSyncSettings.scene}
+            videoTransform={videoSyncSettings.videoTransform}
+            onVideoTransformChange={handlers.updateVideoTransform}
             offsetInput={videoSyncSettings.offsetInput}
             onOffsetInputChange={videoSyncSettings.setOffsetInput}
             onOffsetBlur={handlers.handleOffsetBlur}

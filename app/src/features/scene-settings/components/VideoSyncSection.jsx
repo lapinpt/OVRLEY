@@ -43,7 +43,9 @@ export default function VideoSyncSection({
   videoSyncTimezoneMode,
   onVideoSyncTimezoneModeChange,
   videoSyncWarning,
-  videoResolutionMismatch,
+  scene,
+  videoTransform,
+  onVideoTransformChange,
   offsetInput,
   onOffsetInputChange,
   onOffsetBlur,
@@ -51,6 +53,9 @@ export default function VideoSyncSection({
   activitySummary,
   onComputeVideoSync,
 }) {
+  const sourceCrop = importedVideoResolution ? { x: 0, y: 0, width: importedVideoResolution.width, height: importedVideoResolution.height } : null
+  const crop = videoTransform?.crop ?? sourceCrop
+  const updateCrop = (key, value) => onVideoTransformChange({ crop: { ...crop, [key]: Number.parseInt(value, 10) || 0 } })
   return (
     <div className="space-y-4 pt-4">
       <div className="flex items-center gap-2 mb-2">
@@ -97,12 +102,50 @@ export default function VideoSyncSection({
           <p className="text-[0.65rem] font-semibold leading-tight">{videoSyncWarning}</p>
         </div>
       )}
-      {videoResolutionMismatch && (
-        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
-          <Bell className="h-3 w-3 shrink-0" />
-          <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
+      {sourceCrop ? (
+        <div className="space-y-2 rounded-sm border border-border/60 p-3 text-xs">
+          <div className="flex items-center justify-between">
+            <b>VIDEO TRANSFORM</b>
+            <span className="text-muted-foreground">Stretch</span>
+          </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={Boolean(videoTransform)}
+              onChange={(event) => onVideoTransformChange(event.target.checked ? { crop: sourceCrop } : null)}
+            />
+            Custom crop / output
+          </label>
+          {videoTransform ? (
+            <div className="grid grid-cols-2 gap-2">
+              {['x', 'y', 'width', 'height'].map((key) => (
+                <label key={key} className="capitalize">
+                  {key}
+                  <BlurInput className="h-8" type="number" value={crop?.[key] ?? ''} onChange={(event) => updateCrop(key, event.target.value)} />
+                </label>
+              ))}
+              <label>
+                Output width
+                <BlurInput
+                  className="h-8"
+                  type="number"
+                  value={scene?.width ?? ''}
+                  onChange={(event) => onVideoTransformChange({ crop, output_width: Number.parseInt(event.target.value, 10) || 0 })}
+                />
+              </label>
+              <label>
+                Output height
+                <BlurInput
+                  className="h-8"
+                  type="number"
+                  value={scene?.height ?? ''}
+                  onChange={(event) => onVideoTransformChange({ crop, output_height: Number.parseInt(event.target.value, 10) || 0 })}
+                />
+              </label>
+            </div>
+          ) : null}
         </div>
-      )}
+      ) : null}
       {activitySummary && (
         <div className="space-y-1">
           <div className="flex items-center justify-between pt-2">

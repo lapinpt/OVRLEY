@@ -286,7 +286,7 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     let paths = test_paths();
     let mut scene = config.scene.clone();
     let render = derive_composite_render_plan(&mut scene, None).unwrap();
-    let plan = derive_composite_pipeline_plan(&paths, &scene, render, true, None).unwrap();
+    let plan = derive_composite_pipeline_plan(&paths, &scene, render, true, None, None).unwrap();
 
     assert!(!has_argument_pair(
         &plan.ffmpeg_settings.input_0_args,

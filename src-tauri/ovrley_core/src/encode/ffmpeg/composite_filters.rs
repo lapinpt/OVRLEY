@@ -4,6 +4,7 @@ use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind}
 use crate::error::{CoreError, CoreResult};
 
 use super::composite::CompositeProfile;
+use crate::normalize::ValidatedVideoTransform;
 
 const CUDA_FRAME_ALIGNMENT: u32 = 32;
 
@@ -88,6 +89,7 @@ pub(super) fn composite_filter_complex(
     source_rotation_degrees: Option<i32>,
     source_rotation_filter: Option<&'static str>,
     qsv_overlay_cpu_rotation_filter: Option<&'static str>,
+    video_transform: Option<ValidatedVideoTransform>,
 ) -> CoreResult<String> {
     let template = profile
         .filter_complex
@@ -101,6 +103,12 @@ pub(super) fn composite_filter_complex(
     if let Some(rotation_filter) = source_rotation_filter {
         base_video_filters.push_str(rotation_filter);
         base_video_filters.push_str("sidedata=mode=delete:type=DISPLAYMATRIX,");
+    }
+    if let Some(transform) = video_transform {
+        base_video_filters.push_str(&format!(
+            "crop=w={}:h={}:x={}:y={},",
+            transform.crop_width, transform.crop_height, transform.crop_x, transform.crop_y
+        ));
     }
     let (main_width, main_height) = if matches!(
         profile.codec_id.metadata().filter_stack_kind,

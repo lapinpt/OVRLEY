@@ -52,6 +52,9 @@ pub struct SceneConfig {
     pub composite_video_trim_start: Option<f64>,
     #[serde(default, skip_serializing)]
     pub composite_widget_update_rate: Option<u32>,
+    /// Optional display-oriented source crop for composite video renders.
+    #[serde(default)]
+    pub video_transform: Option<VideoTransformConfig>,
     #[serde(default)]
     pub ffmpeg: Value,
     #[serde(default)]
@@ -78,6 +81,19 @@ pub struct SceneConfig {
     pub custom_export_range_active: Option<bool>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct VideoTransformConfig {
+    pub crop: CropRectConfig,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CropRectConfig {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 /// Static text label drawn onto the cached base layer.

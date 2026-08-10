@@ -280,6 +280,7 @@ pub fn render_composite_video(
         &render_plan.video_path,
         scene.width,
         scene.height,
+        scene.video_transform,
     )?;
     let include_audio = include_audio && source_has_audio;
     let plan = derive_composite_pipeline_plan(
@@ -288,6 +289,7 @@ pub fn render_composite_video(
         render_plan,
         include_audio,
         source_rotation_degrees,
+        scene.video_transform,
     )?;
     let task_count = usize::try_from(plan.render.overlay_frame_count).map_err(|_| {
         CoreError::Encode("Composite overlay frame count exceeds usize".to_string())
