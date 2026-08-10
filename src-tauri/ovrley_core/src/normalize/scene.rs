@@ -9,7 +9,7 @@ use super::helpers::{
     require_f32, require_finite_f64, require_non_negative_f32, require_positive_f32,
     require_positive_f64, require_positive_u32, require_u32,
 };
-use super::raw::SceneConfig;
+use super::raw::{SceneConfig, VideoTransformConfig};
 use crate::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId, TransparentCodecId};
 use crate::error::{CoreError, CoreResult};
 use serde_json::{Map, Value};
@@ -150,6 +150,28 @@ pub struct ValidatedSceneConfig {
     pub composite_render_duration: Option<f64>,
     pub composite_video_trim_start: Option<f64>,
     pub composite_widget_update_rate: Option<NonZeroU32>,
+    pub video_transform: Option<ValidatedVideoTransform>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ValidatedVideoTransform {
+    pub crop_x: u32,
+    pub crop_y: u32,
+    pub crop_width: u32,
+    pub crop_height: u32,
+}
+
+fn validate_video_transform(raw: Option<VideoTransformConfig>) -> CoreResult<Option<ValidatedVideoTransform>> {
+    raw.map(|transform| {
+        let crop = transform.crop;
+        if crop.width == 0 || crop.height == 0 {
+            return Err(CoreError::Config("scene.video_transform.crop width and height must be greater than zero".into()));
+        }
+        if crop.width % 2 != 0 || crop.height % 2 != 0 || crop.x % 2 != 0 || crop.y % 2 != 0 {
+            return Err(CoreError::Config("scene.video_transform.crop x, y, width, and height must be even for YUV composite encoding".into()));
+        }
+        Ok(ValidatedVideoTransform { crop_x: crop.x, crop_y: crop.y, crop_width: crop.width, crop_height: crop.height })
+    }).transpose()
 }
 
 /// Validates scene config, rejecting missing or out-of-range fields.
@@ -199,6 +221,7 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
     };
     let ffmpeg = validate_ffmpeg_config(raw.ffmpeg, default_codec)?;
     let custom_export_range_active = raw.custom_export_range_active;
+    let video_transform = validate_video_transform(raw.video_transform)?;
 
     Ok(ValidatedSceneConfig {
         fps,
@@ -230,5 +253,6 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         composite_render_duration: raw.composite_render_duration,
         composite_video_trim_start,
         composite_widget_update_rate,
+        video_transform,
     })
 }

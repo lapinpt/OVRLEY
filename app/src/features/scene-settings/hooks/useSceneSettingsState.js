@@ -166,9 +166,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     if (normalizedUpdateRate !== updateRate) setUpdateRate(normalizedUpdateRate)
   }, [scene?.fps, setUpdateRate, updateRate])
 
-  const videoResolutionMismatch =
-    Boolean(scene?.width && scene?.height && importedVideoResolution) &&
-    (Number(scene.width) !== Number(importedVideoResolution.width) || Number(scene.height) !== Number(importedVideoResolution.height))
+  const videoResolutionMismatch = false
 
   const sceneStyleValue = (key, fallback) => scene?.[key] ?? fallback
 
@@ -176,6 +174,19 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     let finalValue = value
     if (['width', 'height', 'x', 'y', 'start', 'end'].includes(key)) finalValue = sanitizeNumber(value)
     onConfigChange({ ...config, scene: { ...config.scene, [key]: finalValue } })
+  }
+
+  const updateVideoTransform = (videoTransform) => {
+    const { output_width, output_height, ...transform } = videoTransform || {}
+    onConfigChange({
+      ...config,
+      scene: {
+        ...config.scene,
+        ...(output_width ? { width: output_width } : {}),
+        ...(output_height ? { height: output_height } : {}),
+        video_transform: videoTransform ? transform : undefined,
+      },
+    })
   }
 
   const handleAspectRatioChange = (v) => {
@@ -240,6 +251,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     handleResolutionChange,
     handleUpdateRateChange,
     updateScene,
+    updateVideoTransform,
   }
 
   return {
@@ -269,6 +281,8 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       importedVideoFps,
       importedVideoPath,
       importedVideoResolution,
+      scene,
+      videoTransform: scene?.video_transform ?? null,
       offsetInput,
       setOffsetInput,
       setVideoSyncTimezoneMode,

@@ -12,6 +12,7 @@ import { useVideoPreview } from '@/features/video-preview'
 import { syncVideoCurrentTime } from '@/features/video-preview/utils/videoPreviewPlayback'
 import useStore from '@/store/useStore'
 import HevcPlaybackPlaceholder from './HevcPlaybackPlaceholder'
+import { fullFrameCrop, resolveVideoTransformGeometry } from '@/features/video-preview/utils/videoTransformGeometry'
 
 /**
  * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
@@ -75,7 +76,7 @@ const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
   )
 })
 
-function FrozenVideoFrame({ className, importId, second, src }) {
+function FrozenVideoFrame({ className, style, importId, second, src }) {
   const videoRef = useRef(null)
 
   useEffect(() => {
@@ -113,6 +114,7 @@ function FrozenVideoFrame({ className, importId, second, src }) {
       ref={videoRef}
       src={src}
       className={className}
+      style={style}
       preload="auto"
       playsInline
       muted
@@ -231,13 +233,20 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const videoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
+  const importedVideoResolution = useStore((state) => state.importedVideoResolution)
+  const config = useStore((state) => state.config)
   const platformOs = useStore((state) => state.platformOs)
   const { videoSrc, importId, frozenFrameSecond, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } =
     useVideoPreview(videoRef, backgroundMode === 'video')
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
-  const videoBackgroundClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
+  const crop = config?.scene?.video_transform?.crop ?? fullFrameCrop(importedVideoResolution)
+  const videoGeometry = resolveVideoTransformGeometry({ source: importedVideoResolution, crop, output: sceneSize })
+  const videoBackgroundClassName = cn('pointer-events-none absolute', isOutOfRange ? 'opacity-20' : 'opacity-100')
+  const videoStyle = videoGeometry
+    ? { width: videoGeometry.width, height: videoGeometry.height, left: videoGeometry.left, top: videoGeometry.top }
+    : undefined
 
   return (
     <div
@@ -261,19 +270,24 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
         />
       ) : null}
       {backgroundMode === 'video' && videoSrc && !hasHevcPlaybackError ? (
-        <video
-          key={importId ?? 'no-video'}
-          ref={videoRef}
-          src={videoSrc}
-          className={videoBackgroundClassName}
-          preload="metadata"
-          playsInline
-          muted={isVideoMuted}
-          onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
-        />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <video
+            key={importId ?? 'no-video'}
+            ref={videoRef}
+            src={videoSrc}
+            className={videoBackgroundClassName}
+            style={videoStyle}
+            preload="metadata"
+            playsInline
+            muted={isVideoMuted}
+            onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
+          />
+        </div>
       ) : null}
       {backgroundMode === 'video' && videoSrc && frozenFrameSecond !== null && !hasHevcPlaybackError ? (
-        <FrozenVideoFrame className={videoBackgroundClassName} importId={importId} second={frozenFrameSecond} src={videoSrc} />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <FrozenVideoFrame className={videoBackgroundClassName} style={videoStyle} importId={importId} second={frozenFrameSecond} src={videoSrc} />
+        </div>
       ) : null}
       {backgroundMode === 'image' && backgroundImageSrc ? (
         <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />

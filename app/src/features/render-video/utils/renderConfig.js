@@ -72,8 +72,10 @@ function applyCompositeSceneFields(scene, options) {
     throw new Error('Imported video sync offset must be a finite number.')
   }
 
-  scene.width = displayWidth
-  scene.height = displayHeight
+  if (!scene.video_transform) {
+    scene.width = displayWidth
+    scene.height = displayHeight
+  }
   scene.composite_video_path = importedVideoPath
   scene.composite_bitrate = formatCompositeBitrate(exportBitrate)
   scene.composite_sync_offset = videoSyncOffsetSeconds
