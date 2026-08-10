@@ -8,11 +8,13 @@
 use super::catalog::CompositeCodecId;
 use super::composite::CompositeProfile;
 
-const SOFTWARE_H264_FILTER: &str = "[0:v]{base_video_filters}scale=w={width}:h={height}[base];\
+const SOFTWARE_H264_FILTER: &str =
+    "[0:v]{base_video_filters}scale=w={width}:h={height}{output_sar_filter}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]";
 
-const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}scale=w={width}:h={height}[base];\
+const SOFTWARE_HEVC_FILTER: &str =
+    "[0:v]{base_video_filters}scale=w={width}:h={height}{output_sar_filter}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1[out]";
 
@@ -23,7 +25,8 @@ const VAAPI_FILTER: &str =
 
 const AMF_D3D11_INPUT_ARGS: &[&str] = &["-init_hw_device", "d3d11va=dx", "-filter_hw_device", "dx"];
 
-const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}scale=w={width}:h={height}[base];\
+const AMF_D3D11_FILTER: &str =
+    "[0:v]{base_video_filters}scale=w={width}:h={height}{output_sar_filter}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
 

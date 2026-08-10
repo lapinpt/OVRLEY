@@ -132,6 +132,43 @@ fn render_plan(
     derive_composite_render_plan(&mut scene, None).unwrap()
 }
 
+fn settings_with_stretch_transform(codec: &str) -> CompositeFfmpegSettings {
+    let mut scene: SceneConfig =
+        serde_json::from_value(common::seam::explicit_scene_json()).unwrap();
+    scene.width = Some(1000);
+    scene.height = Some(980);
+    scene.ffmpeg = json!({"codec": codec});
+    scene.composite_video_path = Some("test.mp4".to_string());
+    scene.composite_bitrate = Some("60M".to_string());
+    scene.composite_sync_offset = Some(0.0);
+    scene.composite_video_fps_num = Some(50);
+    scene.composite_video_fps_den = Some(1);
+    scene.composite_video_duration = Some(10.0);
+    scene.composite_render_duration = Some(10.0);
+    scene.composite_video_trim_start = Some(0.0);
+    scene.composite_widget_update_rate = Some(1);
+    scene.video_transform = Some(
+        serde_json::from_value(json!({
+            "crop": { "x": 100, "y": 100, "width": 2388, "height": 1312 }
+        }))
+        .unwrap(),
+    );
+    let mut scene = validate_scene_config(scene).unwrap();
+    let transform = scene.video_transform;
+    let render = derive_composite_render_plan(&mut scene, None).unwrap();
+    build_composite_ffmpeg_settings(
+        &render,
+        FrameSize {
+            width: 1000,
+            height: 980,
+        },
+        true,
+        None,
+        transform,
+    )
+    .unwrap()
+}
+
 #[test]
 fn test_2_1_builds_command_for_29_97_fps_source_without_rounding() {
     let built = settings(
@@ -364,6 +401,21 @@ fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
     assert_argument_pair(&built.output_args, "-r", "60000/1001");
     assert!(built.filter_complex.contains("overlay=0:0"));
     assert!(!built.filter_complex.contains("overlay_cuda"));
+}
+
+#[test]
+fn video_transform_stretches_crop_to_square_pixel_output_for_software_and_nvenc() {
+    for codec in ["libx264", "libx265", "h264_nvenc", "hevc_nvenc"] {
+        let built = settings_with_stretch_transform(codec);
+        assert!(built
+            .filter_complex
+            .contains("crop=w=2388:h=1312:x=100:y=100,"));
+        assert!(built
+            .filter_complex
+            .contains("scale=w=1000:h=980,setsar=1[base]"));
+        assert!(!built.filter_complex.contains("force_original_aspect_ratio"));
+        assert!(!built.filter_complex.contains("pad="));
+    }
 }
 
 #[test]

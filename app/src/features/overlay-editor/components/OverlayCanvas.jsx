@@ -245,7 +245,19 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const videoGeometry = resolveVideoTransformGeometry({ source: importedVideoResolution, crop, output: sceneSize })
   const videoBackgroundClassName = cn('pointer-events-none absolute', isOutOfRange ? 'opacity-20' : 'opacity-100')
   const videoStyle = videoGeometry
-    ? { width: videoGeometry.width, height: videoGeometry.height, left: videoGeometry.left, top: videoGeometry.top }
+    ? {
+        width: videoGeometry.width,
+        height: videoGeometry.height,
+        left: videoGeometry.left,
+        top: videoGeometry.top,
+        // Tailwind's base reset constrains `video` to max-width: 100% and
+        // height: auto. A transformed source deliberately exceeds the canvas
+        // before the overflow wrapper crops it, so preserve the explicit
+        // non-uniform geometry and make STRETCH unambiguous to the media view.
+        maxWidth: 'none',
+        maxHeight: 'none',
+        objectFit: 'fill',
+      }
     : undefined
 
   return (
