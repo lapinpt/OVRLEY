@@ -1,0 +1,75 @@
+name: OVRLEY Windows Test Build
+
+on:
+  push:
+    branches:
+      - feature/manual-gauge-range
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows portable test artifact
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout selected branch or ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate shared packaging resources
+        run: pnpm prepare:packaging
+
+      - name: Build Tauri application without release bundles
+        run: pnpm tauri build --no-bundle
+
+      - name: Create and validate portable test ZIP
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archiveName = 'OVRLEY-manual-gauge-range-windows-test.zip'
+          $nativeBinary = Get-Item -LiteralPath 'src-tauri\target\release\app.exe'
+          if ($nativeBinary.Length -le 0) { throw 'The compiled Windows executable is missing or empty.' }
+
+          node scripts/package-portable.mjs --archive-name $archiveName
+          $portablePath = Join-Path $PWD "dist-portable\$archiveName"
+          if (-not (Test-Path -LiteralPath $portablePath)) { throw 'Portable ZIP was not produced.' }
+
+          $extractDirectory = Join-Path $env:RUNNER_TEMP 'ovrley-portable-test-check'
+          Expand-Archive -LiteralPath $portablePath -DestinationPath $extractDirectory -Force
+          $portableRoot = Join-Path $extractDirectory 'OVRLEY'
+          foreach ($requiredPath in @('OVRLEY.exe', '.ovrley-portable', 'fonts', 'templates', 'vendor\ffmpeg\bin\ffmpeg.exe', 'vendor\ffmpeg\bin\ffprobe.exe', 'THIRD_PARTY_NOTICES.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $portableRoot $requiredPath))) { throw "Portable ZIP is missing $requiredPath." }
+          }
+
+          $portableHash = (Get-FileHash -LiteralPath (Join-Path $portableRoot 'OVRLEY.exe')).Hash
+          $nativeHash = (Get-FileHash -LiteralPath $nativeBinary.FullName).Hash
+          if ($portableHash -ne $nativeHash) { throw 'Portable executable does not match compiled app.exe.' }
+
+      - name: Upload Windows portable test artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: OVRLEY-manual-gauge-range-windows-test
+          path: dist-portable/OVRLEY-manual-gauge-range-windows-test.zip
+          if-no-files-found: error
