@@ -6,8 +6,15 @@ import {
   getLinearGaugeLayout,
 } from '@/features/widget-preview/widgets/linear-gauge/geometry'
 import { formatGaugeBoundaryLabel } from '@/features/widget-preview/shared/gaugeLabelFormat'
+import { gaugeRangeValueToCanonical, gaugeRangeValueToDisplay } from '@/features/widget-preview/shared/gaugeMetricRange'
 
 describe('linearGaugeGeometry', () => {
+  test('converts a manual speed range between display and canonical units', () => {
+    expect(gaugeRangeValueToCanonical('speed', 180, 'kmh')).toBeCloseTo(50)
+    expect(gaugeRangeValueToDisplay('speed', 50, 'kmh')).toBeCloseTo(180)
+    expect(gaugeRangeValueToCanonical('speed', 60, 'mph')).toBeCloseTo(26.8224, 3)
+  })
+
   test('fill percentage clamps values into the configured range', () => {
     expect(getFillPercentage(50, 0, 100)).toBe(0.5)
     expect(getFillPercentage(-10, 0, 100)).toBe(0)
@@ -68,6 +75,14 @@ describe('linearGaugeGeometry', () => {
   test('range derives from activity values and falls back to preview placeholder', () => {
     expect(getLinearGaugeRange([10, null, 30, 50])).toEqual({ min: 10, max: 50 })
     expect(getLinearGaugeRange([])).toEqual({ min: 0, max: 100 })
+  })
+
+  test('manual range overrides semantic and observed values', () => {
+    expect(getLinearGaugeRange([0, 5567], 'rpm', { min: 0, max: 9500 })).toEqual({ min: 0, max: 9500 })
+    expect(
+      getLinearGaugeLayout({ value: 4750, values: [0, 5567], metric: 'rpm', gaugeRange: { min: 0, max: 9500 }, width: 200, height: 40 }).fill,
+    ).toBe(0.5)
+    expect(getLinearGaugeRange([8, 92], 'throttle_position')).toEqual({ min: 0, max: 100 })
   })
 
   test('linear layout uses 50 percent placeholder fill without activity values', () => {

@@ -127,6 +127,7 @@ pub fn validate_time_value(
             formatting: ValidatedValueFormatting::DecimalPlaces { decimals: 0 },
             hours_offset: Some(hours_offset),
             format: None,
+            gauge_range: None,
         },
         hours_offset,
         formatting,

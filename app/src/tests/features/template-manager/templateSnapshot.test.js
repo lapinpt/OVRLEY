@@ -171,6 +171,25 @@ describe('template snapshot standard metric schema', () => {
     expect(normalized.values[0]).not.toHaveProperty('temperature_unit')
   })
 
+  test('persists an optional canonical manual gauge range', () => {
+    const normalized = normalizeTemplateConfig({
+      scene: {},
+      labels: [],
+      values: [
+        {
+          value: 'rpm',
+          x: 10,
+          y: 20,
+          gauge_range: { min: 0, max: 9500 },
+        },
+      ],
+      plots: [],
+    })
+
+    expect(normalized.values[0].gauge_range).toEqual({ min: 0, max: 9500 })
+    expect(normalizeTemplateConfig(normalized).values[0].gauge_range).toEqual({ min: 0, max: 9500 })
+  })
+
   test('does not persist boolean display_unit defaults for widgets without a string unit', () => {
     const state = createTemplateState({
       config: {

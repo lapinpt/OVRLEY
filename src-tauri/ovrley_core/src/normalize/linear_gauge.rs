@@ -6,6 +6,7 @@
 
 use super::helpers::{require_bool, require_f32, require_string};
 use super::raw::ValueConfig;
+use super::value::{validate_gauge_range, ValidatedGaugeRange};
 use super::{resolve_bar_style_geometry, track_corner_radius_max, ResolvedBarGeometry};
 use crate::error::{CoreError, CoreResult};
 use crate::standard_metrics::is_standard_metric;
@@ -53,6 +54,7 @@ pub struct ValidatedLinearGaugeWidget {
     pub min_max_label_font_size: f32,
     pub min_max_label_position: ValidatedLinearGaugeLabelPosition,
     pub min_max_label_color: String,
+    pub gauge_range: Option<ValidatedGaugeRange>,
 }
 
 /// Validates a raw value config as a linear gauge widget.
@@ -64,6 +66,7 @@ pub fn validate_linear_gauge(
     index: usize,
 ) -> CoreResult<ValidatedLinearGaugeWidget> {
     let p = |f: &str| format!("values[{index}].{f}");
+    let gauge_range = validate_gauge_range(value.gauge_range.clone(), &p("gauge_range"))?;
 
     if !is_standard_metric(value.value) {
         return Err(CoreError::Config(format!(
@@ -206,5 +209,6 @@ pub fn validate_linear_gauge(
         )?,
         min_max_label_position,
         min_max_label_color: require_string(value.min_max_label_color, &p("min_max_label_color"))?,
+        gauge_range,
     })
 }

@@ -84,7 +84,11 @@ pub fn prepare_arc_gauge_cache(
                 track_border_thickness,
             ),
         };
-        let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
+        let (min_value, max_value) = metric_range(
+            &dense_activity.series,
+            gauge.metric,
+            gauge.inner_value.gauge_range,
+        );
         let text_style = validated_value_style(&gauge.inner_value, scene, scale);
         let unit_parts = format_validated_metric_parts(&gauge.inner_value, dense_activity, 0)
             .expect("validated arc gauge metric must have a formatter");

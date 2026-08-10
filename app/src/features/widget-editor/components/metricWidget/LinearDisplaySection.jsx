@@ -7,6 +7,7 @@ import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
+import GaugeRangeSection from './GaugeRangeSection'
 
 const ORIENTATION_OPTIONS = [
   { value: 'horizontal', label: 'Horizontal' },
@@ -178,6 +179,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
       </div>
+      <GaugeRangeSection widget={widget} updateWidgetData={updateWidgetData} />
 
       <div className="space-y-4">
         <div className="flex flex-row items-center gap-3">

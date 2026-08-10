@@ -26,6 +26,24 @@ describe('arcGaugeLayout', () => {
     expect(layout).toMatchObject({ centerX: 80, centerY: 80, radius: 72, startAngle: 180, endAngle: 360, sweepAngle: 180 })
   })
 
+  test('uses a widget manual range for arc and corner gauges', () => {
+    const data = {
+      width: 160,
+      height: 160,
+      arc_angle: 180,
+      track_thickness: 12,
+      track_border_thickness: 2,
+      value: 'rpm',
+      gauge_range: { min: 0, max: 9500 },
+    }
+    expect(getArcGaugeLayout(data, 4750, [0, 5567])).toMatchObject({ min: 0, max: 9500, fill: 0.5 })
+    expect(getCornerGaugeLayout({ ...data, corner_orientation: 'bottom-left', track_corner_radius: 0 }, 4750, [0, 5567])).toMatchObject({
+      min: 0,
+      max: 9500,
+      fill: 0.5,
+    })
+  })
+
   test('places each track opposite its gauge corner and reverses bottom-left fill', () => {
     expect(getCornerGaugeAngles('bottom-left')).toEqual({ startAngle: 0, endAngle: -90, sweepAngle: -90 })
     expect(getCornerGaugeAngles('bottom-right')).toEqual({ startAngle: 180, endAngle: 270, sweepAngle: 90 })

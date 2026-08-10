@@ -367,6 +367,7 @@ mod tests {
             formatting: crate::normalize::ValidatedValueFormatting::DecimalPlaces { decimals: 0 },
             hours_offset: None,
             format: None,
+            gauge_range: None,
         };
 
         assert!(

@@ -65,7 +65,7 @@ export const BACKDROP_SHARED_KEYS = [
 ]
 
 /** Keys preserved when normalizing a metric value widget. */
-export const VALUE_SHARED_KEYS = [...Object.keys(TEXT_DEFAULTS), 'id', 'value', 'display_variants']
+export const VALUE_SHARED_KEYS = [...Object.keys(TEXT_DEFAULTS), 'id', 'value', 'gauge_range', 'display_variants']
 
 /** Flat fields owned by the lap timer display contract. */
 export const LAP_TIMER_KEYS = [...Object.keys(DISPLAY_TYPE_DEFINITIONS.lap_timer.defaults), ...DISPLAY_TYPE_DEFINITIONS.lap_timer.configFields]

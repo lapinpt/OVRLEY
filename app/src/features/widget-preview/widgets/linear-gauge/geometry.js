@@ -3,6 +3,7 @@
 import { getTranslatedTrackCapPath, getTranslatedTrackCapReveal } from '../../shared/trackPathGeometry'
 import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { measurePreviewText } from '../../shared/textMeasurement'
+import { resolveGaugeRange } from '../../shared/gaugeMetricRange'
 
 const LINEAR_GAUGE_LABEL_GAP_PX = 8
 
@@ -118,15 +119,8 @@ export function getLinearGaugeLabelLayout({ data, labelFontFamily, minLabel, max
  * @param {number[]} values - Array of numeric values.
  * @returns {{ min: number, max: number }} The value range.
  */
-export function getLinearGaugeRange(values) {
-  const finiteValues = []
-  for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) finiteValues.push(value)
-  }
-  if (finiteValues.length === 0) return { min: 0, max: 100 }
-  const min = Math.min(...finiteValues)
-  const max = Math.max(...finiteValues)
-  return max > min ? { min, max } : { min: 0, max: 100 }
+export function getLinearGaugeRange(values, metric, manualRange) {
+  return resolveGaugeRange(values, metric, manualRange)
 }
 
 /**
@@ -142,8 +136,8 @@ export function getLinearGaugeRange(values) {
  * @param {number} [params.borderThickness=0] - Border inset.
  * @returns {{ min: number, max: number, fill: number, innerTrackRect: object, fillRect: object }}
  */
-export function getLinearGaugeLayout({ value, values, width, height, orientation = 'horizontal', borderThickness = 0 }) {
-  const range = getLinearGaugeRange(values)
+export function getLinearGaugeLayout({ value, values, metric, gaugeRange, width, height, orientation = 'horizontal', borderThickness = 0 }) {
+  const range = getLinearGaugeRange(values, metric, gaugeRange)
   const hasValue = typeof value === 'number' && Number.isFinite(value)
   const fill = hasValue ? getFillPercentage(value, range.min, range.max) : 0.5
   const innerTrackRect = getLinearInsetRect({ width, height, borderThickness })
