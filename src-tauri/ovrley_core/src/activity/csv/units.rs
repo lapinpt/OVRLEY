@@ -37,6 +37,8 @@ pub(super) enum Unit {
     Percent,
     /// Revolutions per minute.
     RevolutionsPerMinute,
+    /// Degrees Celsius.
+    Celsius,
     /// Mechanical power in watts.
     Watts,
     /// Mechanical power in kilowatts.
@@ -92,6 +94,7 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "s" | "sec" | "second" | "seconds" => Unit::Seconds,
         "ms" | "millisecond" | "milliseconds" => Unit::Milliseconds,
         "deg" | "degree" | "degrees" | "°" => Unit::Degrees,
+        "c" | "°c" | "celsius" => Unit::Celsius,
         "m/s" | "mps" => Unit::MetresPerSecond,
         "km/h" | "kmh" | "kph" => Unit::KilometresPerHour,
         "mph" | "mi/h" => Unit::MilesPerHour,
@@ -203,6 +206,7 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
             matches!(unit, Unit::G)
         }
         Metric::Rpm => matches!(unit, Unit::RevolutionsPerMinute),
+        Metric::Temperature => matches!(unit, Unit::Celsius),
         Metric::EnginePower => {
             matches!(
                 unit,
@@ -239,6 +243,7 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         | Unit::G
         | Unit::Percent
         | Unit::RevolutionsPerMinute
+        | Unit::Celsius
         | Unit::Watts
         | Unit::NewtonMetres
         | Unit::Raw => value,
@@ -258,6 +263,7 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::Heading => Unit::Degrees,
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
         Metric::Rpm => Unit::RevolutionsPerMinute,
+        Metric::Temperature => Unit::Celsius,
         Metric::EnginePower => Unit::Watts,
         Metric::Torque => Unit::NewtonMetres,
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,

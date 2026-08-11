@@ -302,6 +302,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(AccelerationKind::Semantic),
         ),
         "rpm" | "engine rpm" => (Metric::Rpm, SourcePriority::Direct, None, None, None),
+        "temperature" | "coolant temperature" | "engine coolant temperature" => (
+            Metric::Temperature,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "power"
         | "estimated power"
         | "engine kw (at the wheels)"

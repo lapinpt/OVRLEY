@@ -267,6 +267,7 @@ pub(super) fn build_activity_columns(
         heading: preserve_heading_gaps,
     };
     let (rpm, _) = series(Metric::Rpm);
+    let (temperature, _) = series(Metric::Temperature);
     let (engine_power, _) = series(Metric::EnginePower);
     let (torque, _) = series(Metric::Torque);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
@@ -368,7 +369,7 @@ pub(super) fn build_activity_columns(
         cadence: empty(),
         power: empty(),
         engine_power,
-        temperature: empty(),
+        temperature,
         calories: empty(),
         gradient: empty(),
         pace: empty(),

@@ -1251,6 +1251,25 @@ fn vehicle_power_populates_engine_power_without_cycling_calories() {
 }
 
 #[test]
+fn vehicle_temperature_aliases_populate_canonical_celsius_without_affecting_engine_power() {
+    for header in [
+        "Temperature (C)",
+        "Temperature (°C)",
+        "Temperature (celsius)",
+        "coolant temperature (C)",
+        "engine coolant temperature (C)",
+    ] {
+        let csv = format!("Time,{header},Estimated Power (kW)\n0,-4.5,12\n1,,13\n");
+        let activity = parse_csv_activity_reader(Cursor::new(csv), "vehicle-temperature.csv")
+            .unwrap()
+            .parsed_activity;
+
+        assert_eq!(activity.temperature, vec![Some(-4.5), None], "{header}");
+        assert_eq!(activity.engine_power, vec![Some(12_000.0), Some(13_000.0)]);
+    }
+}
+
+#[test]
 fn vehicle_power_aliases_and_units_convert_to_engine_power() {
     let estimated = "Time,Estimated Power (kW)\n0,10\n1,5\n";
     let cv = "Time,Power (CV)\n0,20\n1,10\n";
