@@ -1258,6 +1258,7 @@ fn vehicle_temperature_aliases_populate_canonical_celsius_without_affecting_engi
         "Temperature (celsius)",
         "coolant temperature (C)",
         "engine coolant temperature (C)",
+        "Coolant temperature (.C) *obd",
     ] {
         let csv = format!("Time,{header},Estimated Power (kW)\n0,-4.5,12\n1,,13\n");
         let activity = parse_csv_activity_reader(Cursor::new(csv), "vehicle-temperature.csv")

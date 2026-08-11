@@ -94,7 +94,7 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "s" | "sec" | "second" | "seconds" => Unit::Seconds,
         "ms" | "millisecond" | "milliseconds" => Unit::Milliseconds,
         "deg" | "degree" | "degrees" | "°" => Unit::Degrees,
-        "c" | "°c" | "celsius" => Unit::Celsius,
+        "c" | ".c" | "°c" | "celsius" => Unit::Celsius,
         "m/s" | "mps" => Unit::MetresPerSecond,
         "km/h" | "kmh" | "kph" => Unit::KilometresPerHour,
         "mph" | "mi/h" => Unit::MilesPerHour,
