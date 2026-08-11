@@ -45,6 +45,8 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByText('Gear')).toBeInTheDocument()
     expect(screen.getByText('V. Osc.')).toBeInTheDocument()
     expect(screen.getByText('Core T.')).toBeInTheDocument()
+    expect(screen.getByText('Engine Power')).toBeInTheDocument()
+    expect(screen.getByText('Engine Temp.')).toBeInTheDocument()
   })
 
   test('clicking a metric display type calls onAddWidget with the correct type and display label', async () => {

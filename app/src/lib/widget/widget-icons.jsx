@@ -144,6 +144,18 @@ export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradien
     })),
   }))
   .concat({
+    type: 'temperature',
+    icon: TYPE_ICONS.temperature,
+    label: 'Engine Temp.',
+    drawerCategory: 'motosports',
+    options: getWidgetDisplayTypes('temperature').map((value) => ({
+      value,
+      label: DISPLAY_TYPE_LABELS[value] ?? value,
+      icon: DISPLAY_TYPE_ICONS[value],
+      selection: { displayType: value },
+    })),
+  })
+  .concat({
     type: 'lap_timer',
     icon: Timer,
     label: DISPLAY_TYPE_LABELS.lap_timer,
@@ -160,6 +172,7 @@ const NON_METRIC_CATEGORIES = {
 }
 
 function getWidgetCategory(type) {
+  if (type === 'engine_power') return 'motosports'
   if (type in NON_METRIC_CATEGORIES) return NON_METRIC_CATEGORIES[type]
   return getStandardMetricDefinition(type)?.category || 'other'
 }
@@ -169,7 +182,7 @@ const CATEGORY_ORDER = ['general', 'cycling', 'running', 'motosports', 'camera',
 export const GROUPED_QUICKMENU_ITEMS = (() => {
   const groups = {}
   for (const item of QUICKMENU_ITEMS) {
-    const cat = getWidgetCategory(item.type)
+    const cat = item.drawerCategory ?? getWidgetCategory(item.type)
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(item)
   }
