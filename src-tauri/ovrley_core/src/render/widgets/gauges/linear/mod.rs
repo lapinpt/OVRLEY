@@ -18,7 +18,7 @@ pub use geometry::{bar_fill_rect, bordered_bar_fill_rect};
 use self::labels::label_padding;
 use self::layer::{draw_continuous_fill, draw_segmented_fill, draw_static_layer};
 use super::metric::{fill_percentage, metric_range, metric_values};
-use crate::activity::schema::DenseActivityReport;
+use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedLinearGaugeWidget, ValidatedSceneConfig};
@@ -36,6 +36,7 @@ use std::path::PathBuf;
 /// Prepares the cached static layer and per-frame fill states.
 pub fn prepare_linear_gauge_cache(
     gauge: &ValidatedLinearGaugeWidget,
+    activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     scene: &ValidatedSceneConfig,
     scale: f32,
@@ -45,7 +46,7 @@ pub fn prepare_linear_gauge_cache(
     prepare_profiler.measure("gauge.linear.prepare", || {
         let scaled_width = ((gauge.width as f32) * scale).round().max(1.0) as u32;
         let scaled_height = ((gauge.height as f32) * scale).round().max(1.0) as u32;
-        let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
+        let (min_value, max_value) = metric_range(activity, gauge.metric);
         let shadow = normalize_shadow_style_validated(
             &scene.shadow_color,
             scene.shadow_strength,

@@ -20,7 +20,7 @@ mod segment;
 use self::inner_widget::{inner_widget_layout, unit_font_size, DEFAULT_GAP_PX, LINE_HEIGHT};
 use self::layer::{draw_fill, draw_static_layer};
 use super::metric::{fill_percentage, format_gauge_label, metric_range, metric_values};
-use crate::activity::schema::DenseActivityReport;
+use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
@@ -56,6 +56,7 @@ const ARC_LABEL_GAP_PX: f32 = 8.0;
 /// Prepares a cached static layer and per-frame states for an arc gauge.
 pub fn prepare_arc_gauge_cache(
     gauge: &ValidatedArcGaugeWidget,
+    activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     scene: &ValidatedSceneConfig,
     scale: f32,
@@ -84,7 +85,7 @@ pub fn prepare_arc_gauge_cache(
                 track_border_thickness,
             ),
         };
-        let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
+        let (min_value, max_value) = metric_range(activity, gauge.metric);
         let text_style = validated_value_style(&gauge.inner_value, scene, scale);
         let unit_parts = format_validated_metric_parts(&gauge.inner_value, dense_activity, 0)
             .expect("validated arc gauge metric must have a formatter");

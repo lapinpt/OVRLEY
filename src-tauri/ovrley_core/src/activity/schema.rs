@@ -748,6 +748,57 @@ impl DenseSeriesReport {
     }
 }
 
+impl ParsedActivity {
+    /// Returns the canonical numeric source series for a metric.
+    ///
+    /// Gauge domains use these complete-session observations so a scene trim
+    /// cannot silently shrink a gauge's scale.
+    pub(crate) fn numeric_series_for(&self, metric: MetricKind) -> Option<&[Option<f64>]> {
+        match metric {
+            MetricKind::Speed => Some(&self.speed),
+            MetricKind::Distance => Some(&self.distance),
+            MetricKind::Elevation => Some(&self.elevation),
+            MetricKind::Gradient => Some(&self.gradient),
+            MetricKind::Heartrate => Some(&self.heartrate),
+            MetricKind::Cadence => Some(&self.cadence),
+            MetricKind::Power => Some(&self.power),
+            MetricKind::EnginePower => Some(&self.engine_power),
+            MetricKind::Temperature => Some(&self.temperature),
+            MetricKind::Calories => Some(&self.calories),
+            MetricKind::Pace => Some(&self.pace),
+            MetricKind::GForce => Some(&self.g_force),
+            MetricKind::AirPressure => Some(&self.air_pressure),
+            MetricKind::GroundContactTime => Some(&self.ground_contact_time),
+            MetricKind::LeftRightBalance => Some(&self.left_right_balance),
+            MetricKind::StrideLength => Some(&self.stride_length),
+            MetricKind::StrokeRate => Some(&self.stroke_rate),
+            MetricKind::Torque => Some(&self.torque),
+            MetricKind::VerticalSpeed => Some(&self.vertical_speed),
+            MetricKind::VerticalRatio => Some(&self.vertical_ratio),
+            MetricKind::VerticalOscillation => Some(&self.vertical_oscillation),
+            MetricKind::CoreTemperature => Some(&self.core_temperature),
+            MetricKind::Heading => Some(&self.heading),
+            MetricKind::Altitude => Some(preferred_elevation_series(
+                &self.barometric_altitude,
+                &self.elevation,
+            )),
+            MetricKind::Iso => Some(&self.iso),
+            MetricKind::Aperture => Some(&self.aperture),
+            MetricKind::ShutterSpeed => Some(&self.shutter_speed),
+            MetricKind::FocalLength => Some(&self.focal_length),
+            MetricKind::Ev => Some(&self.ev),
+            MetricKind::ColorTemperature => Some(&self.color_temperature),
+            MetricKind::Rpm => Some(&self.rpm),
+            MetricKind::ThrottlePosition => Some(&self.throttle_position),
+            MetricKind::BrakePosition => Some(&self.brake_position),
+            MetricKind::LeanAngle => Some(&self.lean_angle),
+            MetricKind::DistanceToHome => Some(&self.distance_to_home),
+            MetricKind::TotalAscent => Some(&self.total_ascent),
+            MetricKind::GearPosition | MetricKind::GpsCoordinates | MetricKind::Time | MetricKind::LapTimer => None,
+        }
+    }
+}
+
 /// Activity samples after applying a scene trim but before per-frame densifying.
 ///
 /// The first elapsed value is always `0.0`, and the last is `end - start`.

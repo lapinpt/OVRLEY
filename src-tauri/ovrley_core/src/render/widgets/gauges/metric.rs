@@ -5,7 +5,7 @@
 //! fill quantization and boundary-label formatting identical across arc and
 //! linear renderers.
 
-use crate::activity::schema::DenseSeriesReport;
+use crate::activity::schema::{DenseSeriesReport, ParsedActivity};
 use crate::render::format::convert_standard_metric_value;
 use crate::types::MetricKind;
 
@@ -25,14 +25,22 @@ pub(crate) fn bar_fill_count(fill01: f32, count: u32) -> usize {
     (fill01.clamp(0.0, 1.0) * count as f32).floor() as usize
 }
 
-/// Derives the finite minimum and maximum for a metric's dense series.
+/// Derives the finite minimum and maximum for a metric's complete activity.
 ///
 /// An absent or constant series uses the documented neutral gauge range so
 /// cache preparation still has a usable scale.
-pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
+pub(crate) fn metric_range(activity: &ParsedActivity, metric: MetricKind) -> (f64, f64) {
+    if let Some(range) = semantic_gauge_range(metric) {
+        return range;
+    }
     let mut min_value = f64::INFINITY;
     let mut max_value = f64::NEG_INFINITY;
-    for value in metric_values(series, metric).iter().flatten() {
+    for value in activity
+        .numeric_series_for(metric)
+        .unwrap_or(&[])
+        .iter()
+        .flatten()
+    {
         min_value = min_value.min(*value);
         max_value = max_value.max(*value);
     }
@@ -40,6 +48,13 @@ pub(crate) fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f
         (min_value, max_value)
     } else {
         (0.0, 100.0)
+    }
+}
+
+fn semantic_gauge_range(metric: MetricKind) -> Option<(f64, f64)> {
+    match metric {
+        MetricKind::ThrottlePosition | MetricKind::BrakePosition => Some((0.0, 100.0)),
+        _ => None,
     }
 }
 
