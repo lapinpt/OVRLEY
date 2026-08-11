@@ -4,7 +4,8 @@
 //! Label formatting is intentionally omitted because it is a thin formatting
 //! expression with no meaningful branching contract.
 
-use super::super::gauges::metric::{bar_fill_count, fill_percentage, resolve_gauge_range};
+use super::super::gauges::metric::{bar_fill_count, fill_percentage, metric_range, resolve_gauge_range};
+use crate::activity::schema::ParsedActivity;
 use crate::normalize::ValidatedGaugeRange;
 use crate::MetricKind;
 
@@ -24,6 +25,17 @@ fn manual_range_overrides_semantic_and_observed_ranges() {
         resolve_gauge_range(None, MetricKind::ThrottlePosition, Some((8.0, 92.0))),
         (0.0, 100.0)
     );
+}
+
+#[test]
+fn gauge_range_uses_untrimmed_activity_observations() {
+    let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "rpm": [1200.0, 3400.0, 9000.0]
+    }))
+    .expect("minimal activity JSON must deserialize");
+
+    assert_eq!(metric_range(&activity, MetricKind::Rpm, None), (1200.0, 9000.0));
 }
 
 #[test]
